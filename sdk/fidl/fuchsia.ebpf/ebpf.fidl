@@ -28,6 +28,21 @@ type MapType = strict enum {
     LPM_TRIE = 6;
 };
 
+/// Map flags.
+type MapFlags = flexible bits : uint32 {
+    /// Memory is not pre-allocated.
+    NO_PREALLOC = 1;
+
+    /// `bpf()` syscall can read from the map, but can't write to it.
+    SYSCALL_READ_ONLY = 2;
+
+    /// `bpf()` syscall can write to the map, but can't read it.
+    SYSCALL_WRITE_ONLY = 4;
+
+    /// The map can be mapped in a Starnix process's address space.
+    MMAPABLE = 8;
+};
+
 /// Schema of an eBPF map.
 type MapSchema = struct {
     /// Map type.
@@ -41,6 +56,9 @@ type MapSchema = struct {
 
     /// Maximum number of entries in the map.
     max_entries uint32;
+
+    /// Map flags.
+    flags MapFlags;
 };
 
 /// A representation of eBPF map that can be shared between processes.

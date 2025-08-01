@@ -16,7 +16,7 @@ use crate::vfs::{
     Anon, FdFlags, FdNumber, FileObject, LookupContext, NamespaceNode, OutputBuffer,
     UserBuffersOutputBuffer,
 };
-use ebpf::{EbpfInstruction, MapSchema};
+use ebpf::{EbpfInstruction, MapFlags, MapSchema};
 use ebpf_api::{Map, MapError, MapKey};
 use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
@@ -43,7 +43,7 @@ use starnix_uapi::{
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
     bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE,
     bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
-    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY,
+    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_WRONLY,
 };
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -132,6 +132,7 @@ fn map_error_to_errno(e: MapError) -> Errno {
         MapError::EntryExists => errno!(EEXIST),
         MapError::NoMemory => errno!(ENOMEM),
         MapError::SizeLimit => errno!(E2BIG),
+        MapError::NotSupported => errno!(ENOSYS),
         MapError::InvalidVmo | MapError::Internal => errno!(EIO),
     }
 }
@@ -159,29 +160,32 @@ pub fn sys_bpf(
             let map_attr: bpf_attr__bindgen_ty_1 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_CREATE {:?}", map_attr);
             security::check_bpf_access(current_task, cmd, &map_attr, attr_size)?;
-            let schema = MapSchema {
-                map_type: map_attr.map_type,
-                key_size: map_attr.key_size,
-                value_size: map_attr.value_size,
-                max_entries: map_attr.max_entries,
-            };
 
-            let mut flags = map_attr.map_flags;
-
+            let map_type = map_attr.map_type;
+            let mut flags =
+                MapFlags::from_bits(map_attr.map_flags).ok_or_else(|| errno!(EINVAL))?;
             // To quote
             // https://cs.android.com/android/platform/superproject/+/master:system/bpf/libbpf_android/Loader.cpp;l=670;drc=28e295395471b33e662b7116378d15f1e88f0864
             // "DEVMAPs are readonly from the bpf program side's point of view, as such the kernel
             // in kernel/bpf/devmap.c dev_map_init_map() will set the flag"
-            if schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP
-                || schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH
+            if map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP
+                || map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH
             {
-                flags |= BPF_F_RDONLY_PROG;
+                flags |= MapFlags::ProgReadOnly;
             }
+
+            let schema = MapSchema {
+                map_type,
+                key_size: map_attr.key_size,
+                value_size: map_attr.value_size,
+                max_entries: map_attr.max_entries,
+                flags,
+            };
 
             let map = BpfMap::new(
                 locked,
                 current_task,
-                Map::new(schema, flags).map_err(map_error_to_errno)?,
+                Map::new(schema).map_err(map_error_to_errno)?,
                 security::bpf_map_alloc(current_task),
             );
             install_bpf_fd(locked, current_task, map)
@@ -194,6 +198,10 @@ pub fn sys_bpf(
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
+
+            if map.schema.flags.contains(MapFlags::SyscallWriteOnly) {
+                return error!(EPERM);
+            }
 
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
@@ -219,7 +227,7 @@ pub fn sys_bpf(
             // Get the frozen state and keep the lock to prevent a race.
             let frozen = map.frozen(locked);
 
-            if *frozen {
+            if *frozen || map.schema.flags.contains(MapFlags::SyscallReadOnly) {
                 return error!(EPERM);
             }
 
@@ -248,7 +256,7 @@ pub fn sys_bpf(
             // Get the frozen state and keep the lock to prevent a race.
             let frozen = map.frozen(locked);
 
-            if *frozen {
+            if *frozen || map.schema.flags.contains(MapFlags::SyscallReadOnly) {
                 return error!(EPERM);
             }
 
@@ -268,6 +276,11 @@ pub fn sys_bpf(
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
+
+            if map.schema.flags.contains(MapFlags::SyscallWriteOnly) {
+                return error!(EPERM);
+            }
+
             let key = if elem_attr.key != 0 {
                 Some(read_map_key(
                     current_task,
@@ -408,7 +421,7 @@ pub fn sys_bpf(
                     key_size: map.schema.key_size,
                     value_size: map.schema.value_size,
                     max_entries: map.schema.max_entries,
-                    map_flags: map.flags,
+                    map_flags: map.schema.flags.bits(),
                     ..Default::default()
                 }
                 .as_bytes()

@@ -174,7 +174,7 @@ fn main() {
             .maps
             .iter()
             .map(|def| {
-                Map::new(def.schema, def.flags)
+                Map::new(def.schema)
                     .unwrap_or_else(|e| exit_on_error(format!("Failed to create a map: {:?}", e)))
             })
             .collect();

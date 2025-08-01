@@ -681,7 +681,7 @@ impl<D: StrongDeviceIdentifier + DeviceIfIndex> SocketOpsFilter<D> for &EbpfMana
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ebpf::Packet;
+    use ebpf::{MapFlags, Packet};
     use ebpf_api::{AttachType, ProgramType, SKF_AD_MAX};
     use ip_test_macro::ip_test;
     use net_types::Witness;
@@ -839,6 +839,7 @@ mod tests {
             key_size: 1,
             value_size: 2,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
         let cache = Arc::new(EbpfMapCache::default());
@@ -847,7 +848,7 @@ mod tests {
         assert_eq!(num_cached(), 0);
 
         // Create a map and insert it to the cache.
-        let map1 = Map::new(schema, 0).unwrap();
+        let map1 = Map::new(schema).unwrap();
         let fidl_map = map1.share().unwrap();
         let cache_ref1 = cache.init_map(fidl_map).unwrap();
 
@@ -855,7 +856,7 @@ mod tests {
         assert_eq!(num_cached(), 1);
 
         // Import second map.
-        let map2 = Map::new(schema, 0).unwrap();
+        let map2 = Map::new(schema).unwrap();
         let fidl_map = map2.share().unwrap();
         let cache_ref2 = cache.init_map(fidl_map).unwrap();
 
@@ -911,7 +912,7 @@ mod tests {
         let maps: Vec<_> = prog
             .maps
             .iter()
-            .map(|def| ebpf_api::Map::new(def.schema, def.flags).expect("Failed to create a map"))
+            .map(|def| ebpf_api::Map::new(def.schema).expect("Failed to create a map"))
             .collect();
         let shared_maps =
             maps.iter().map(|map| map.share().expect("Failed to share a map")).collect();

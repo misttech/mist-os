@@ -9,7 +9,7 @@ use crate::bpf::syscalls::BpfTypeFormat;
 use crate::bpf::{BpfMapHandle, ProgramHandle};
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
-use crate::security::{self, PermissionFlags};
+use crate::security;
 use crate::task::{
     CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
 };
@@ -20,7 +20,7 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
-use ebpf::MapSchema;
+use ebpf::{MapFlags, MapSchema};
 use ebpf_api::{compute_map_storage_size, RINGBUF_SIGNAL};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
@@ -85,11 +85,9 @@ impl BpfHandle {
     /// Performs security-related checks when opening a BPF map.
     pub(super) fn security_check_open_fd(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         match self {
-            Self::Map(bpf_map) => security::check_bpf_map_access(
-                current_task,
-                &bpf_map,
-                PermissionFlags::from_bpf_flags(bpf_map.flags),
-            ),
+            Self::Map(bpf_map) => {
+                security::check_bpf_map_access(current_task, &bpf_map, bpf_map.schema.flags.into())
+            }
             Self::Program(program) => security::check_bpf_prog_access(current_task, &program),
             _ => Ok(()),
         }
@@ -190,6 +188,10 @@ impl FileOps for BpfHandle {
             }
 
             bpf_map_type_BPF_MAP_TYPE_ARRAY => {
+                if !schema.flags.contains(MapFlags::Mmapable) {
+                    return error!(EPERM);
+                }
+
                 let array_size = round_up_to_increment(
                     compute_map_storage_size(&schema).map_err(|_| errno!(EINVAL))?,
                     *PAGE_SIZE as usize,

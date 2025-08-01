@@ -31,6 +31,7 @@ rustc_library("ebpf") {
   deps = [
     "//src/lib/fuchsia-sync",
     "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:paste",

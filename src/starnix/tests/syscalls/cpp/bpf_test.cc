@@ -485,6 +485,50 @@ TEST_F(BpfMapTest, Map) {
   CheckMapInfo();
 }
 
+TEST_F(BpfMapTest, MapWriteOnly) {
+  auto map = CreateMap(BPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), 10, BPF_F_WRONLY);
+  uint32_t x = 0;
+  bpf_attr attr = {
+      .map_fd = (unsigned)map.get(),
+      .key = (uintptr_t)(&x),
+      .value = (uintptr_t)(&x),
+  };
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), 0) << strerror(errno);
+
+  // Lookup and GetNextKey should fail.
+  EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), -1);
+  EXPECT_EQ(errno, EPERM);
+
+  uint32_t next_key = 0;
+  attr = {
+      .map_fd = (unsigned)map.get(),
+      .key = 0,
+      .next_key = (uintptr_t)&next_key,
+  };
+  EXPECT_EQ(bpf(BPF_MAP_GET_NEXT_KEY, &attr), -1);
+  EXPECT_EQ(errno, EPERM);
+}
+
+TEST_F(BpfMapTest, MapReadOnly) {
+  auto map = CreateMap(BPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), 10, BPF_F_RDONLY);
+  uint32_t x = 0;
+  bpf_attr attr = {
+      .map_fd = (unsigned)map.get(),
+      .key = (uintptr_t)(&x),
+      .value = (uintptr_t)(&x),
+  };
+
+  // Update and Delete should fail.
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), -1);
+  EXPECT_EQ(errno, EPERM);
+
+  EXPECT_EQ(bpf(BPF_MAP_DELETE_ELEM, &attr), -1);
+  EXPECT_EQ(errno, EPERM);
+
+  // Lookups should still succeed.
+  EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), 0);
+}
+
 TEST_F(BpfMapTest, PinMap) {
   const char* pin_path = "/sys/fs/bpf/foo";
 
@@ -838,12 +882,26 @@ TEST_F(BpfMapTest, NotificationsRingBufTest) {
   EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
 }
 
+TEST_F(BpfMapTest, LpmTrieNoFlag) {
+  // LPM trie creation without `BPF_F_NO_PREALLOC` should fail.
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_type = BPF_MAP_TYPE_LPM_TRIE;
+  attr.key_size = 20;
+  attr.value_size = 4;
+  attr.max_entries = 10;
+  attr.map_flags = 0;
+  EXPECT_EQ(bpf(BPF_MAP_CREATE, &attr), -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
 TEST_F(BpfMapTest, LpmTrie) {
   struct LpmKey {
     uint32_t prefix_len;
     uint32_t data;
   };
-  fbl::unique_fd trie_fd = CreateMap(BPF_MAP_TYPE_LPM_TRIE, sizeof(LpmKey), sizeof(uint32_t), 10);
+  fbl::unique_fd trie_fd =
+      CreateMap(BPF_MAP_TYPE_LPM_TRIE, sizeof(LpmKey), sizeof(uint32_t), 10, BPF_F_NO_PREALLOC);
 
   struct KeyValue {
     LpmKey key;

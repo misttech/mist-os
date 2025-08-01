@@ -54,7 +54,7 @@
 
 use super::buffer::MapBuffer;
 use super::{MapError, MapImpl, MapKey, MapValueRef};
-use ebpf::{EbpfBufferPtr, MapSchema};
+use ebpf::{EbpfBufferPtr, MapFlags, MapSchema};
 use linux_uapi::{BPF_EXIST, BPF_NOEXIST};
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
@@ -768,6 +768,11 @@ impl LpmTrie {
             return Err(MapError::InvalidParam);
         }
 
+        // `BPF_F_NO_PREALLOC` is required for LPM Trie.
+        if !schema.flags.contains(MapFlags::NoPrealloc) {
+            return Err(MapError::InvalidParam);
+        }
+
         let layout = Layout::new(schema)?;
         let buffer = MapBuffer::new(layout.total_size(), vmo)?;
 
@@ -1059,6 +1064,7 @@ mod test {
                 key_size: std::mem::size_of::<Key>() as u32,
                 value_size: 4,
                 max_entries: 10,
+                flags: MapFlags::NoPrealloc,
             },
             None,
         )
@@ -1102,6 +1108,7 @@ mod test {
                 key_size: std::mem::size_of::<Key>() as u32,
                 value_size: 4,
                 max_entries: 10,
+                flags: MapFlags::NoPrealloc,
             },
             None,
         )
@@ -1140,6 +1147,7 @@ mod test {
                 key_size: std::mem::size_of::<Key>() as u32,
                 value_size: 4,
                 max_entries: NUM_ENTRIES.into(),
+                flags: MapFlags::NoPrealloc,
             },
             None,
         )

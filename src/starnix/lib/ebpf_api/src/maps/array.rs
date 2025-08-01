@@ -112,6 +112,7 @@ impl MapImpl for Array {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ebpf::MapFlags;
     use linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY;
 
     // Verifies that array elements are always 8-byte aligned.
@@ -122,6 +123,7 @@ mod test {
             key_size: 4,
             value_size: 5,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
         let array = Array::new(&schema, None).unwrap();
@@ -133,6 +135,7 @@ mod test {
             key_size: 4,
             value_size: 10,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
         let array = Array::new(&schema, None).unwrap();
