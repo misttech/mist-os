@@ -169,11 +169,11 @@ fn handle_one_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use std::pin::pin;
-    use wlan_common::assert_variant;
     use wlan_common::sink::UnboundedSink;
 
     // MLME owns the driver event receiver, but its lifetime is not exactly synchronized with the
@@ -196,7 +196,7 @@ mod tests {
         let mut server_fut =
             pin!(serve_wlan_fullmac_impl_ifc_request_handler(ifc_req_stream, driver_event_sink));
 
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
 
         std::mem::drop(driver_event_receiver);
 
@@ -207,10 +207,10 @@ mod tests {
         };
 
         let mut req_fut = pin!(ifc_proxy.on_scan_end(&scan_end));
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Pending,);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
 
         // check that server_fut completes the FIDL request without error
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(())),);
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(())));
     }
 }

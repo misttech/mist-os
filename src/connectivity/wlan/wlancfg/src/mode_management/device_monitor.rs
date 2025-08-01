@@ -134,6 +134,7 @@ mod tests {
     use crate::mode_management::Defect;
     use crate::regulatory_manager::REGION_CODE_LEN;
     use anyhow::Error;
+    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use futures::channel::oneshot;
     use futures::task::Poll;
@@ -141,7 +142,6 @@ mod tests {
     use ieee80211::MacAddr;
     use std::collections::HashMap;
     use std::pin::pin;
-    use wlan_common::assert_variant;
     use {
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
@@ -179,7 +179,7 @@ mod tests {
         // Add Phy 0.
         let fut = on_phy_added(&listener, 0);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 is now present
         let list_phys_fut = async move {
@@ -188,7 +188,7 @@ mod tests {
         };
         let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
-            assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
+            assert_matches!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
         assert_eq!(phys, vec![0]);
     }
@@ -208,7 +208,7 @@ mod tests {
         // Add Phy 0.
         let fut = on_phy_added(&listener, 0);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 was not added and its failure was logged.
         let phy_manager_fut = async move {
@@ -217,7 +217,7 @@ mod tests {
             assert_eq!(phy_manager.failed_phys, 1);
         };
         let mut phy_manager_fut = pin!(phy_manager_fut);
-        assert_variant!(exec.run_until_stalled(&mut phy_manager_fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut phy_manager_fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -236,7 +236,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is an AP.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -249,7 +249,7 @@ mod tests {
         send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
 
         // Nothing special should happen for the AP interface and the future should complete.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -268,7 +268,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is an AP.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -282,7 +282,7 @@ mod tests {
 
         // The future should return an error in this case since an unknown WlanMacRole is not
         // supported.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -301,7 +301,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is a mesh interface.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -314,7 +314,7 @@ mod tests {
         send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
 
         // The future should return an error in this case since mesh is not supported.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -333,7 +333,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is a client.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -346,8 +346,8 @@ mod tests {
         send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
 
         // The future should stall again while requesting a client SME proxy.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
@@ -357,7 +357,7 @@ mod tests {
         );
 
         // The future should now run to completion.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // The listener should have a client interface.
         assert!(listener.legacy_shim.get().is_ok());
@@ -379,7 +379,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is a client.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -392,8 +392,8 @@ mod tests {
         send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
 
         // The future should stall again while requesting a client SME proxy.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
@@ -403,7 +403,7 @@ mod tests {
         );
 
         // The future should now run to completion.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
 
         // The listener should not have a client interface.
         assert!(listener.legacy_shim.get().is_err());
@@ -428,7 +428,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the future should immediately return an error.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
 
         // The listener should not have a client interface.
         assert!(listener.legacy_shim.get().is_err());
@@ -449,7 +449,7 @@ mod tests {
         // Simulate an OnPhyAdded event
         let fut = handle_event(&listener, DeviceWatcherEvent::OnPhyAdded { phy_id: 0 });
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 is now present
         let list_phys_fut = async move {
@@ -458,7 +458,7 @@ mod tests {
         };
         let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
-            assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
+            assert_matches!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
         assert_eq!(phys, vec![0]);
     }
@@ -476,7 +476,7 @@ mod tests {
                 phy_manager.phys.push(0);
             };
             let mut add_phy_fut = pin!(add_phy_fut);
-            assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(()));
         }
 
         let listener = Listener::new(
@@ -489,7 +489,7 @@ mod tests {
         // Simulate an OnPhyRemoved event.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnPhyRemoved { phy_id: 0 });
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the PHY ID is no longer present
         let list_phys_fut = async move {
@@ -498,7 +498,7 @@ mod tests {
         };
         let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
-            assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
+            assert_matches!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
         assert!(phys.is_empty());
     }
@@ -516,7 +516,7 @@ mod tests {
                 iface_manager.ifaces.push(0);
             };
             let mut add_iface_fut = pin!(add_iface_fut);
-            assert_variant!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
         }
 
         // Setup the Listener to look like it has an interface.
@@ -534,7 +534,7 @@ mod tests {
         // Run the iface removal handler.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceRemoved { iface_id: 123 });
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // The IfaceRef should still have its interface.
         assert!(listener.legacy_shim.get().is_ok());
@@ -553,7 +553,7 @@ mod tests {
                 iface_manager.ifaces.push(0);
             };
             let mut add_iface_fut = pin!(add_iface_fut);
-            assert_variant!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
         }
 
         // Setup the Listener to look like it has an interface.
@@ -571,7 +571,7 @@ mod tests {
         // Run the iface removal handler.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceRemoved { iface_id: 0 });
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // The PhyManager and IfaceManager should have no reference to the interface.
         {
@@ -584,7 +584,7 @@ mod tests {
                 assert!(iface_manager.ifaces.is_empty());
             };
             let mut verify_fut = pin!(verify_fut);
-            assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
         // The IfaceRef should be empty.
@@ -607,7 +607,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // The future should stall out while performing the legacy add interface routine.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Reply to the query indicating that this is a client.
         let iface_response = Some(fidl_service::QueryIfaceResponse {
@@ -620,8 +620,8 @@ mod tests {
         send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
 
         // The future should stall again while requesting a client SME proxy.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
@@ -631,7 +631,7 @@ mod tests {
         );
 
         // The future should not run to completion
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the IfaceManager has been notified of the new interface.
         {
@@ -641,7 +641,7 @@ mod tests {
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
             let mut verify_fut = pin!(verify_fut);
-            assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
         // The IfaceRef should have also been updated.
@@ -667,7 +667,7 @@ mod tests {
         // Handle the interface addition and expect it to complete immediately.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 });
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the IfaceManager is updated.
         {
@@ -677,7 +677,7 @@ mod tests {
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
             let mut verify_fut = pin!(verify_fut);
-            assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
         // Verify that the IfaceRef was not updated.
@@ -884,7 +884,7 @@ mod tests {
         iface_info: Option<fidl_service::QueryIfaceResponse>,
     ) {
         let response = iface_info.as_ref().ok_or(zx::sys::ZX_ERR_NOT_FOUND);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(
                 fidl_service::DeviceMonitorRequest::QueryIface {

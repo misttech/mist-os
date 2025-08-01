@@ -1266,9 +1266,9 @@ pub mod test_utils {
 mod tests {
     use super::*;
     use crate::{ddk_converter, WlanTxPacketExt as _};
+    use assert_matches::assert_matches;
     use fdf::Arena;
     use ieee80211::Ssid;
-    use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211};
 
     fn make_deauth_confirm_msg() -> fidl_mlme::DeauthenticateConfirm {
@@ -1656,7 +1656,7 @@ mod tests {
             })
             .await
             .expect("error enabling beaconing");
-        assert_variant!(
+        assert_matches!(
         fake_device_state.lock().beacon_config.as_ref(),
         Some((buffer, tim_ele_offset, beacon_interval)) => {
             assert_eq!(&buffer[..], &[1, 2, 3, 4][..]);
@@ -1664,7 +1664,7 @@ mod tests {
             assert_eq!(*beacon_interval, TimeUnit(2));
         });
         fake_device.disable_beaconing().await.expect("error disabling beaconing");
-        assert_variant!(fake_device_state.lock().beacon_config.as_ref(), None);
+        assert_matches!(fake_device_state.lock().beacon_config.as_ref(), None);
     }
 
     #[fuchsia::test(allow_stalls = false)]

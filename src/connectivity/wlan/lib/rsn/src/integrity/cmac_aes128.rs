@@ -39,8 +39,8 @@ impl Algorithm for CmacAes128 {
 mod tests {
     use super::*;
     use crate::aes::AesError;
+    use assert_matches::assert_matches;
     use hex::FromHex;
-    use wlan_common::assert_variant;
 
     const K: &str = "2b7e151628aed2a6abf7158809cf4f3c";
 
@@ -91,7 +91,7 @@ mod tests {
     fn test_wrong_key_len() {
         let key = Vec::from_hex("123456").unwrap();
         let data = vec![];
-        assert_variant!(
+        assert_matches!(
             CmacAes128::new().compute(&key[..], &data[..]),
             Err(Error::Aes(AesError::KeySize(3)))
         );

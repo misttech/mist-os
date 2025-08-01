@@ -1778,6 +1778,7 @@ async fn main() {
 mod tests {
     use super::*;
     use anyhow::format_err;
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
     use fidl_fuchsia_wlan_wlanix::Nl80211Message;
     use futures::channel::mpsc;
@@ -1787,7 +1788,6 @@ mod tests {
     use ifaces::test_utils::{ClientIfaceCall, TestIfaceManager, FAKE_IFACE_RESPONSE};
     use std::pin::{pin, Pin};
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::security::wep::WepKey;
     use {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -1837,9 +1837,9 @@ mod tests {
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
         let mut get_state_fut = pin!(get_state_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -1852,26 +1852,26 @@ mod tests {
 
         let start_fut = test_helper.wifi_proxy.start();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // The chip is assumed to be powered on by default
         let get_state_fut = test_helper.wifi_proxy.get_state();
         let mut get_state_fut = pin!(get_state_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut),
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.is_started, Some(true));
         let calls = test_helper.iface_manager.calls.lock();
         assert!(!calls.is_empty());
-        assert_variant!(
+        assert_matches!(
             &calls[calls.len() - 1],
             ifaces::test_utils::IfaceManagerCall::GetPowerState(_)
         );
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
@@ -1885,28 +1885,28 @@ mod tests {
 
         let start_fut = test_helper.wifi_proxy.start();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let start_fut2 = test_helper.wifi_proxy.start();
         let mut start_fut2 = pin!(start_fut2);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
         let mut get_state_fut = pin!(get_state_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut),
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.is_started, Some(true));
         let calls = test_helper.iface_manager.calls.lock();
-        assert_variant!(calls.len(), 5);
-        assert_variant!(&calls[2], ifaces::test_utils::IfaceManagerCall::GetPowerState(_));
-        assert_variant!(&calls[1], ifaces::test_utils::IfaceManagerCall::ListPhys);
+        assert_matches!(calls.len(), 5);
+        assert_matches!(&calls[2], ifaces::test_utils::IfaceManagerCall::GetPowerState(_));
+        assert_matches!(&calls[1], ifaces::test_utils::IfaceManagerCall::ListPhys);
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
@@ -1921,34 +1921,34 @@ mod tests {
         // PowerUp
         let start_fut = test_helper.wifi_proxy.start();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // PowerDown
         let stop_fut = test_helper.wifi_proxy.stop();
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // State should be false (stopped)
         let get_state_fut1 = test_helper.wifi_proxy.get_state();
         let mut get_state_fut1 = pin!(get_state_fut1);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut1), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut1), Poll::Pending);
 
         // PowerUp again
         let start_fut2 = test_helper.wifi_proxy.start();
         let mut start_fut2 = pin!(start_fut2);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
 
         // State should be true (started)
         let get_state_fut2 = test_helper.wifi_proxy.get_state();
         let mut get_state_fut2 = pin!(get_state_fut2);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut2), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut2), Poll::Pending);
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response1 = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response1 = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut1),
             Poll::Ready(Ok(response1)) => response1
         );
-        let response2 = assert_variant!(
+        let response2 = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut2),
             Poll::Ready(Ok(response2)) => response2
         );
@@ -1956,9 +1956,9 @@ mod tests {
         assert_eq!(response2.is_started, Some(true));
         let calls = test_helper.iface_manager.calls.lock();
         assert!(!calls.is_empty());
-        assert_variant!(&calls[calls.len() - 1], ifaces::test_utils::IfaceManagerCall::PowerUp(_));
+        assert_matches!(&calls[calls.len() - 1], ifaces::test_utils::IfaceManagerCall::PowerUp(_));
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
@@ -1972,17 +1972,17 @@ mod tests {
 
         let start_fut = test_helper.wifi_proxy.start();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let stop_fut = test_helper.wifi_proxy.stop();
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
         let mut get_state_fut = pin!(get_state_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_state_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -1991,23 +1991,23 @@ mod tests {
         // On stop, we shut down all remaining ifaces and power down.
         let calls = test_helper.iface_manager.calls.lock();
         assert!(!calls.is_empty());
-        assert_variant!(
+        assert_matches!(
             &calls[calls.len() - 1],
             ifaces::test_utils::IfaceManagerCall::PowerDown(_)
         );
-        assert_variant!(
+        assert_matches!(
             &calls[calls.len() - 2],
             ifaces::test_utils::IfaceManagerCall::DestroyIface(_)
         );
 
         // There was a start and a stop, so expect enabled and disabled mesages.
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
             }))
         );
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Disabled
@@ -2024,11 +2024,11 @@ mod tests {
 
         let start_fut = test_helper.wifi_proxy.start();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         // Clear out the client connections toggle event so that we can test for the telemetry
         // event we are interested in later in this test.
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientConnectionsToggle {
                 event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
@@ -2037,11 +2037,11 @@ mod tests {
 
         let stop_fut = test_helper.wifi_proxy.stop();
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Verify that telemetry event for iface destruction failure is sent.
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::IfaceDestructionFailure))
         );
@@ -2053,9 +2053,9 @@ mod tests {
 
         let get_chip_ids_fut = test_helper.wifi_proxy.get_chip_ids();
         let mut get_chip_ids_fut = pin!(get_chip_ids_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_chip_ids_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_chip_ids_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_chip_ids_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -2074,13 +2074,13 @@ mod tests {
             },
         );
         let mut set_country_fut = pin!(set_country_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let calls = test_helper.iface_manager.calls.lock();
         assert_eq!(calls.len(), 2);
         // CreateClientIface is called in setup_wifi_test.
-        assert_variant!(&calls[0], ifaces::test_utils::IfaceManagerCall::CreateClientIface(_));
-        assert_variant!(
+        assert_matches!(&calls[0], ifaces::test_utils::IfaceManagerCall::CreateClientIface(_));
+        assert_matches!(
             &calls[1],
             ifaces::test_utils::IfaceManagerCall::SetCountry { country, .. } => { assert_eq!(*country, COUNTRY_CODE) }
         );
@@ -2098,7 +2098,7 @@ mod tests {
             wifi: Some(wifi_server_end),
             ..Default::default()
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
         let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
@@ -2107,7 +2107,7 @@ mod tests {
             ..Default::default()
         });
         let mut get_chip_fut = pin!(get_chip_fut);
-        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
 
         let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
             create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
@@ -2117,7 +2117,7 @@ mod tests {
                 ..Default::default()
             });
         let mut create_sta_iface_fut = pin!(create_sta_iface_fut);
-        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new().mock_create_client_iface_failure());
@@ -2130,13 +2130,13 @@ mod tests {
         );
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
 
         // Execute test
-        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Err(_)));
 
         // Verify telemetry event for iface creation failure is sent
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::IfaceCreationFailure))
         );
@@ -2156,13 +2156,13 @@ mod tests {
         let mut remove_sta_iface_fut = pin!(remove_sta_iface_fut);
 
         assert_eq!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut remove_sta_iface_fut),
             Poll::Ready(Ok(Err(_)))
         );
 
         // Verify telemetry event for iface destruction failure is sent
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::IfaceDestructionFailure))
         );
@@ -2174,12 +2174,12 @@ mod tests {
 
         let get_available_modes_fut = test_helper.wifi_chip_proxy.get_available_modes();
         let mut get_available_modes_fut = pin!(get_available_modes_fut);
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_available_modes_fut),
             Poll::Pending
         );
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_available_modes_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -2207,9 +2207,9 @@ mod tests {
 
         let get_id_fut = test_helper.wifi_chip_proxy.get_id();
         let mut get_id_fut = pin!(get_id_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Ready(Ok(response)) => response);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Ready(Ok(response)) => response);
         assert_eq!(response.id, Some(CHIP_ID));
     }
 
@@ -2219,9 +2219,9 @@ mod tests {
 
         let get_mode_fut = test_helper.wifi_chip_proxy.get_mode();
         let mut get_mode_fut = pin!(get_mode_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Ready(Ok(response)) => response);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Ready(Ok(response)) => response);
         assert_eq!(response.mode, Some(0));
     }
 
@@ -2231,15 +2231,14 @@ mod tests {
 
         let get_capabilities_fut = test_helper.wifi_chip_proxy.get_capabilities();
         let mut get_capabilities_fut = pin!(get_capabilities_fut);
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_capabilities_fut),
             Poll::Pending
         );
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_capabilities_fut),
-            Poll::Ready(Ok(response)) => response,
-        );
+            Poll::Ready(Ok(response)) => response);
         assert_eq!(response.capabilities_mask, Some(0));
     }
 
@@ -2249,17 +2248,16 @@ mod tests {
 
         let request_fut = test_helper.wifi_chip_proxy.trigger_subsystem_restart();
         let mut request_fut = pin!(request_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut request_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut request_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut request_fut),
-            Poll::Ready(Ok(response)) => response,
-        );
-        assert_variant!(response, Ok(()));
+            Poll::Ready(Ok(response)) => response);
+        assert_matches!(response, Ok(()));
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RecoveryEvent)),
+            Ok(Some(TelemetryEvent::RecoveryEvent))
         );
     }
 
@@ -2274,17 +2272,17 @@ mod tests {
             },
         );
         let mut remove_sta_iface_fut = pin!(remove_sta_iface_fut);
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut remove_sta_iface_fut),
             Poll::Pending
         );
         assert_eq!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut remove_sta_iface_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ClientIfaceDestroyed { iface_id })) => {
                 assert_eq!(iface_id, FAKE_IFACE_RESPONSE.id);
@@ -2299,8 +2297,8 @@ mod tests {
         // We observe the iface created by setup_wifi_test.
         let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
         let mut get_iface_names_fut = pin!(get_iface_names_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_matches!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
         assert_eq!(result.iface_names, Some(vec![IFACE_NAME.to_string()]));
     }
 
@@ -2314,8 +2312,8 @@ mod tests {
         // No ifaces show up.
         let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
         let mut get_iface_names_fut = pin!(get_iface_names_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_matches!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
         assert_eq!(result.iface_names, Some(vec![]));
     }
 
@@ -2332,15 +2330,15 @@ mod tests {
                 ..Default::default()
             });
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_matches!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
         assert!(result.is_ok());
 
         let get_name_fut = wifi_sta_iface_proxy.get_name();
         let mut get_name_fut = pin!(get_name_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_name_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -2361,8 +2359,8 @@ mod tests {
                 ..Default::default()
             });
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_matches!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
         assert!(result.is_err());
     }
 
@@ -2372,9 +2370,9 @@ mod tests {
 
         let get_name_fut = test_helper.wifi_sta_iface_proxy.get_name();
         let mut get_name_fut = pin!(get_name_fut);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let response = assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_name_fut),
             Poll::Ready(Ok(response)) => response
         );
@@ -2409,7 +2407,7 @@ mod tests {
             wifi: Some(wifi_server_end),
             ..Default::default()
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
         let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
@@ -2418,7 +2416,7 @@ mod tests {
             ..Default::default()
         });
         let mut get_chip_fut = pin!(get_chip_fut);
-        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
             create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
@@ -2428,7 +2426,7 @@ mod tests {
                 ..Default::default()
             });
         let mut create_sta_iface_fut = pin!(create_sta_iface_fut);
-        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(iface_manager);
@@ -2442,15 +2440,15 @@ mod tests {
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
-        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Ok(Ok(()))));
 
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ClientIfaceCreated { iface_id })) => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ClientIfaceCreated { iface_id })) => {
             assert_eq!(iface_id, FAKE_IFACE_RESPONSE.id);
         });
 
         // Quick check that telemetry event queue is now empty
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
+        assert_matches!(telemetry_receiver.try_next(), Err(_));
 
         let test_helper = WifiTestHelper {
             _wlanix_proxy: wlanix_proxy,
@@ -2475,10 +2473,10 @@ mod tests {
                 ..Default::default()
             })
             .expect("Failed to call RemoveInterface");
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
+        assert_matches!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
     }
 
     #[test]
@@ -2486,11 +2484,11 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_supplicant_test();
 
         let mut disconnect_fut = test_helper.supplicant_sta_iface_proxy.disconnect();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
-        assert_variant!(
+        assert_matches!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Ok(()))
         );
@@ -2501,17 +2499,16 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_supplicant_test();
 
         let mut get_mac_address_fut = test_helper.supplicant_sta_iface_proxy.get_mac_address();
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_mac_address_fut),
             Poll::Pending
         );
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Query);
-        let response = assert_variant!(
+        assert_matches!(&iface_calls.lock()[0], ClientIfaceCall::Query);
+        let response = assert_matches!(
             test_helper.exec.run_until_stalled(&mut get_mac_address_fut),
-            Poll::Ready(Ok(Ok(response))) => response,
-        );
+            Poll::Ready(Ok(Ok(response))) => response);
         assert_eq!(response.mac_addr.unwrap(), [13u8, 37, 13, 37, 13, 37]);
     }
 
@@ -2526,13 +2523,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut set_sta_country_fut),
             Poll::Pending
         );
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::SetCountry(country) => assert_eq!(*country, COUNTRY_CODE));
+        assert_matches!(&iface_calls.lock()[0], ClientIfaceCall::SetCountry(country) => assert_eq!(*country, COUNTRY_CODE));
     }
 
     #[test]
@@ -2542,8 +2539,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2551,19 +2548,19 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(result, Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, credential, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_matches!(
             iface_calls.lock()[0].clone(),
             ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
@@ -2571,17 +2568,17 @@ mod tests {
         assert_eq!(credential, Credential::None);
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
         assert_eq!(on_state_changed.bssid, Some([42, 42, 42, 42, 42, 42]));
         assert_eq!(on_state_changed.id, Some(1));
         assert_eq!(on_state_changed.ssid, Some(vec![b'f', b'o', b'o']));
 
-        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
         assert!(mcast_msg.payload.attrs.contains(&Nl80211Attr::Mac([42, 42, 42, 42, 42, 42])));
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { result, bss })) => {
                 assert_eq!(result, fidl_ieee80211::StatusCode::Success);
@@ -2598,8 +2595,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2607,7 +2604,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let passphrase = vec![b'p', b'a', b's', b's'];
         let result = test_helper.supplicant_sta_network_proxy.set_psk_passphrase(
@@ -2616,19 +2613,19 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(result, Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, credential, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_matches!(
             iface_calls.lock()[0].clone(),
             ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
@@ -2636,10 +2633,10 @@ mod tests {
         assert_eq!(credential, Credential::Password(passphrase));
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
 
-        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
     }
 
@@ -2650,8 +2647,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2659,7 +2656,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let key = [b'w', b'e', b'p', b'k', b'e'];
         let index = 0;
@@ -2670,33 +2667,33 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, credential, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_matches!(
             iface_calls.lock()[0].clone(),
             ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
-        assert_variant!(credential, Credential::WepKey(keys) => {
+        assert_matches!(credential, Credential::WepKey(keys) => {
             assert_eq!(keys.get_key(), Some(WepKey::Wep40(key)));
         });
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
 
-        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
     }
 
@@ -2707,8 +2704,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2716,7 +2713,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let result = test_helper.supplicant_sta_network_proxy.set_bssid(
             &fidl_wlanix::SupplicantStaNetworkSetBssidRequest {
@@ -2724,18 +2721,18 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, credential, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_matches!(
             iface_calls.lock()[0].clone(),
             ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
@@ -2743,13 +2740,13 @@ mod tests {
         assert_eq!(credential, Credential::None);
         assert_eq!(bssid, Some(Bssid::from([1, 2, 3, 4, 5, 6])));
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
         assert_eq!(on_state_changed.bssid, Some([1, 2, 3, 4, 5, 6]));
         assert_eq!(on_state_changed.id, Some(1));
         assert_eq!(on_state_changed.ssid, Some(vec![b'f', b'o', b'o']));
 
-        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
     }
 
@@ -2760,8 +2757,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2769,7 +2766,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let result = test_helper.supplicant_sta_network_proxy.set_bssid(
             &fidl_wlanix::SupplicantStaNetworkSetBssidRequest {
@@ -2777,25 +2774,25 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(result, Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let bssid = assert_variant!(
+        let bssid = assert_matches!(
             iface_calls.lock()[0].clone(),
             ClientIfaceCall::ConnectToNetwork { bssid, .. } => bssid
         );
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
         assert_eq!(on_state_changed.bssid, Some([42, 42, 42, 42, 42, 42]));
     }
@@ -2811,13 +2808,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(result, Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
@@ -2825,12 +2822,12 @@ mod tests {
         {
             let next_mcast = next_mcast_message(mcast_stream);
             let mut next_mcast = pin!(next_mcast);
-            let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+            let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
             assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
         }
 
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        let on_state_changed = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
     }
 
@@ -2844,8 +2841,8 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
             &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
@@ -2853,20 +2850,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
-        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+        assert_matches!(result, Ok(()));
+        assert_matches!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
 
         let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(iface_calls.lock()[0].clone(), ClientIfaceCall::ConnectToNetwork { .. });
+        assert_matches!(iface_calls.lock()[0].clone(), ClientIfaceCall::ConnectToNetwork { .. });
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let reject = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnAssociationRejected { payload, .. }))) => payload);
+        let reject = assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnAssociationRejected { payload, .. }))) => payload);
         assert_eq!(reject.bssid, Some([42, 42, 42, 42, 42, 42]));
         assert_eq!(reject.ssid, Some(vec![b'f', b'o', b'o']));
         assert_eq!(reject.status_code, Some(fidl_ieee80211::StatusCode::RefusedReasonUnspecified));
@@ -2880,7 +2877,7 @@ mod tests {
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
         // Metrics: for this test, we don't care about the contents of the ConnectResult
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
         );
@@ -2907,17 +2904,17 @@ mod tests {
                 .expect("Failed to send OnDisconnect");
         }
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
 
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut next_callback_fut),
             Poll::Ready(Some(Ok(
                 fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnDisconnected { .. }
             )))
         );
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        let on_state_changed = assert_variant!(
+        let on_state_changed = assert_matches!(
             test_helper.exec.run_until_stalled(&mut next_callback_fut),
             Poll::Ready(Some(Ok(
                 fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }
@@ -2929,17 +2926,17 @@ mod tests {
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let disconnect_info = assert_variant!(
+        let disconnect_info = assert_matches!(
             iface_calls.lock().pop().expect("iface call history should not be empty"),
             ClientIfaceCall::OnDisconnect { info } => info
         );
         assert_eq!(disconnect_info, mocked_disconnect_source);
 
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
                 assert_eq!(info.connected_duration, zx::BootDuration::from_nanos(connection_length_nanos.into()));
@@ -2975,7 +2972,7 @@ mod tests {
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
         // Metrics: for this test, we don't care about the contents of the ConnectResult
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
         );
@@ -3003,15 +3000,15 @@ mod tests {
         }
 
         // No callbacks for disconnect, since we're awaiting a reconnect result.
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Pending);
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         // We should always log a disconnect to the metrics module, even if reconnect is pending
-        assert_variant!(
+        assert_matches!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
                 assert_eq!(info.connected_duration, zx::BootDuration::from_nanos(connection_length_nanos.into()));
@@ -3029,16 +3026,16 @@ mod tests {
         handle
             .send_on_connect_result(&reconnect_result)
             .expect("Failed to send ConnectResult for reconnect");
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if expect_disconnect {
-            assert_variant!(
+            assert_matches!(
                 test_helper.exec.run_until_stalled(&mut next_callback_fut),
                 Poll::Ready(Some(Ok(
                     fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnDisconnected { .. }
                 )))
             );
-            let on_state_changed = assert_variant!(
+            let on_state_changed = assert_matches!(
             test_helper.exec.run_until_stalled(&mut next_callback_fut),
             Poll::Ready(Some(Ok(
                 fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }
@@ -3048,26 +3045,26 @@ mod tests {
                 Some(fidl_wlanix::StaIfaceCallbackState::Disconnected)
             );
 
-            let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+            let mcast_msg = assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
             assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
 
             let iface_calls = test_helper.iface_manager.get_iface_call_history();
-            let disconnect_info = assert_variant!(
+            let disconnect_info = assert_matches!(
                 iface_calls.lock().pop().expect("iface call history should not be empty"),
                 ClientIfaceCall::OnDisconnect { info } => info
             );
             assert_eq!(disconnect_info, mocked_disconnect_source);
         } else {
             // Still no messages, since the reconnect was successful.
-            assert_variant!(
+            assert_matches!(
                 test_helper.exec.run_until_stalled(&mut next_callback_fut),
                 Poll::Pending
             );
-            assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+            assert_matches!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
         }
 
         // Metrics: no further messages expected, regardless of if reconnect is successful
-        assert_variant!(test_helper.telemetry_receiver.try_next(), Err(_));
+        assert_matches!(test_helper.telemetry_receiver.try_next(), Err(_));
     }
 
     #[test]
@@ -3088,10 +3085,10 @@ mod tests {
                 .expect("Failed to send OnDisconnect");
         }
 
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let signal_report_ind = assert_variant!(
+        let signal_report_ind = assert_matches!(
             iface_calls.lock().pop().expect("iface call history should not be empty"),
             ClientIfaceCall::OnSignalReport { ind } => ind
         );
@@ -3110,11 +3107,11 @@ mod tests {
                 enable: Some(desired),
                 ..Default::default()
             });
-        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetPowerSaveMode(setting) => assert_eq!(*setting, desired));
-        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
+        assert_matches!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetPowerSaveMode(setting) => assert_eq!(*setting, desired));
+        assert_matches!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
     }
 
     #[test_case(true)]
@@ -3130,11 +3127,11 @@ mod tests {
                     ..Default::default()
                 },
             );
-        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
-        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_matches!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetSuspendMode(setting)  => assert_eq!(*setting, desired));
-        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
+        assert_matches!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetSuspendMode(setting)  => assert_eq!(*setting, desired));
+        assert_matches!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
     }
 
     struct SupplicantTestHelper {
@@ -3162,14 +3159,14 @@ mod tests {
             supplicant: Some(supplicant_server_end),
             ..Default::default()
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (nl80211_proxy, nl80211_server_end) = create_proxy::<fidl_wlanix::Nl80211Marker>();
         let result = wlanix_proxy.get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
             nl80211: Some(nl80211_server_end),
             ..Default::default()
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (supplicant_sta_iface_proxy, supplicant_sta_iface_server_end) =
             create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>();
@@ -3179,7 +3176,7 @@ mod tests {
                 iface_name: Some(FAKE_IFACE_NAME.to_string()),
                 ..Default::default()
             });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (supplicant_sta_iface_callback_client_end, supplicant_sta_iface_callback_stream) =
             create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>();
@@ -3189,7 +3186,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let (supplicant_sta_network_proxy, supplicant_sta_network_server_end) =
             create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>();
@@ -3199,7 +3196,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -3251,7 +3248,7 @@ mod tests {
             .await
             .expect("Failed to request multicast message")
             .expect("Multicast message stream terminated");
-        let mcast_msg = assert_variant!(req, fidl_wlanix::Nl80211MulticastRequest::Message {
+        let mcast_msg = assert_matches!(req, fidl_wlanix::Nl80211MulticastRequest::Message {
             payload: fidl_wlanix::Nl80211MulticastMessageRequest {message: Some(m), .. }, ..} => m);
         expect_nl80211_message(&mcast_msg)
     }
@@ -3273,7 +3270,7 @@ mod tests {
                 ..Default::default()
             })
             .expect("Failed to get Nl80211");
-        assert_variant!(exec.run_until_stalled(&mut wlanix_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut wlanix_fut), Poll::Pending);
         assert!(!nl_proxy.is_closed());
     }
 
@@ -3290,16 +3287,16 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "doesnt_exist");
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         // The stream should immediately terminate.
         let next_mcast = mcast_stream.next();
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(None));
+        assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(None));
 
         // serve_nl80211 should complete successfully.
         drop(proxy);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Ready(()));
     }
 
     #[test]
@@ -3356,10 +3353,10 @@ mod tests {
 
         let query_resp_fut = proxy.message_v2(&invalid_message);
         let mut query_resp_fut = pin!(query_resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut query_resp_fut),
-            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INTERNAL))),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INTERNAL)))
         );
     }
 
@@ -3378,11 +3375,10 @@ mod tests {
         let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
         let get_interface_fut = proxy.message_v2(&get_interface_message);
         let mut get_interface_fut = pin!(get_interface_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = deserialize(assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = deserialize(assert_matches!(
             exec.run_until_stalled(&mut get_interface_fut),
-            Poll::Ready(Ok(Ok(r))) => r,
-        ));
+            Poll::Ready(Ok(Ok(r))) => r));
 
         assert_eq!(responses.len(), 2);
         let message = expect_nl80211_message(&responses[0]);
@@ -3415,11 +3411,10 @@ mod tests {
         let get_station_fut = proxy.message_v2(&get_station_message);
 
         let mut get_station_fut = pin!(get_station_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = deserialize(assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = deserialize(assert_matches!(
             exec.run_until_stalled(&mut get_station_fut),
-            Poll::Ready(Ok(Ok(r))) => r,
-        ));
+            Poll::Ready(Ok(Ok(r))) => r));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
     }
@@ -3437,11 +3432,11 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let trigger_scan_message = build_nl80211_message(
             Nl80211Cmd::TriggerScan,
@@ -3450,18 +3445,17 @@ mod tests {
         let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
 
-        let responses = deserialize(assert_variant!(
+        let responses = deserialize(assert_matches!(
             exec.run_until_stalled(&mut trigger_scan_fut),
-            Poll::Ready(Ok(Ok(r))) => r,
-        ));
+            Poll::Ready(Ok(Ok(r))) => r));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Ack));
 
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanResult {
                 result: wlan_telemetry::ScanResult::Complete { .. }
@@ -3470,7 +3464,7 @@ mod tests {
 
         // With our faked scan results we expect an immediate multicast notification.
         let mcast_msg =
-            assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+            assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::NewScanResults);
     }
 
@@ -3490,10 +3484,10 @@ mod tests {
         let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut trigger_scan_fut),
-            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS)))
         );
     }
 
@@ -3514,10 +3508,10 @@ mod tests {
         let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut trigger_scan_fut),
-            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_NOT_FOUND))),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_NOT_FOUND)))
         );
     }
 
@@ -3540,11 +3534,11 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let trigger_scan_message = build_nl80211_message(
             Nl80211Cmd::TriggerScan,
@@ -3552,19 +3546,19 @@ mod tests {
         );
         let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
-        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
 
         // After ending the scan we expect wlanix to broadcast the scan abort.
         scan_end_sender.send(scan_result).expect("Failed to send scan result");
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let message = assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(message) => message);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let message = assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(message) => message);
         assert_eq!(message.payload.cmd, Nl80211Cmd::ScanAborted);
 
-        let scan_result = assert_variant!(
+        let scan_result = assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanResult { result })) => result
         );
@@ -3584,11 +3578,11 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
-        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let abort_scan_message = build_nl80211_message(
             Nl80211Cmd::AbortScan,
@@ -3597,10 +3591,10 @@ mod tests {
         let abort_scan_fut = proxy.message_v2(&abort_scan_message);
 
         let mut abort_scan_fut = pin!(abort_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut abort_scan_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut abort_scan_fut), Poll::Ready(_));
 
-        let scan_result = assert_variant!(
+        let scan_result = assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanResult { result })) => result
         );
@@ -3626,11 +3620,10 @@ mod tests {
         let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = deserialize(assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = deserialize(assert_matches!(
             exec.run_until_stalled(&mut get_scan_fut),
-            Poll::Ready(Ok(Ok(r))) => r,
-        ));
+            Poll::Ready(Ok(Ok(r))) => r));
         assert_eq!(responses.len(), 2);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
@@ -3652,10 +3645,10 @@ mod tests {
         let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut get_scan_fut),
-            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS)))
         );
     }
 
@@ -3681,11 +3674,10 @@ mod tests {
         let get_reg_fut = proxy.message_v2(&get_reg_message);
 
         let mut get_reg_fut = pin!(get_reg_fut);
-        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = deserialize(assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = deserialize(assert_matches!(
             exec.run_until_stalled(&mut get_reg_fut),
-            Poll::Ready(Ok(Ok(r))) => r,
-        ));
+            Poll::Ready(Ok(Ok(r))) => r));
 
         assert_eq!(responses.len(), 1);
         let message = expect_nl80211_message(&responses[0]);

@@ -4,14 +4,15 @@
 
 use crate::client::rsn::Supplicant;
 use crate::client::{EstablishRsnaFailureReason, ServingApInfo};
+use assert_matches::assert_matches;
 use futures::channel::mpsc;
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
 use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use wlan_common::bss::Protection;
+use wlan_common::channel;
 use wlan_common::ie::fake_ies::{fake_ht_cap_bytes, fake_vht_cap_bytes};
-use wlan_common::{assert_variant, channel};
 use wlan_rsn::rsna::UpdateSink;
 use wlan_rsn::{auth, format_rsn_err, psk, Error};
 use {
@@ -114,8 +115,11 @@ pub fn fake_wmm_status_resp() -> fidl_internal::WmmStatusResponse {
     }
 }
 
-pub fn expect_stream_empty<T>(stream: &mut mpsc::UnboundedReceiver<T>, error_msg: &str) {
-    assert_variant!(
+pub fn expect_stream_empty<T: std::fmt::Debug>(
+    stream: &mut mpsc::UnboundedReceiver<T>,
+    error_msg: &str,
+) {
+    assert_matches!(
         stream.try_next(),
         Ok(None) | Err(..),
         "error, receiver not empty: {}",

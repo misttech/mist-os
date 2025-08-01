@@ -380,10 +380,10 @@ impl<B: SplitByteSlice> ChannelSwitchBuilder<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::mac::CapabilityInfo;
     use wlan_common::timer::EventId;
     use zerocopy::IntoBytes;
@@ -458,7 +458,7 @@ mod tests {
     #[test]
     fn empty_builder_returns_no_csa() {
         let builder = ChannelSwitchBuilder::<&[u8]>::default();
-        assert_variant!(builder.build(), ChannelSwitchResult::NoChannelSwitch);
+        assert_matches!(builder.build(), ChannelSwitchResult::NoChannelSwitch);
     }
 
     #[test_case(0, false ; "when transmission is not paused")]
@@ -468,7 +468,7 @@ mod tests {
         let mut builder = ChannelSwitchBuilder::<&[u8]>::default();
         builder.add_channel_switch_announcement(csa(mode, NEW_CHANNEL, COUNT));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -495,7 +495,7 @@ mod tests {
             COUNT,
         ));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -516,7 +516,7 @@ mod tests {
         builder.add_channel_switch_announcement(csa(0, NEW_CHANNEL, COUNT));
         builder.add_secondary_channel_offset(ie::SecChanOffset::SECONDARY_ABOVE);
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -538,7 +538,7 @@ mod tests {
         builder.add_secondary_channel_offset(ie::SecChanOffset::SECONDARY_ABOVE);
         builder.add_wide_bandwidth_channel_switch(wbcs(NEW_CHANNEL + 8, 0));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -560,7 +560,7 @@ mod tests {
         builder.add_secondary_channel_offset(ie::SecChanOffset::SECONDARY_ABOVE);
         builder.add_wide_bandwidth_channel_switch(wbcs(NEW_CHANNEL + 8, NEW_CHANNEL + 16));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -582,7 +582,7 @@ mod tests {
         builder.add_secondary_channel_offset(ie::SecChanOffset::SECONDARY_ABOVE);
         builder.add_wide_bandwidth_channel_switch(wbcs(NEW_CHANNEL + 8, NEW_CHANNEL + 100));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -610,7 +610,7 @@ mod tests {
             COUNT,
         ));
         let channel_switch =
-            assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
+            assert_matches!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
             new_channel: fidl_ieee80211::WlanChannel {
@@ -632,16 +632,16 @@ mod tests {
         let mut ecsa = ecsa(0, NEW_OPERATING_CLASS, NEW_CHANNEL, COUNT);
         ecsa.new_channel_number += 1;
         builder.add_extended_channel_switch_announcement(ecsa);
-        let err = assert_variant!(builder.build(), ChannelSwitchResult::Error(err) => err);
-        assert_variant!(err, ChannelSwitchError::ConflictingElements);
+        let err = assert_matches!(builder.build(), ChannelSwitchResult::Error(err) => err);
+        assert_matches!(err, ChannelSwitchError::ConflictingElements);
     }
 
     #[test]
     fn basic_csa_invalid_mode_20mhz() {
         let mut builder = ChannelSwitchBuilder::<&[u8]>::default();
         builder.add_channel_switch_announcement(csa(123, NEW_CHANNEL, COUNT));
-        let err = assert_variant!(builder.build(), ChannelSwitchResult::Error(err) => err);
-        assert_variant!(err, ChannelSwitchError::InvalidChannelSwitchMode(123));
+        let err = assert_matches!(builder.build(), ChannelSwitchResult::Error(err) => err);
+        assert_matches!(err, ChannelSwitchError::InvalidChannelSwitchMode(123));
     }
 
     #[derive(Default)]
@@ -719,12 +719,12 @@ mod tests {
             .expect("Failed to handle beacon");
 
         assert_eq!(actions.actions.len(), 4);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let new_channel =
-            assert_variant!(actions.actions[1], ChannelAction::SwitchChannel(chan) => chan);
+            assert_matches!(actions.actions[1], ChannelAction::SwitchChannel(chan) => chan);
         assert_eq!(new_channel.primary, NEW_CHANNEL);
-        assert_variant!(actions.actions[2], ChannelAction::EnableScanning);
-        assert_variant!(actions.actions[3], ChannelAction::EnableTx);
+        assert_matches!(actions.actions[2], ChannelAction::EnableScanning);
+        assert_matches!(actions.actions[3], ChannelAction::EnableTx);
     }
 
     #[test]
@@ -742,16 +742,16 @@ mod tests {
             let elements = csa_bytes(0, NEW_CHANNEL, 2);
             let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle beacon"
             );
         }
         assert_eq!(actions.actions.len(), 2);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let (_first_event_id, event_time) =
-            assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
+            assert_matches!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, (time + (bcn_header.beacon_interval * 2u16).into()).into());
         actions.actions.clear();
 
@@ -764,16 +764,16 @@ mod tests {
             let elements = csa_bytes(0, NEW_CHANNEL, 1);
             let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle beacon"
             );
         }
         assert_eq!(actions.actions.len(), 2);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let (_second_event_id, event_time) =
-            assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
+            assert_matches!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, (time + bcn_header.beacon_interval.into()).into());
         actions.actions.clear();
 
@@ -785,7 +785,7 @@ mod tests {
             let mut bound_channel_state = channel_state.test_bind(&mut actions);
             let fut = bound_channel_state.handle_channel_switch_timeout();
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle channel switch timeout"
@@ -794,10 +794,10 @@ mod tests {
 
         assert_eq!(actions.actions.len(), 3);
         let new_channel =
-            assert_variant!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
+            assert_matches!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
         assert_eq!(new_channel.primary, NEW_CHANNEL);
-        assert_variant!(actions.actions[1], ChannelAction::EnableScanning);
-        assert_variant!(actions.actions[2], ChannelAction::EnableTx);
+        assert_matches!(actions.actions[1], ChannelAction::EnableScanning);
+        assert_matches!(actions.actions[2], ChannelAction::EnableTx);
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -843,12 +843,12 @@ mod tests {
             .expect("Failed to handle beacon");
 
         assert_eq!(actions.actions.len(), 4);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let new_channel =
-            assert_variant!(actions.actions[1], ChannelAction::SwitchChannel(chan) => chan);
+            assert_matches!(actions.actions[1], ChannelAction::SwitchChannel(chan) => chan);
         assert_eq!(new_channel.primary, NEW_CHANNEL);
-        assert_variant!(actions.actions[2], ChannelAction::EnableScanning);
-        assert_variant!(actions.actions[3], ChannelAction::EnableTx);
+        assert_matches!(actions.actions[2], ChannelAction::EnableScanning);
+        assert_matches!(actions.actions[3], ChannelAction::EnableTx);
     }
 
     #[test]
@@ -867,7 +867,7 @@ mod tests {
             let elements = [];
             let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle beacon"
@@ -882,16 +882,16 @@ mod tests {
             let elements = csa_bytes(0, NEW_CHANNEL, 1);
             let fut = bound_channel_state.handle_announcement_frame(&elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle announcement"
             );
         }
         assert_eq!(actions.actions.len(), 2);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let (_event_id, event_time) =
-            assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
+            assert_matches!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, bcn_time);
         actions.actions.clear();
 
@@ -901,7 +901,7 @@ mod tests {
             let mut bound_channel_state = channel_state.test_bind(&mut actions);
             let fut = bound_channel_state.handle_channel_switch_timeout();
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle channel switch timeout"
@@ -909,10 +909,10 @@ mod tests {
         }
         assert_eq!(actions.actions.len(), 3);
         let new_channel =
-            assert_variant!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
+            assert_matches!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
         assert_eq!(new_channel.primary, NEW_CHANNEL);
-        assert_variant!(actions.actions[1], ChannelAction::EnableScanning);
-        assert_variant!(actions.actions[2], ChannelAction::EnableTx);
+        assert_matches!(actions.actions[1], ChannelAction::EnableScanning);
+        assert_matches!(actions.actions[2], ChannelAction::EnableTx);
     }
 
     #[test]
@@ -929,7 +929,7 @@ mod tests {
             let elements = [];
             let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle beacon"
@@ -950,16 +950,16 @@ mod tests {
             let elements = csa_bytes(0, NEW_CHANNEL, 1);
             let fut = bound_channel_state.handle_announcement_frame(&elements[..]);
             let mut fut = pin!(fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(_)),
                 "Failed to handle announcement"
             );
         }
         assert_eq!(actions.actions.len(), 2);
-        assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
+        assert_matches!(actions.actions[0], ChannelAction::DisableScanning);
         let (_event_id, event_time) =
-            assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
+            assert_matches!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         // The CSA should be timed based on our best estimate of the missed beacon.
         assert_eq!(
             event_time,

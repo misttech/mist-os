@@ -4723,6 +4723,7 @@ mod tests {
         generate_random_ap_state, generate_random_bss, generate_random_channel,
         generate_random_scanned_candidate,
     };
+    use assert_matches::assert_matches;
     use diagnostics_assertions::{
         AnyBoolProperty, AnyNumericProperty, AnyStringProperty, NonZeroUintProperty,
     };
@@ -4743,7 +4744,7 @@ mod tests {
     use wlan_common::channel::Cbw;
     use wlan_common::ie::IeType;
     use wlan_common::test_utils::fake_stas::IesOverrides;
-    use wlan_common::{assert_variant, random_bss_description, random_fidl_bss_description};
+    use wlan_common::{random_bss_description, random_fidl_bss_description};
 
     const STEP_INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
     const IFACE_ID: u16 = 1;
@@ -4850,14 +4851,14 @@ mod tests {
         // Initiate a read of the inspect node.  This will run the future that was constructed.
         let fut = reader::read(&inspector);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // First, inspect will query the current state from the telemetry event loop.  In order to
         // get to the point of querying histograms, we need to reply that we are in the connected
         // state.
         let (telemetry_proxy, _telemetry_server) =
             fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>();
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::QueryStatus {sender})) => {
                 sender.send(QueryStatusResult {
@@ -4869,14 +4870,14 @@ mod tests {
                 }).expect("failed to send query status result")
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // The future should block on getting the histogram stats until the timer expires.
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(_));
 
         // We should get a timeout defect.
-        assert_variant!(
+        assert_matches!(
             defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::Timeout {
                 iface_id: 0,
@@ -4940,14 +4941,14 @@ mod tests {
         // Call handle_periodic_telemetry.
         let fut = telemetry.handle_periodic_telemetry();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Have the executor trigger the timeout.
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the timeout has been received.
-        assert_variant!(
+        assert_matches!(
             defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::Timeout {
                 iface_id: 0,
@@ -5142,10 +5143,10 @@ mod tests {
             });
             let mut fut = pin!(fut);
 
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // There should be a single batch logging event.
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
                     events: _,
@@ -5156,11 +5157,11 @@ mod tests {
             );
 
             // And then the future should run to completion.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // Verify that the telemetry state has transitioned to idle.
-        assert_variant!(
+        assert_matches!(
             telemetry.connection_state,
             ConnectionState::Idle(IdleState { connect_start_time: None })
         );
@@ -6852,7 +6853,7 @@ mod tests {
 
         let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
         assert_eq!(metrics.len(), 1);
-        assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
+        assert_matches!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
             assert_eq!(buckets.len(), 2);
             assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 79, count: 2}));
             assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 68, count: 1}));
@@ -6871,7 +6872,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         let buckets =
-            assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
+            assert_matches!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
         assert_eq!(buckets.len(), 1);
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 54, count: 1 }));
     }
@@ -6902,7 +6903,7 @@ mod tests {
 
         let metrics = test_helper.get_logged_metrics(metrics::RSSI_VELOCITY_METRIC_ID);
         assert_eq!(metrics.len(), 1);
-        assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
+        assert_matches!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
             // RSSI velocity in [-2,-1) maps to bucket 9 and velocity in [2,3) maps to bucket 13.
             assert_eq!(buckets.len(), 2);
             assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 9, count: 1}));
@@ -6959,7 +6960,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         let buckets =
-            assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
+            assert_matches!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 1, count: 3 }));
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 129, count: 1 }));
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 130, count: 2 }));
@@ -7000,7 +7001,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::RSSI_VELOCITY_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         let buckets =
-            assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
+            assert_matches!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
         // RSSI velocity below -10 maps to underflow bucket, and 11 or above maps to overflow.
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 1, count: 1 }));
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 21, count: 1 }));
@@ -8555,16 +8556,16 @@ mod tests {
         // First, test the case where the factory service cannot be reached and expect an error.
         if failure_mode == CreateMetricsLoggerFailureMode::FactoryRequest {
             drop(factory_stream);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
             return;
         }
 
         // If the test case is intended to allow the factory service to be contacted, run the
         // request future until stalled.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let request = exec.run_until_stalled(&mut factory_stream.next());
-        assert_variant!(
+        assert_matches!(
             request,
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerFactoryRequest::CreateMetricEventLogger {
                 project_spec: fidl_fuchsia_metrics::ProjectSpec {
@@ -8585,11 +8586,11 @@ mod tests {
 
         // The future should run to completion and the output will vary depending on the specified
         // failure mode.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(result) => {
             match failure_mode {
                 CreateMetricsLoggerFailureMode::FactoryRequest => panic!("The factory request failure should have been handled already."),
-                CreateMetricsLoggerFailureMode::None => assert_variant!(result, Ok(_)),
-                CreateMetricsLoggerFailureMode::ApiFailure => assert_variant!(result, Err(_))
+                CreateMetricsLoggerFailureMode::None => assert_matches!(result, Ok(_)),
+                CreateMetricsLoggerFailureMode::ApiFailure => assert_matches!(result, Err(_))
             }
         });
     }
@@ -8602,7 +8603,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Err(())));
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the interface creation failure.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -8619,7 +8620,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::IfaceDestructionResult(Err(())));
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the interface creation failure.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -8644,7 +8645,7 @@ mod tests {
         test_helper.telemetry_sender.send(event);
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the metric
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -8660,7 +8661,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::StartApResult(Err(())));
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the AP start failure.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -8714,10 +8715,10 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::RecoveryEvent { reason });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the recovery event
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
@@ -8988,10 +8989,10 @@ mod tests {
         // Log the test telemetry event.
         let fut = stats_logger.log_post_recovery_result(reason, outcome);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the metric that was emitted.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
@@ -9003,7 +9004,7 @@ mod tests {
         });
 
         // The future should complete.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -9016,7 +9017,7 @@ mod tests {
         test_helper.telemetry_sender.send(event);
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the recovery event
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9043,7 +9044,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Verify the connect post-recovery success metric was logged.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9066,7 +9067,7 @@ mod tests {
             network_is_likely_hidden: false,
         });
 
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.cobalt_events = Vec::new();
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9085,7 +9086,7 @@ mod tests {
         test_helper.telemetry_sender.send(event);
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the recovery event
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9112,7 +9113,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Verify the connect post-recovery failure metric was logged.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9135,7 +9136,7 @@ mod tests {
             network_is_likely_hidden: false,
         });
 
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.cobalt_events = Vec::new();
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9156,11 +9157,11 @@ mod tests {
 
         // Send the recovery event metric
         test_helper.telemetry_sender.send(recovery_event);
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Send the post-recovery result metric
         test_helper.telemetry_sender.send(post_recovery_event);
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Get the metric that was logged and verify that it was constructed properly.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9172,7 +9173,7 @@ mod tests {
         // Re-send the result metric and verify that nothing new was logged.
         test_helper.cobalt_events = Vec::new();
         test_helper.telemetry_sender.send(duplicate_check_event);
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         let logged_metrics = test_helper.get_logged_metrics(expected_metric_id);
         assert!(logged_metrics.is_empty());
 
@@ -9634,7 +9635,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the scan fulfillment metric
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9661,7 +9662,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the scan queue metrics
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -9723,26 +9724,26 @@ mod tests {
         let mut prev_score = 0;
         // Verify one second average delta
         assert_eq!(logged_metrics[0].event_codes[1], DurationDimension::OneSecond as u32);
-        assert_variant!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
 
         // Verify five second average delta
         assert_eq!(logged_metrics[1].event_codes[1], DurationDimension::FiveSeconds as u32);
-        assert_variant!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
         // Verify ten second average delta
         assert_eq!(logged_metrics[2].event_codes[1], DurationDimension::TenSeconds as u32);
-        assert_variant!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
         // Verify thirty second average delta
         assert_eq!(logged_metrics[3].event_codes[1], DurationDimension::ThirtySeconds as u32);
-        assert_variant!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
         });
 
@@ -9756,23 +9757,23 @@ mod tests {
 
         // Verify one second average RSSI delta
         assert_eq!(logged_metrics[0].event_codes[1], DurationDimension::OneSecond as u32);
-        assert_variant!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 10);
         });
 
         // Verify five second average RSSI delta
         assert_eq!(logged_metrics[1].event_codes[1], DurationDimension::FiveSeconds as u32);
-        assert_variant!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 20);
         });
         // Verify ten second average RSSI delta
         assert_eq!(logged_metrics[2].event_codes[1], DurationDimension::TenSeconds as u32);
-        assert_variant!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 30);
         });
         // Verify thirty second average RSSI delta
         assert_eq!(logged_metrics[3].event_codes[1], DurationDimension::ThirtySeconds as u32);
-        assert_variant!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 40);
         });
     }
@@ -9831,26 +9832,26 @@ mod tests {
         let mut prev_score = 0;
         // Verify one second average delta
         assert_eq!(logged_metrics[0].event_codes[1], DurationDimension::OneSecond as u32);
-        assert_variant!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
 
         // Verify five second average delta
         assert_eq!(logged_metrics[1].event_codes[1], DurationDimension::FiveSeconds as u32);
-        assert_variant!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
         // Verify ten second average delta
         assert_eq!(logged_metrics[2].event_codes[1], DurationDimension::TenSeconds as u32);
-        assert_variant!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
             prev_score = *delta;
         });
         // Verify thirty second average delta
         assert_eq!(logged_metrics[3].event_codes[1], DurationDimension::ThirtySeconds as u32);
-        assert_variant!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_gt!(*delta, prev_score);
         });
 
@@ -9864,23 +9865,23 @@ mod tests {
 
         // Verify one second average RSSI delta
         assert_eq!(logged_metrics[0].event_codes[1], DurationDimension::OneSecond as u32);
-        assert_variant!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[0].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 10);
         });
 
         // Verify five second average RSSI delta
         assert_eq!(logged_metrics[1].event_codes[1], DurationDimension::FiveSeconds as u32);
-        assert_variant!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[1].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 20);
         });
         // Verify ten second average RSSI delta
         assert_eq!(logged_metrics[2].event_codes[1], DurationDimension::TenSeconds as u32);
-        assert_variant!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[2].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 30);
         });
         // Verify thirty second average RSSI delta
         assert_eq!(logged_metrics[3].event_codes[1], DurationDimension::ThirtySeconds as u32);
-        assert_variant!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
+        assert_matches!(&logged_metrics[3].payload, MetricEventPayload::IntegerValue(delta) => {
             assert_eq!(*delta, 40);
         });
 
@@ -9919,7 +9920,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Verify the network selection is counted
@@ -9942,7 +9943,7 @@ mod tests {
         });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Verify the network selection is counted
@@ -10283,10 +10284,10 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::SmeTimeout { source });
 
         // Run the telemetry loop until it stalls.
-        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        assert_matches!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the timeout
-        assert_variant!(
+        assert_matches!(
             test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
@@ -10466,9 +10467,9 @@ mod tests {
         ) -> Arc<Mutex<TimeSeriesStats>> {
             let (sender, mut receiver) = oneshot::channel();
             self.telemetry_sender.send(TelemetryEvent::GetTimeSeries { sender });
-            assert_variant!(self.advance_test_fut(test_fut), Poll::Pending);
+            assert_matches!(self.advance_test_fut(test_fut), Poll::Pending);
             self.drain_cobalt_events(test_fut);
-            assert_variant!(receiver.try_recv(), Ok(Some(stats)) => stats)
+            assert_matches!(receiver.try_recv(), Ok(Some(stats)) => stats)
         }
     }
 

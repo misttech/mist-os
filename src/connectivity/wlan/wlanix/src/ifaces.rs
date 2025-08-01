@@ -1103,6 +1103,7 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
     use std::pin::pin;
 
     use super::test_utils::FAKE_IFACE_RESPONSE;
@@ -1114,9 +1115,9 @@ mod tests {
     use ieee80211::{MacAddrBytes, Ssid};
     use test_case::test_case;
     use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::fake_fidl_bss_description;
     use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
     use wlan_common::test_utils::ExpectWithin;
-    use wlan_common::{assert_variant, fake_fidl_bss_description};
     #[allow(
         clippy::single_component_path_imports,
         reason = "mass allow for https://fxbug.dev/381896734"
@@ -1225,7 +1226,7 @@ mod tests {
 
         manager.ifaces.lock().insert(1, Arc::new(iface));
         let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let iface = assert_matches!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
         drop(client_fut);
         (exec, monitor_stream, sme_stream, telemetry_receiver, manager, iface)
     }
@@ -1245,15 +1246,15 @@ mod tests {
         let mut fut = manager.query_iface(FAKE_IFACE_RESPONSE.id);
 
         // We should query device monitor for info on the iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let (iface_id, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let (iface_id, responder) = assert_matches!(
                  exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::QueryIface { iface_id, responder })) => (iface_id, responder));
         assert_eq!(iface_id, FAKE_IFACE_RESPONSE.id);
         responder.send(Ok(&FAKE_IFACE_RESPONSE)).expect("Failed to respond to QueryIfaceResponse");
 
         let result =
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
         assert_eq!(result, FAKE_IFACE_RESPONSE);
     }
 
@@ -1262,8 +1263,8 @@ mod tests {
         let (mut exec, mut monitor_stream, _telemetry_receiver, manager) = setup_test_manager();
         let mut fut = manager.get_country(123);
 
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let (phy_id, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let (phy_id, responder) = assert_matches!(
                  exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetCountry { phy_id, responder })) => (phy_id, responder));
         assert_eq!(phy_id, 123);
@@ -1272,7 +1273,7 @@ mod tests {
             .expect("Failed to respond to GetCountry");
 
         let country =
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
         assert_eq!(country, [b'A', b'B']);
     }
 
@@ -1299,15 +1300,15 @@ mod tests {
         assert!(manager.list_ifaces().is_empty());
 
         // Indicate that there are no existing ifaces.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
         responder.send(&[]).expect("Failed to respond to ListIfaces");
 
         // Create a new iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
         responder
@@ -1318,18 +1319,18 @@ mod tests {
             .expect("Failed to send CreateIface response");
 
         // Establish a connection to the new iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { responder, .. })) => responder);
         responder.send(Ok(())).expect("Failed to send GetClientSme response");
 
         // Expect power broker initialization
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut pb_stream.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload: _payload, responder }))) => {
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
         });
 
         // Creation complete!
@@ -1340,7 +1341,7 @@ mod tests {
         assert_eq!(manager.list_ifaces(), vec![FAKE_IFACE_RESPONSE.id]);
 
         // The new iface is ready for use.
-        let iface = assert_variant!(
+        let iface = assert_matches!(
             exec.run_until_stalled(&mut manager.get_client_iface(FAKE_IFACE_RESPONSE.id)),
             Poll::Ready(Ok(i)) => i
         );
@@ -1355,22 +1356,22 @@ mod tests {
         let mut fut = manager.create_client_iface(0);
 
         // Indicate that there are no existing ifaces.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
         responder.send(&[]).expect("Failed to respond to ListIfaces");
 
         // Return an error for CreateIface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
         responder
             .send(Err(fidl_device_service::DeviceMonitorError::unknown()))
             .expect("Failed to send CreateIface response");
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut manager.get_client_iface(FAKE_IFACE_RESPONSE.id)),
             Poll::Ready(Err(_))
         );
@@ -1386,23 +1387,23 @@ mod tests {
         assert!(manager.list_ifaces().is_empty());
 
         // Indicate that there is a fake iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
         responder.send(&[FAKE_IFACE_RESPONSE.id]).expect("Failed to respond to ListIfaces");
 
         // Respond with iface info.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let (iface_id, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let (iface_id, responder) = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::QueryIface { iface_id, responder })) => (iface_id, responder));
         assert_eq!(iface_id, FAKE_IFACE_RESPONSE.id);
         responder.send(Ok(&FAKE_IFACE_RESPONSE)).expect("Failed to respond to QueryIface");
 
         // Establish a connection to the new iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { responder, .. })) => responder);
         responder.send(Ok(())).expect("Failed to send GetClientSme response");
@@ -1411,7 +1412,7 @@ mod tests {
         // the power broker FIDL can take a few loops.
         let mut fut_with_timeout =
             pin!(fut.expect_within(zx::MonotonicDuration::from_seconds(5), "Awaiting iface"));
-        let id = assert_variant!(exec.run_singlethreaded(&mut fut_with_timeout), Ok(id) => id);
+        let id = assert_matches!(exec.run_singlethreaded(&mut fut_with_timeout), Ok(id) => id);
         assert_eq!(id, FAKE_IFACE_RESPONSE.id);
         assert_eq!(&manager.list_ifaces()[..], [id]);
     }
@@ -1422,12 +1423,12 @@ mod tests {
             setup_test_manager_with_iface();
         let mut fut = manager.destroy_iface(TEST_IFACE_ID);
 
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::DestroyIface { responder, .. })) => responder);
         responder.send(0).expect("Failed to send DestroyIface response");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         assert!(manager.ifaces.lock().is_empty());
     }
@@ -1471,8 +1472,8 @@ mod tests {
         let mut fut = manager.destroy_iface(iface_id);
 
         // No destroy request is sent.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Pending
         );
@@ -1487,7 +1488,7 @@ mod tests {
         let mut fut = manager.get_client_iface(TEST_IFACE_ID + 1);
 
         // No ifaces exist, so this should always error.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_e)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_e)));
     }
 
     #[test]
@@ -1497,7 +1498,7 @@ mod tests {
         let mut fut = manager.destroy_iface(TEST_IFACE_ID + 1);
 
         // No ifaces exist, so this should always return immediately.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[test]
@@ -1505,13 +1506,13 @@ mod tests {
         let (mut exec, mut monitor_stream, _sme_stream, _telemetry_receiver, manager, _iface) =
             setup_test_manager_with_iface();
         let mut set_country_fut = manager.set_country(123, *b"WW");
-        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
-        let (req, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        let (req, responder) = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::SetCountry { req, responder }))) => (req, responder));
         assert_eq!(req, fidl_device_service::SetCountryRequest { phy_id: 123, alpha2: *b"WW" });
         responder.send(0).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
     }
 
     #[test]
@@ -1519,8 +1520,8 @@ mod tests {
         let (mut exec, mut monitor_stream, _sme_stream, _telemetry_receiver, _manager, iface) =
             setup_test_manager_with_iface();
         let mut set_country_fut = iface.set_country(*b"WW");
-        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
-        let (req, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        let (req, responder) = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::SetCountry { req, responder }))) => (req, responder));
         assert_eq!(
@@ -1528,7 +1529,7 @@ mod tests {
             fidl_device_service::SetCountryRequest { phy_id: iface.phy_id, alpha2: *b"WW" }
         );
         responder.send(0).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
     }
 
     #[test]
@@ -1536,8 +1537,8 @@ mod tests {
         let (mut exec, mut monitor_stream, _sme_stream, _telemetry_receiver, _manager, iface) =
             setup_test_manager_with_iface();
         let mut query_fut = iface.query();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let (iface_id, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
+        let (iface_id, responder) = assert_matches!(
             exec.run_until_stalled(&mut monitor_stream.next()),
             Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::QueryIface { iface_id, responder }))) => (iface_id, responder));
         assert_eq!(iface_id, iface.iface_id);
@@ -1550,7 +1551,7 @@ mod tests {
                 sta_addr: [4, 5, 6, 7, 8, 9],
             };
         responder.send(Ok(&RESPONSE)).expect("Failed to send result");
-        let response = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(response)) => response);
+        let response = assert_matches!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(response)) => response);
         assert_eq!(response, RESPONSE);
     }
 
@@ -1560,14 +1561,14 @@ mod tests {
             setup_test_manager_with_iface();
         assert!(iface.get_last_scan_results().is_empty());
         let mut scan_fut = iface.trigger_scan();
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-        let (_req, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        let (_req, responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
         let result = wlan_common::scan::write_vmo(vec![test_utils::fake_scan_result()])
             .expect("Failed to write scan VMO");
         responder.send(Ok(result)).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Complete)));
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Complete)));
         assert_eq!(iface.get_last_scan_results().len(), 1);
     }
 
@@ -1577,14 +1578,14 @@ mod tests {
             setup_test_manager_with_iface();
         assert!(iface.get_last_scan_results().is_empty());
         let mut scan_fut = iface.trigger_scan();
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-        let (_req, _responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        let (_req, _responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
 
         // trigger_scan returns after we abort the scan, even though we have no results from SME.
-        assert_variant!(exec.run_until_stalled(&mut iface.abort_scan()), Poll::Ready(Ok(())));
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Cancelled)));
+        assert_matches!(exec.run_until_stalled(&mut iface.abort_scan()), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Cancelled)));
     }
 
     #[test]
@@ -1593,16 +1594,16 @@ mod tests {
             setup_test_manager_with_iface_and_fake_time();
         assert!(iface.get_last_scan_results().is_empty());
         let mut scan_fut = iface.trigger_scan();
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-        let (_req, _responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        let (_req, _responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
 
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(61_000_000_000));
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Err(_)));
 
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(event, TelemetryEvent::SmeTimeout);
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(event, TelemetryEvent::SmeTimeout);
     }
 
     #[test_case(
@@ -1668,8 +1669,8 @@ mod tests {
 
         let bssid = if bssid_specified { Some(Bssid::from([1, 2, 3, 4, 5, 6])) } else { None };
         let mut connect_fut = iface.connect_to_network(b"foo", credential, bssid);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (req, connect_txn) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         assert_eq!(req.bss_description, bss_description);
@@ -1681,11 +1682,11 @@ mod tests {
             is_credential_rejected: false,
             is_reconnect: false,
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
-        let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        let connected_result = assert_matches!(connect_result, Ok(ConnectResult::Success(r)) => r);
         assert_eq!(connected_result.bss.ssid, Ssid::try_from("foo").unwrap());
         assert_eq!(connected_result.bss.bssid, Bssid::from([1, 2, 3, 4, 5, 6]));
     }
@@ -1702,8 +1703,8 @@ mod tests {
         );
         let mut connect_fut =
             iface.connect_to_network(b"foo", Credential::None, Some(Bssid::from(bssid)));
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (_req, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (_req, responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
         let result = wlan_common::scan::write_vmo(vec![fidl_sme::ScanResult {
@@ -1715,9 +1716,9 @@ mod tests {
         }])
         .expect("Failed to write scan VMO");
         responder.send(Ok(result)).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
 
-        let (req, connect_txn) = assert_variant!(
+        let (req, connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         assert_eq!(req.bss_description, bss_description);
@@ -1728,11 +1729,11 @@ mod tests {
             is_credential_rejected: false,
             is_reconnect: false,
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
-        let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        let connected_result = assert_matches!(connect_result, Ok(ConnectResult::Success(r)) => r);
         assert_eq!(connected_result.bss.ssid, Ssid::try_from("foo").unwrap());
         assert_eq!(connected_result.bss.bssid, Bssid::from(bssid));
     }
@@ -1767,8 +1768,8 @@ mod tests {
         );
         let mut connect_fut =
             iface.connect_to_network(b"foo", Credential::None, Some(Bssid::from(bssid)));
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (_req, responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (_req, responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
         let result = wlan_common::scan::write_vmo(vec![fidl_sme::ScanResult {
@@ -1780,9 +1781,9 @@ mod tests {
         }])
         .expect("Failed to write scan VMO");
         responder.send(Ok(result)).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
 
-        let (req, connect_txn) = assert_variant!(
+        let (req, connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         assert_eq!(req.bss_description, bss_description);
@@ -1793,11 +1794,11 @@ mod tests {
             is_credential_rejected: false,
             is_reconnect: false,
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
-        let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        let connected_result = assert_matches!(connect_result, Ok(ConnectResult::Success(r)) => r);
         assert_eq!(connected_result.bss.ssid, Ssid::try_from("foo").unwrap());
         assert_eq!(connected_result.bss.bssid, Bssid::from(bssid));
     }
@@ -1866,7 +1867,7 @@ mod tests {
         }
 
         let mut connect_fut = iface.connect_to_network(b"foo", credential, bssid);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
     }
 
     #[test]
@@ -1890,8 +1891,8 @@ mod tests {
         ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (req, connect_txn) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         assert_eq!(req.bss_description, bss_description);
@@ -1909,11 +1910,11 @@ mod tests {
             is_credential_rejected: false,
             is_reconnect: false,
         });
-        assert_variant!(result, Ok(()));
+        assert_matches!(result, Ok(()));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
-        let failure = assert_variant!(connect_result, ConnectResult::Fail(failure) => failure);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
+        let failure = assert_matches!(connect_result, ConnectResult::Fail(failure) => failure);
         assert_eq!(failure.status_code, fidl_ieee80211::StatusCode::RefusedExternalReason);
         assert!(!failure.timed_out);
     }
@@ -1939,19 +1940,19 @@ mod tests {
         ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (_req, _connect_txn) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (_req, _connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(40_000_000_000));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
-        let failure = assert_variant!(connect_result, ConnectResult::Fail(failure) => failure);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
+        let failure = assert_matches!(connect_result, ConnectResult::Fail(failure) => failure);
         assert!(failure.timed_out);
 
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(event, TelemetryEvent::SmeTimeout);
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(event, TelemetryEvent::SmeTimeout);
     }
 
     #[test_case(
@@ -2040,13 +2041,13 @@ mod tests {
             ));
 
             let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-            let (_req, connect_txn) = assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+            let (_req, connect_txn) = assert_matches!(
                 exec.run_until_stalled(&mut sme_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
             let connect_txn_handle = connect_txn.into_stream_and_control_handle().1;
             let _result = connect_txn_handle.send_on_connect_result(&connect_failure);
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_r)));
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_r)));
         }
 
         *iface.last_scan_results.lock() = Some(LastScanResults::new(
@@ -2064,8 +2065,8 @@ mod tests {
         ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-        let (req, _connect_txn) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, _connect_txn) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
         assert_eq!(req.bss_description.bssid, expected_bssid.to_array());
@@ -2077,14 +2078,14 @@ mod tests {
             setup_test_manager_with_iface();
 
         let mut disconnect_fut = iface.disconnect();
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
-        let (disconnect_reason, disconnect_responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        let (disconnect_reason, disconnect_responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { reason, responder }))) => (reason, responder));
         assert_eq!(disconnect_reason, fidl_sme::UserDisconnectReason::Unknown);
 
-        assert_variant!(disconnect_responder.send(), Ok(()));
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        assert_matches!(disconnect_responder.send(), Ok(()));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
     }
 
     #[test]
@@ -2093,16 +2094,16 @@ mod tests {
             setup_test_manager_with_iface_and_fake_time();
 
         let mut disconnect_fut = iface.disconnect();
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
-        let (_disconnect_reason, _disconnect_responder) = assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        let (_disconnect_reason, _disconnect_responder) = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { reason, responder }))) => (reason, responder));
 
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(11_000_000_000));
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Err(_)));
 
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(event, TelemetryEvent::SmeTimeout);
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(event, TelemetryEvent::SmeTimeout);
     }
 
     #[test]
@@ -2111,11 +2112,11 @@ mod tests {
             setup_test_manager_with_iface();
 
         iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
-        assert_variant!(iface.get_connected_network_rssi(), Some(-40));
+        assert_matches!(iface.get_connected_network_rssi(), Some(-40));
         iface.on_disconnect(&fidl_sme::DisconnectSource::User(
             fidl_sme::UserDisconnectReason::Unknown,
         ));
-        assert_variant!(iface.get_connected_network_rssi(), None);
+        assert_matches!(iface.get_connected_network_rssi(), None);
     }
 
     #[test]
@@ -2123,9 +2124,9 @@ mod tests {
         let (_exec, _monitor_stream, _sme_stream, _telemetry_stream, _manager, iface) =
             setup_test_manager_with_iface();
 
-        assert_variant!(iface.get_connected_network_rssi(), None);
+        assert_matches!(iface.get_connected_network_rssi(), None);
         iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
-        assert_variant!(iface.get_connected_network_rssi(), Some(-40));
+        assert_matches!(iface.get_connected_network_rssi(), Some(-40));
     }
 
     #[derive(PartialEq)]
@@ -2185,13 +2186,13 @@ mod tests {
             Some(pb_topology_proxy),
             TelemetrySender::new(telemetry_sender),
         ));
-        assert_variant!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
         // Expect power broker initialization
-        let mut pb_update_channel = assert_variant!(
+        let mut pb_update_channel = assert_matches!(
             exec.run_until_stalled(&mut pb_stream.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload, responder }))) => {
                 assert_eq!(payload.initial_current_level, Some(StaIfacePowerLevel::NoPowerSavings as u8));
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
                 payload.level_control_channels.unwrap().current.into_stream()
         });
         let iface = exec.run_singlethreaded(iface_create_fut);
@@ -2203,7 +2204,7 @@ mod tests {
                 PowerCall::SetPowerSaveMode(val) => iface.set_power_save_mode(val),
                 PowerCall::SetSuspendMode(val) => iface.set_suspend_mode(val),
             };
-            assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
 
             // Validate the expected setting is sent to the power broker
             let expected_pb_val = match expected_driver_val {
@@ -2212,12 +2213,12 @@ mod tests {
                 fidl_common::PowerSaveType::PsModeBalanced => StaIfacePowerLevel::Normal,
                 fidl_common::PowerSaveType::PsModePerformance => StaIfacePowerLevel::NoPowerSavings,
             };
-            assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut pb_update_channel.next()),
                 Poll::Ready(Some(Ok(fidl_power_broker::CurrentLevelRequest::Update { current_level, responder }))) => {
                     assert_eq!(current_level, expected_pb_val as u8);
-                    assert_variant!(responder.send(Ok(())), Ok(()));
+                    assert_matches!(responder.send(Ok(())), Ok(()));
             });
 
             // Future completes
@@ -2250,13 +2251,13 @@ mod tests {
             Some(pb_topology_proxy),
             TelemetrySender::new(telemetry_sender),
         ));
-        assert_variant!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
         // Expect power broker initialization
-        let mut pb_update_channel = assert_variant!(
+        let mut pb_update_channel = assert_matches!(
             exec.run_until_stalled(&mut pb_stream.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload, responder }))) => {
                 assert_eq!(payload.initial_current_level, Some(StaIfacePowerLevel::NoPowerSavings as u8));
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
                 payload.level_control_channels.unwrap().current.into_stream()
         });
         let iface = exec.run_singlethreaded(iface_create_fut);
@@ -2266,14 +2267,14 @@ mod tests {
             PowerCall::SetPowerSaveMode(val) => iface.set_power_save_mode(val),
             PowerCall::SetSuspendMode(val) => iface.set_suspend_mode(val),
         };
-        assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
 
         // Respond to the call to power broker
-        assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut pb_update_channel.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::CurrentLevelRequest::Update { current_level: _, responder }))) => {
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
         });
 
         // Future completes
@@ -2291,8 +2292,8 @@ mod tests {
             }
         };
 
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(event, TelemetryEvent::IfacePowerLevelChanged {
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(event, TelemetryEvent::IfacePowerLevelChanged {
             iface_id,
             iface_power_level
         } => {
@@ -2323,31 +2324,31 @@ mod tests {
             Some(pb_topology_proxy),
             TelemetrySender::new(telemetry_sender),
         ));
-        assert_variant!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
         // Expect power broker initialization
-        let mut pb_update_channel = assert_variant!(
+        let mut pb_update_channel = assert_matches!(
             exec.run_until_stalled(&mut pb_stream.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload, responder }))) => {
                 assert_eq!(payload.initial_current_level, Some(StaIfacePowerLevel::NoPowerSavings as u8));
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
                 payload.level_control_channels.unwrap().current.into_stream()
         });
         let iface = exec.run_singlethreaded(iface_create_fut);
 
         // Set suspend mode on
         let mut power_call_fut = iface.set_suspend_mode(true);
-        assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
 
         // Respond to the power broker setting
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut pb_update_channel.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::CurrentLevelRequest::Update { current_level: _, responder }))) => {
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
         });
         exec.run_singlethreaded(&mut power_call_fut).expect("future finished");
 
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(
             event,
             TelemetryEvent::IfacePowerLevelChanged { iface_power_level: _, iface_id: _ }
         );
@@ -2358,21 +2359,21 @@ mod tests {
             PowerCall::SetPowerSaveMode(val) => iface.set_power_save_mode(val),
             PowerCall::SetSuspendMode(val) => iface.set_suspend_mode(val),
         };
-        assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
 
         // Respond to the power broker setting
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut pb_update_channel.next()),
             Poll::Ready(Some(Ok(fidl_power_broker::CurrentLevelRequest::Update { current_level: _, responder }))) => {
-                assert_variant!(responder.send(Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
         });
 
         // Future completes
         exec.run_singlethreaded(&mut power_call_fut).expect("future finished");
 
         // Check for the unclear power demand metric
-        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
-        assert_variant!(
+        let event = assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_matches!(
             event,
             TelemetryEvent::UnclearPowerDemand(
                 wlan_telemetry::UnclearPowerDemand::PowerSaveRequestedWhileSuspendModeEnabled

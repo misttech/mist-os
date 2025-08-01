@@ -357,7 +357,8 @@ where
 mod tests {
     use super::*;
     use crate::mac::*;
-    use crate::{assert_variant, TimeUnit};
+    use crate::TimeUnit;
+    use assert_matches::assert_matches;
 
     #[test]
     fn mgmt_hdr_len() {
@@ -374,7 +375,7 @@ mod tests {
             3,3, // capabilities
             0,5,1,2,3,4,5 // SSID IE: "12345"
         ];
-        assert_variant!(
+        assert_matches!(
             MgmtBody::parse(MgmtSubtype::BEACON, &bytes[..]),
             Some(MgmtBody::Beacon { bcn_hdr, elements }) => {
                 assert_eq!(TimeUnit(0x0202), { bcn_hdr.beacon_interval });

@@ -85,14 +85,15 @@ mod test {
         generate_random_bss_with_compatibility, generate_random_connect_reason,
         generate_random_scanned_candidate,
     };
+    use assert_matches::assert_matches;
     use diagnostics_assertions::{
         assert_data_tree, AnyBoolProperty, AnyNumericProperty, AnyProperty, AnyStringProperty,
     };
     use futures::channel::mpsc;
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
+    use wlan_common::random_fidl_bss_description;
     use wlan_common::scan::Incompatible;
-    use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
         fuchsia_inspect as inspect,
@@ -404,8 +405,8 @@ mod test {
             ))
             .is_some());
 
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::BssSelectionResult {
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::BssSelectionResult {
                 reason,
                 scored_candidates,
                 selected_candidate: _,

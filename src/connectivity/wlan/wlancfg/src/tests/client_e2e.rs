@@ -21,6 +21,7 @@ use crate::util::testing::{
     create_inspect_persistence_channel, generate_ssid, run_until_completion, run_while,
 };
 use anyhow::{format_err, Error};
+use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
 use fidl_fuchsia_wlan_internal::SignalReportIndication;
@@ -41,9 +42,9 @@ use std::pin::{pin, Pin};
 use std::rc::Rc;
 use std::sync::Arc;
 use test_case::test_case;
+use wlan_common::random_fidl_bss_description;
 use wlan_common::scan::write_vmo;
 use wlan_common::test_utils::ExpectWithin;
-use wlan_common::{assert_variant, random_fidl_bss_description};
 #[allow(
     clippy::single_component_path_imports,
     reason = "mass allow for https://https://fxbug.devug.dev/381896734"
@@ -368,7 +369,7 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
         &mut add_phy_fut,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         device_monitor_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSupportedMacRoles {
             phy_id: TEST_PHY_ID, responder
@@ -397,7 +398,7 @@ fn prepare_client_interface(
     let start_connections_fut =
         test_values.external_interfaces.client_controller.start_client_connections();
     let mut start_connections_fut = pin!(start_connections_fut);
-    assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
 
     // Expect an interface creation request
     let iface_creation_req = run_while(
@@ -405,7 +406,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         iface_creation_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
             payload: fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceRequest {
@@ -431,7 +432,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         iface_query,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
             iface_id: TEST_CLIENT_IFACE_ID, responder
@@ -455,7 +456,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    let sme_server = assert_variant!(
+    let sme_server = assert_matches!(
         sme_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -474,7 +475,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    let sme_server = assert_variant!(
+    let sme_server = assert_matches!(
         sme_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -489,7 +490,7 @@ fn prepare_client_interface(
     // State machine does an initial disconnect
     let sme_req =
         run_while(exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
-    assert_variant!(
+    assert_matches!(
         sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
@@ -500,7 +501,7 @@ fn prepare_client_interface(
     );
 
     // Ensure the disconnect is fully processed by our state machine
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -511,7 +512,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         &mut start_connections_fut,
     );
-    assert_variant!(start_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
+    assert_matches!(start_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
     iface_sme_stream
 }
@@ -538,7 +539,7 @@ where
 {
     // Get the next update
     let next_update_req = run_while(exec, background_tasks, client_listener_update_requests.next());
-    let update_request = assert_variant!(
+    let update_request = assert_matches!(
         next_update_req,
         Some(Ok(update_request)) => {
             update_request
@@ -548,7 +549,7 @@ where
 
     // Send ack and ensure it is processed
     let _ = responder.send();
-    assert_variant!(exec.run_until_stalled(background_tasks), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(background_tasks), Poll::Pending);
 
     update
 }
@@ -591,7 +592,7 @@ fn save_and_connect(
     test_values: &mut TestValues,
 ) -> ExistingConnectionSmeObjects {
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -631,7 +632,7 @@ fn save_and_connect(
 
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let save_resp = run_while(exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -672,7 +673,7 @@ fn save_and_connect(
         &mut test_values.internal_objects.internal_futures,
         iface_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_stream_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
@@ -689,7 +690,7 @@ fn save_and_connect(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    let sme_server = assert_variant!(
+    let sme_server = assert_matches!(
         next_device_monitor_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -707,7 +708,7 @@ fn save_and_connect(
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
@@ -723,7 +724,7 @@ fn save_and_connect(
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),
     );
-    let connect_txn_handle = assert_variant!(
+    let connect_txn_handle = assert_matches!(
         next_sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Connect {
             req, txn, control_handle: _
@@ -877,7 +878,7 @@ fn test_save_and_fail_to_connect(
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -933,7 +934,7 @@ fn test_save_and_fail_to_connect(
     // Save request returns once the scan has been queued.
     let save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, &mut save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     let mut bss_selection_scan_count = 0;
     while bss_selection_scan_count < 3 {
@@ -961,7 +962,7 @@ fn test_save_and_fail_to_connect(
             &mut test_values.internal_objects.internal_futures,
             iface_sme_stream.next(),
         );
-        assert_variant!(
+        assert_matches!(
             sme_request,
             Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder
@@ -1027,13 +1028,13 @@ fn test_fail_to_save(
     let mut save_fut = pin!(save_fut);
 
     // Progress the WLAN policy side of the future
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
 
     // Saving the network should return an error
-    assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Err(error))) => {
+    assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Err(error))) => {
         assert_eq!(error, save_error);
     });
 }
@@ -1072,7 +1073,7 @@ fn test_connect_to_new_network() {
     // Save request returns.
     let save_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_fut_resp, Ok(Ok(())));
+    assert_matches!(save_fut_resp, Ok(Ok(())));
 
     // Send a request to connect to the second network.
     let connect_fut = test_values.external_interfaces.client_controller.connect(&network_id);
@@ -1081,7 +1082,7 @@ fn test_connect_to_new_network() {
     // Check that connect request was acknowledged.
     let connect_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, connect_fut);
-    assert_variant!(connect_fut_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
+    assert_matches!(connect_fut_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
     // Check for a listener update saying we're both connected and connecting.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -1141,7 +1142,7 @@ fn test_connect_to_new_network() {
         &mut test_values.internal_objects.internal_futures,
         existing_connection.iface_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         client_sme_request,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
@@ -1158,7 +1159,7 @@ fn test_connect_to_new_network() {
         &mut test_values.internal_objects.internal_futures,
         existing_connection.state_machine_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         client_sme_request,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
@@ -1192,7 +1193,7 @@ fn test_connect_to_new_network() {
         &mut test_values.internal_objects.internal_futures,
         existing_connection.state_machine_sme_stream.next(),
     );
-    let connect_txn_handle = assert_variant!(
+    let connect_txn_handle = assert_matches!(
         client_sme_request,
         Some(Ok(fidl_sme::ClientSmeRequest::Connect {
             req, txn, control_handle: _
@@ -1239,7 +1240,7 @@ fn test_autoconnect_to_saved_network() {
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -1269,7 +1270,7 @@ fn test_autoconnect_to_saved_network() {
     // Save request returns.
     let save_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_fut_resp, Ok(Ok(())));
+    assert_matches!(save_fut_resp, Ok(Ok(())));
 
     // Enable client connections.
     let mut iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
@@ -1297,7 +1298,7 @@ fn test_autoconnect_to_saved_network() {
         &mut test_values.internal_objects.internal_futures,
         iface_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_stream_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
@@ -1317,12 +1318,12 @@ fn test_autoconnect_to_saved_network() {
         &mut test_values.internal_objects.internal_futures,
         iface_sme_stream.next(),
     );
-    let active_scan_channels = assert_variant!(
+    let active_scan_channels = assert_matches!(
         next_sme_stream_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
         })) => {
-            let channels = assert_variant!(req, fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
+            let channels = assert_matches!(req, fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
                 mut ssids, channels
             }) => {
                 assert_eq!(ssids.len(), 1);
@@ -1352,7 +1353,7 @@ fn test_autoconnect_to_saved_network() {
                 &mut test_values.internal_objects.internal_futures,
                 iface_sme_stream.next(),
             );
-            assert_variant!(
+            assert_matches!(
                 next_sme_stream_req,
                 Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                     req, responder
@@ -1375,7 +1376,7 @@ fn test_autoconnect_to_saved_network() {
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    let sme_server = assert_variant!(
+    let sme_server = assert_matches!(
         next_device_monitor_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -1393,7 +1394,7 @@ fn test_autoconnect_to_saved_network() {
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
@@ -1431,7 +1432,7 @@ fn test_autoconnect_to_saved_network() {
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),
     );
-    let connect_txn_handle = assert_variant!(
+    let connect_txn_handle = assert_matches!(
         next_sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Connect {
             req, txn, control_handle: _
@@ -1475,7 +1476,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -1505,7 +1506,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     // Save request returns.
     let save_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_fut_resp, Ok(Ok(())));
+    assert_matches!(save_fut_resp, Ok(Ok(())));
 
     // Enter the loop of:
     //  - start client connections
@@ -1545,7 +1546,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             // location sensor results.
             let mut scan_req = None;
             for _j in 1..=10 {
-                assert_variant!(
+                assert_matches!(
                     exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
                     Poll::Pending
                 );
@@ -1569,7 +1570,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 )
             });
             debug!("This is scan number {}", _i);
-            assert_variant!(
+            assert_matches!(
                 next_sme_stream_req,
                 Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                     req, responder
@@ -1605,7 +1606,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             test_values.external_interfaces.monitor_service_stream.next(),
         );
-        let sme_server = assert_variant!(
+        let sme_server = assert_matches!(
             next_device_monitor_req,
             Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -1623,7 +1624,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             state_machine_sme_stream.next(),
         );
-        assert_variant!(
+        assert_matches!(
             next_sme_req,
             Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
                 reason, responder
@@ -1661,7 +1662,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             state_machine_sme_stream.next(),
         );
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             next_sme_req,
             Some(Ok(fidl_sme::ClientSmeRequest::Connect {
                 req, txn, control_handle: _
@@ -1698,7 +1699,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         let stop_connections_fut =
             test_values.external_interfaces.client_controller.stop_client_connections();
         let mut stop_connections_fut = pin!(stop_connections_fut);
-        assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
 
         // State machine disconnects
         let next_sme_req = run_while(
@@ -1706,7 +1707,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             state_machine_sme_stream.next(),
         );
-        assert_variant!(
+        assert_matches!(
             next_sme_req,
             Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
                 reason, responder
@@ -1735,7 +1736,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             test_values.external_interfaces.monitor_service_stream.next(),
         );
-        assert_variant!(
+        assert_matches!(
             iface_destruction_req,
             Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
                 req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {
@@ -1755,7 +1756,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             &mut stop_connections_fut,
         );
-        assert_variant!(stop_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
+        assert_matches!(stop_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
         // Check for a listener update saying client connections are disabled.
         let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -1777,7 +1778,7 @@ fn test_destroy_iface_recovery() {
         test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -1789,7 +1790,7 @@ fn test_destroy_iface_recovery() {
     let stop_connections_fut =
         test_values.external_interfaces.client_controller.stop_client_connections();
     let mut stop_connections_fut = pin!(stop_connections_fut);
-    assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
 
     // Device monitor gets an iface destruction request and responds indicating that the interface
     // destruction was unsuccessful.
@@ -1798,7 +1799,7 @@ fn test_destroy_iface_recovery() {
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         iface_destruction_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
             req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {
@@ -1818,7 +1819,7 @@ fn test_destroy_iface_recovery() {
         &mut test_values.internal_objects.internal_futures,
         &mut stop_connections_fut,
     );
-    assert_variant!(
+    assert_matches!(
         stop_connections_resp,
         Ok(fidl_fuchsia_wlan_policy::RequestStatus::Acknowledged)
     );
@@ -1829,7 +1830,7 @@ fn test_destroy_iface_recovery() {
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         phy_reset_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
             phy_id: TEST_PHY_ID,
@@ -1847,7 +1848,7 @@ fn test_create_iface_recovery() {
         test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -1859,7 +1860,7 @@ fn test_create_iface_recovery() {
     let start_connections_fut =
         test_values.external_interfaces.client_controller.start_client_connections();
     let mut start_connections_fut = pin!(start_connections_fut);
-    assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
 
     // Expect an interface creation request and reply with a failure to trigger recovery.
     let iface_creation_req = run_while(
@@ -1867,7 +1868,7 @@ fn test_create_iface_recovery() {
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         iface_creation_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
             payload,
@@ -1886,7 +1887,7 @@ fn test_create_iface_recovery() {
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         phy_reset_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
             phy_id: TEST_PHY_ID,
@@ -1903,13 +1904,13 @@ fn request_scan_and_reply(
 ) {
     // Make a scan request.
     let (_iter, server) = create_proxy();
-    assert_variant!(
+    assert_matches!(
         test_values.external_interfaces.client_controller.scan_for_networks(server),
         Ok(())
     );
 
     // Run the internal futures to route the scan request to SME.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -1917,7 +1918,7 @@ fn request_scan_and_reply(
         run_while(exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
 
     // Respond with a failure.
-    assert_variant!(
+    assert_matches!(
         next_sme_stream_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             responder, ..
@@ -1944,7 +1945,7 @@ fn expect_destroy_iface_request_and_reply(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         destroy_iface_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
             req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {iface_id},
@@ -1974,14 +1975,14 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
     let remove_iface_event = DeviceWatcherEvent::OnIfaceRemoved { iface_id: expected_iface_id };
     let remove_iface_fut = device_monitor::handle_event(&listener, remove_iface_event);
     let mut remove_iface_fut = pin!(remove_iface_fut);
-    assert_variant!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Pending);
 
     let iface_creation_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         iface_creation_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
             payload: fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceRequest {
@@ -2008,7 +2009,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
     );
-    let sme_server = assert_variant!(
+    let sme_server = assert_matches!(
         sme_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id, sme_server, responder
@@ -2023,11 +2024,11 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
 
     // Run the iface removal notification to completion.  This is subtle, but the device watcher
     // holds a lock on the IfaceManager until this future completes.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
-    assert_variant!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Ready(()));
+    assert_matches!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Ready(()));
 
     sme_stream
 }
@@ -2048,7 +2049,7 @@ fn test_scan_recovery(
         test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2114,7 +2115,7 @@ fn reject_connect_requests(
 
         // Progress the internal futures to run the iface manager, client state machine, scan
         // manager, and network selection logic.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
             Poll::Pending
         );
@@ -2222,7 +2223,7 @@ fn test_connect_failure_recovery() {
     }];
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2238,7 +2239,7 @@ fn test_connect_failure_recovery() {
     // the scan has been queued.
     let save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     // Reject connect requests until the recovery threshold has been hit.
     let mut state_machine_sme_stream = None;
@@ -2276,7 +2277,7 @@ fn listener_updates_connecting_networks_correctly_on_removal() {
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2318,7 +2319,7 @@ fn listener_updates_connecting_networks_correctly_on_removal() {
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2341,7 +2342,7 @@ fn listener_updates_connecting_networks_correctly_on_removal() {
     // Continue processing the remove request.
     let remove_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, remove_fut);
-    assert_variant!(remove_resp, Ok(Ok(())));
+    assert_matches!(remove_resp, Ok(Ok(())));
 
     // Check for a listener update saying the connecting network has disconnected.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2365,7 +2366,7 @@ fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2407,7 +2408,7 @@ fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, &mut save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting to the first network.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2441,7 +2442,7 @@ fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let second_save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, second_save_fut);
-    assert_variant!(second_save_resp, Ok(Ok(())));
+    assert_matches!(second_save_resp, Ok(Ok(())));
 
     // Check for a listener update saying the first network is now disconnected, and the new network
     // is connecting.
@@ -2471,7 +2472,7 @@ fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
     // Continue processing the remove request.
     let remove_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, remove_fut);
-    assert_variant!(remove_resp, Ok(Ok(())));
+    assert_matches!(remove_resp, Ok(Ok(())));
 
     // Check for a listener update saying the second network has disconnected.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2495,7 +2496,7 @@ fn listener_updates_connecting_networks_correctly_on_stop_client_connections() {
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2537,7 +2538,7 @@ fn listener_updates_connecting_networks_correctly_on_stop_client_connections() {
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let save_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
+    assert_matches!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2556,7 +2557,7 @@ fn listener_updates_connecting_networks_correctly_on_stop_client_connections() {
     let stop_connections_fut =
         test_values.external_interfaces.client_controller.stop_client_connections();
     let mut stop_connections_fut = pin!(stop_connections_fut);
-    assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+    assert_matches!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
 
     // Check for a listener update that connections are disabled and the pending connection was cancelled.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2618,7 +2619,7 @@ fn solicit_roam_scan_with_signal_reports(
             .expect("failed to send signal report");
 
         // Run the state machine to process the signal report.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
             Poll::Pending
         );
@@ -2748,7 +2749,7 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     );
 
     // Expect successful attempt to solicit a roam scan.
-    assert_variant!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+    assert_matches!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
         // Respond to the scan request so the next is not deduped.
         responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to respond to scan request");
     });
@@ -2831,7 +2832,7 @@ fn assert_roam_request_expectation<F>(
     }
 
     // Run forward internal futures.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -2965,7 +2966,7 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
         ));
 
         // Expect a successful attempt to trigger a roam scan.
-        assert_variant!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+        assert_matches!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
             // Respond with the mock roam candidate.
             responder
             .send(Ok(write_vmo(scan_results.clone()).expect("failed to write VMO")))
@@ -2973,13 +2974,13 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
         });
 
         // Run forward internal futures.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
             Poll::Pending
         );
 
         // Expect that a roam request was sent to SME.
-        assert_variant!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
+        assert_matches!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
             assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
         });
 
@@ -3006,7 +3007,7 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
             .expect("failed to return roam result");
 
         // Run forward internal futures.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
             Poll::Pending
         );
@@ -3063,7 +3064,7 @@ fn test_autconnect_starts_after_roam_error() {
     ));
 
     // Expect a successful attempt to trigger a roam scan.
-    assert_variant!(solicit_roam_scan_weak_rssi(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+    assert_matches!(solicit_roam_scan_weak_rssi(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
         // Respond with the mock roam candidate.
         responder
         .send(Ok(write_vmo(scan_results.clone()).expect("failed to write VMO")))
@@ -3071,13 +3072,13 @@ fn test_autconnect_starts_after_roam_error() {
     });
 
     // Run forward internal futures.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
 
     // Expect that a roam request was sent to SME.
-    assert_variant!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
+    assert_matches!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
         assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
     });
 
@@ -3097,7 +3098,7 @@ fn test_autconnect_starts_after_roam_error() {
         .expect("failed to return roam result");
 
     // Run forward internal futures.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -3108,7 +3109,7 @@ fn test_autconnect_starts_after_roam_error() {
         &mut test_values.internal_objects.internal_futures,
         existing_connection.state_machine_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
@@ -3119,7 +3120,7 @@ fn test_autconnect_starts_after_roam_error() {
     );
 
     // Run forward internal futures.
-    assert_variant!(
+    assert_matches!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
         Poll::Pending
     );
@@ -3160,7 +3161,7 @@ fn test_autconnect_starts_after_roam_error() {
         &mut test_values.internal_objects.internal_futures,
         existing_connection.iface_sme_stream.next(),
     );
-    assert_variant!(
+    assert_matches!(
         next_sme_stream_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
