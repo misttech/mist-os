@@ -158,7 +158,7 @@ impl std::ops::Drop for EventHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use crate::assert_variant;
     use fuchsia_async as fasync;
 
     use futures::channel::mpsc::UnboundedSender;
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(event2.id, 1);
         assert_eq!(event2.event, 9);
 
-        assert_matches!(time_stream.try_next(), Err(e) => {
+        assert_variant!(time_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty")
         });
     }
@@ -221,7 +221,7 @@ mod tests {
         // values since they're dependent on the system clock.
         assert!(t1.into_nanos() > t2.into_nanos());
 
-        assert_matches!(time_stream.try_next(), Err(e) => {
+        assert_variant!(time_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty")
         });
     }
@@ -265,9 +265,9 @@ mod tests {
             assert_eq!(Poll::Pending, exec.run_until_stalled(&mut fut));
             assert!(exec.wake_next_timer().is_some());
         }
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut fut),
-            Poll::Ready(events) => assert_eq!(events, vec![1, 2, 3, 0])
+            Poll::Ready(events) => assert_eq!(events, vec![1, 2, 3, 0]),
         );
     }
 
@@ -286,7 +286,7 @@ mod tests {
 
         exec.set_fake_time(deadline.into());
         let mut next = timeout_stream.next();
-        assert_matches!(exec.run_until_stalled(&mut next), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut next), Poll::Pending);
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
         let mut next = timeout_stream.next();
         // The event still appears.
         let event =
-            assert_matches!(exec.run_until_stalled(&mut next), Poll::Ready(Some(event)) => event);
+            assert_variant!(exec.run_until_stalled(&mut next), Poll::Ready(Some(event)) => event);
         assert_eq!(event.event, 7357);
     }
 

@@ -318,7 +318,6 @@ fn convert_roam_result(result: &RoamResult) -> fidl_sme::RoamResult {
 mod tests {
     use super::*;
     use crate::client::{ConnectFailure, EstablishRsnaFailure, EstablishRsnaFailureReason};
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_wlan_mlme::ScanResultCode;
     use fidl_fuchsia_wlan_sme::{self as fidl_sme};
@@ -328,8 +327,8 @@ mod tests {
     use rand::Rng;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::random_bss_description;
     use wlan_common::scan::{self, Incompatible};
+    use wlan_common::{assert_variant, random_bss_description};
     use wlan_rsn::auth;
     use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
@@ -464,7 +463,7 @@ mod tests {
         let result_fut = request_and_collect_result(&client_sme_proxy);
         let mut result_fut = pin!(result_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut result_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Pending);
 
         // Generate and send scan results
         let mut rng = rand::rng();
@@ -473,7 +472,7 @@ mod tests {
         } else {
             vec![random_scan_result(&mut rng).into(); number_of_scan_results]
         };
-        assert_matches!(exec.run_until_stalled(&mut client_sme_stream.next()),
+        assert_variant!(exec.run_until_stalled(&mut client_sme_stream.next()),
                         Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                             req: _, responder,
                         }))) => {
@@ -483,7 +482,7 @@ mod tests {
         );
 
         // Verify scan results
-        assert_matches!(exec.run_until_stalled(&mut result_fut), Poll::Ready(Ok(vmo)) => {
+        assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Ready(Ok(vmo)) => {
             assert_eq!(scan_result_list, scan::read_vmo(vmo).expect("failed to read VMO"));
         })
     }
@@ -510,9 +509,9 @@ mod tests {
                 is_reconnect: true,
             })
             .expect("expect sending ConnectTransactionEvent to succeed");
-        assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let event = assert_matches!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
+        assert_variant!(
             event,
             fidl_sme::ConnectTransactionEvent::OnConnectResult {
                 result: fidl_sme::ConnectResult {
@@ -534,9 +533,9 @@ mod tests {
         sme_proxy
             .unbounded_send(ConnectTransactionEvent::OnDisconnect { info: input_info })
             .expect("expect sending ConnectTransactionEvent to succeed");
-        assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let event = assert_matches!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
-        assert_matches!(event, fidl_sme::ConnectTransactionEvent::OnDisconnect { info: output_info } => {
+        assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
+        assert_variant!(event, fidl_sme::ConnectTransactionEvent::OnDisconnect { info: output_info } => {
             assert_eq!(input_info, output_info);
         });
 
@@ -545,9 +544,9 @@ mod tests {
         sme_proxy
             .unbounded_send(ConnectTransactionEvent::OnSignalReport { ind: input_ind })
             .expect("expect sending ConnectTransactionEvent to succeed");
-        assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let event = assert_matches!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
-        assert_matches!(event, fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
+        assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
+        assert_variant!(event, fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
             assert_eq!(input_ind, ind);
         });
 
@@ -556,15 +555,15 @@ mod tests {
         sme_proxy
             .unbounded_send(ConnectTransactionEvent::OnChannelSwitched { info: input_info })
             .expect("expect sending ConnectTransactionEvent to succeed");
-        assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let event = assert_matches!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
-        assert_matches!(event, fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
+        assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
+        assert_variant!(event, fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
             assert_eq!(input_info, info);
         });
 
         // When SME proxy is dropped, the fut should terminate
         std::mem::drop(sme_proxy);
-        assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Ready(Ok(())));
     }
 
     fn poll_stream_fut<S: Stream + std::marker::Unpin>(

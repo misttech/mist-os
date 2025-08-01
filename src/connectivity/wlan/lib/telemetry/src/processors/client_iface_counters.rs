@@ -491,12 +491,12 @@ impl IfaceCountersTimeSeries {
 mod tests {
     use super::*;
     use crate::testing::*;
-    use assert_matches::assert_matches;
     use futures::TryStreamExt;
     use std::pin::pin;
     use std::task::Poll;
     use test_case::test_case;
     use windowed_stats::experimental::testing::{MockTimeMatrixClient, TimeMatrixCall};
+    use wlan_common::assert_variant;
 
     const IFACE_ID: u16 = 66;
 
@@ -536,7 +536,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        assert_matches!(logger.iface_state.try_lock().as_deref(), Some(IfaceState::Created { .. }));
+        assert_variant!(logger.iface_state.try_lock().as_deref(), Some(IfaceState::Created { .. }));
         let driver_counters_time_series = logger.driver_counters_time_series.try_lock().unwrap();
         assert_eq!(driver_counters_time_series.keys().copied().collect::<Vec<u16>>(), vec![1u16],);
     }

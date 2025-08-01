@@ -73,7 +73,7 @@ pub fn extract_elements(key_data: &[u8]) -> Result<Vec<Element>, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
     use wlan_common::ie::rsn::{akm, cipher};
     use wlan_common::organization::Oui;
 
@@ -200,7 +200,7 @@ mod tests {
         assert_eq!(elements.len(), 2);
 
         for e in elements {
-            assert_matches!(e, Element::UnsupportedIe(10, 13) | Element::Padding);
+            assert_variant!(e, Element::UnsupportedIe(10, 13) | Element::Padding);
         }
     }
 
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(elements.len(), 2);
 
         for e in elements {
-            assert_matches!(e, Element::UnsupportedIe(20, 6) | Element::Padding);
+            assert_variant!(e, Element::UnsupportedIe(20, 6) | Element::Padding);
         }
     }
 
@@ -242,7 +242,7 @@ mod tests {
         assert_eq!(elements.len(), 1);
 
         for e in elements {
-            assert_matches!(e, Element::Gtk(hdr, kde) => {
+            assert_variant!(e, Element::Gtk(hdr, kde) => {
                 assert_eq!(
                     hdr,
                     kde::Header { type_: 0xDD, len: 14, oui: Oui::DOT11, data_type: 1 }
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(elements.len(), 1);
 
         for e in elements {
-            assert_matches!(e, Element::Gtk(hdr, kde) => {
+            assert_variant!(e, Element::Gtk(hdr, kde) => {
                 assert_eq!(
                     hdr,
                     kde::Header { type_: 0xDD, len: 22, oui: Oui::DOT11, data_type: 1 }
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(elements.len(), 1);
 
         for e in elements {
-            assert_matches!(e, Element::LegacyWpa1(wpa_ie) => {
+            assert_variant!(e, Element::LegacyWpa1(wpa_ie) => {
                 assert_eq!(
                     wpa_ie.multicast_cipher,
                     cipher::Cipher { oui: Oui::MSFT, suite_type: cipher::TKIP }

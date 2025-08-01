@@ -136,12 +136,6 @@ pub struct DataFrame<B> {
     pub body: B,
 }
 
-impl<B> std::fmt::Debug for DataFrame<B> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DataFrame").finish()
-    }
-}
-
 impl<B> DataFrame<B>
 where
     B: SplitByteSlice,
@@ -302,17 +296,6 @@ impl<B: SplitByteSlice> MacFrame<B> {
     }
 }
 
-impl<B: SplitByteSlice> std::fmt::Debug for MacFrame<B> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MacFrame::Mgmt(_) => f.write_str("MacFrame::Mgmt"),
-            MacFrame::Data(_) => f.write_str("MacFrame::Data"),
-            MacFrame::Ctrl(_) => f.write_str("MacFrame::Ctrl"),
-            MacFrame::Unsupported { .. } => f.write_str("MacFrame::Unsupported"),
-        }
-    }
-}
-
 impl<B> From<CtrlFrame<B>> for MacFrame<B> {
     fn from(ctrl: CtrlFrame<B>) -> Self {
         MacFrame::Ctrl(ctrl)
@@ -351,13 +334,13 @@ fn round_up<T: Unsigned + Copy>(value: T, multiple: T) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_variant;
     use crate::test_utils::fake_frames::*;
-    use assert_matches::assert_matches;
 
     #[test]
     fn parse_mgmt_frame() {
         let bytes = make_mgmt_frame(false);
-        assert_matches!(
+        assert_variant!(
             MacFrame::parse(&bytes[..], false),
             Some(MacFrame::Mgmt(MgmtFrame { mgmt_hdr, ht_ctrl, body })) => {
                 assert_eq!(0x0101, { mgmt_hdr.frame_ctrl.0 });
@@ -379,7 +362,7 @@ mod tests {
         assert!(MacFrame::parse(&[0; 22][..], false).is_none());
 
         // Unsupported frame type.
-        assert_matches!(
+        assert_variant!(
             MacFrame::parse(&[0xFF; 24][..], false),
             Some(MacFrame::Unsupported { frame_ctrl }) => {
                 assert_eq!(frame_ctrl, FrameControl(0xFFFF))
@@ -391,7 +374,7 @@ mod tests {
     #[test]
     fn parse_data_frame() {
         let bytes = make_data_frame_single_llc(None, None);
-        assert_matches!(
+        assert_variant!(
             MacFrame::parse(&bytes[..], false),
             Some(MacFrame::Data(DataFrame { fixed_fields, addr4, qos_ctrl, ht_ctrl, body })) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
@@ -411,7 +394,7 @@ mod tests {
 
     #[test]
     fn parse_ctrl_frame() {
-        assert_matches!(
+        assert_variant!(
             MacFrame::parse(&[
                 0b10100100, 0b00000000, // Frame Control
                 0b00000001, 0b11000000, // Masked AID

@@ -57,7 +57,6 @@ mod tests {
     use crate::mode_management::recovery::RecoverySummary;
     use crate::mode_management::Defect;
     use crate::regulatory_manager::REGION_CODE_LEN;
-    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy;
     use fuchsia_async as fasync;
@@ -65,6 +64,7 @@ mod tests {
     use std::collections::HashMap;
     use std::pin::pin;
     use std::unimplemented;
+    use wlan_common::assert_variant;
 
     #[derive(Debug)]
     struct StubPhyManager(Option<MacAddr>);
@@ -179,7 +179,7 @@ mod tests {
         // Verify that the MAC has been set on the PhyManager
         let lock_fut = phy_manager.lock();
         let mut lock_fut = pin!(lock_fut);
-        let phy_manager = assert_matches!(
+        let phy_manager = assert_variant!(
             exec.run_until_stalled(&mut lock_fut),
             Poll::Ready(phy_manager) => {
                 phy_manager
@@ -188,6 +188,6 @@ mod tests {
         let expected_mac = MacAddr::from(octets);
         assert_eq!(Some(expected_mac), phy_manager.0);
 
-        assert_matches!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Ok(Ok(()))));
+        assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Ok(Ok(()))));
     }
 }

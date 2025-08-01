@@ -716,12 +716,12 @@ mod test {
     use crate::boringssl::{Bignum, EcGroupId};
     use crate::hmac_utils::HmacUtilsImpl;
     use crate::{ecc, PweMethod};
-    use assert_matches::assert_matches;
     use hex::FromHex;
     use ieee80211::{MacAddr, Ssid};
     use lazy_static::lazy_static;
     use mundane::hash::Sha256;
     use std::convert::TryFrom;
+    use wlan_common::assert_variant;
 
     // IEEE Std 802.11-18/1104r0: "New Test Vectors for SAE" provides all of these values.
     // TEST_PWD is slightly modified by concatenating the password identifier field; IEEE Std
@@ -807,7 +807,7 @@ mod test {
 
         let result =
             process_commit(&config, &rand_a, &commit_a, &scalar_b[..], &element_b[..]).unwrap();
-        let (_peer_commit_a, kck, key) = assert_matches!(result, FrameResult::Proceed(res) => res);
+        let (_peer_commit_a, kck, key) = assert_variant!(result, FrameResult::Proceed(res) => res);
 
         assert_eq!(kck, expected_kck());
         assert_eq!(key, expected_key());
@@ -824,7 +824,7 @@ mod test {
 
         let result =
             process_commit(&config, &rand_b, &commit_b, &scalar_a[..], &element_a[..]).unwrap();
-        let (_peer_commit_b, kck, key) = assert_matches!(result, FrameResult::Proceed(res) => res);
+        let (_peer_commit_b, kck, key) = assert_variant!(result, FrameResult::Proceed(res) => res);
 
         assert_eq!(kck, expected_kck());
         assert_eq!(key, expected_key());
@@ -842,7 +842,7 @@ mod test {
 
         let result =
             process_commit(&config, &rand_a, &commit_a, &scalar_b[..], &element_b[..]).unwrap();
-        assert_matches!(result, FrameResult::Drop);
+        assert_variant!(result, FrameResult::Drop);
     }
 
     #[test]

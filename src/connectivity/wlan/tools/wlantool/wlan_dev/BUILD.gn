@@ -27,10 +27,7 @@ rustc_library("wlan-dev") {
     "//third_party/rust_crates:structopt",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [
     "src/lib.rs",

@@ -538,7 +538,7 @@ pub type UpdateSink = Vec<SecAssocUpdate>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
     use wlan_common::ie::rsn::akm::{self, AKM_PSK};
     use wlan_common::ie::rsn::cipher::{self, CIPHER_CCMP_128, CIPHER_GCMP_256};
     use wlan_common::ie::rsn::fake_wpa2_s_rsne;
@@ -636,7 +636,7 @@ mod tests {
         let negotiated_protection = NegotiatedProtection::from_rsne(&rsne)
             .expect("error, could not create negotiated RSNE")
             .to_full_protection();
-        assert_matches!(negotiated_protection, ProtectionInfo::Rsne(actual_protection) => {
+        assert_variant!(negotiated_protection, ProtectionInfo::Rsne(actual_protection) => {
             assert_eq!(actual_protection, rsne);
         });
     }
@@ -647,7 +647,7 @@ mod tests {
         let negotiated_protection = NegotiatedProtection::from_legacy_wpa(&wpa_ie)
             .expect("error, could not create negotiated WPA")
             .to_full_protection();
-        assert_matches!(negotiated_protection, ProtectionInfo::LegacyWpa(actual_protection) => {
+        assert_variant!(negotiated_protection, ProtectionInfo::LegacyWpa(actual_protection) => {
             assert_eq!(actual_protection, wpa_ie);
         });
     }
@@ -658,7 +658,7 @@ mod tests {
         let rsne = Rsne::wpa3_rsne();
         let negotiated_protection =
             NegotiatedProtection::from_rsne(&rsne).expect("Could not create negotiated RSNE");
-        assert_matches!(negotiated_protection.igtk_support(), IgtkSupport::Required);
+        assert_variant!(negotiated_protection.igtk_support(), IgtkSupport::Required);
         assert_eq!(negotiated_protection.group_mgmt_cipher(), CIPHER_BIP_CMAC_128);
 
         // Mixed mode RSNE is compatible with MFP.
@@ -666,13 +666,13 @@ mod tests {
         rsne.rsn_capabilities.replace(RsnCapabilities(0).with_mgmt_frame_protection_cap(true));
         let negotiated_protection =
             NegotiatedProtection::from_rsne(&rsne).expect("Could not create negotiated RSNE");
-        assert_matches!(negotiated_protection.igtk_support(), IgtkSupport::Capable);
+        assert_variant!(negotiated_protection.igtk_support(), IgtkSupport::Capable);
 
         // WPA2 RSNE doesn't support MFP.
         let rsne = Rsne::wpa2_rsne();
         let negotiated_protection =
             NegotiatedProtection::from_rsne(&rsne).expect("Could not create negotiated RSNE");
-        assert_matches!(negotiated_protection.igtk_support(), IgtkSupport::Unsupported);
+        assert_variant!(negotiated_protection.igtk_support(), IgtkSupport::Unsupported);
     }
 
     #[test]
@@ -681,7 +681,7 @@ mod tests {
         rsne.group_mgmt_cipher_suite.take(); // Default to BIP_CMAC_128.
         let negotiated_protection =
             NegotiatedProtection::from_rsne(&rsne).expect("Could not create negotiated RSNE");
-        assert_matches!(negotiated_protection.igtk_support(), IgtkSupport::Required);
+        assert_variant!(negotiated_protection.igtk_support(), IgtkSupport::Required);
         assert_eq!(negotiated_protection.group_mgmt_cipher(), CIPHER_BIP_CMAC_128);
     }
 

@@ -105,11 +105,11 @@ impl PowerLogger {
 mod tests {
     use super::*;
     use crate::testing::setup_test;
-    use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
     use futures::pin_mut;
     use futures::task::Poll;
     use std::pin::pin;
+    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn test_iface_power_event_in_inspect() {
@@ -274,7 +274,7 @@ mod tests {
 
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::POWER_LEVEL_AT_SUSPEND_METRIC_ID);
-        assert_matches!(&logged_metrics[..], [metric] => {
+        assert_variant!(&logged_metrics[..], [metric] => {
             let expected_metric = fidl_fuchsia_metrics::MetricEvent {
                 metric_id: metrics::POWER_LEVEL_AT_SUSPEND_METRIC_ID,
                 event_codes: vec![metrics::PowerLevelAtSuspendMetricDimensionPowerLevel::PowerSaveMode
@@ -301,7 +301,7 @@ mod tests {
 
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::UNCLEAR_POWER_LEVEL_DEMAND_METRIC_ID);
-        assert_matches!(&logged_metrics[..], [metric] => {
+        assert_variant!(&logged_metrics[..], [metric] => {
             let expected_metric = fidl_fuchsia_metrics::MetricEvent {
                 metric_id: metrics::UNCLEAR_POWER_LEVEL_DEMAND_METRIC_ID,
                 event_codes: vec![metrics::UnclearPowerLevelDemandMetricDimensionReason::PowerSaveRequestedWhileSuspendModeEnabled

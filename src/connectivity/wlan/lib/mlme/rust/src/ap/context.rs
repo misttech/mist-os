@@ -517,8 +517,8 @@ mod test {
     use super::*;
     use crate::ap::ClientEvent;
     use crate::device::FakeDevice;
-    use assert_matches::assert_matches;
     use lazy_static::lazy_static;
+    use wlan_common::assert_variant;
     use wlan_common::timer::{self, create_timer};
 
     lazy_static! {
@@ -663,7 +663,7 @@ mod test {
             time_stream.try_next().unwrap().expect("Should have scheduled an event");
         assert_eq!(timed_event.id, event_handle.id());
 
-        assert_matches!(
+        assert_variant!(
             timed_event.event,
             TimedEvent::ClientEvent(mac_addr, ClientEvent::BssIdleTimeout) => {
                 assert_eq!(MacAddr::from([1; 6]), mac_addr);

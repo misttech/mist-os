@@ -640,7 +640,7 @@ mod tests {
     use crate::rsna::test_util::expect_eapol_resp;
     use crate::rsna::{test_util, AuthStatus};
     use crate::{Authenticator, Supplicant};
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
     use wlan_common::ie::get_rsn_ie_bytes;
     use wlan_common::ie::rsn::fake_wpa2_s_rsne;
 
@@ -1329,7 +1329,7 @@ mod tests {
 
         // Go idle on the last retry.
         updates = vec![];
-        assert_matches!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
+        assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
         assert!(updates.is_empty(), "{:?}", updates);
     }
 
@@ -1367,7 +1367,7 @@ mod tests {
 
             // Go idle on the last retry.
             updates = vec![];
-            assert_matches!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
+            assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
             assert!(updates.is_empty(), "{:?}", updates);
         }
     }
@@ -1381,7 +1381,7 @@ mod tests {
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
-        assert_matches!(supplicant.incomplete_reason(), Error::EapolHandshakeNotStarted);
+        assert_variant!(supplicant.incomplete_reason(), Error::EapolHandshakeNotStarted);
     }
 
     #[test]
@@ -1404,7 +1404,7 @@ mod tests {
             .expect("Failed to send eapol conf");
         assert!(updates.is_empty(), "{:?}", updates);
 
-        assert_matches!(supplicant.incomplete_reason(), Error::LikelyWrongCredential);
+        assert_variant!(supplicant.incomplete_reason(), Error::LikelyWrongCredential);
     }
 
     #[test]
@@ -1423,7 +1423,7 @@ mod tests {
             .expect("Failed to send eapol frame");
         let _msg2 = test_util::expect_eapol_resp(&updates[..]);
 
-        assert_matches!(supplicant.incomplete_reason(), Error::NoKeyFrameTransmissionConfirm(0));
+        assert_variant!(supplicant.incomplete_reason(), Error::NoKeyFrameTransmissionConfirm(0));
     }
 
     #[test]
@@ -1456,7 +1456,7 @@ mod tests {
 
         // Failure on the next timeout.
         updates = vec![];
-        assert_matches!(
+        assert_variant!(
             supplicant.on_rsna_retransmission_timeout(&mut updates),
             Err(Error::NoKeyFrameTransmissionConfirm(0))
         );
@@ -1534,7 +1534,7 @@ mod tests {
         //   * GTK
         //   * ESSSA Established
         updates = vec![];
-        assert_matches!(
+        assert_variant!(
             supplicant.on_rsna_retransmission_timeout(&mut updates),
             Err(Error::NoKeyFrameTransmissionConfirm(4))
         );

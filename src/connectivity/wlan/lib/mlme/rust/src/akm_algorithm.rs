@@ -161,8 +161,8 @@ impl AkmAlgorithm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_mlme as fidl_mlme;
+    use wlan_common::assert_variant;
     use wlan_common::mac::IntoBytesExt;
 
     struct MockAkmAction {
@@ -221,14 +221,14 @@ mod tests {
         let mut supplicant = AkmAlgorithm::OpenSupplicant;
 
         // Initiate sends
-        assert_matches!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
+        assert_variant!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
         assert_eq!(actions.sent_frames.len(), 1);
         assert_eq!(
             actions.sent_frames.remove(0),
             (mac::AuthAlgorithmNumber::OPEN, 1, fidl_ieee80211::StatusCode::Success.into(), vec![])
         );
 
-        assert_matches!(
+        assert_variant!(
             supplicant.handle_auth_frame(
                 &mut actions,
                 // A valid response completes auth.
@@ -256,11 +256,11 @@ mod tests {
         let mut supplicant = AkmAlgorithm::OpenSupplicant;
 
         // Initiate sends
-        assert_matches!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
+        assert_variant!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
         assert_eq!(actions.sent_frames.len(), 1);
         actions.sent_frames.clear();
 
-        assert_matches!(
+        assert_variant!(
             supplicant.handle_auth_frame(
                 &mut actions,
                 // A rejected response ends auth.
@@ -287,14 +287,14 @@ mod tests {
         let mut actions = MockAkmAction::new();
         let mut supplicant = AkmAlgorithm::Sae;
 
-        assert_matches!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
+        assert_variant!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
         assert_eq!(actions.sae_ind_sent, 1);
         assert_eq!(actions.sent_frames.len(), 0);
 
         // We only test sending one frame each way, since there's no functional difference in the
         // second exchange.
 
-        assert_matches!(
+        assert_variant!(
             supplicant.handle_sme_sae_tx(
                 &mut actions,
                 1,
@@ -315,7 +315,7 @@ mod tests {
         );
         actions.sent_frames.clear();
 
-        assert_matches!(
+        assert_variant!(
             supplicant.handle_auth_frame(
                 &mut actions,
                 mac::AuthFrame {
@@ -337,7 +337,7 @@ mod tests {
         );
         actions.sent_sae_rx.clear();
 
-        assert_matches!(
+        assert_variant!(
             supplicant.handle_sae_resp(&mut actions, fidl_ieee80211::StatusCode::Success),
             Ok(AkmState::AuthComplete)
         );
@@ -348,8 +348,8 @@ mod tests {
         let mut actions = MockAkmAction::new();
         let mut supplicant = AkmAlgorithm::Sae;
 
-        assert_matches!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
-        assert_matches!(
+        assert_variant!(supplicant.initiate(&mut actions), Ok(AkmState::InProgress));
+        assert_variant!(
             supplicant.handle_sae_resp(
                 &mut actions,
                 fidl_ieee80211::StatusCode::RefusedReasonUnspecified

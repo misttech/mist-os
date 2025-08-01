@@ -64,7 +64,6 @@ rustc_binary("wlanix_bin") {
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
   ]

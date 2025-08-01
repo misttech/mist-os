@@ -109,7 +109,6 @@ pub async fn get_wlan_sta_addr(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_common::WlanMacRole;
     use fidl_fuchsia_wlan_device_service::{
         DeviceMonitorCreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest,
@@ -119,6 +118,7 @@ mod tests {
     use futures::task::Poll;
     use futures::StreamExt;
     use std::pin::pin;
+    use wlan_common::assert_variant;
 
     pub(crate) fn setup_fake_service<M: fidl::endpoints::ProtocolMarker>(
     ) -> (fuchsia_async::TestExecutor, M::Proxy, M::RequestStream) {
@@ -189,7 +189,7 @@ mod tests {
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
         let mut mac_addr_fut = pin!(mac_addr_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
         respond_to_query_iface_request(
             &mut exec,
@@ -208,7 +208,7 @@ mod tests {
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
         let mut mac_addr_fut = pin!(mac_addr_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
         respond_to_query_iface_request(&mut exec, &mut req_stream, WlanMacRole::Client, None);
 
@@ -222,7 +222,7 @@ mod tests {
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
         let mut mac_addr_fut = pin!(mac_addr_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
         // Simulate service not being available by closing the channel
         std::mem::drop(req_stream);
@@ -238,7 +238,7 @@ mod tests {
 
         let mut iface_id_fut = pin!(iface_id_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
         respond_to_create_iface_request(&mut exec, &mut req_stream, Ok(15));
 
         let iface_id = exec.run_singlethreaded(&mut iface_id_fut).expect("should get an iface id");
@@ -253,7 +253,7 @@ mod tests {
 
         let mut iface_id_fut = pin!(iface_id_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
         respond_to_create_iface_request(&mut exec, &mut req_stream, Err(zx::sys::ZX_ERR_INTERNAL));
 
         let err = exec.run_singlethreaded(&mut iface_id_fut).expect_err("Should get an error");

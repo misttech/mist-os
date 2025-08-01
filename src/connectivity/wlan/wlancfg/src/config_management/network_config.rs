@@ -842,9 +842,9 @@ pub fn select_authentication_method(
 mod tests {
     use super::*;
     use crate::util::testing::{generate_string, random_connection_data};
-    use assert_matches::assert_matches;
     use std::collections::VecDeque;
     use test_case::test_case;
+    use wlan_common::assert_variant;
     use wlan_common::security::wep::WepAuthenticator;
     use wlan_common::security::wpa::{
         Authentication, Wpa1Credentials, Wpa2PersonalCredentials, Wpa3PersonalCredentials,
@@ -939,7 +939,7 @@ mod tests {
             false,
         );
 
-        assert_matches!(config_result, Err(NetworkConfigError::PasswordLen));
+        assert_variant!(config_result, Err(NetworkConfigError::PasswordLen));
     }
 
     #[fuchsia::test]
@@ -952,14 +952,14 @@ mod tests {
             false,
         );
 
-        assert_matches!(config_result, Err(NetworkConfigError::PskLen));
+        assert_variant!(config_result, Err(NetworkConfigError::PskLen));
     }
 
     #[fuchsia::test]
     fn check_config_errors_invalid_wep_password() {
         // Unsupported length (7).
         let password = Credential::Password(b"1234567".to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wep,
@@ -973,7 +973,7 @@ mod tests {
     fn check_config_errors_invalid_wpa_password() {
         // password too short
         let short_password = Credential::Password(b"1234567".to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa2,
@@ -984,7 +984,7 @@ mod tests {
 
         // password too long
         let long_password = Credential::Password([5, 65].to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa2,
@@ -998,7 +998,7 @@ mod tests {
     fn check_config_errors_invalid_wep_credential_variant() {
         // Unsupported variant (`Psk`).
         let psk = Credential::Psk(b"12345".to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wep,
@@ -1013,7 +1013,7 @@ mod tests {
         // PSK length not 32 characters
         let short_psk = Credential::Psk([6; WPA_PSK_BYTE_LEN - 1].to_vec());
 
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa2,
@@ -1023,7 +1023,7 @@ mod tests {
         );
 
         let long_psk = Credential::Psk([7; WPA_PSK_BYTE_LEN + 1].to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa2,
@@ -1037,7 +1037,7 @@ mod tests {
     fn check_config_errors_invalid_security_credential() {
         // Use a password with open network.
         let password = Credential::Password(b"password".to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::None,
@@ -1047,7 +1047,7 @@ mod tests {
         );
 
         let psk = Credential::Psk([1; WPA_PSK_BYTE_LEN].to_vec());
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::None,
@@ -1057,7 +1057,7 @@ mod tests {
         );
         // Use no password with a protected network.
         let password = Credential::None;
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa,
@@ -1066,7 +1066,7 @@ mod tests {
             Err(NetworkConfigError::MissingPasswordPsk)
         );
 
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa2,
@@ -1075,7 +1075,7 @@ mod tests {
             Err(NetworkConfigError::MissingPasswordPsk)
         );
 
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa3,
@@ -1084,7 +1084,7 @@ mod tests {
             Err(NetworkConfigError::MissingPasswordPsk)
         );
 
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::try_from("valid_ssid").unwrap(),
                 &SecurityType::Wpa3,
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[fuchsia::test]
     fn check_config_errors_ssid_empty() {
-        assert_matches!(
+        assert_variant!(
             check_config_errors(
                 &client_types::Ssid::empty(),
                 &SecurityType::None,
@@ -1307,11 +1307,11 @@ mod tests {
 
         // We should get back the added data when specifying the same or an earlier time.
         assert_eq!(past_connections_list.get_recent(curr_time).len(), 1);
-        assert_matches!(past_connections_list.get_recent(curr_time).as_slice(), [data] => {
+        assert_variant!(past_connections_list.get_recent(curr_time).as_slice(), [data] => {
             assert_eq!(data, &past_connection_data.clone());
         });
         let earlier_time = curr_time - zx::MonotonicDuration::from_seconds(1);
-        assert_matches!(past_connections_list.get_recent(earlier_time).as_slice(), [data] => {
+        assert_variant!(past_connections_list.get_recent(earlier_time).as_slice(), [data] => {
             assert_eq!(data, &data.clone());
         });
         // The results should be empty if the requested time is after the latest past connection's

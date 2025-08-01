@@ -90,13 +90,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::stream::FuturesUnordered;
     use futures::task::Poll;
     use futures::{future, select, FutureExt};
     use std::pin::pin;
+    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn test_atomic_stream() {
@@ -108,7 +108,7 @@ mod tests {
         sender.unbounded_send(()).expect("failed to send test message");
         let token = {
             let mut oneshot_stream = atomic_stream.get_atomic_oneshot_stream();
-            assert_matches!(
+            assert_variant!(
                 exec.run_until_stalled(&mut oneshot_stream.next()),
                 Poll::Ready(Some((token, ()))) => token
             )
@@ -118,13 +118,13 @@ mod tests {
         sender.unbounded_send(()).expect("failed to send test message");
         {
             let mut oneshot_stream = atomic_stream.get_atomic_oneshot_stream();
-            assert_matches!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(None));
+            assert_variant!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(None),);
         }
 
         // Now drop the token and observe that the message comes through.
         drop(token);
         let mut oneshot_stream = atomic_stream.get_atomic_oneshot_stream();
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut oneshot_stream.next()),
             Poll::Ready(Some((_, ())))
         );
@@ -169,30 +169,30 @@ mod tests {
         // will produce pending.  The ready future will return immediately.
         let fut = future::ready(1).boxed();
         let mut oneshot_stream = atomic_stream.get_atomic_oneshot_stream();
-        assert_matches!(
+        assert_variant!(
             select_helper(&mut exec, fut, &mut oneshot_stream),
-            Poll::Ready(SelectResult::IntegerFutureReady(1))
+            Poll::Ready(SelectResult::IntegerFutureReady(1)),
         );
 
         // Poll the underlying stream again to demonstrate that this behavior is safe.
         let fut = future::ready(2).boxed();
-        assert_matches!(
+        assert_variant!(
             select_helper(&mut exec, fut, &mut oneshot_stream),
-            Poll::Ready(SelectResult::IntegerFutureReady(2))
+            Poll::Ready(SelectResult::IntegerFutureReady(2)),
         );
 
         // Now send something and let the select statement handle the stream.
         let fut = future::pending().boxed();
         sender.unbounded_send(()).expect("failed to send test message");
-        assert_matches!(
+        assert_variant!(
             select_helper(&mut exec, fut, &mut oneshot_stream),
-            Poll::Ready(SelectResult::StreamReady)
+            Poll::Ready(SelectResult::StreamReady),
         );
 
         // Poll a pending future and the now-complete stream to demonstrate that it is safe to poll
         // again.
         let fut = future::pending().boxed();
-        assert_matches!(select_helper(&mut exec, fut, &mut oneshot_stream), Poll::Pending);
+        assert_variant!(select_helper(&mut exec, fut, &mut oneshot_stream), Poll::Pending,);
     }
 
     #[fuchsia::test]
@@ -228,7 +228,7 @@ mod tests {
 
             // After learning that there is no event in the stream, the state should still be
             // NotRunning.
-            assert_matches!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Pending,);
             assert_eq!(*status.read(), StreamStatus::Ready);
         }
 
@@ -240,7 +240,7 @@ mod tests {
             assert_eq!(*status.read(), StreamStatus::Ready);
 
             // But once the item is actually received, the state should change.
-            let token = assert_matches!(
+            let token = assert_variant!(
                 exec.run_until_stalled(&mut oneshot_stream.next()),
                 Poll::Ready(Some((token, ()))) => token
             );

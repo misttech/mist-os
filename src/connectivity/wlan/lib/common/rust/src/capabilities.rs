@@ -230,9 +230,8 @@ fn intersect(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mac;
     use crate::test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw;
-    use assert_matches::assert_matches;
+    use crate::{assert_variant, mac};
     use fidl_fuchsia_wlan_common as fidl_common;
 
     #[test]
@@ -359,7 +358,7 @@ mod tests {
 
     #[test]
     fn client_intersect_with_ap() {
-        let caps = assert_matches!(
+        let caps = assert_variant!(
             intersect_with_ap_as_client(&fake_client_join_cap(), &fake_ap_join_cap()),
             Ok(caps) => caps
         );

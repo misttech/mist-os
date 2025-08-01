@@ -366,68 +366,68 @@ async fn start<D: DeviceOps + Send + 'static>(
 mod tests {
     use super::*;
     use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
-    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use futures::Future;
     use std::pin::Pin;
     use std::sync::{Arc, Mutex};
+    use wlan_common::assert_variant;
 
     #[test]
     fn test_happy_path() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Ok(()));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Ok(()));
 
         let (client_sme_proxy, client_sme_server) =
             fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let mut client_sme_response_fut =
             h.generic_sme_proxy.as_ref().unwrap().get_client_sme(client_sme_server);
-        assert_matches!(h.exec.run_until_stalled(&mut client_sme_response_fut), Poll::Pending);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(h.exec.run_until_stalled(&mut client_sme_response_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
             h.exec.run_until_stalled(&mut client_sme_response_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let mut status_fut = client_sme_proxy.status();
-        assert_matches!(h.exec.run_until_stalled(&mut status_fut), Poll::Pending);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        let status_result = assert_matches!(h.exec.run_until_stalled(&mut status_fut), Poll::Ready(result) => result);
-        assert_matches!(status_result, Ok(fidl_sme::ClientStatusResponse::Idle(_)));
+        assert_variant!(h.exec.run_until_stalled(&mut status_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let status_result = assert_variant!(h.exec.run_until_stalled(&mut status_fut), Poll::Ready(result) => result);
+        assert_variant!(status_result, Ok(fidl_sme::ClientStatusResponse::Idle(_)));
     }
 
     #[test]
     fn test_mlme_exits_due_to_driver_event() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Ok(()));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Ok(()));
 
         h.driver_event_sender
             .unbounded_send(FullmacDriverEvent::Stop)
             .expect("expect sending driver Stop event to succeed");
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(Ok(())));
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(Ok(())));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_device_start() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().start_fn_status_mock = Some(zx::sys::ZX_ERR_BAD_STATE);
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::DeviceStartFailed(_)))
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::DeviceStartFailed(_)))
     }
 
     #[test]
@@ -435,80 +435,80 @@ mod tests {
         let bootstrap = false;
         let (mut h, mut test_fut) = TestHelper::set_up_with_usme_bootstrap(bootstrap);
         h.usme_bootstrap_proxy.take();
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::UsmeBootstrapStreamTerminated));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::UsmeBootstrapStreamTerminated));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_query_device_info_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_device_info_mock = None;
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_query_security_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_security_support_mock = None;
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_query_spectrum_management_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_spectrum_management_support_mock = None;
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_failure_to_convert_query_device_info() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = None;
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         let startup_result =
-            assert_matches!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_matches!(startup_result, Err(FullmacMlmeError::FailedToConvertVendorDriverQuery(_)));
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToConvertVendorDriverQuery(_)));
     }
 
     #[test]
     fn test_mlme_startup_exits_due_to_sme_channel_closure() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_matches!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
 
         std::mem::drop(h.generic_sme_proxy.take());
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
@@ -517,11 +517,11 @@ mod tests {
     #[test]
     fn test_mlme_startup_exits_due_to_wlan_fullmac_impl_ifc_channel_closure() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
-        assert_matches!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
 
         std::mem::drop(h.fake_device.lock().unwrap().fullmac_ifc_client_end.take());
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))
         );

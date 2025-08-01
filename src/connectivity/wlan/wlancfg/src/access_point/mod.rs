@@ -347,7 +347,6 @@ mod tests {
     use crate::client::types as client_types;
     use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
     use crate::regulatory_manager::REGION_CODE_LEN;
-    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
     use fuchsia_async as fasync;
@@ -355,6 +354,7 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use std::unimplemented;
+    use wlan_common::assert_variant;
 
     #[derive(Debug)]
     struct FakeIfaceManager {
@@ -501,11 +501,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue StartAP request.
         let network_id = fidl_policy::NetworkIdentifier {
@@ -524,8 +524,8 @@ mod tests {
         let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut start_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -541,17 +541,17 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Set the StartAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
             let mut iface_manager_fut = pin!(iface_manager_fut);
-            let mut iface_manager = assert_matches!(
+            let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
             );
@@ -575,8 +575,8 @@ mod tests {
         let mut start_fut = pin!(start_fut);
 
         // Verify the start response is successful despite the AP's failure to start.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut start_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -593,7 +593,7 @@ mod tests {
         {
             let iface_manager_fut = test_values.iface_manager.lock();
             let mut iface_manager_fut = pin!(iface_manager_fut);
-            let mut iface_manager = assert_matches!(
+            let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
             );
@@ -604,11 +604,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue StartAP request.
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
@@ -620,8 +620,8 @@ mod tests {
         let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut start_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedNotSupported))
         );
@@ -637,11 +637,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue StopAP request.
         let network_id = fidl_policy::NetworkIdentifier {
@@ -658,8 +658,8 @@ mod tests {
         let mut stop_fut = pin!(stop_fut);
 
         // Process stop request and verify stop response.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut stop_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -675,17 +675,17 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Set the StopAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
             let mut iface_manager_fut = pin!(iface_manager_fut);
-            let mut iface_manager = assert_matches!(
+            let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
             );
@@ -707,8 +707,8 @@ mod tests {
         let mut stop_fut = pin!(stop_fut);
 
         // Process stop request and verify stop response.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut stop_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedIncompatibleMode))
         );
@@ -724,18 +724,18 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue StopAllAps request.
         let stop_result = controller.stop_all_access_points();
         assert!(stop_result.is_ok());
 
         // Verify that the service is still running.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     /// Tests the case where StopAccessPoints is called and there is a valid interface to handle
@@ -748,13 +748,13 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Set the StopAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
             let mut iface_manager_fut = pin!(iface_manager_fut);
-            let mut iface_manager = assert_matches!(
+            let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
             );
@@ -763,14 +763,14 @@ mod tests {
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue StopAllAps request.
         let stop_result = controller.stop_all_access_points();
         assert!(stop_result.is_ok());
 
         // Verify that the service is still running despite the call to stop failing.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -781,21 +781,21 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (_controller1, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request another controller.
         let (controller2, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
         let mut controller2_event_fut = pin!(controller2_event_fut);
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::ALREADY_BOUND,
@@ -813,11 +813,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (controller1, _) = request_controller(&test_values.provider);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Create another request stream and begin serving it.  This is equivalent to the behavior
         // that occurs when a second client connects to the AccessPointProvider service.
@@ -827,13 +827,13 @@ mod tests {
         let mut second_serve_fut = pin!(second_serve_fut);
 
         let (controller2, _) = request_controller(&provider);
-        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
         let mut controller2_event_fut = pin!(controller2_event_fut);
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::ALREADY_BOUND,
@@ -845,10 +845,10 @@ mod tests {
         // Drop the initial client controller and make sure the second service instance can get a
         // client controller and make a request.
         drop(controller1);
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         let (controller2, _) = request_controller(&provider);
-        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Issue StartAP request to make sure the new controller works.
         let network_id = fidl_policy::NetworkIdentifier {
@@ -867,8 +867,8 @@ mod tests {
         let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
-        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut start_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );

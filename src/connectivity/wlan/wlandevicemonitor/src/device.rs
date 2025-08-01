@@ -122,11 +122,11 @@ async fn serve_phy(
 mod tests {
     use super::*;
     use crate::watchable_map;
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fuchsia_async as fasync;
     use fuchsia_inspect::{Inspector, InspectorConfig};
     use futures::task::Poll;
+    use wlan_common::assert_variant;
     use wlan_common::test_utils::ExpectWithin;
 
     #[fuchsia::test]
@@ -138,7 +138,7 @@ mod tests {
         let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
         let fut = serve_phys(phys.clone(), inspect_tree, "/wrong/path");
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -160,7 +160,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the PHY service to pick up the new PHY.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         match exec.run_until_stalled(&mut pin!(phy_events.next().expect_within(
             zx::MonotonicDuration::from_seconds(60),
             "phy_watcher did not observe device addition",
@@ -178,7 +178,7 @@ mod tests {
 
         // Now drop the other end of the PHY and observe that the PHY is removed from the map.
         drop(phy_server);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         match exec.run_until_stalled(&mut pin!(phy_events.next().expect_within(
             zx::MonotonicDuration::from_seconds(60),
             "phy_watcher did not observe device removal",

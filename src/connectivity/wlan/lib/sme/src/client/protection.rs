@@ -356,8 +356,6 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
 mod tests {
     use super::*;
     use crate::client::{self};
-    use assert_matches::assert_matches;
-    use wlan_common::fake_bss_description;
     use wlan_common::ie::fake_ies::fake_wpa_ie;
     use wlan_common::ie::rsn::fake_rsnes::{fake_wpa2_s_rsne, fake_wpa3_s_rsne};
     use wlan_common::security::wep::{WEP104_KEY_BYTES, WEP40_KEY_BYTES};
@@ -365,6 +363,7 @@ mod tests {
     use wlan_common::test_utils::fake_features::{
         fake_security_support, fake_security_support_empty,
     };
+    use wlan_common::{assert_variant, fake_bss_description};
 
     #[test]
     fn rsn_auth_method() {
@@ -609,7 +608,7 @@ mod tests {
         assert!(matches!(context.authentication_config(), auth::Config::ComputedPsk(_)));
 
         let protection = Protection::try_from(context).unwrap();
-        assert_matches!(protection, Protection::LegacyWpa(rsna) => {
+        assert_variant!(protection, Protection::LegacyWpa(rsna) => {
             assert_eq!(rsna.supplicant.get_auth_method(), auth::MethodName::Psk);
         });
     }
@@ -632,7 +631,7 @@ mod tests {
         assert!(matches!(context.authentication_config(), auth::Config::ComputedPsk(_)));
 
         let protection = Protection::try_from(context).unwrap();
-        assert_matches!(protection, Protection::Rsna(rsna) => {
+        assert_variant!(protection, Protection::Rsna(rsna) => {
             assert_eq!(rsna.supplicant.get_auth_method(), auth::MethodName::Psk);
         });
     }
@@ -656,7 +655,7 @@ mod tests {
         assert!(matches!(context.authentication_config(), Ok(auth::Config::Sae { .. })));
 
         let protection = Protection::try_from(context).unwrap();
-        assert_matches!(protection, Protection::Rsna(rsna) => {
+        assert_variant!(protection, Protection::Rsna(rsna) => {
             assert_eq!(rsna.supplicant.get_auth_method(), auth::MethodName::Sae);
         });
     }
@@ -682,7 +681,7 @@ mod tests {
         assert!(matches!(context.authentication_config(), Ok(auth::Config::DriverSae { .. })));
 
         let protection = Protection::try_from(context).unwrap();
-        assert_matches!(protection, Protection::Rsna(rsna) => {
+        assert_variant!(protection, Protection::Rsna(rsna) => {
             assert_eq!(rsna.supplicant.get_auth_method(), auth::MethodName::Sae);
         });
     }

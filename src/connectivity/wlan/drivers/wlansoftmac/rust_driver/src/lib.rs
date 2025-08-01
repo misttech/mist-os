@@ -537,7 +537,6 @@ async fn serve_wlan_softmac_ifc_bridge(
 mod tests {
     use super::*;
     use anyhow::format_err;
-    use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::TestExecutor;
     use fuchsia_inspect::InspectorConfig;
@@ -545,6 +544,7 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
+    use wlan_common::assert_variant;
     use wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig};
     use zx::Vmo;
 
@@ -833,7 +833,7 @@ mod tests {
             Poll::Pending => panic!("start_fut still pending!"),
         };
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut mlme).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut mlme).await, Poll::Pending);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut harness.mlme_init_receiver).await,
             Poll::Ready(Ok(()))
@@ -841,7 +841,7 @@ mod tests {
 
         let resp_fut = generic_sme_proxy.query();
         let mut resp_fut = pin!(resp_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
 
         let sme_and_mlme = [sme, mlme].into_iter().collect::<FuturesUnordered<_>>();
         let mut sme_and_mlme = pin!(sme_and_mlme);
@@ -870,10 +870,10 @@ mod tests {
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
         let mut server_fut = pin!(server_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         softmac_ifc_bridge_channel.write(&[], &mut []).unwrap();
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut server_fut).await,
             Poll::Ready(Err(_))
         );
@@ -889,10 +889,10 @@ mod tests {
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
         let mut server_fut = pin!(server_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         drop(softmac_ifc_bridge_client);
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut server_fut).await,
             Poll::Ready(Err(_))
         );
@@ -923,12 +923,12 @@ mod tests {
 
         let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(&request);
         let mut resp_fut = pin!(resp_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
-        assert_matches!(
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut server_fut).await,
             Poll::Ready(Err(_))
         );
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
         assert!(matches!(driver_event_stream.try_next(), Ok(None)));
     }
 
@@ -951,9 +951,9 @@ mod tests {
             },
         );
         let mut resp_fut = pin!(resp_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
 
         assert!(matches!(
             driver_event_stream.try_next(),
@@ -1020,9 +1020,9 @@ mod tests {
             result_code: fidl_common::WlanTxResultCode::Failed,
         });
         let mut resp_fut = pin!(resp_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
 
         match driver_event_stream.try_next().unwrap().unwrap() {
             DriverEvent::TxResultReport { tx_result } => {
@@ -1047,9 +1047,9 @@ mod tests {
     async fn serve_exits_with_error_if_mlme_init_sender_dropped() {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         drop(harness.mlme_init_sender);
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
@@ -1061,7 +1061,7 @@ mod tests {
 
         harness.complete_mlme_sender.send(Ok(())).unwrap();
         drop(harness.mlme_init_sender);
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
@@ -1073,7 +1073,7 @@ mod tests {
 
         harness.complete_mlme_sender.send(Ok(())).unwrap();
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Ok(()))
         );
@@ -1087,9 +1087,9 @@ mod tests {
     ) {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_mlme_sender.send(early_mlme_result).unwrap();
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
@@ -1103,11 +1103,11 @@ mod tests {
     ) {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_sme_sender.send(early_sme_result).unwrap();
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
@@ -1117,9 +1117,9 @@ mod tests {
     async fn serve_exits_with_error_if_mlme_completes_with_error() {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_mlme_sender.send(Err(format_err!("mlme error"))).unwrap();
         assert_eq!(
             TestExecutor::poll_until_stalled(&mut serve_fut).await,
@@ -1131,9 +1131,9 @@ mod tests {
     async fn serve_exits_with_error_if_sme_shuts_down_with_error() {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_mlme_sender.send(Ok(())).unwrap();
         harness.complete_sme_sender.send(Err(format_err!("sme error"))).unwrap();
         assert_eq!(
@@ -1146,9 +1146,9 @@ mod tests {
     async fn serve_exits_with_error_if_bridge_exits_early_with_error() {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
 
         // Cause the bridge to encounter an error when the client drops its endpoint.
         drop(harness.softmac_ifc_bridge_proxy);
@@ -1159,9 +1159,9 @@ mod tests {
     async fn serve_exits_with_error_if_bridge_cannot_queue_stop() {
         let (mut serve_fut, harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
 
         // Cause the bridge to encounter an error when the bridge cannot queue the DriverEvent::Stop.
         drop(harness.driver_event_stream);
@@ -1175,9 +1175,9 @@ mod tests {
     async fn serve_shuts_down_gracefully(bridge_shutdown_before_mlme: bool) {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(()).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         let mut stop_response_fut = harness.softmac_ifc_bridge_proxy.stop_bridged_driver();
 
         // The server should not fail if the MLME future completes before or after the bridge futures
@@ -1190,14 +1190,14 @@ mod tests {
         // there is a race between the MLME and bridge exit receiver, either of which could run first
         // depending on the executor.
         if bridge_shutdown_before_mlme {
-            assert_matches!(
+            assert_variant!(
                 TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
-                Poll::Pending
+                Poll::Pending,
             );
-            let responder = assert_matches!(harness.driver_event_stream.next().await,
+            let responder = assert_variant!(harness.driver_event_stream.next().await,
                 Some(DriverEvent::Stop{ responder }) => responder);
             responder.send().unwrap();
-            assert_matches!(
+            assert_variant!(
                 TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
                 Poll::Ready(Ok(()))
             );
@@ -1207,14 +1207,14 @@ mod tests {
             harness.complete_mlme_sender.send(Ok(())).unwrap();
             assert_eq!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
 
-            assert_matches!(
+            assert_variant!(
                 TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
-                Poll::Pending
+                Poll::Pending,
             );
-            let responder = assert_matches!(harness.driver_event_stream.next().await,
+            let responder = assert_variant!(harness.driver_event_stream.next().await,
                 Some(DriverEvent::Stop{ responder }) => responder);
             responder.send().unwrap();
-            assert_matches!(
+            assert_variant!(
                 TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
                 Poll::Ready(Ok(()))
             );
@@ -1262,7 +1262,7 @@ mod tests {
                     "start_and_serve() failed to exit when the UsmeBootstrap client was dropped."
                 ),
                 Poll::Ready(result) => {
-                    assert_matches!(
+                    assert_variant!(
                         TestExecutor::poll_until_stalled(&mut start_complete_receiver).await,
                         Poll::Ready(Ok(status)) => assert_ne!(status, zx::Status::OK.into_raw())
                     );
@@ -1281,7 +1281,7 @@ mod tests {
                 {
                     Poll::Pending => start_and_serve_fut,
                     Poll::Ready(result) => {
-                        assert_matches!(
+                        assert_variant!(
                             TestExecutor::poll_until_stalled(&mut start_complete_receiver)
                                 .await,
                             Poll::Ready(Ok(status)) => assert_ne!(status, zx::Status::OK.into_raw())
@@ -1336,7 +1336,7 @@ mod tests {
         } = start_and_serve_with_device(fake_device)
             .await
             .expect("Failed to initiate wlansoftmac setup.");
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut start_complete_receiver).await,
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
@@ -1361,7 +1361,7 @@ mod tests {
             .await
             .expect("Failed to initiate wlansoftmac setup.");
         assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut start_complete_receiver).await,
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
@@ -1369,7 +1369,7 @@ mod tests {
         let wlan_softmac_ifc_bridge_proxy =
             fake_device_state.lock().wlan_softmac_ifc_bridge_proxy.take().unwrap();
         let stop_response_fut = wlan_softmac_ifc_bridge_proxy.stop_bridged_driver();
-        assert_matches!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
+        assert_variant!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1382,7 +1382,7 @@ mod tests {
         } = start_and_serve_with_device(fake_device)
             .await
             .expect("Failed to initiate wlansoftmac setup.");
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut start_complete_receiver).await,
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
@@ -1395,9 +1395,9 @@ mod tests {
 
         // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
         // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut resp_fut).await,
             Poll::Ready(Ok(Ok(())))
         );
@@ -1407,14 +1407,14 @@ mod tests {
 
         // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
         // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
         resp_fut.await.expect("Generic SME proxy failed").expect("Client SME request failed");
 
         let wlan_softmac_ifc_bridge_proxy =
             fake_device_state.lock().wlan_softmac_ifc_bridge_proxy.take().unwrap();
         let stop_response_fut = wlan_softmac_ifc_bridge_proxy.stop_bridged_driver();
-        assert_matches!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
+        assert_variant!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());
@@ -1436,7 +1436,7 @@ mod tests {
         } = start_and_serve_with_device(fake_device)
             .await
             .expect("Failed to initiate wlansoftmac setup.");
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut start_complete_receiver).await,
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
@@ -1445,7 +1445,7 @@ mod tests {
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
         let mut resp_fut = pin!(resp_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut resp_fut).await,
@@ -1481,7 +1481,7 @@ mod tests {
         ));
 
         let stop_response_fut = wlan_softmac_ifc_bridge_proxy.stop_bridged_driver();
-        assert_matches!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
+        assert_variant!(futures::join!(start_and_serve_fut, stop_response_fut), (Ok(()), Ok(())));
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());

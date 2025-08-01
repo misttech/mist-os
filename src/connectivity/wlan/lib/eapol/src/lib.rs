@@ -422,7 +422,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
     use wlan_common::buffer_writer::BufferWriter;
 
     #[cfg(feature = "benchmarks")]
@@ -475,7 +475,7 @@ mod tests {
             0x00,
         ];
         let result = KeyFrameRx::parse(16, &frame[..]);
-        assert_matches!(result, Err(Error::WrongEapolFrame));
+        assert_variant!(result, Err(Error::WrongEapolFrame));
     }
 
     #[test]
@@ -521,7 +521,7 @@ mod tests {
             0x03, 0x01,
         ];
         let result = KeyFrameRx::parse(16, &frame[..]);
-        assert_matches!(result, Err(Error::FrameTruncated));
+        assert_variant!(result, Err(Error::FrameTruncated));
     }
 
     #[test]
@@ -537,7 +537,7 @@ mod tests {
             0x03, 0x01, 0x02, 0x03,
         ];
         let result = KeyFrameRx::parse(16, &frame[..]);
-        assert_matches!(result, Err(Error::WrongPacketBodyLength(0xff, 0x62)));
+        assert_variant!(result, Err(Error::WrongPacketBodyLength(0xff, 0x62)));
     }
 
     #[test]
@@ -606,7 +606,7 @@ mod tests {
         let mut buf = [0u8; 40];
         let mut writer = BufferWriter::new(&mut buf[..]);
         let result = keyframe.write_into(true, &mut writer);
-        assert_matches!(result, Err(Error::BufferTooShort));
+        assert_variant!(result, Err(Error::BufferTooShort));
     }
 
     #[test]

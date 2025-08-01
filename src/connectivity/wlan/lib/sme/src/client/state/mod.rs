@@ -2134,7 +2134,6 @@ fn now() -> zx::MonotonicInstant {
 mod tests {
     use super::*;
     use anyhow::format_err;
-    use assert_matches::assert_matches;
     use diagnostics_assertions::{
         assert_data_tree, AnyBytesProperty, AnyNumericProperty, AnyStringProperty,
     };
@@ -2154,7 +2153,7 @@ mod tests {
         fake_security_support, fake_spectrum_management_support_empty,
     };
     use wlan_common::test_utils::fake_stas::IesOverrides;
-    use wlan_common::{fake_bss_description, timer};
+    use wlan_common::{assert_variant, fake_bss_description, timer};
     use wlan_rsn::key::exchange::Key;
     use wlan_rsn::rsna::SecAssocStatus;
     use wlan_rsn::NegotiatedProtection;
@@ -2184,7 +2183,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
             assert_eq!(req, fidl_mlme::ConnectRequest {
                 selected_bss: bss.clone().into(),
                 connect_failure_timeout: DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT,
@@ -2200,7 +2199,7 @@ mod tests {
         let _state = state.on_mlme_event(connect_conf, &mut h.context);
 
         // User should be notified that we are connected
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Success);
         });
 
@@ -2239,7 +2238,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
             assert_eq!(req, fidl_mlme::ConnectRequest {
                 selected_bss: bss.clone().into(),
                 connect_failure_timeout: DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT,
@@ -2287,7 +2286,7 @@ mod tests {
         let _state = on_eapol_ind(state, &mut h, bss.bssid, &suppl_mock, vec![update]);
 
         expect_set_ctrl_port(&mut h.mlme_stream, bss.bssid, fidl_mlme::ControlledPortState::Open);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Success);
         });
 
@@ -2332,7 +2331,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
             assert_eq!(req, fidl_mlme::ConnectRequest {
                 selected_bss: bss.clone().into(),
                 connect_failure_timeout: DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT,
@@ -2381,7 +2380,7 @@ mod tests {
         let _state = on_eapol_ind(state, &mut h, bss.bssid, &suppl_mock, vec![update]);
 
         expect_set_ctrl_port(&mut h.mlme_stream, bss.bssid, fidl_mlme::ControlledPortState::Open);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Success);
         });
 
@@ -2425,7 +2424,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
             assert_eq!(req, fidl_mlme::ConnectRequest {
                 selected_bss: bss.clone().into(),
                 connect_failure_timeout: DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT,
@@ -2449,7 +2448,7 @@ mod tests {
         let _state = state.on_mlme_event(connect_conf, &mut h.context);
 
         // User should be notified that we are connected
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Success);
         });
 
@@ -2486,7 +2485,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_req))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_req))));
 
         // (mlme->sme) Send a ConnectConf as a response
         let connect_conf = fidl_mlme::MlmeEvent::ConnectConf {
@@ -2509,7 +2508,7 @@ mod tests {
         let _state = state.on_mlme_event(connect_conf, &mut h.context);
 
         // User should be notified that we are connected
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Success);
         });
 
@@ -2548,7 +2547,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_req))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_req))));
 
         // (mlme->sme) Send a ConnectConf as a response
         suppl_mock
@@ -2597,9 +2596,9 @@ mod tests {
             &mut h.context,
         );
 
-        assert_matches!(connect_txn_stream.try_next(),
+        assert_variant!(connect_txn_stream.try_next(),
         Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
-            assert_matches!(result, ConnectResult::Failed(_))
+            assert_variant!(result, ConnectResult::Failed(_))
         });
 
         let state = exchange_deauth(state, &mut h);
@@ -2653,7 +2652,7 @@ mod tests {
             },
         };
         let state = state.on_mlme_event(deauth_ind, &mut h.context);
-        assert_matches!(connect_txn_stream1.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream1.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, AssociationFailure {
                 bss_protection,
                 code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
@@ -2692,7 +2691,7 @@ mod tests {
         };
         let state = state.on_mlme_event(disassoc_ind, &mut h.context);
         let state = exchange_deauth(state, &mut h);
-        assert_matches!(connect_txn_stream1.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream1.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, AssociationFailure {
                 bss_protection,
                 code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
@@ -2735,7 +2734,7 @@ mod tests {
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
 
         let state = exchange_deauth(state, &mut h);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::StartSupplicantFailed,
@@ -2780,9 +2779,9 @@ mod tests {
         let s = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // There should be no message in the connect_txn_stream
-        assert_matches!(connect_txn_stream.try_next(), Err(_));
-        assert_matches!(s, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::EstablishingRsna { .. })});
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
+        assert_variant!(s, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. })});
 
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
@@ -2815,9 +2814,9 @@ mod tests {
         let s = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // There should be no message in the connect_txn_stream
-        assert_matches!(connect_txn_stream.try_next(), Err(_));
-        assert_matches!(s, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::EstablishingRsna { .. })});
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
+        assert_variant!(s, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. })});
 
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
@@ -2852,10 +2851,10 @@ mod tests {
         let state = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // Verify state did not change.
-        assert_matches!(state, ClientState::Associated(state) => {
-            assert_matches!(
+        assert_variant!(state, ClientState::Associated(state) => {
+            assert_variant!(
                 &state.link_state,
-                LinkState::LinkUp(state) => assert_matches!(&state.protection, Protection::Rsna(_))
+                LinkState::LinkUp(state) => assert_variant!(&state.protection, Protection::Rsna(_))
             )
         });
 
@@ -2888,7 +2887,7 @@ mod tests {
         let state = on_eapol_ind(state, &mut h, bss.bssid, &suppl_mock, vec![update]);
 
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::InternalError,
@@ -2927,19 +2926,19 @@ mod tests {
         mut timed_event_stream: impl Stream<Item = timer::Event<E>> + std::marker::Unpin,
         deadline: fuchsia_async::MonotonicInstant,
     ) -> timer::Event<E> {
-        assert_matches!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
+        assert_variant!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
         loop {
             let next_deadline = executor.wake_next_timer().expect("expected pending timer");
             executor.set_fake_time(next_deadline);
             if next_deadline == deadline {
-                return assert_matches!(
+                return assert_variant!(
                             executor.run_until_stalled(&mut timed_event_stream.next()),
                             Poll::Ready(Some(timed_event)) => timed_event
                 );
             } else {
                 // Assert that the timer has been cancelled, since we haven't yet
                 // reached the expected deadline.
-                assert_matches!(
+                assert_variant!(
                     executor.run_until_stalled(&mut timed_event_stream.next()),
                     Poll::Pending
                 );
@@ -2977,7 +2976,7 @@ mod tests {
             &mut timed_event_stream,
             rsna_response_deadline,
         );
-        assert_matches!(timed_event.event, Event::RsnaResponseTimeout(..));
+        assert_variant!(timed_event.event, Event::RsnaResponseTimeout(..));
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeNotStarted,
         ));
@@ -2985,7 +2984,7 @@ mod tests {
 
         // Check that SME sends a deauthenticate request and fails the connection
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::RsnaResponseTimeout(wlan_rsn::Error::EapolHandshakeNotStarted),
@@ -3079,7 +3078,7 @@ mod tests {
                 &mut timed_event_stream,
                 rsna_retransmission_deadline,
             );
-            assert_matches!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
+            assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
 
             if i < mock_number_of_retransmissions {
                 suppl_mock
@@ -3199,7 +3198,7 @@ mod tests {
                 &mut timed_event_stream,
                 rsna_retransmission_deadline,
             );
-            assert_matches!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
+            assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
 
             if i < mock_number_of_retransmissions {
                 suppl_mock
@@ -3214,14 +3213,14 @@ mod tests {
             &mut timed_event_stream,
             rsna_response_deadline,
         );
-        assert_matches!(timeout.event, Event::RsnaResponseTimeout(..));
+        assert_variant!(timeout.event, Event::RsnaResponseTimeout(..));
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
         ));
         let state = state.handle_timeout(timeout.event, &mut h.context);
 
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::RsnaResponseTimeout(wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string())),
@@ -3354,7 +3353,7 @@ mod tests {
                 &mut timed_event_stream,
                 rsna_retransmission_deadline,
             );
-            assert_matches!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
+            assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
             state = state.handle_timeout(timed_event.event, &mut h.context);
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
@@ -3380,7 +3379,7 @@ mod tests {
             &mut timed_event_stream,
             rsna_retransmission_deadline,
         );
-        assert_matches!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
+        assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
         state = state.handle_timeout(timed_event.event, &mut h.context);
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
@@ -3390,7 +3389,7 @@ mod tests {
             &mut timed_event_stream,
             rsna_completion_deadline,
         );
-        assert_matches!(timed_event.event, Event::RsnaCompletionTimeout(RsnaCompletionTimeout {}));
+        assert_variant!(timed_event.event, Event::RsnaCompletionTimeout(RsnaCompletionTimeout {}));
         suppl_mock.set_on_rsna_completion_timeout(
             EstablishRsnaFailureReason::RsnaCompletionTimeout(
                 wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
@@ -3400,7 +3399,7 @@ mod tests {
 
         // Check that SME sends a deauthenticate request and fails the connection
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::RsnaCompletionTimeout(wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string())),
@@ -3492,19 +3491,19 @@ mod tests {
         expect_eapol_req(&mut h.mlme_stream, bssid);
         expect_set_gtk(&mut h.mlme_stream);
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
-        assert_matches!(&state, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::LinkUp { .. });
+        assert_variant!(&state, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::LinkUp { .. });
         });
 
         // Any timeout is ignored
         let (_, timed_event, _) = h.time_stream.try_next().unwrap().expect("expect timed event");
         state = state.handle_timeout(timed_event.event, &mut h.context);
-        assert_matches!(&state, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::LinkUp { .. });
+        assert_variant!(&state, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::LinkUp { .. });
         });
 
         // No new ConnectResult is sent
-        assert_matches!(connect_txn_stream.try_next(), Err(_));
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
     }
 
     #[test]
@@ -3517,12 +3516,12 @@ mod tests {
         let state = exchange_deauth(state, &mut h);
 
         // First stream should be dropped already
-        assert_matches!(connect_txn_stream1.try_next(), Ok(None));
+        assert_variant!(connect_txn_stream1.try_next(), Ok(None));
         // Second stream should either have event or is empty, but is not dropped
-        assert_matches!(connect_txn_stream2.try_next(), Ok(Some(_)) | Err(_));
+        assert_variant!(connect_txn_stream2.try_next(), Ok(Some(_)) | Err(_));
 
         // (sme->mlme) Expect a ConnectRequest
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(req))) => {
             assert_eq!(req.selected_bss, (*connect_command_two().0.bss).into());
         });
         assert_connecting(state, &connect_command_two().0.bss);
@@ -3589,12 +3588,12 @@ mod tests {
         };
         let roam_result_ind_event = MlmeEvent::RoamResultInd { ind: ind.clone() };
         let state = state.on_mlme_event(roam_result_ind_event, &mut h.context);
-        assert_matches!(&state, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::LinkUp { .. });
+        assert_variant!(&state, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::LinkUp { .. });
         });
 
         // User should be notified that the roam succeeded.
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
             assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
         });
 
@@ -3630,12 +3629,12 @@ mod tests {
         };
         let roam_conf_event = MlmeEvent::RoamConf { conf: conf.clone() };
         let state = state.on_mlme_event(roam_conf_event, &mut h.context);
-        assert_matches!(&state, ClientState::Associated(state) => {
-            assert_matches!(&state.link_state, LinkState::LinkUp { .. });
+        assert_variant!(&state, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::LinkUp { .. });
         });
 
         // User should be notified that the roam succeeded.
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
             assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
         });
 
@@ -3715,8 +3714,8 @@ mod tests {
         let roam_result_ind_event = MlmeEvent::RoamResultInd { ind: ind.clone() };
         let state = state.on_mlme_event(roam_result_ind_event, &mut h.context);
 
-        assert_matches!(&state, ClientState::Associated(state)  => {
-            assert_matches!(&state.link_state, LinkState::EstablishingRsna { .. });
+        assert_variant!(&state, ClientState::Associated(state)  => {
+            assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
         h.executor.run_singlethreaded(expect_state_events_link_up_roaming_rsna(
@@ -3762,8 +3761,8 @@ mod tests {
         let roam_conf_event = MlmeEvent::RoamConf { conf: conf.clone() };
         let state = state.on_mlme_event(roam_conf_event, &mut h.context);
 
-        assert_matches!(&state, ClientState::Associated(state)  => {
-            assert_matches!(&state.link_state, LinkState::EstablishingRsna { .. });
+        assert_variant!(&state, ClientState::Associated(state)  => {
+            assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
         h.executor.run_singlethreaded(expect_state_events_link_up_roaming_rsna(
@@ -3782,12 +3781,12 @@ mod tests {
         mlme_event_name: fidl_sme::DisconnectMlmeEventName,
         connect_txn_stream: &mut ConnectTransactionStream,
     ) {
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
-            assert_matches!(result, RoamResult::Failed(failure) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
+            assert_variant!(result, RoamResult::Failed(failure) => {
                 assert_eq!(failure.failure_type, failure_type);
                 assert_eq!(failure.status_code, status_code);
                 assert_eq!(failure.selected_bssid, selected_bssid.into());
-                assert_matches!(failure.disconnect_info.disconnect_source, fidl_sme::DisconnectSource::Mlme(cause) => {
+                assert_variant!(failure.disconnect_info.disconnect_source, fidl_sme::DisconnectSource::Mlme(cause) => {
                     assert_eq!(cause.mlme_event_name, mlme_event_name);
                 });
             });
@@ -4021,7 +4020,7 @@ mod tests {
         let state = state.on_mlme_event(roam_start_ind, &mut h.context);
         assert_idle(state);
 
-        assert_matches!(connect_txn_stream.try_next(), Err(_));
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
     }
 
     #[test]
@@ -4038,7 +4037,7 @@ mod tests {
 
         assert_idle(state);
 
-        assert_matches!(connect_txn_stream.try_next(), Err(_));
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
     }
 
     #[test]
@@ -4061,7 +4060,7 @@ mod tests {
         assert_connecting(state, &original_bss);
 
         // Nothing should be sent upward.
-        assert_matches!(connect_txn_stream.try_next(), Ok(None));
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
     }
 
     #[test]
@@ -4080,7 +4079,7 @@ mod tests {
         assert_connecting(state, &original_bss);
 
         // Nothing should be sent upward.
-        assert_matches!(connect_txn_stream.try_next(), Ok(None));
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
     }
 
     #[test]
@@ -4102,7 +4101,7 @@ mod tests {
         assert_disconnecting(state);
 
         // Nothing should be sent upward.
-        assert_matches!(connect_txn_stream.try_next(), Ok(None));
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
     }
 
     #[test]
@@ -4120,7 +4119,7 @@ mod tests {
         assert_disconnecting(state);
 
         // Nothing should be sent upward.
-        assert_matches!(connect_txn_stream.try_next(), Ok(None));
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
     }
 
     async fn expect_state_events_roaming_disconnecting_idle(inspector: &Inspector) {
@@ -4246,8 +4245,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let mut disconnect_fut =
             proxy.disconnect(fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme);
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
-        let responder = assert_matches!(
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        let responder = assert_variant!(
             h.executor.run_singlethreaded(stream.next()).unwrap().unwrap(),
             fidl_sme::ClientSmeRequest::Disconnect{ responder, .. } => responder);
         (disconnect_fut, responder)
@@ -4265,7 +4264,7 @@ mod tests {
         assert_idle(new_state);
         // Expect no messages to the MLME
         assert!(h.mlme_stream.try_next().is_err());
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
         assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
@@ -4288,7 +4287,7 @@ mod tests {
         let state = connecting_state(cmd);
         let state = disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
         let state = exchange_deauth(state, &mut h);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, ConnectResult::Canceled);
         });
         assert_idle(state);
@@ -4351,15 +4350,15 @@ mod tests {
             fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme,
             responder,
         );
-        assert_matches!(&state, ClientState::Disconnecting(_));
+        assert_variant!(&state, ClientState::Disconnecting(_));
 
         let timed_event =
-            assert_matches!(h.time_stream.try_next(), Ok(Some((_, timed_event, _))) => timed_event);
-        assert_matches!(timed_event.event, Event::DeauthenticateTimeout(..));
+            assert_variant!(h.time_stream.try_next(), Ok(Some((_, timed_event, _))) => timed_event);
+        assert_variant!(timed_event.event, Event::DeauthenticateTimeout(..));
 
         let state = state.handle_timeout(timed_event.event, &mut h.context);
         assert_idle(state);
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
         assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
@@ -4396,15 +4395,15 @@ mod tests {
         );
 
         let disconnecting =
-            assert_matches!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
-        assert_matches!(&disconnecting.action, PostDisconnectAction::RespondDisconnect { .. });
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+            assert_variant!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
+        assert_variant!(&disconnecting.action, PostDisconnectAction::RespondDisconnect { .. });
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
 
         let state = state.connect(cmd2, &mut h.context);
         let disconnecting =
-            assert_matches!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
-        assert_matches!(&disconnecting.action, PostDisconnectAction::BeginConnect { .. });
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+            assert_variant!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
+        assert_variant!(&disconnecting.action, PostDisconnectAction::BeginConnect { .. });
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
         let state = exchange_deauth(state, &mut h);
         assert_connecting(state, &connect_command_two().0.bss);
 
@@ -4443,10 +4442,10 @@ mod tests {
             responder,
         );
         let disconnecting =
-            assert_matches!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
-        assert_matches!(&disconnecting.action, PostDisconnectAction::RespondDisconnect { .. });
+            assert_variant!(&state, ClientState::Disconnecting(disconnecting) => disconnecting);
+        assert_variant!(&disconnecting.action, PostDisconnectAction::RespondDisconnect { .. });
 
-        let result = assert_matches!(
+        let result = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, .. })) => result
         );
@@ -4473,7 +4472,7 @@ mod tests {
         assert_eq!(h.context.att_id, 0);
 
         let state = state.connect(connect_command_one().0, &mut h.context);
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 1);
 
         let state = disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
@@ -4481,12 +4480,12 @@ mod tests {
         assert_eq!(h.context.att_id, 1);
 
         let state = state.connect(connect_command_two().0, &mut h.context);
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 2);
 
         let state = state.connect(connect_command_one().0, &mut h.context);
         let _state = exchange_deauth(state, &mut h);
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 3);
     }
 
@@ -4507,7 +4506,7 @@ mod tests {
         };
 
         let state = state.on_mlme_event(disassociate_ind, &mut h.context);
-        assert_matches!(&state, ClientState::Connecting(connecting) =>
+        assert_variant!(&state, ClientState::Connecting(connecting) =>
                             assert_eq!(connecting.reassociation_loop_count, 1));
         assert_connecting(state, &bss);
         assert_eq!(h.context.att_id, 1);
@@ -4538,7 +4537,7 @@ mod tests {
 
         // We should notify of a disconnect and stop any retries.
         assert_disconnecting(state);
-        let info = assert_matches!(
+        let info = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
         );
@@ -4607,7 +4606,7 @@ mod tests {
         };
 
         let _state = state.on_mlme_event(deauth_ind, &mut h.context);
-        let fidl_info = assert_matches!(
+        let fidl_info = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
         );
@@ -4650,7 +4649,7 @@ mod tests {
         };
 
         let state = state.on_mlme_event(deauth_ind, &mut h.context);
-        let info = assert_matches!(
+        let info = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
         );
@@ -4664,7 +4663,7 @@ mod tests {
         );
 
         // Check that reconnect is attempted
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
             assert_eq!(&req.peer_sta_address, bss.bssid.as_array());
         });
 
@@ -4673,7 +4672,7 @@ mod tests {
         let _state = state.on_mlme_event(connect_conf, &mut h.context);
 
         // User should be notified that we are reconnected
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect })) => {
             assert_eq!(result, ConnectResult::Success);
             assert!(is_reconnect);
         });
@@ -4714,13 +4713,13 @@ mod tests {
         };
 
         let state = state.on_mlme_event(disassoc_ind, &mut h.context);
-        assert_matches!(
+        assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { .. }))
         );
 
         // Check that reconnect is attempted
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
             assert_eq!(&req.peer_sta_address, bss.bssid.as_array());
         });
 
@@ -4733,7 +4732,7 @@ mod tests {
         assert_idle(state);
 
         // User should be notified that reconnection attempt failed
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect })) => {
             assert_eq!(result, AssociationFailure {
                 bss_protection: BssProtection::Open,
                 code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
@@ -4774,7 +4773,7 @@ mod tests {
 
         let state = disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
         assert_idle(state);
-        let info = assert_matches!(
+        let info = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
         );
@@ -4820,7 +4819,7 @@ mod tests {
         let state = disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
         assert_idle(state);
 
-        let info = assert_matches!(
+        let info = assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
         );
@@ -4863,15 +4862,15 @@ mod tests {
         let input_info = fidl_internal::ChannelSwitchInfo { new_channel: 36 };
         let switch_ind = MlmeEvent::OnChannelSwitched { info: input_info };
 
-        assert_matches!(&state, ClientState::Associated(state) => {
+        assert_variant!(&state, ClientState::Associated(state) => {
             assert_eq!(state.latest_ap_state.channel.primary, 1);
         });
         let state = state.on_mlme_event(switch_ind, &mut h.context);
-        assert_matches!(state, ClientState::Associated(state) => {
+        assert_variant!(state, ClientState::Associated(state) => {
             assert_eq!(state.latest_ap_state.channel.primary, 36);
         });
 
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnChannelSwitched { info })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnChannelSwitched { info })) => {
             assert_eq!(info, input_info);
         });
     }
@@ -4893,7 +4892,7 @@ mod tests {
         let state = idle_state().connect(command, &mut h.context);
 
         // State did not change to Connecting because command is invalid, thus ignored.
-        assert_matches!(state, ClientState::Idle(_));
+        assert_variant!(state, ClientState::Idle(_));
 
         assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
@@ -4929,7 +4928,7 @@ mod tests {
         let state = state.connect(command, &mut h.context);
 
         // State did not change to Connecting because command is invalid, thus ignored.
-        assert_matches!(state, ClientState::Idle(_));
+        assert_variant!(state, ClientState::Idle(_));
 
         assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
@@ -4956,39 +4955,39 @@ mod tests {
         let state = link_up_state(cmd);
         let input_ind = fidl_internal::SignalReportIndication { rssi_dbm: -42, snr_db: 20 };
         let state = state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind }, &mut h.context);
-        let serving_ap_info = assert_matches!(state.status(),
+        let serving_ap_info = assert_variant!(state.status(),
                                                      ClientSmeStatus::Connected(serving_ap_info) =>
                                                      serving_ap_info);
         assert_eq!(serving_ap_info.rssi_dbm, -42);
         assert_eq!(serving_ap_info.snr_db, 20);
         assert!(serving_ap_info.signal_report_time > time_a);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnSignalReport { ind })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnSignalReport { ind })) => {
             assert_eq!(input_ind, ind);
         });
 
         let time_b = now();
-        let signal_report_time = assert_matches!(state.status(),
+        let signal_report_time = assert_variant!(state.status(),
                                                  ClientSmeStatus::Connected(serving_ap_info) =>
                                                  serving_ap_info.signal_report_time);
         assert!(signal_report_time < time_b);
 
         let input_ind = fidl_internal::SignalReportIndication { rssi_dbm: -24, snr_db: 10 };
         let state = state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind }, &mut h.context);
-        let serving_ap_info = assert_matches!(state.status(),
+        let serving_ap_info = assert_variant!(state.status(),
                                                      ClientSmeStatus::Connected(serving_ap_info) =>
                                                      serving_ap_info);
         assert_eq!(serving_ap_info.rssi_dbm, -24);
         assert_eq!(serving_ap_info.snr_db, 10);
-        let signal_report_time = assert_matches!(state.status(),
+        let signal_report_time = assert_variant!(state.status(),
                                                  ClientSmeStatus::Connected(serving_ap_info) =>
                                                  serving_ap_info.signal_report_time);
         assert!(signal_report_time > time_b);
-        assert_matches!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnSignalReport { ind })) => {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnSignalReport { ind })) => {
             assert_eq!(input_ind, ind);
         });
 
         let time_c = now();
-        let signal_report_time = assert_matches!(state.status(),
+        let signal_report_time = assert_variant!(state.status(),
                                                  ClientSmeStatus::Connected(serving_ap_info) =>
                                                  serving_ap_info.signal_report_time);
         assert!(signal_report_time < time_c);
@@ -5015,7 +5014,7 @@ mod tests {
             .set_on_sae_frame_rx_updates(vec![SecAssocUpdate::TxSaeFrame(frame_tx)]);
         let state =
             state.on_mlme_event(MlmeEvent::OnSaeFrameRx { frame: frame_rx }, &mut h.context);
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::SaeFrameTx(_))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::SaeFrameTx(_))));
         state
     }
 
@@ -5025,7 +5024,7 @@ mod tests {
         let (cmd, _connect_txn_stream) = connect_command_wpa3(supplicant);
         let state = connecting_state(cmd);
         let end_state = test_sae_frame_rx_tx(suppl_mock, state);
-        assert_matches!(end_state, ClientState::Connecting(_))
+        assert_variant!(end_state, ClientState::Connecting(_))
     }
 
     fn test_sae_frame_ind_resp(
@@ -5040,7 +5039,7 @@ mod tests {
         ]);
         let state = state.on_mlme_event(MlmeEvent::OnSaeHandshakeInd { ind }, &mut h.context);
 
-        let resp = assert_matches!(
+        let resp = assert_variant!(
             h.mlme_stream.try_next(),
             Ok(Some(MlmeRequest::SaeHandshakeResp(resp))) => resp);
         assert_eq!(resp.status_code, fidl_ieee80211::StatusCode::Success);
@@ -5053,7 +5052,7 @@ mod tests {
         let (cmd, _connect_txn_stream) = connect_command_wpa3(supplicant);
         let state = connecting_state(cmd);
         let end_state = test_sae_frame_ind_resp(suppl_mock, state);
-        assert_matches!(end_state, ClientState::Connecting(_))
+        assert_variant!(end_state, ClientState::Connecting(_))
     }
 
     fn test_sae_timeout(
@@ -5070,7 +5069,7 @@ mod tests {
         mock_supplicant_controller
             .set_on_sae_timeout_updates(vec![SecAssocUpdate::TxSaeFrame(frame_tx)]);
         let state = state.handle_timeout(event::SaeTimeout(2).into(), &mut h.context);
-        assert_matches!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::SaeFrameTx(_))));
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::SaeFrameTx(_))));
         state
     }
 
@@ -5083,7 +5082,7 @@ mod tests {
             .set_on_sae_timeout_failure(anyhow::anyhow!("Failed to process timeout"));
         let state = state.handle_timeout(event::SaeTimeout(2).into(), &mut h.context);
         let state = exchange_deauth(state, &mut h);
-        assert_matches!(state, ClientState::Idle(_))
+        assert_variant!(state, ClientState::Idle(_))
     }
 
     #[test]
@@ -5092,7 +5091,7 @@ mod tests {
         let (cmd, _connect_txn_stream) = connect_command_wpa3(supplicant);
         let state = connecting_state(cmd);
         let end_state = test_sae_timeout(suppl_mock, state);
-        assert_matches!(end_state, ClientState::Connecting(_));
+        assert_variant!(end_state, ClientState::Connecting(_));
     }
 
     #[test]
@@ -5110,8 +5109,8 @@ mod tests {
         let state = link_up_state_with_wmm(connect_command_one().0, wmm_param);
 
         let state = state.on_mlme_event(create_on_wmm_status_resp(zx::sys::ZX_OK), &mut h.context);
-        assert_matches!(state, ClientState::Associated(state) => {
-            assert_matches!(state.wmm_param, Some(wmm_param) => {
+        assert_variant!(state, ClientState::Associated(state) => {
+            assert_variant!(state.wmm_param, Some(wmm_param) => {
                 assert!(wmm_param.wmm_info.ap_wmm_info().uapsd());
                 assert_wmm_param_acs(&wmm_param);
             })
@@ -5128,8 +5127,8 @@ mod tests {
         let state = link_up_state_with_wmm(connect_command_one().0, Some(existing_wmm_param));
 
         let state = state.on_mlme_event(create_on_wmm_status_resp(zx::sys::ZX_OK), &mut h.context);
-        assert_matches!(state, ClientState::Associated(state) => {
-            assert_matches!(state.wmm_param, Some(wmm_param) => {
+        assert_variant!(state, ClientState::Associated(state) => {
+            assert_variant!(state.wmm_param, Some(wmm_param) => {
                 assert!(wmm_param.wmm_info.ap_wmm_info().uapsd());
                 assert_wmm_param_acs(&wmm_param);
             })
@@ -5146,8 +5145,8 @@ mod tests {
 
         let state = state
             .on_mlme_event(create_on_wmm_status_resp(zx::sys::ZX_ERR_UNAVAILABLE), &mut h.context);
-        assert_matches!(state, ClientState::Associated(state) => {
-            assert_matches!(state.wmm_param, Some(wmm_param) => {
+        assert_variant!(state, ClientState::Associated(state) => {
+            assert_variant!(state.wmm_param, Some(wmm_param) => {
                 assert_eq!(wmm_param, existing_wmm_param);
             })
         });
@@ -5271,7 +5270,7 @@ mod tests {
 
     fn exchange_deauth(state: ClientState, h: &mut TestHelper) -> ClientState {
         // (sme->mlme) Expect a DeauthenticateRequest
-        let peer_sta_address = assert_matches!(
+        let peer_sta_address = assert_variant!(
             h.mlme_stream.try_next(),
             Ok(Some(MlmeRequest::Deauthenticate(req))) => req.peer_sta_address
         );
@@ -5288,7 +5287,7 @@ mod tests {
         bssid: Bssid,
         state: fidl_mlme::ControlledPortState,
     ) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetCtrlPort(req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetCtrlPort(req))) => {
             assert_eq!(&req.peer_sta_address, bssid.as_array());
             assert_eq!(req.state, state);
         });
@@ -5300,7 +5299,7 @@ mod tests {
         reason_code: fidl_ieee80211::ReasonCode,
     ) {
         // (sme->mlme) Expect a DeauthenticateRequest
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Deauthenticate(req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Deauthenticate(req))) => {
             assert_eq!(bssid.as_array(), &req.peer_sta_address);
             assert_eq!(reason_code, req.reason_code);
         });
@@ -5308,7 +5307,7 @@ mod tests {
 
     #[track_caller]
     fn expect_eapol_req(mlme_stream: &mut MlmeStream, bssid: Bssid) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(req))) => {
             assert_eq!(req.src_addr, fake_device_info().sta_addr);
             assert_eq!(&req.dst_addr, bssid.as_array());
             assert_eq!(req.data, Vec::<u8>::from(test_utils::eapol_key_frame()));
@@ -5316,7 +5315,7 @@ mod tests {
     }
 
     fn expect_set_ptk(mlme_stream: &mut MlmeStream, bssid: Bssid) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
@@ -5330,7 +5329,7 @@ mod tests {
     }
 
     fn expect_set_gtk(mlme_stream: &mut MlmeStream) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
@@ -5344,7 +5343,7 @@ mod tests {
     }
 
     fn expect_set_wpa1_ptk(mlme_stream: &mut MlmeStream, bssid: Bssid) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::wpa1_cipher().tk_bytes().unwrap() as usize]);
@@ -5358,7 +5357,7 @@ mod tests {
     }
 
     fn expect_set_wpa1_gtk(mlme_stream: &mut MlmeStream) {
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::wpa1_gtk_bytes()[..]);
@@ -5475,7 +5474,7 @@ mod tests {
     }
 
     fn assert_idle(state: ClientState) {
-        assert_matches!(&state, ClientState::Idle(_));
+        assert_variant!(&state, ClientState::Idle(_));
     }
 
     fn disconnect(
@@ -5490,15 +5489,15 @@ mod tests {
         };
         let (mut disconnect_fut, responder) = make_disconnect_request(h);
         state = state.disconnect(&mut h.context, reason, responder);
-        assert_matches!(&state, ClientState::Disconnecting(_));
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        assert_variant!(&state, ClientState::Disconnecting(_));
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
         let state = state.on_mlme_event(
             fidl_mlme::MlmeEvent::DeauthenticateConf {
                 resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bssid.to_array() },
             },
             &mut h.context,
         );
-        assert_matches!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
         state
     }
 
@@ -5513,22 +5512,22 @@ mod tests {
     }
 
     fn assert_connecting(state: ClientState, bss: &BssDescription) {
-        assert_matches!(&state, ClientState::Connecting(connecting) => {
+        assert_variant!(&state, ClientState::Connecting(connecting) => {
             assert_eq!(connecting.cmd.bss.as_ref(), bss);
         });
     }
 
     fn assert_roaming(state: &ClientState) {
-        assert_matches!(state, ClientState::Roaming(_));
+        assert_variant!(state, ClientState::Roaming(_));
     }
 
     fn assert_disconnecting(state: ClientState) {
-        assert_matches!(&state, ClientState::Disconnecting(_));
+        assert_variant!(&state, ClientState::Disconnecting(_));
     }
 
     fn establishing_rsna_state(cmd: ConnectCommand) -> ClientState {
         let auth_method = cmd.protection.rsn_auth_method();
-        let rsna = assert_matches!(cmd.protection, Protection::Rsna(rsna) => rsna);
+        let rsna = assert_variant!(cmd.protection, Protection::Rsna(rsna) => rsna);
         let link_state = testing::new_state(EstablishingRsna {
             rsna,
             rsna_completion_timeout: None,

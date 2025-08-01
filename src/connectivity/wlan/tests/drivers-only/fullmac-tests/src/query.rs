@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::FullmacDriverFixture;
-use assert_matches::assert_matches;
 use fullmac_helpers::config::{default_fullmac_query_info, FullmacDriverConfig};
 use rand::seq::IndexedRandom;
+use wlan_common::assert_variant;
 use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac};
 
 #[fuchsia::test]
@@ -31,7 +31,7 @@ async fn test_generic_sme_query() {
     let sme_fut = async { generic_sme_proxy.query().await.expect("Failed to request SME query") };
 
     let driver_fut = async {
-        assert_matches!(request_stream.next().await,
+        assert_variant!(request_stream.next().await,
         fidl_fullmac::WlanFullmacImpl_Request::Query { responder } => {
             responder.send(Ok(&fullmac_driver.config.query_info))
                 .expect("Failed to respondt to Query");

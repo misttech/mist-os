@@ -22,7 +22,6 @@ rustc_library("fullmac-helpers") {
     "//src/connectivity/wlan/tests/helpers/test-realm-helpers",
     "//src/connectivity/wlan/tests/helpers/testcontroller-driver/fidl:test.wlan.testcontroller_rust",
     "//src/lib/fidl/rust/fidl",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:zerocopy",

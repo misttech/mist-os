@@ -128,7 +128,7 @@ mod tests {
     use super::*;
     use crate::integrity::{self, Algorithm};
     use crate::rsna::test_util;
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
     use wlan_common::ie::rsn::akm::Akm;
 
     fn fake_key_frame(mic_len: usize) -> eapol::KeyFrameTx {
@@ -159,7 +159,7 @@ mod tests {
         let mut protection = test_util::get_rsne_protection();
         protection.akm = Akm::new_dot11(200);
         let result = compute_mic(&KCK[..], &protection, &frame.keyframe());
-        assert_matches!(result, Err(Error::UnknownIntegrityAlgorithm));
+        assert_variant!(result, Err(Error::UnknownIntegrityAlgorithm));
     }
 
     #[test]
@@ -170,7 +170,7 @@ mod tests {
         let frame =
             frame.serialize().finalize_without_mic().expect("failed to create fake key frame");
         let result = compute_mic(&KCK[..], &test_util::get_rsne_protection(), &frame.keyframe());
-        assert_matches!(result, Err(Error::ComputingMicForUnprotectedFrame));
+        assert_variant!(result, Err(Error::ComputingMicForUnprotectedFrame));
     }
 
     #[test]
@@ -181,7 +181,7 @@ mod tests {
             .finalize_with_mic(&[][..])
             .expect("failed to create fake key frame");
         let result = compute_mic(&KCK[..], &test_util::get_rsne_protection(), &frame.keyframe());
-        assert_matches!(result, Err(Error::MicSizesDiffer(0, 16)));
+        assert_variant!(result, Err(Error::MicSizesDiffer(0, 16)));
     }
 
     #[test]

@@ -710,13 +710,13 @@ pub async fn handle_suggest_ap_mac(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fidl::endpoints;
     use fuchsia_async::TestExecutor;
     use futures::stream::StreamExt;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
+    use wlan_common::assert_variant;
     use zx_status;
 
     static TEST_SSID: &str = "test_ssid";
@@ -969,7 +969,7 @@ mod tests {
         server: &mut wlan_policy::ScanResultIteratorRequestStream,
         scan_result: Result<&[wlan_policy::ScanResult], wlan_policy::ScanErrorCode>,
     ) {
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(wlan_policy::ScanResultIteratorRequest::GetNext {
                 responder
@@ -1012,7 +1012,7 @@ mod tests {
         server: &mut wlan_policy::NetworkConfigIteratorRequestStream,
         saved_networks_response: Vec<wlan_policy::NetworkConfig>,
     ) {
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(wlan_policy::NetworkConfigIteratorRequest::GetNext {
                 responder
@@ -1043,7 +1043,7 @@ mod tests {
             wlan_policy::RequestStatus::Acknowledged,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where starting client connections fails.
@@ -1064,7 +1064,7 @@ mod tests {
             wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where starting client connections is successful.
@@ -1085,7 +1085,7 @@ mod tests {
             wlan_policy::RequestStatus::Acknowledged,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where starting client connections fails.
@@ -1106,7 +1106,7 @@ mod tests {
             wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where a network is successfully saved.
@@ -1124,7 +1124,7 @@ mod tests {
         // Drop the remote channel indicating success
         send_network_config_response(&mut exec, &mut test_values.client_stream, true);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where a network configuration cannot be saved.
@@ -1142,7 +1142,7 @@ mod tests {
         // Send back an error
         send_network_config_response(&mut exec, &mut test_values.client_stream, false);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where a network config can be successfully removed.
@@ -1174,7 +1174,7 @@ mod tests {
         let mut iterator = get_saved_networks_iterator(&mut exec, &mut test_values.client_stream);
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where a network config can be successfully removed when only the SSID of the
@@ -1212,7 +1212,7 @@ mod tests {
         let mut iterator = get_saved_networks_iterator(&mut exec, &mut test_values.client_stream);
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Test the case where a network config is removed successfully when only the SSID and
@@ -1250,7 +1250,7 @@ mod tests {
         let mut iterator = get_saved_networks_iterator(&mut exec, &mut test_values.client_stream);
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Test the case where a network config is removed successfully when only the SSID and
@@ -1288,7 +1288,7 @@ mod tests {
         let mut iterator = get_saved_networks_iterator(&mut exec, &mut test_values.client_stream);
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where removing a network config by specifying an SSID fails because there is
@@ -1319,7 +1319,7 @@ mod tests {
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
         // Since there is no matching network to remove, an error should be returned.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where network removal fails.
@@ -1346,7 +1346,7 @@ mod tests {
         // Send back an error
         send_network_config_response(&mut exec, &mut test_values.client_stream, false);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where network removal returns no error but the network is still present.
@@ -1381,7 +1381,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut fut).is_pending());
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the config_matches function which compares a config against optional arguments if
@@ -1468,7 +1468,7 @@ mod tests {
         ));
 
         // The connect process should complete after receiving the Connected status response
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where the security type is not specified, but it is automatically chosen
@@ -1519,7 +1519,7 @@ mod tests {
         ));
 
         // The connect process should complete after receiving the Connected status response
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where a user doesn't provide a security type and nothing matching is saved.
@@ -1542,10 +1542,10 @@ mod tests {
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
         // The connect routine should return an error.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
 
         // No connect request should have been sent through FIDL.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.client_stream.next()),
             Poll::Ready(None)
         );
@@ -1579,10 +1579,10 @@ mod tests {
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
         // The connect routine should return an error since there are multiple matches.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
 
         // No connect request should have been sent through FIDL.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.client_stream.next()),
             Poll::Ready(None)
         );
@@ -1619,7 +1619,7 @@ mod tests {
         ));
 
         // The connect process should return an error after receiving a Failed status
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where a scan is requested and results are sent back to the requester.
@@ -1645,7 +1645,7 @@ mod tests {
         send_scan_result(&mut exec, &mut iterator, Ok(&[]));
 
         // Expect the scan process to complete
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Ok(result)) => {
                 assert_eq!(result.len(), 1);
@@ -1671,7 +1671,7 @@ mod tests {
         send_scan_result(&mut exec, &mut iterator, Err(wlan_policy::ScanErrorCode::GeneralError));
 
         // Process the scan error
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the ability to get saved networks from the client policy layer.
@@ -1695,7 +1695,7 @@ mod tests {
         send_saved_networks(&mut exec, &mut iterator, vec![]);
 
         // Verify that the saved networks response was recorded properly
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Ok(result)) => {
                 assert_eq!(result.len(), 1);
@@ -1728,7 +1728,7 @@ mod tests {
         ));
 
         // Listener future should continue to run but stall waiting for more updates
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     /// Tests to ensure that querying client status returns after the first update.
@@ -1748,7 +1748,7 @@ mod tests {
         ));
 
         // Listener future should complete.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where an AP is requested to be stopped and the policy service returns an
@@ -1773,7 +1773,7 @@ mod tests {
         );
 
         // Run the request to completion
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where an AP is successfully stopped.
@@ -1797,7 +1797,7 @@ mod tests {
         );
 
         // Run the request to completion
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where the request to start an AP results in an error.
@@ -1821,7 +1821,7 @@ mod tests {
         );
 
         // Run the request to completion
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where the start AP process returns an acknowledgement.  The tool should then
@@ -1862,7 +1862,7 @@ mod tests {
         )]);
 
         // Run the request to completion
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where the AP start command is successfully sent, but the AP fails during
@@ -1894,7 +1894,7 @@ mod tests {
         let _ = test_values.update_proxy.on_access_point_state_update(state_updates);
 
         // Expect that the future returns an error
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where all APs are requested to be stopped.
@@ -1907,10 +1907,10 @@ mod tests {
         let mut fut = pin!(fut);
 
         // The future should finish immediately
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // Make sure that the request is seen on the request stream
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.ap_stream.next()),
             Poll::Ready(Some(Ok(
                 wlan_policy::AccessPointControllerRequest::StopAllAccessPoints { .. }
@@ -1940,12 +1940,12 @@ mod tests {
         )]);
 
         // Process message and stall again
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
             wlan_policy::OperatingState::Failed,
         )]);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     /// Tests that the AP status routine only takes a single update.
@@ -1964,7 +1964,7 @@ mod tests {
         )]);
 
         // The future should complete now that a single update has been processed.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1977,9 +1977,9 @@ mod tests {
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
         let mut suggest_fut = pin!(suggest_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
 
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut configurator_stream.next()),
             Poll::Ready(Some(Ok(wlan_deprecated::DeprecatedConfiguratorRequest::SuggestAccessPointMacAddress {
                 mac: fidl_fuchsia_net::MacAddress { octets: [0, 1, 2, 3, 4, 5] }, responder
@@ -1988,7 +1988,7 @@ mod tests {
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -2001,9 +2001,9 @@ mod tests {
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
         let mut suggest_fut = pin!(suggest_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
 
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut configurator_stream.next()),
             Poll::Ready(Some(Ok(wlan_deprecated::DeprecatedConfiguratorRequest::SuggestAccessPointMacAddress {
                 mac: fidl_fuchsia_net::MacAddress { octets: [0, 1, 2, 3, 4, 5] }, responder
@@ -2012,7 +2012,7 @@ mod tests {
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

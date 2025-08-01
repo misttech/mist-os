@@ -34,10 +34,10 @@ rustc_library("donut-lib") {
     with_unit_tests = true
     test_deps = [
       "//sdk/rust/zx-status",
+      "//src/connectivity/wlan/lib/common/rust/:wlan-common",
       "//src/connectivity/wlan/lib/ieee80211",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:test-case",
     ]
   }

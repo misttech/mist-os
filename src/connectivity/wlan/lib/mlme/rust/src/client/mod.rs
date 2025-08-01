@@ -1280,7 +1280,6 @@ mod tests {
     use crate::client::test_utils::drain_timeouts;
     use crate::device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus};
     use crate::test_utils::{fake_wlan_channel, MockWlanRxInfo};
-    use assert_matches::assert_matches;
     use fuchsia_sync::Mutex;
     use lazy_static::lazy_static;
     use std::sync::Arc;
@@ -1290,7 +1289,7 @@ mod tests {
     use wlan_common::test_utils::fake_capabilities::fake_client_capabilities;
     use wlan_common::test_utils::fake_frames::*;
     use wlan_common::timer::{self, create_timer};
-    use wlan_common::{fake_bss_description, fake_fidl_bss_description};
+    use wlan_common::{assert_variant, fake_bss_description, fake_fidl_bss_description};
     use wlan_sme::responder::Responder;
     use wlan_statemachine::*;
     use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
@@ -2595,7 +2594,7 @@ mod tests {
         let mut me = m.make_mlme().await;
 
         let (responder, receiver) = Responder::new();
-        assert_matches!(
+        assert_variant!(
             me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)).await,
             Ok(())
         );
@@ -2639,7 +2638,7 @@ mod tests {
             .expect("Failed to send MlmeRequest::Connect");
 
         // Verify an event was queued up in the timer.
-        assert_matches!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
+        assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
             assert_eq!(ids.len(), 1);
         });
 
@@ -2804,7 +2803,7 @@ mod tests {
             .expect("Failed to send MlmeRequest::Connect");
 
         // Verify an event was queued up in the timer.
-        assert_matches!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
+        assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
             assert_eq!(ids.len(), 1);
         });
 
@@ -2991,7 +2990,7 @@ mod tests {
             .expect("Failed to send MlmeRequest::Connect.");
 
         // Verify an event was queued up in the timer.
-        assert_matches!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
+        assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
             assert_eq!(ids.len(), 1);
         });
 
@@ -3068,7 +3067,7 @@ mod tests {
             .expect("Failed to send MlmeRequest::Connect.");
 
         // Verify an event was queued up in the timer.
-        let (event, _id) = assert_matches!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(events) => {
+        let (event, _id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(events) => {
             assert_eq!(events.len(), 1);
             events[0].clone()
         });
@@ -3104,7 +3103,7 @@ mod tests {
 
         let reconnect_req = fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] };
         let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Reconnect(reconnect_req)).await;
-        assert_matches!(result, Err(Error::Status(_, zx::Status::BAD_STATE)));
+        assert_variant!(result, Err(Error::Status(_, zx::Status::BAD_STATE)));
 
         // Verify a connect confirm message was sent
         let msg = m

@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::FullmacDriverFixture;
-use assert_matches::assert_matches;
 use drivers_only_common::sme_helpers::{
     self, random_password, random_ssid, DEFAULT_OPEN_AP_CONFIG,
 };
 use fullmac_helpers::config::FullmacDriverConfig;
 use fullmac_helpers::recorded_request_stream::FullmacRequest;
 use rand::seq::IndexedRandom;
+use wlan_common::assert_variant;
 use wlan_common::ie::rsn::rsne;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
@@ -31,7 +31,7 @@ async fn setup_test_bss_started(
 
         let ap_fut = ap_sme_proxy.start(&ap_config);
         let driver_fut = async {
-            assert_matches!(fullmac_driver.request_stream.next().await,
+            assert_variant!(fullmac_driver.request_stream.next().await,
                 fidl_fullmac::WlanFullmacImpl_Request::StartBss { payload: _, responder } => {
                     responder.send().expect("Could not respond to StartBss");
             });
@@ -45,7 +45,7 @@ async fn setup_test_bss_started(
                 .await
                 .expect("Could not send StartConf");
 
-            assert_matches!(fullmac_driver.request_stream.next().await,
+            assert_variant!(fullmac_driver.request_stream.next().await,
                 fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                     responder.send().expect("Could not respond to OnLinkStateChanged");
             });
@@ -90,7 +90,7 @@ async fn test_start_2ghz_bss_success() {
 
     let ap_fut = ap_sme_proxy.start(&sme_ap_config);
     let driver_fut = async {
-        assert_matches!(fullmac_driver.request_stream.next().await,
+        assert_variant!(fullmac_driver.request_stream.next().await,
             fidl_fullmac::WlanFullmacImpl_Request::StartBss { payload: _, responder } => {
                 responder.send().expect("Could not respond to StartBss");
         });
@@ -104,7 +104,7 @@ async fn test_start_2ghz_bss_success() {
             .await
             .expect("Could not send StartConf");
 
-        assert_matches!(fullmac_driver.request_stream.next().await,
+        assert_variant!(fullmac_driver.request_stream.next().await,
             fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
@@ -211,7 +211,7 @@ async fn test_stop_bss() {
 
     let ap_fut = ap_sme_proxy.stop();
     let driver_fut = async {
-        assert_matches!(fullmac_driver.request_stream.next().await,
+        assert_variant!(fullmac_driver.request_stream.next().await,
            fidl_fullmac::WlanFullmacImpl_Request::StopBss { payload: _, responder } => {
                responder.send().expect("Could not respond to StopBss");
         });
@@ -225,7 +225,7 @@ async fn test_stop_bss() {
             .await
             .expect("Could not send StopConf");
 
-        assert_matches!(fullmac_driver.request_stream.next().await,
+        assert_variant!(fullmac_driver.request_stream.next().await,
             fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
@@ -273,7 +273,7 @@ async fn test_remote_client_connected_open() {
         .await
         .expect("Could not send AuthInd");
 
-    assert_matches!(fullmac_driver.request_stream.next().await,
+    assert_variant!(fullmac_driver.request_stream.next().await,
         fidl_fullmac::WlanFullmacImpl_Request::AuthResp { payload: _, responder } => {
             responder.send().expect("Could not respond to AuthResp");
     });
@@ -291,7 +291,7 @@ async fn test_remote_client_connected_open() {
         .await
         .expect("Could not send AssocInd");
 
-    assert_matches!(fullmac_driver.request_stream.next().await,
+    assert_variant!(fullmac_driver.request_stream.next().await,
         fidl_fullmac::WlanFullmacImpl_Request::AssocResp { payload: _, responder } => {
             responder.send().expect("Could not respond to AssocResp");
     });
@@ -320,7 +320,7 @@ async fn test_remote_client_connected_open() {
     );
 
     let assoc_resp =
-        assert_matches!(&fullmac_request_history[1], FullmacRequest::AssocResp(resp) => resp);
+        assert_variant!(&fullmac_request_history[1], FullmacRequest::AssocResp(resp) => resp);
     assert_eq!(assoc_resp.peer_sta_address, Some(remote_sta_address.clone()));
     assert_eq!(assoc_resp.result_code, Some(fidl_fullmac::WlanAssocResult::Success));
     // Note: association id is not checked since SME can pick any value.

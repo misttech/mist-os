@@ -90,10 +90,10 @@ fn extract_current_ap(status: &fidl_sme::ClientStatusResponse) -> Option<Box<dep
 mod tests {
     use super::*;
     use crate::legacy::Iface;
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use futures::task::Poll;
     use std::pin::pin;
+    use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync};
 
     struct TestValues {
@@ -119,7 +119,7 @@ mod tests {
         let mut status_fut = pin!(status_fut);
 
         // Expect that no client is reported and the AP status information is empty.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut status_fut),
             Poll::Ready(deprecated::WlanStatus {
                 state: deprecated::State::NoClient,
@@ -140,7 +140,7 @@ mod tests {
         let mut status_fut = pin!(status_fut);
 
         // Expect that no client is reported and the AP status information is empty.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut status_fut),
             Poll::Ready(deprecated::WlanStatus {
                 state: deprecated::State::NoClient,
@@ -158,8 +158,8 @@ mod tests {
 
         // Expect an SME status request and send back a response indicating that the SME is neither
         // connected nor connecting.
-        assert_matches!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
                 responder.send(&fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty{})).expect("could not send sme response")
@@ -167,7 +167,7 @@ mod tests {
         );
 
         // Expect a disconnected status.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut status_fut),
             Poll::Ready(deprecated::WlanStatus {
                 state: deprecated::State::Disassociated,
@@ -185,8 +185,8 @@ mod tests {
 
         // Expect an SME status request and send back a response indicating that the SME is
         // connecting.
-        assert_matches!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
+        assert_variant!(
                     exec.run_until_stalled(&mut test_values.sme_stream.next()),
                     Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
                         responder.send(&fidl_sme::ClientStatusResponse::Connecting("test_ssid".as_bytes().to_vec()))
@@ -195,7 +195,7 @@ mod tests {
                 );
 
         // Expect a connecting status.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut status_fut),
             Poll::Ready(deprecated::WlanStatus {
                 state: deprecated::State::Associating,
@@ -215,8 +215,8 @@ mod tests {
 
         // Expect an SME status request and send back a response indicating that the SME is
         // connected.
-        assert_matches!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut status_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
                 responder.send(&fidl_sme::ClientStatusResponse::Connected(
@@ -238,7 +238,7 @@ mod tests {
         // Expect a connected status.
         let expected_current_ap =
             Some(Box::new(deprecated::Ap { ssid: ssid.to_string(), rssi_dbm }));
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut status_fut),
             Poll::Ready(deprecated::WlanStatus {
                 state: deprecated::State::Associated,

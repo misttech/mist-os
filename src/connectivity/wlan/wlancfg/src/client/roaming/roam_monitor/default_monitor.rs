@@ -46,15 +46,15 @@ impl RoamMonitorApi for DefaultRoamMonitor {
 mod test {
     use super::*;
     use crate::util::testing::generate_random_scanned_candidate;
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_internal as fidl_internal;
+    use wlan_common::assert_variant;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_roam_trigger_data_always_returns_noop() {
         let mut monitor = DefaultRoamMonitor::new();
 
         // Send each type of trigger data and verify the default monitor always returns noop.
-        assert_matches!(
+        assert_variant!(
             monitor
                 .handle_roam_trigger_data(RoamTriggerData::SignalReportInd(
                     fidl_internal::SignalReportIndication { rssi_dbm: -100, snr_db: 0 },
@@ -70,7 +70,7 @@ mod test {
 
         // Send a candidate and verify an error is returned
         let candidate = generate_random_scanned_candidate();
-        assert_matches!(
+        assert_variant!(
             monitor.should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] }),
             Err(_)
         );

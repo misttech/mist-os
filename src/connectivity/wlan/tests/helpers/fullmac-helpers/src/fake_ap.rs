@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::recorded_request_stream::RecordedRequestStream;
-use assert_matches::assert_matches;
 use fidl_fuchsia_wlan_mlme::EapolResultCode;
 use ieee80211::MacAddr;
 use std::sync::{Arc, Mutex};
-use wlan_common::bss;
 use wlan_common::ie::rsn::cipher::{CIPHER_BIP_CMAC_128, CIPHER_CCMP_128};
 use wlan_common::ie::rsn::rsne;
+use wlan_common::{assert_variant, bss};
 use wlan_rsn::rsna::{SecAssocUpdate, UpdateSink};
 use wlan_rsn::Authenticator;
 use zerocopy::IntoBytes;
@@ -69,7 +68,7 @@ pub fn create_wpa3_authenticator(
     let supplicant_protection_info = get_protection_info(bss_description);
 
     let password =
-        assert_matches!(credentials, fidl_wlan_security::WpaCredentials::Passphrase(p) => p);
+        assert_variant!(credentials, fidl_wlan_security::WpaCredentials::Passphrase(p) => p);
 
     let nonce_rdr = wlan_rsn::nonce::NonceReader::new(&bss_description.bssid.clone().into())
         .expect("creating nonce reader");
@@ -119,9 +118,9 @@ pub async fn handle_sae_exchange(
 
     // Authenticator produces the commit and confirm frame at the same time
     // after receiving the supplicant commit.
-    let authenticator_commit_frame = assert_matches!(
+    let authenticator_commit_frame = assert_variant!(
         &update_sink[0], SecAssocUpdate::TxSaeFrame(frame) => frame.clone());
-    let authenticator_confirm_frame = assert_matches!(
+    let authenticator_confirm_frame = assert_variant!(
         &update_sink[1], SecAssocUpdate::TxSaeFrame(frame) => frame.clone());
     update_sink.clear();
 
@@ -175,7 +174,7 @@ pub async fn handle_fourway_eapol_handshake(
         .on_eapol_frame(&mut update_sink, eapol::Frame::Key(frame_to_auth))
         .expect("Could not send EAPOL frame to authenticator");
 
-    let frame_to_client = assert_matches!(update_sink.remove(0), SecAssocUpdate::TxEapolKeyFrame { frame, .. } => frame);
+    let frame_to_client = assert_variant!(update_sink.remove(0), SecAssocUpdate::TxEapolKeyFrame { frame, .. } => frame);
     send_eapol_frame_to_test_realm(
         authenticator,
         frame_to_client,
@@ -225,7 +224,7 @@ async fn get_eapol_frame_from_test_realm(
     fullmac_req_stream: &mut RecordedRequestStream,
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) -> Vec<u8> {
-    let frame_data = assert_matches!(fullmac_req_stream.next().await,
+    let frame_data = assert_variant!(fullmac_req_stream.next().await,
         fidl_fullmac::WlanFullmacImpl_Request::EapolTx { payload, responder } => {
             responder
                 .send()
@@ -253,7 +252,7 @@ fn get_protection_info(bss_description: &bss::BssDescription) -> wlan_rsn::Prote
 async fn get_sae_frame_from_test_realm(
     fullmac_req_stream: &mut RecordedRequestStream,
 ) -> fidl_mlme::SaeFrame {
-    let fullmac_sae_frame = assert_matches!(fullmac_req_stream.next().await,
+    let fullmac_sae_frame = assert_variant!(fullmac_req_stream.next().await,
         fidl_fullmac::WlanFullmacImpl_Request::SaeFrameTx { frame, responder } => {
             responder
                 .send()

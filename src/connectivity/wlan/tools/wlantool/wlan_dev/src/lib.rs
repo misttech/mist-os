@@ -825,14 +825,13 @@ fn format_iface_query_response(resp: QueryIfaceResponse) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use ieee80211::SsidError;
     use std::pin::pin;
-    use wlan_common::fake_bss_description;
+    use wlan_common::{assert_variant, fake_bss_description};
 
     #[fuchsia::test]
     fn negotiate_authentication() {
@@ -904,8 +903,8 @@ mod tests {
         let del_fut = do_iface(IfaceCmd::Delete { iface_id: 5 }, monitor_svc_local);
         let mut del_fut = pin!(del_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut del_fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut del_fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::DestroyIface {
                 req, responder
@@ -936,8 +935,8 @@ mod tests {
         let fut = do_phy(PhyCmd::GetCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetCountry {
                 phy_id, responder,
@@ -950,7 +949,7 @@ mod tests {
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -962,8 +961,8 @@ mod tests {
             do_phy(PhyCmd::SetCountry { phy_id: 45, country: "RS".to_string() }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::SetCountry {
                 req, responder,
@@ -983,8 +982,8 @@ mod tests {
         let fut = do_phy(PhyCmd::ClearCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::ClearCountry {
                 req, responder,
@@ -1004,8 +1003,8 @@ mod tests {
             do_phy(PhyCmd::SetPowerState { phy_id: 45, state: OnOffArg::Off }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::PowerDown {
                 phy_id, responder,
@@ -1025,8 +1024,8 @@ mod tests {
             do_phy(PhyCmd::SetPowerState { phy_id: 45, state: OnOffArg::On }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::PowerUp {
                 phy_id, responder,
@@ -1045,8 +1044,8 @@ mod tests {
         let fut = do_phy(PhyCmd::Reset { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::Reset {
                 phy_id, responder,
@@ -1065,8 +1064,8 @@ mod tests {
         let fut = do_phy(PhyCmd::GetPowerState { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPowerState {
                 phy_id, responder,
@@ -1076,7 +1075,7 @@ mod tests {
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1090,8 +1089,8 @@ mod tests {
         );
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::SetPowerSaveMode {
                 req, responder,
@@ -1114,8 +1113,8 @@ mod tests {
         let fut = do_phy(PhyCmd::GetPowerSaveMode { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
             Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPowerSaveMode {
                 phy_id, responder,
@@ -1129,7 +1128,7 @@ mod tests {
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1198,11 +1197,11 @@ mod tests {
         let connect_fut = do_client_connect(cmd, monitor_local.clone());
         let mut connect_fut = pin!(connect_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(e)) => {
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(e)) => {
           assert_eq!(format!("{}", e), format!("{}", SsidError::Size(33)));
         });
         // No connect request is sent to SME because the command is invalid and rejected.
-        assert_matches!(exec.run_until_stalled(&mut monitor_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut monitor_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -1219,8 +1218,8 @@ mod tests {
             );
             let mut fut = pin!(fut);
 
-            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let mut fake_sme_server_stream = assert_matches!(
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            let mut fake_sme_server_stream = assert_variant!(
                 exec.run_until_stalled(&mut monitor_stream.next()),
                 Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetClientSme {
                     iface_id, sme_server, responder,
@@ -1231,8 +1230,8 @@ mod tests {
                 }
             );
 
-            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_matches!(
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_variant!(
                 exec.run_until_stalled(&mut fake_sme_server_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::WmmStatus { responder }))) => {
                     let wmm_status_resp = fidl_internal::WmmStatusResponse {
@@ -1270,7 +1269,7 @@ mod tests {
                 }
             );
 
-            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
         assert_eq!(
             String::from_utf8(stdout).expect("expect valid UTF8"),

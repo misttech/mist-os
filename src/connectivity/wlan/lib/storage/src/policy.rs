@@ -204,7 +204,6 @@ async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLog
 mod tests {
     use super::*;
     use crate::tests::{network_id, rand_string};
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_request_stream;
     use fidl_fuchsia_stash::{SecureStoreRequest, StoreAccessorRequest};
     use fuchsia_async as fasync;
@@ -215,6 +214,7 @@ mod tests {
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use wlan_common::assert_variant;
     use wlan_storage_constants::PersistentData;
 
     /// The PSK provided must be the bytes form of the 64 hexadecimal character hash. This is a
@@ -652,12 +652,12 @@ mod tests {
         logged_metric: fidl_fuchsia_metrics::MetricEventLoggerRequest,
         expected_event: MigrationResult,
     ) {
-        assert_matches!(logged_metric, fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
+        assert_variant!(logged_metric, fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
             mut events, responder, ..
         } => {
             assert_eq!(events.len(), 1);
             let event = events.pop().unwrap();
-            assert_matches!(event, fidl_fuchsia_metrics::MetricEvent { metric_id, event_codes, payload: _payload } => {
+            assert_variant!(event, fidl_fuchsia_metrics::MetricEvent { metric_id, event_codes, payload: _payload } => {
                 assert_eq!(metric_id, wlan_metrics_registry::STASH_MIGRATION_RESULTS_METRIC_ID);
                 assert_eq!(event_codes, [expected_event as u32]);
             });
@@ -670,12 +670,12 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         mut stash_stream: fidl_stash::SecureStoreRequestStream,
     ) -> fidl_stash::StoreAccessorRequestStream {
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut stash_stream.next()),
             Poll::Ready(Some(Ok(SecureStoreRequest::Identify { .. })))
         );
 
-        let accessor_req_stream = assert_matches!(
+        let accessor_req_stream = assert_variant!(
             exec.run_until_stalled(&mut stash_stream.next()),
             Poll::Ready(Some(Ok(SecureStoreRequest::CreateAccessor { accessor_request, .. }))) =>
         {
@@ -691,13 +691,13 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         stash_server: &mut fidl_stash::StoreAccessorRequestStream,
     ) {
-        let request = assert_matches!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
+        let request = assert_variant!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
             req.expect("ListPrefix stash request not recieved.")
         });
         match request.unwrap() {
             StoreAccessorRequest::ListPrefix { it, .. } => {
                 let mut iter = it.into_stream();
-                assert_matches!(
+                assert_variant!(
                     exec.run_until_stalled(&mut iter.try_next()),
                     Poll::Ready(Ok(Some(fidl_stash::ListIteratorRequest::GetNext { responder }))) => {
                         responder.send(&[]).expect("error sending stash response");
@@ -712,7 +712,7 @@ mod tests {
         stash_server: &mut fidl_stash::StoreAccessorRequestStream,
     ) {
         // Respond to stash delete.
-        let request = assert_matches!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
+        let request = assert_variant!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
             req.expect("DeletePrefix stash request not recieved.")
         });
         match request.unwrap() {
@@ -721,7 +721,7 @@ mod tests {
         }
 
         // Respond to stash flush.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut stash_server.try_next()),
             Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
                 responder.send(Ok(())).expect("failed to send stash response");
@@ -740,42 +740,42 @@ mod tests {
         {
             let load_fut = test_values.store.load();
             futures::pin_mut!(load_fut);
-            assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
             // Respond to stash initialization requests.
             let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
-            assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
             // Respond to stash read requests with empty data.
             respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
-            assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
             // Process stash delete and flush.
             process_stash_delete(&mut exec, &mut accessor_req_stream);
-            assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
             let mut metric_fut = test_values.cobalt_stream.next();
-            assert_matches!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+            assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
                 check_load_metric(logged_metric, MigrationResult::Success);
             });
-            assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
         }
 
         // Load again, an AlreadyMigrated metric event code should be logged. Stash do not need
         // handling because the stash wrapper internally stores the data.
         let load_fut = test_values.store.load();
         futures::pin_mut!(load_fut);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         let mut metric_fut = test_values.cobalt_stream.next();
-        assert_matches!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
             check_load_metric(logged_metric, MigrationResult::AlreadyMigrated);
         });
 
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
 
         // Check that nothing else was logged
-        assert_matches!(exec.run_until_stalled(&mut metric_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -787,14 +787,14 @@ mod tests {
 
         // Start running the future to load and trigger migration. It should halt waiting on a
         // stash request.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Respond to stash initialization requests.
         let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Drop the request to read stash so that loading stash fails.
-        let request = assert_matches!(exec.run_until_stalled(&mut accessor_req_stream.next()), Poll::Ready(req) => {
+        let request = assert_variant!(exec.run_until_stalled(&mut accessor_req_stream.next()), Poll::Ready(req) => {
             req.expect("ListPrefix stash request not recieved.")
         });
         match request.unwrap() {
@@ -805,20 +805,20 @@ mod tests {
         }
 
         // Continue the load fut, it should wait on a response to sending a metric.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Check for the correct metric and ack.
-        assert_matches!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
+        assert_variant!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
             check_load_metric(metric, MigrationResult::FailedToLoadLegacyData);
         });
 
         // The load should finish this time.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
             assert!(data.is_empty());
         });
 
         // Verify that nothing else was send through the cobalt channel.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
             Poll::Pending
         );
@@ -833,11 +833,11 @@ mod tests {
 
         // Start running the future to load and trigger migration. It should halt waiting on a
         // stash request.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Respond to stash initialization requests.
         let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Respond to stash requests as if loading empty stash data.
         respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
@@ -846,20 +846,20 @@ mod tests {
         drop(accessor_req_stream);
 
         // Continue the load fut, it should wait on a response to sending a metric.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Check for the correct metric and ack.
-        assert_matches!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
+        assert_variant!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
             check_load_metric(metric, MigrationResult::MigratedButFailedToDeleteLegacy);
         });
 
         // The load should finish this time.
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
             assert!(data.is_empty());
         });
 
         // Verify that nothing else was sent through the cobalt channel.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
             Poll::Pending
         );
@@ -878,26 +878,26 @@ mod tests {
         // Start loading to migrate stash data.
         let load_fut = test_values.store.load();
         futures::pin_mut!(load_fut);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Respond to stash initialization requests.
         let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Respond to stash requests as if loading empty stash data.
         respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
 
         // Check that the metric is logged for the failure to write.
         let mut metric_fut = test_values.cobalt_stream.next();
-        assert_matches!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
             check_load_metric(logged_metric, MigrationResult::FailedToWriteNewStore);
         });
 
-        assert_matches!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
 
         // Verify that nothing else was sent through the cobalt channel.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
             Poll::Pending
         );

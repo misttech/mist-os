@@ -454,14 +454,13 @@ mod tests {
     use super::*;
     use crate::device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus};
     use crate::test_utils::MockWlanRxInfo;
-    use assert_matches::assert_matches;
     use fuchsia_sync::Mutex;
     use ieee80211::MacAddrBytes;
     use lazy_static::lazy_static;
     use std::sync::Arc;
     use wlan_common::big_endian::BigEndianU16;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
-    use wlan_common::timer;
+    use wlan_common::{assert_variant, timer};
     use wlan_frame_writer::write_frame_to_vec;
     use wlan_sme::responder::Responder;
     use {
@@ -1077,7 +1076,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn ap_handle_mlme_setkeys_req_no_bss() {
         let (mut ap, _, _) = make_ap().await;
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
                     cipher_suite_oui: [1, 2, 3],
@@ -1114,7 +1113,7 @@ mod tests {
             .expect("expected InfraBss::new ok"),
         );
 
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
                     cipher_suite_oui: [1, 2, 3],
@@ -1460,7 +1459,7 @@ mod tests {
         let (mut ap, _, _) = make_ap().await;
 
         let (responder, receiver) = Responder::new();
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)).await,
             Ok(())
         );
@@ -1481,7 +1480,7 @@ mod tests {
         let (mut ap, _, _) = make_ap().await;
 
         let (responder, receiver) = Responder::new();
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder)).await,
             Ok(())
         );
@@ -1501,7 +1500,7 @@ mod tests {
         let (mut ap, _, _) = make_ap().await;
 
         let (responder, receiver) = Responder::new();
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)).await,
             Ok(())
         );
@@ -1516,7 +1515,7 @@ mod tests {
         let (mut ap, _, _) = make_ap().await;
 
         let (responder, receiver) = Responder::new();
-        assert_matches!(
+        assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder))
                 .await,
             Ok(())

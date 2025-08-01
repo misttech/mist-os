@@ -829,10 +829,10 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use crate::{MlmeStream, Station};
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_mlme as fidl_mlme;
     use lazy_static::lazy_static;
     use test_case::test_case;
+    use wlan_common::assert_variant;
     use wlan_common::channel::Cbw;
     use wlan_common::mac::Aid;
     use wlan_common::test_utils::fake_capabilities::{
@@ -970,7 +970,7 @@ mod tests {
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
 
-        assert_matches!(mlme_stream.try_next(), Err(e) => {
+        assert_variant!(mlme_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty");
         });
     }
@@ -987,7 +987,7 @@ mod tests {
         let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
 
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(start_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(start_req))) => {
             assert_eq!(start_req.ssid, SSID.to_vec());
             assert_eq!(
                 start_req.capability_info,
@@ -1013,7 +1013,7 @@ mod tests {
     async fn ap_starts_success_get_running_ap() {
         let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_start_req))) => {});
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_start_req))) => {});
         // status should be Starting
         assert_eq!(None, sme.get_running_ap());
         assert_eq!(Ok(None), receiver.try_recv());
@@ -1102,7 +1102,7 @@ mod tests {
     async fn ap_stops_while_idle() {
         let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_stop_command();
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert!(stop_req.ssid.is_empty());
         });
 
@@ -1120,8 +1120,8 @@ mod tests {
         assert_eq!(Ok(None), stop_receiver.try_recv());
 
         // Verify start request is sent to MLME but not stop request yet
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_))));
-        assert_matches!(mlme_stream.try_next(), Err(e) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_))));
+        assert_variant!(mlme_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty");
         });
 
@@ -1129,7 +1129,7 @@ mod tests {
         sme.on_mlme_event(create_start_conf(fidl_mlme::StartResultCode::Success));
         assert_eq!(Ok(Some(StartResult::Canceled)), start_receiver.try_recv());
         assert_eq!(Ok(None), stop_receiver.try_recv());
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
 
@@ -1147,8 +1147,8 @@ mod tests {
         assert_eq!(Ok(None), stop_receiver.try_recv());
 
         // Verify start request is sent to MLME but not stop request yet
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_))));
-        assert_matches!(mlme_stream.try_next(), Err(e) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_))));
+        assert_variant!(mlme_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty");
         });
 
@@ -1157,7 +1157,7 @@ mod tests {
         sme.on_timeout(event);
         assert_eq!(Ok(Some(StartResult::TimedOut)), start_receiver.try_recv());
         assert_eq!(Ok(None), stop_receiver.try_recv());
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
 
@@ -1171,7 +1171,7 @@ mod tests {
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let mut receiver = sme.on_stop_command();
 
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
         assert_eq!(Ok(None), receiver.try_recv());
@@ -1196,14 +1196,14 @@ mod tests {
             sme.get_running_ap()
         );
         let mut receiver = sme.on_stop_command();
-        assert_matches!(
+        assert_variant!(
         mlme_stream.try_next(),
         Ok(Some(MlmeRequest::Deauthenticate(deauth_req))) => {
             assert_eq!(&deauth_req.peer_sta_address, client.addr.as_array());
             assert_eq!(deauth_req.reason_code, fidl_ieee80211::ReasonCode::StaLeaving);
         });
 
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
         assert_eq!(Ok(None), receiver.try_recv());
@@ -1233,7 +1233,7 @@ mod tests {
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let mut stop_receiver1 = sme.on_stop_command();
         // Clear out the stop request
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
 
@@ -1244,13 +1244,13 @@ mod tests {
         // While in unclean stopping state, no start request can be made
         let mut start_receiver = sme.on_start_command(unprotected_config());
         assert_eq!(Ok(Some(StartResult::Canceled)), start_receiver.try_recv());
-        assert_matches!(mlme_stream.try_next(), Err(e) => {
+        assert_variant!(mlme_stream.try_next(), Err(e) => {
             assert_eq!(e.to_string(), "receiver channel is empty");
         });
 
         // SME will forward another stop request to lower layer
         let mut stop_receiver2 = sme.on_stop_command();
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert_eq!(stop_req.ssid, SSID.to_vec());
         });
 
@@ -1331,7 +1331,7 @@ mod tests {
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
 
         // Drain the association timeout message.
-        assert_matches!(time_stream.try_next(), Ok(Some(_)));
+        assert_variant!(time_stream.try_next(), Ok(Some(_)));
 
         sme.on_mlme_event(client.create_assoc_ind(Some(RSNE.to_vec())));
         client.verify_assoc_resp(
@@ -1342,7 +1342,7 @@ mod tests {
         );
 
         // Drain the RSNA negotiation timeout message.
-        assert_matches!(time_stream.try_next(), Ok(Some(_)));
+        assert_variant!(time_stream.try_next(), Ok(Some(_)));
 
         for _i in 0..4 {
             client.verify_eapol_req(&mut mlme_stream);
@@ -1429,7 +1429,7 @@ mod tests {
             mlme_stream: &mut crate::MlmeStream,
         ) {
             sme.on_mlme_event(self.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
-            assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::AuthResponse(..))));
+            assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::AuthResponse(..))));
         }
 
         fn associate_and_drain_mlme(
@@ -1439,7 +1439,7 @@ mod tests {
             rsne: Option<Vec<u8>>,
         ) {
             sme.on_mlme_event(self.create_assoc_ind(rsne));
-            assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::AssocResponse(..))));
+            assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::AssocResponse(..))));
         }
 
         fn create_auth_ind(&self, auth_type: fidl_mlme::AuthenticationTypes) -> MlmeEvent {
@@ -1472,7 +1472,7 @@ mod tests {
             result_code: fidl_mlme::AuthenticateResultCode,
         ) {
             let msg = mlme_stream.try_next();
-            assert_matches!(msg, Ok(Some(MlmeRequest::AuthResponse(auth_resp))) => {
+            assert_variant!(msg, Ok(Some(MlmeRequest::AuthResponse(auth_resp))) => {
                 assert_eq!(&auth_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(auth_resp.result_code, result_code);
             });
@@ -1486,7 +1486,7 @@ mod tests {
             privacy: bool,
         ) {
             let msg = mlme_stream.try_next();
-            assert_matches!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
+            assert_variant!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
                 assert_eq!(&assoc_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(assoc_resp.association_id, aid);
                 assert_eq!(assoc_resp.result_code, result_code);
@@ -1503,7 +1503,7 @@ mod tests {
             result_code: fidl_mlme::AssociateResultCode,
         ) {
             let msg = mlme_stream.try_next();
-            assert_matches!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
+            assert_variant!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
                 assert_eq!(&assoc_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(assoc_resp.association_id, 0);
                 assert_eq!(assoc_resp.result_code, result_code);
@@ -1512,7 +1512,7 @@ mod tests {
         }
 
         fn verify_eapol_req(&self, mlme_stream: &mut MlmeStream) {
-            assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(eapol_req))) => {
+            assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(eapol_req))) => {
                 assert_eq!(&eapol_req.src_addr, AP_ADDR.as_array());
                 assert_eq!(&eapol_req.dst_addr, self.addr.as_array());
                 assert!(!eapol_req.data.is_empty());
@@ -1525,7 +1525,7 @@ mod tests {
             reason_code: fidl_ieee80211::ReasonCode,
         ) {
             let msg = mlme_stream.try_next();
-            assert_matches!(msg, Ok(Some(MlmeRequest::Deauthenticate(deauth_req))) => {
+            assert_variant!(msg, Ok(Some(MlmeRequest::Deauthenticate(deauth_req))) => {
                 assert_eq!(&deauth_req.peer_sta_address, self.addr.as_array());
                 assert_eq!(deauth_req.reason_code, reason_code);
             });
@@ -1554,7 +1554,7 @@ mod tests {
         let config = if protected { protected_config() } else { unprotected_config() };
         let mut receiver = sme.on_start_command(config);
         assert_eq!(Ok(None), receiver.try_recv());
-        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(..))));
+        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(..))));
         // drain time stream
         while time_stream.try_next().is_ok() {}
         sme.on_mlme_event(create_start_conf(fidl_mlme::StartResultCode::Success));

@@ -137,12 +137,12 @@ mod tests {
         generate_random_ap_state, generate_random_network_identifier, generate_random_password,
         generate_random_roaming_connection_data, FakeSavedNetworksManager,
     };
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_internal::SignalReportIndication;
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
+    use wlan_common::assert_variant;
 
     struct RoamManagerServiceTestValues {
         telemetry_sender: TelemetrySender,
@@ -222,7 +222,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.saved_networks,
         ));
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
@@ -234,7 +234,7 @@ mod tests {
             sender,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Send some data via one of the roam monitor. Ensure that it doesn't error out, which means
         // a created roam monitor is holding the receiver end.
@@ -256,7 +256,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.saved_networks,
         ));
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
@@ -268,7 +268,7 @@ mod tests {
             sender,
         );
 
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Send some trigger data over a channel. Ensure that it doesn't error out, which means
         // a created roam monitor is holding the receiver end.
@@ -276,11 +276,11 @@ mod tests {
             .send_signal_report_ind(SignalReportIndication { rssi_dbm: -60, snr_db: 30 })
             .expect("error sending data via roam monitor sender");
 
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Drop the trigger data sender. This should cause the monitor to terminate?
         std::mem::drop(roam_monitor_sender);
 
-        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 }

@@ -238,7 +238,7 @@ pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<Vendo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use crate::assert_variant;
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     #[repr(C)]
@@ -507,7 +507,7 @@ mod tests {
         let country = csw.new_country.expect("New country present in CSW.");
         assert_eq!(country.country_code, [b'U', b'S']);
         assert_eq!(country.environment, CountryEnvironment::OUTDOOR);
-        assert_matches!(csw.wide_bandwidth_channel_switch, Some(wbcs) => {
+        assert_variant!(csw.wide_bandwidth_channel_switch, Some(wbcs) => {
             assert_eq!(wbcs.new_width, VhtChannelBandwidth::CBW_20_40);
             assert_eq!(wbcs.new_center_freq_seg0, 10);
             assert_eq!(wbcs.new_center_freq_seg1, 20);
@@ -528,7 +528,7 @@ mod tests {
         let csw =
             parse_channel_switch_wrapper(&raw_csw[..]).expect("valid CSW should result in OK");
         assert!(csw.new_country.is_none());
-        assert_matches!(csw.wide_bandwidth_channel_switch, Some(wbcs) => {
+        assert_variant!(csw.wide_bandwidth_channel_switch, Some(wbcs) => {
             assert_eq!(wbcs.new_width, VhtChannelBandwidth::CBW_20_40);
             assert_eq!(wbcs.new_center_freq_seg0, 10);
             assert_eq!(wbcs.new_center_freq_seg1, 20);
@@ -672,14 +672,14 @@ mod tests {
     fn ext_capabilities_ok() {
         let data = [0x04, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x40];
         let ext_capabilities = parse_ext_capabilities(&data[..]);
-        assert_matches!(ext_capabilities.ext_caps_octet_1, Some(caps) => {
+        assert_variant!(ext_capabilities.ext_caps_octet_1, Some(caps) => {
             assert!(caps.extended_channel_switching());
             assert!(!caps.psmp_capability());
         });
-        assert_matches!(ext_capabilities.ext_caps_octet_2, Some(caps) => {
+        assert_variant!(ext_capabilities.ext_caps_octet_2, Some(caps) => {
             assert!(!caps.civic_location());
         });
-        assert_matches!(ext_capabilities.ext_caps_octet_3, Some(caps) => {
+        assert_variant!(ext_capabilities.ext_caps_octet_3, Some(caps) => {
             assert!(caps.bss_transition());
             assert!(!caps.ac_station_count());
         });
@@ -740,7 +740,7 @@ mod tests {
             0x01, 0x00, 0x00, 0x50, 0xf2, 0x02, // 1 AKM: PSK
         ];
         let wpa_ie = parse_vendor_ie(&raw_body[..]).expect("failed to parse wpa vendor ie");
-        assert_matches!(wpa_ie, VendorIe::MsftLegacyWpa(wpa_body) => {
+        assert_variant!(wpa_ie, VendorIe::MsftLegacyWpa(wpa_body) => {
             parse_wpa_ie(&wpa_body[..]).expect("failed to parse wpa vendor ie")
         });
     }
@@ -756,7 +756,7 @@ mod tests {
         // parse_vendor_ie does not validate the actual wpa ie body, so this
         // succeeds.
         let wpa_ie = parse_vendor_ie(&raw_body[..]).expect("failed to parse wpa vendor ie");
-        assert_matches!(wpa_ie, VendorIe::MsftLegacyWpa(wpa_body) => {
+        assert_variant!(wpa_ie, VendorIe::MsftLegacyWpa(wpa_body) => {
             parse_wpa_ie(&wpa_body[..]).expect_err("parsed truncated wpa ie")
         });
     }
@@ -769,8 +769,8 @@ mod tests {
             0x80, // QoS Info: U-APSD enabled
         ];
         let wmm_info_ie = parse_vendor_ie(&raw_body[..]).expect("expected Ok");
-        assert_matches!(wmm_info_ie, VendorIe::WmmInfo(body) => {
-            assert_matches!(parse_wmm_info(&body[..]), Ok(wmm_info) => {
+        assert_variant!(wmm_info_ie, VendorIe::WmmInfo(body) => {
+            assert_variant!(parse_wmm_info(&body[..]), Ok(wmm_info) => {
                 assert_eq!(wmm_info.0, 0x80);
             })
         });
@@ -784,7 +784,7 @@ mod tests {
                   // truncated
         ];
         let wmm_info_ie = parse_vendor_ie(&raw_body[..]).expect("expected Ok");
-        assert_matches!(wmm_info_ie, VendorIe::WmmInfo(body) => {
+        assert_variant!(wmm_info_ie, VendorIe::WmmInfo(body) => {
             parse_wmm_info(&body[..]).expect_err("parsed truncated WMM info ie")
         });
     }
@@ -802,8 +802,8 @@ mod tests {
             0x62, 0x32, 0x2f, 0x00, // AC_VO Params - ACM no, AIFSN 2, ECWmin/max 2/3, TXOP 47
         ];
         let wmm_param_ie = parse_vendor_ie(&raw_body[..]).expect("expected Ok");
-        assert_matches!(wmm_param_ie, VendorIe::WmmParam(body) => {
-            assert_matches!(parse_wmm_param(&body[..]), Ok(wmm_param) => {
+        assert_variant!(wmm_param_ie, VendorIe::WmmParam(body) => {
+            assert_variant!(parse_wmm_param(&body[..]), Ok(wmm_param) => {
                 assert_eq!(wmm_param.wmm_info.0, 0x80);
                 let ac_be = wmm_param.ac_be_params;
                 assert_eq!(ac_be.aci_aifsn.aifsn(), 3);
@@ -850,7 +850,7 @@ mod tests {
                   // truncated
         ];
         let wmm_param_ie = parse_vendor_ie(&raw_body[..]).expect("expected Ok");
-        assert_matches!(wmm_param_ie, VendorIe::WmmParam(body) => {
+        assert_variant!(wmm_param_ie, VendorIe::WmmParam(body) => {
             parse_wmm_param(&body[..]).expect_err("parsed truncated WMM param ie")
         });
     }
@@ -865,14 +865,14 @@ mod tests {
             0x01, 0x00, 0x00, 0x50, 0xf2, 0x02, // 1 AKM: PSK
         ];
         let ie = parse_vendor_ie(&raw_body[..]).expect("failed to parse ie");
-        assert_matches!(ie, VendorIe::Unknown { .. });
+        assert_variant!(ie, VendorIe::Unknown { .. });
     }
 
     #[test]
     fn parse_unknown_vendor_ie() {
         let raw_body: Vec<u8> = vec![0x00, 0x12, 0x34]; // Made up OUI
         let ie = parse_vendor_ie(&raw_body[..]).expect("failed to parse wpa vendor ie");
-        assert_matches!(ie, VendorIe::Unknown { .. });
+        assert_variant!(ie, VendorIe::Unknown { .. });
     }
 
     #[test]

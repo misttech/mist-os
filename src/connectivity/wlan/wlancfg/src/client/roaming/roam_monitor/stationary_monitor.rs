@@ -228,11 +228,11 @@ mod test {
         generate_random_bss, generate_random_password, generate_random_roaming_connection_data,
         generate_random_scanned_candidate, FakeSavedNetworksManager,
     };
-    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_internal as fidl_internal;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use test_case::test_case;
+    use wlan_common::assert_variant;
 
     struct TestValues {
         monitor: StationaryMonitor,
@@ -286,7 +286,7 @@ mod test {
         monitor: &mut StationaryMonitor,
         trigger_data: RoamTriggerData,
     ) -> RoamTriggerDataOutcome {
-        return assert_matches!(exec.run_until_stalled(&mut monitor.handle_roam_trigger_data(trigger_data)), Poll::Ready(Ok(should_roam)) => {should_roam});
+        return assert_variant!(exec.run_until_stalled(&mut monitor.handle_roam_trigger_data(trigger_data)), Poll::Ready(Ok(should_roam)) => {should_roam});
     }
 
     #[test_case(-80, true; "bad rssi")]
@@ -319,9 +319,9 @@ mod test {
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
 
         if should_roam_search {
-            assert_matches!(result, RoamTriggerDataOutcome::RoamSearch { .. });
+            assert_variant!(result, RoamTriggerDataOutcome::RoamSearch { .. });
         } else {
-            assert_matches!(result, RoamTriggerDataOutcome::Noop);
+            assert_variant!(result, RoamTriggerDataOutcome::Noop);
         }
     }
 
@@ -353,7 +353,7 @@ mod test {
         )));
 
         // Send trigger data, and verify that the roam scan type is Active.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Active, .. }
         );
@@ -385,7 +385,7 @@ mod test {
 
         // Send trigger data, and verify that we aren't told to roam search because the minimum wait
         // time has not passed.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
@@ -396,7 +396,7 @@ mod test {
         ));
 
         // Send trigger data, and verify that we are told to roam search.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -431,7 +431,7 @@ mod test {
 
             // Send trigger data, and verify that we aren't told to roam search because the minimum wait
             // time has not passed.
-            assert_matches!(
+            assert_variant!(
                 run_handle_roam_trigger_data(
                     &mut exec,
                     &mut test_values.monitor,
@@ -446,7 +446,7 @@ mod test {
             ));
 
             // Send trigger data, and verify that we are told to roam search.
-            assert_matches!(
+            assert_variant!(
                 run_handle_roam_trigger_data(
                     &mut exec,
                     &mut test_values.monitor,
@@ -463,7 +463,7 @@ mod test {
         exec.set_fake_time(fasync::MonotonicInstant::after(
             MAX_BACKOFF_BETWEEN_ROAM_SCANS + fasync::MonotonicDuration::from_seconds(1),
         ));
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -495,7 +495,7 @@ mod test {
         );
 
         // Send trigger data, and verify that we are told to roam search.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -507,7 +507,7 @@ mod test {
         );
 
         // Send trigger data, and verify that we do not roam search, because the backoff has grown.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
@@ -517,7 +517,7 @@ mod test {
 
         // Send trigger data, and verify that we may now roam search, because the backoff has been
         // reset.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -549,7 +549,7 @@ mod test {
         );
 
         // Send trigger data, and verify that we are told to roam search.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -561,7 +561,7 @@ mod test {
         );
 
         // Send trigger data, and verify that we do not roam scan, because the backoff has extended.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
@@ -573,7 +573,7 @@ mod test {
                 rssi_dbm: (rssi - MIN_RSSI_DROP_TO_RESET_BACKOFF) as i8,
                 snr_db: TEST_OK_SNR as i8,
             });
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
@@ -585,7 +585,7 @@ mod test {
         );
         // Now send trigger data showing an _additional_ drop in RSSI, but verify that we do not
         // not scan as the minimum backoff time has not passed.
-        assert_matches!(
+        assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
@@ -671,7 +671,7 @@ mod test {
         let _ =
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
 
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::OnSignalVelocityUpdate { .. }))
         );
@@ -752,7 +752,7 @@ mod test {
         );
         let should_roam_scan_result =
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
-        assert_matches!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
+        assert_variant!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
     }
 
     #[fuchsia::test]
@@ -808,6 +808,6 @@ mod test {
         exec.set_fake_time(expected_reenabled_time + zx::MonotonicDuration::from_seconds(1));
         let should_roam_scan_result =
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
-        assert_matches!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
+        assert_variant!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
     }
 }

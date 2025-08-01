@@ -41,7 +41,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use crate::assert_variant;
     use ieee80211::{Bssid, MacAddr};
 
     #[test]
@@ -51,7 +51,7 @@ mod tests {
             2, 2, 2, 2, 2, 2, // addr1
             4, 4, 4, 4, 4, 4, // addr2
         ];
-        assert_matches!(
+        assert_variant!(
             CtrlBody::parse(CtrlSubtype::PS_POLL, &bytes[..]),
             Some(CtrlBody::PsPoll { ps_poll }) => {
                 assert_eq!(0b1100000000000001, { ps_poll.masked_aid });

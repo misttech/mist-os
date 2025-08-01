@@ -261,8 +261,8 @@ fn process_sae_updates(
 #[cfg(test)]
 mod test {
     use super::*;
-    use assert_matches::assert_matches;
     use std::sync::{Arc, Mutex};
+    use wlan_common::assert_variant;
 
     #[test]
     fn psk_rejects_sae() {
@@ -365,7 +365,7 @@ mod test {
 
         auth.on_sae_handshake_ind(&mut sink).expect("SAE handshake should accept SAE ind");
         assert!(sae_counter.lock().unwrap().initiated);
-        assert_matches!(sink.pop(), Some(SecAssocUpdate::TxSaeFrame(_)));
+        assert_variant!(sink.pop(), Some(SecAssocUpdate::TxSaeFrame(_)));
 
         let commit_frame = SaeFrame {
             peer_sta_address: [0xaa; 6],
@@ -387,9 +387,9 @@ mod test {
             .expect("SAE handshake should accept confirm");
         assert_eq!(sae_counter.lock().unwrap().handled_confirms, 1);
         assert_eq!(sink.len(), 3);
-        assert_matches!(sink.remove(0), SecAssocUpdate::TxSaeFrame(_));
-        assert_matches!(sink.remove(0), SecAssocUpdate::Key(_));
-        assert_matches!(sink.remove(0), SecAssocUpdate::SaeAuthStatus(AuthStatus::Success));
+        assert_variant!(sink.remove(0), SecAssocUpdate::TxSaeFrame(_));
+        assert_variant!(sink.remove(0), SecAssocUpdate::Key(_));
+        assert_variant!(sink.remove(0), SecAssocUpdate::SaeAuthStatus(AuthStatus::Success));
         match auth {
             Method::Sae(sae_data) => assert!(sae_data.pmk.is_some()),
             _ => unreachable!(),
@@ -414,8 +414,8 @@ mod test {
                 vec![sae::SaeUpdate::ResetTimeout(sae::Timeout::Retransmission)],
             );
         };
-        let event_id = assert_matches!(sink.pop(),
-            Some(SecAssocUpdate::ScheduleSaeTimeout(id)) => id
+        let event_id = assert_variant!(sink.pop(),
+            Some(SecAssocUpdate::ScheduleSaeTimeout(id)) => id,
         );
         sae.on_sae_timeout(&mut sink, event_id).expect("SAE handshake should accept timeout");
         assert_eq!(sae_counter.lock().unwrap().handled_timeouts, 1);
@@ -434,8 +434,8 @@ mod test {
                 ],
             );
         };
-        let event_id = assert_matches!(sink.pop(),
-                Some(SecAssocUpdate::ScheduleSaeTimeout(id)) => id
+        let event_id = assert_variant!(sink.pop(),
+                Some(SecAssocUpdate::ScheduleSaeTimeout(id)) => id,
         );
         sae.on_sae_timeout(&mut sink, event_id).expect("SAE handshake should accept timeout");
         assert_eq!(sae_counter.lock().unwrap().handled_timeouts, 1); // No timeout handled.
@@ -470,7 +470,7 @@ mod test {
         auth.on_pmk_available(&[0xcc; 8][..], &[0xdd; 8][..], &mut sink)
             .expect("Driver SAE should handle on_pmk_available");
         assert_eq!(sink.len(), 1);
-        let pmk = assert_matches!(sink.get(0), Some(SecAssocUpdate::Key(Key::Pmk(pmk))) => pmk);
+        let pmk = assert_variant!(sink.get(0), Some(SecAssocUpdate::Key(Key::Pmk(pmk))) => pmk);
         assert_eq!(*pmk, vec![0xcc; 8]);
     }
 

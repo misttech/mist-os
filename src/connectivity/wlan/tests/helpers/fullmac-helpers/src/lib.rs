@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, create_proxy};
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
-use wlan_common::{bss, fake_fidl_bss_description};
+use wlan_common::{assert_variant, bss, fake_fidl_bss_description};
 use {
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_test_wlan_testcontroller as fidl_testcontroller,
@@ -82,7 +81,7 @@ pub async fn handle_fullmac_startup(
     let (usme_bootstrap_proxy, usme_bootstrap_server) =
         create_proxy::<fidl_sme::UsmeBootstrapMarker>();
 
-    let fullmac_ifc_proxy = assert_matches!(fullmac_bridge_stream.next().await,
+    let fullmac_ifc_proxy = assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Init { payload, responder })) => {
             responder
                 .send(Ok(fidl_fullmac::WlanFullmacImplInitResponse {
@@ -102,7 +101,7 @@ pub async fn handle_fullmac_startup(
         .await
         .expect("Failed to call usme_bootstrap.start");
 
-    assert_matches!(fullmac_bridge_stream.next().await,
+    assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Query { responder })) => {
             responder
                 .send(Ok(&config.query_info))
@@ -110,7 +109,7 @@ pub async fn handle_fullmac_startup(
         }
     );
 
-    assert_matches!(fullmac_bridge_stream.next().await,
+    assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QuerySecuritySupport {
             responder,
         })) => {
@@ -120,7 +119,7 @@ pub async fn handle_fullmac_startup(
         }
     );
 
-    assert_matches!(fullmac_bridge_stream.next().await,
+    assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QuerySpectrumManagementSupport {
                 responder,
         })) => {
@@ -130,7 +129,7 @@ pub async fn handle_fullmac_startup(
         }
     );
 
-    assert_matches!(fullmac_bridge_stream.next().await,
+    assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Query { responder })) => {
             responder
                 .send(Ok(&config.query_info))

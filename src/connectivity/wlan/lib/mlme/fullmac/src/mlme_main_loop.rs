@@ -359,9 +359,9 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
 mod handle_mlme_request_tests {
     use super::*;
     use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
-    use assert_matches::assert_matches;
     use std::sync::{Arc, Mutex};
     use test_case::test_case;
+    use wlan_common::assert_variant;
     use wlan_common::sink::UnboundedSink;
     use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
@@ -380,7 +380,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
         assert_eq!(driver_req.txn_id, Some(1));
         assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Passive));
         assert_eq!(driver_req.channels, Some(vec![2]));
@@ -404,7 +404,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
         assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Active));
         assert!(driver_req.ssids.as_ref().unwrap().is_empty());
     }
@@ -424,8 +424,8 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Err(_));
-        let scan_end = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::OnScanEnd { end })) => end);
+        assert_variant!(h.driver_calls.try_next(), Err(_));
+        let scan_end = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::OnScanEnd { end })) => end);
         assert_eq!(
             scan_end,
             fidl_mlme::ScanEnd { txn_id: 1, code: fidl_mlme::ScanResultCode::InvalidArgs }
@@ -471,13 +471,13 @@ mod handle_mlme_request_tests {
 
         assert!(h.mlme.is_bss_protected);
 
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
               assert_eq!(req.online, Some(false));
           }
         );
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { req })) => {
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { req })) => {
             let selected_bss = req.selected_bss.clone().unwrap();
             assert_eq!(selected_bss.bssid, [100u8; 6]);
             assert_eq!(selected_bss.bss_type, fidl_common::BssType::Infrastructure);
@@ -521,7 +521,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::ReconnectReq { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ReconnectReq { req })) => req);
         assert_eq!(
             driver_req,
             fidl_fullmac::WlanFullmacImplReconnectRequest {
@@ -541,7 +541,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::AuthResp { resp })) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::AuthResp { resp })) => resp);
         assert_eq!(
             driver_req,
             fidl_fullmac::WlanFullmacImplAuthRespRequest {
@@ -562,13 +562,13 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
               assert_eq!(req.online, Some(false));
           }
         );
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::DeauthReq { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DeauthReq { req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(driver_req.reason_code, Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth));
     }
@@ -586,7 +586,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::AssocResp { resp })) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::AssocResp { resp })) => resp);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(driver_req.result_code, Some(fidl_fullmac::WlanAssocResult::Success));
         assert_eq!(driver_req.association_id, Some(2));
@@ -602,14 +602,14 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
               assert_eq!(req.online, Some(false));
           }
         );
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::Disassoc{ req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Disassoc{ req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(
             driver_req.reason_code,
@@ -639,7 +639,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartBss { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartBss { req })) => req);
 
         assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
         assert_eq!(driver_req.bss_type, Some(fidl_common::BssType::Infrastructure));
@@ -659,7 +659,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::StopBss { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StopBss { req })) => req);
         assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
     }
 
@@ -682,7 +682,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
         assert_eq!(driver_req.key_descriptors.as_ref().unwrap().len(), 1 as usize);
         let key_descriptors = driver_req.key_descriptors.as_ref().unwrap();
         assert_eq!(key_descriptors[0].key_id, Some(7));
@@ -695,7 +695,7 @@ mod handle_mlme_request_tests {
             Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11))
         );
 
-        let conf = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
+        let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
         assert_eq!(
             conf,
             fidl_mlme::SetKeysConfirm {
@@ -727,14 +727,14 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
         assert_eq!(driver_req.key_descriptors.as_ref().unwrap().len(), NUM_KEYS as usize);
         let key_descriptors = driver_req.key_descriptors.unwrap();
         for i in 0..NUM_KEYS {
             assert_eq!(key_descriptors[i].key_id, Some(i as u16));
         }
 
-        let conf = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
+        let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
         assert_eq!(
             conf,
             fidl_mlme::SetKeysConfirm {
@@ -766,8 +766,8 @@ mod handle_mlme_request_tests {
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
         // No SetKeys and SetKeysResp
-        assert_matches!(h.driver_calls.try_next(), Err(_));
-        assert_matches!(h.mlme_event_receiver.try_next(), Err(_));
+        assert_variant!(h.driver_calls.try_next(), Err(_));
+        assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
     }
 
     #[test]
@@ -792,10 +792,10 @@ mod handle_mlme_request_tests {
         // An error is expected when converting the response
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { .. })));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { .. })));
         // No SetKeysConf MLME event because the SetKeysResp from driver has different number of
         // keys.
-        assert_matches!(h.mlme_event_receiver.try_next(), Err(_));
+        assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
     }
 
     #[test]
@@ -809,7 +809,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::EapolTx { req })) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::EapolTx { req })) => req);
         assert_eq!(driver_req.src_addr, Some([1u8; 6]));
         assert_eq!(driver_req.dst_addr, Some([2u8; 6]));
         assert_eq!(driver_req.data, Some(vec![3u8; 4]));
@@ -835,7 +835,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
             assert_eq!(req.online, Some(expected_link_state));
         });
     }
@@ -857,8 +857,8 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::QueryTelemetrySupport)));
-        let support = assert_matches!(support_receiver.try_recv(), Ok(Some(support)) => support);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::QueryTelemetrySupport)));
+        let support = assert_variant!(support_receiver.try_recv(), Ok(Some(support)) => support);
         assert_eq!(support, mocked_support);
     }
 
@@ -887,9 +887,9 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceStats)));
-        let stats = assert_matches!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
-        let stats = assert_matches!(stats, fidl_mlme::GetIfaceStatsResponse::Stats(stats) => stats);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceStats)));
+        let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
+        let stats = assert_variant!(stats, fidl_mlme::GetIfaceStatsResponse::Stats(stats) => stats);
         assert_eq!(
             stats,
             fidl_stats::IfaceStats {
@@ -961,9 +961,9 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceHistogramStats)));
-        let stats = assert_matches!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
-        let stats = assert_matches!(stats, fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats) => stats);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceHistogramStats)));
+        let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
+        let stats = assert_variant!(stats, fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats) => stats);
         assert_eq!(stats, mocked_stats);
     }
 
@@ -977,7 +977,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeHandshakeResp { resp })) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeHandshakeResp { resp })) => resp);
         assert_eq!(driver_req.peer_sta_address.unwrap(), [1u8; 6]);
         assert_eq!(
             driver_req.status_code.unwrap(),
@@ -997,7 +997,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_frame = assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeFrameTx { frame })) => frame);
+        let driver_frame = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeFrameTx { frame })) => frame);
         assert_eq!(driver_frame.peer_sta_address.unwrap(), [1u8; 6]);
         assert_eq!(driver_frame.status_code.unwrap(), fidl_ieee80211::StatusCode::Success);
         assert_eq!(driver_frame.seq_num.unwrap(), 2);
@@ -1011,7 +1011,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::WmmStatusReq)));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::WmmStatusReq)));
     }
 
     pub struct TestHelper {
@@ -1061,15 +1061,14 @@ mod handle_mlme_request_tests {
 mod handle_driver_event_tests {
     use super::*;
     use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
-    use assert_matches::assert_matches;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::Future;
     use std::pin::Pin;
     use std::sync::{Arc, Mutex};
     use test_case::test_case;
-    use wlan_common::fake_fidl_bss_description;
     use wlan_common::sink::UnboundedSink;
+    use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
         fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync,
@@ -1106,7 +1105,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_on_scan_result() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let bss = create_bss_descriptions();
         let scan_result = fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
@@ -1115,36 +1114,36 @@ mod handle_driver_event_tests {
             bss: Some(bss.clone()),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_result(&scan_result)),
-            Poll::Ready(Ok(()))
+            Poll::Ready(Ok(())),
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
         let result =
-            assert_matches!(event, fidl_mlme::MlmeEvent::OnScanResult { result } => result);
+            assert_variant!(event, fidl_mlme::MlmeEvent::OnScanResult { result } => result);
         assert_eq!(result, fidl_mlme::ScanResult { txn_id: 42u64, timestamp_nanos: 1337i64, bss });
     }
 
     #[test]
     fn test_on_scan_end() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let scan_end = fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
             txn_id: Some(42u64),
             code: Some(fidl_fullmac::WlanScanResult::Success),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_end(&scan_end)),
-            Poll::Ready(Ok(()))
+            Poll::Ready(Ok(())),
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let end = assert_matches!(event, fidl_mlme::MlmeEvent::OnScanEnd { end } => end);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let end = assert_variant!(event, fidl_mlme::MlmeEvent::OnScanEnd { end } => end);
         assert_eq!(
             end,
             fidl_mlme::ScanEnd { txn_id: 42u64, code: fidl_mlme::ScanResultCode::Success }
@@ -1154,7 +1153,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_connect_conf() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let connect_conf = fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
             peer_sta_address: Some([1u8; 6]),
@@ -1163,14 +1162,14 @@ mod handle_driver_event_tests {
             association_ies: Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.connect_conf(&connect_conf)),
-            Poll::Ready(Ok(()))
+            Poll::Ready(Ok(())),
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::ConnectConf { resp } => resp);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::ConnectConf { resp } => resp);
         assert_eq!(
             conf,
             fidl_mlme::ConnectConfirm {
@@ -1194,14 +1193,14 @@ mod handle_driver_event_tests {
     ) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let connect_req =
             create_connect_request(if secure_connect { vec![7u8, 8] } else { vec![] });
         h.mlme_request_sender
             .unbounded_send(connect_req)
             .expect("sending ConnectReq should succeed");
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let connect_conf = fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
             peer_sta_address: Some([1u8; 6]),
@@ -1211,49 +1210,49 @@ mod handle_driver_event_tests {
             ..Default::default()
         };
 
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.connect_conf(&connect_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
               assert_eq!(req.online, Some(false));
           }
         );
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { .. })));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { .. })));
         if expected_online {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
                   assert_eq!(req.online, Some(true));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
     }
 
     #[test]
     fn test_auth_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let auth_ind = fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
             peer_sta_address: Some([1u8; 6]),
             auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.auth_ind(&auth_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::AuthenticateInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::AuthenticateInd { ind } => ind);
         assert_eq!(
             ind,
             fidl_mlme::AuthenticateIndication {
@@ -1271,32 +1270,32 @@ mod handle_driver_event_tests {
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
             Some(mac_role);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_conf = fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest {
             peer_sta_address: Some([1u8; 6]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.deauth_conf(&deauth_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
                   assert_eq!(req.online, Some(false));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
         let conf =
-            assert_matches!(event, fidl_mlme::MlmeEvent::DeauthenticateConf { resp } => resp);
+            assert_variant!(event, fidl_mlme::MlmeEvent::DeauthenticateConf { resp } => resp);
         assert_eq!(conf, fidl_mlme::DeauthenticateConfirm { peer_sta_address: [1u8; 6] });
     }
 
@@ -1308,7 +1307,7 @@ mod handle_driver_event_tests {
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
             Some(mac_role);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_ind = fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest {
             peer_sta_address: Some([1u8; 6]),
@@ -1316,25 +1315,25 @@ mod handle_driver_event_tests {
             locally_initiated: Some(true),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.deauth_ind(&deauth_ind)),
-            Poll::Ready(Ok(()))
+            Poll::Ready(Ok(())),
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
                   assert_eq!(req.online, Some(false));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::DeauthenticateInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::DeauthenticateInd { ind } => ind);
         assert_eq!(
             ind,
             fidl_mlme::DeauthenticateIndication {
@@ -1348,7 +1347,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_assoc_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let assoc_ind = fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
             peer_sta_address: Some([1u8; 6]),
@@ -1358,14 +1357,14 @@ mod handle_driver_event_tests {
             vendor_ie: Some(vec![7u8; 8]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::AssociateInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::AssociateInd { ind } => ind);
         assert_eq!(
             ind,
             fidl_mlme::AssociateIndication {
@@ -1387,31 +1386,31 @@ mod handle_driver_event_tests {
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
             Some(mac_role);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_conf = fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest {
             status: Some(1),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_conf(&disassoc_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
                   assert_eq!(req.online, Some(false));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::DisassociateConf { resp } => resp);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::DisassociateConf { resp } => resp);
         assert_eq!(conf, fidl_mlme::DisassociateConfirm { status: 1 });
     }
 
@@ -1423,7 +1422,7 @@ mod handle_driver_event_tests {
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
             Some(mac_role);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_ind = fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest {
             peer_sta_address: Some([1u8; 6]),
@@ -1431,25 +1430,25 @@ mod handle_driver_event_tests {
             locally_initiated: Some(true),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_ind(&disassoc_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
                   assert_eq!(req.online, Some(false));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::DisassociateInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::DisassociateInd { ind } => ind);
         assert_eq!(
             ind,
             fidl_mlme::DisassociateIndication {
@@ -1469,51 +1468,51 @@ mod handle_driver_event_tests {
         expected_fidl_result_code: fidl_mlme::StartResultCode,
     ) {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let start_conf = fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
             result_code: Some(start_result),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.start_conf(&start_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if expected_link_state_changed {
-            assert_matches!(
+            assert_variant!(
                 h.driver_calls.try_next(),
                 Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
                   assert_eq!(req.online, Some(true));
               }
             );
         } else {
-            assert_matches!(h.driver_calls.try_next(), Err(_));
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::StartConf { resp } => resp);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::StartConf { resp } => resp);
         assert_eq!(conf, fidl_mlme::StartConfirm { result_code: expected_fidl_result_code });
     }
 
     #[test]
     fn test_stop_conf() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let stop_conf = fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
             result_code: Some(fidl_fullmac::StopResult::Success),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.stop_conf(&stop_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::StopConf { resp } => resp);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::StopConf { resp } => resp);
         assert_eq!(
             conf,
             fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::Success }
@@ -1523,21 +1522,21 @@ mod handle_driver_event_tests {
     #[test]
     fn test_eapol_conf() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let eapol_conf = fidl_fullmac::WlanFullmacImplIfcEapolConfRequest {
             result_code: Some(fidl_fullmac::EapolTxResult::Success),
             dst_addr: Some([1u8; 6]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_conf(&eapol_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::EapolConf { resp } => resp);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::EapolConf { resp } => resp);
         assert_eq!(
             conf,
             fidl_mlme::EapolConfirm {
@@ -1550,19 +1549,19 @@ mod handle_driver_event_tests {
     #[test]
     fn test_on_channel_switch() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let channel_switch_info = fidl_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 9 };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(
                 &mut h.fullmac_ifc_proxy.on_channel_switch(&channel_switch_info)
             ),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let info = assert_matches!(event, fidl_mlme::MlmeEvent::OnChannelSwitched { info } => info);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let info = assert_variant!(event, fidl_mlme::MlmeEvent::OnChannelSwitched { info } => info);
         assert_eq!(info, fidl_internal::ChannelSwitchInfo { new_channel: 9 });
     }
 
@@ -1570,7 +1569,7 @@ mod handle_driver_event_tests {
     fn test_roam_start_ind() {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let selected_bss = create_bss_descriptions();
         let roam_start_ind = fidl_fullmac::WlanFullmacImplIfcRoamStartIndRequest {
@@ -1579,22 +1578,22 @@ mod handle_driver_event_tests {
             original_association_maintained: Some(false),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_start_ind(&roam_start_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam start causes MLME to close the controlled port.
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
               assert_eq!(req.online, Some(false));
           }
         );
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::RoamStartInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::RoamStartInd { ind } => ind);
 
         // SME is notified of the roam start.
         assert_eq!(
@@ -1618,16 +1617,16 @@ mod handle_driver_event_tests {
         });
 
         h.mlme_request_sender.unbounded_send(roam_req).expect("sending RoamReq should succeed");
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam request causes MLME to close the controlled port.
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
                 assert_eq!(req.online, Some(false));
             }
         );
-        assert_matches!(h.driver_calls.try_next(), Ok(Some(DriverCall::RoamReq { req })) => {
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::RoamReq { req })) => {
             assert_eq!(selected_bss, req.selected_bss.clone().unwrap());
         });
     }
@@ -1635,7 +1634,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_roam_result_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let selected_bss = create_bss_descriptions();
         let original_association_maintained = false;
@@ -1653,22 +1652,22 @@ mod handle_driver_event_tests {
             ..Default::default()
         };
 
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_result_ind(&roam_result_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
               assert_eq!(req.online, Some(true));
           }
         );
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::RoamResultInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::RoamResultInd { ind } => ind);
 
         // SME is notified of the roam result.
         assert_eq!(
@@ -1687,7 +1686,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_roam_conf() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let selected_bss = create_bss_descriptions();
         let original_association_maintained = false;
@@ -1705,22 +1704,22 @@ mod handle_driver_event_tests {
             ..Default::default()
         };
 
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_conf(&roam_conf)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
-        assert_matches!(
+        assert_variant!(
             h.driver_calls.try_next(),
             Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
                 assert_eq!(req.online, Some(true));
             }
         );
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let conf = assert_matches!(event, fidl_mlme::MlmeEvent::RoamConf { conf } => conf);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::RoamConf { conf } => conf);
 
         // SME is notified of the roam result.
         assert_eq!(
@@ -1739,25 +1738,25 @@ mod handle_driver_event_tests {
     #[test]
     fn test_signal_report() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let signal_report_ind =
             fidl_fullmac::WlanFullmacSignalReportIndication { rssi_dbm: 1, snr_db: 2 };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.signal_report(&signal_report_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::SignalReport { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::SignalReport { ind } => ind);
         assert_eq!(ind, fidl_internal::SignalReportIndication { rssi_dbm: 1, snr_db: 2 });
     }
 
     #[test]
     fn test_eapol_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let eapol_ind = fidl_fullmac::WlanFullmacImplIfcEapolIndRequest {
             src_addr: Some([1u8; 6]),
@@ -1765,14 +1764,14 @@ mod handle_driver_event_tests {
             data: Some(vec![3u8; 4]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_ind(&eapol_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::EapolInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::EapolInd { ind } => ind);
         assert_eq!(
             ind,
             fidl_mlme::EapolIndication {
@@ -1786,49 +1785,49 @@ mod handle_driver_event_tests {
     #[test]
     fn test_on_pmk_available() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let pmk_info = fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest {
             pmk: Some(vec![1u8; 2]),
             pmkid: Some(vec![3u8; 4]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_pmk_available(&pmk_info)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let info = assert_matches!(event, fidl_mlme::MlmeEvent::OnPmkAvailable { info } => info);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let info = assert_variant!(event, fidl_mlme::MlmeEvent::OnPmkAvailable { info } => info);
         assert_eq!(info, fidl_mlme::PmkInfo { pmk: vec![1u8; 2], pmkid: vec![3u8; 4] });
     }
 
     #[test]
     fn test_sae_handshake_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let sae_handshake_ind = fidl_fullmac::WlanFullmacImplIfcSaeHandshakeIndRequest {
             peer_sta_address: Some([1u8; 6]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec
                 .run_until_stalled(&mut h.fullmac_ifc_proxy.sae_handshake_ind(&sae_handshake_ind)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let ind = assert_matches!(event, fidl_mlme::MlmeEvent::OnSaeHandshakeInd { ind } => ind);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let ind = assert_variant!(event, fidl_mlme::MlmeEvent::OnSaeHandshakeInd { ind } => ind);
         assert_eq!(ind, fidl_mlme::SaeHandshakeIndication { peer_sta_address: [1u8; 6] });
     }
 
     #[test]
     fn test_sae_frame_rx() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let sae_frame = fidl_fullmac::SaeFrame {
             peer_sta_address: Some([1u8; 6]),
@@ -1837,14 +1836,14 @@ mod handle_driver_event_tests {
             sae_fields: Some(vec![3u8; 4]),
             ..Default::default()
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.sae_frame_rx(&sae_frame)),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let frame = assert_matches!(event, fidl_mlme::MlmeEvent::OnSaeFrameRx { frame } => frame);
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let frame = assert_variant!(event, fidl_mlme::MlmeEvent::OnSaeFrameRx { frame } => frame);
         assert_eq!(
             frame,
             fidl_mlme::SaeFrame {
@@ -1859,7 +1858,7 @@ mod handle_driver_event_tests {
     #[test]
     fn test_on_wmm_status_resp() {
         let (mut h, mut test_fut) = TestHelper::set_up();
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let status = zx::sys::ZX_OK;
         let wmm_params = fidl_common::WlanWmmParameters {
@@ -1893,16 +1892,16 @@ mod handle_driver_event_tests {
                 acm: false,
             },
         };
-        assert_matches!(
+        assert_variant!(
             h.exec.run_until_stalled(
                 &mut h.fullmac_ifc_proxy.on_wmm_status_resp(status, &wmm_params)
             ),
             Poll::Ready(Ok(()))
         );
-        assert_matches!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let event = assert_matches!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
-        let (status, resp) = assert_matches!(event, fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp } => (status, resp));
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let (status, resp) = assert_variant!(event, fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp } => (status, resp));
         assert_eq!(status, zx::sys::ZX_OK);
         assert_eq!(
             resp,

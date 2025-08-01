@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assert_matches::assert_matches;
 use futures::channel::mpsc;
 use fuzz::fuzz;
 use rand::distr::{Alphanumeric, SampleString};
+use wlan_common::assert_variant;
 use wlancfg_lib::config_management::network_config::{Credential, NetworkIdentifier};
 use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
 use wlancfg_lib::telemetry::{TelemetryEvent, TelemetrySender};
@@ -30,7 +30,7 @@ async fn fuzz_saved_networks_manager_store(id: NetworkIdentifier, credential: Cr
         .await
         .expect("storing network failed")
         .is_none());
-    assert_matches!(saved_networks.lookup(&id).await.as_slice(),
+    assert_variant!(saved_networks.lookup(&id).await.as_slice(),
         [network_config] => {
             assert_eq!(network_config.ssid, id.ssid);
             assert_eq!(network_config.security_type, id.security_type);
@@ -41,7 +41,7 @@ async fn fuzz_saved_networks_manager_store(id: NetworkIdentifier, credential: Cr
 
     // Saved networks should persist when we create a saved networks manager with the same ID.
     let saved_networks = create_saved_networks(&store_id).await;
-    assert_matches!(saved_networks.lookup(&id).await.as_slice(),
+    assert_variant!(saved_networks.lookup(&id).await.as_slice(),
         [network_config] => {
             assert_eq!(network_config.ssid, id.ssid);
             assert_eq!(network_config.security_type, id.security_type);

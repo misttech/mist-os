@@ -48,7 +48,7 @@ pub fn validate_ap_resp(auth: &mac::AuthHdr) -> Result<ValidFrame, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use wlan_common::assert_variant;
 
     fn make_valid_auth_resp(frame_type: ValidFrame) -> mac::AuthHdr {
         mac::AuthHdr {
@@ -66,15 +66,15 @@ mod tests {
 
     #[test]
     fn valid_auth_resp() {
-        assert_matches!(
+        assert_variant!(
             validate_ap_resp(&make_valid_auth_resp(ValidFrame::Open)),
             Ok(ValidFrame::Open)
         );
-        assert_matches!(
+        assert_variant!(
             validate_ap_resp(&make_valid_auth_resp(ValidFrame::SaeCommit)),
             Ok(ValidFrame::SaeCommit)
         );
-        assert_matches!(
+        assert_variant!(
             validate_ap_resp(&make_valid_auth_resp(ValidFrame::SaeConfirm)),
             Ok(ValidFrame::SaeConfirm)
         );
@@ -84,22 +84,22 @@ mod tests {
     fn invalid_auth_resp() {
         let mut auth_hdr = make_valid_auth_resp(ValidFrame::Open);
         auth_hdr.auth_alg_num = mac::AuthAlgorithmNumber::FAST_BSS_TRANSITION;
-        assert_matches!(validate_ap_resp(&auth_hdr), Err(_));
+        assert_variant!(validate_ap_resp(&auth_hdr), Err(_));
 
         let mut auth_hdr = make_valid_auth_resp(ValidFrame::Open);
         auth_hdr.auth_txn_seq_num = 1;
-        assert_matches!(validate_ap_resp(&auth_hdr), Err(_));
+        assert_variant!(validate_ap_resp(&auth_hdr), Err(_));
 
         let mut auth_hdr = make_valid_auth_resp(ValidFrame::Open);
         auth_hdr.status_code = fidl_ieee80211::StatusCode::RefusedReasonUnspecified.into();
-        assert_matches!(validate_ap_resp(&auth_hdr), Err(_));
+        assert_variant!(validate_ap_resp(&auth_hdr), Err(_));
 
         let mut auth_hdr = make_valid_auth_resp(ValidFrame::SaeCommit);
         auth_hdr.auth_txn_seq_num = 4;
-        assert_matches!(validate_ap_resp(&auth_hdr), Err(_));
+        assert_variant!(validate_ap_resp(&auth_hdr), Err(_));
 
         let mut auth_hdr = make_valid_auth_resp(ValidFrame::SaeCommit);
         auth_hdr.status_code = fidl_ieee80211::StatusCode::RefusedReasonUnspecified.into();
-        assert_matches!(validate_ap_resp(&auth_hdr), Err(_));
+        assert_variant!(validate_ap_resp(&auth_hdr), Err(_));
     }
 }

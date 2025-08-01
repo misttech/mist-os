@@ -626,13 +626,13 @@ mod tests {
     use super::*;
     use crate::util::listener;
     use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_wlan_common as fidl_common;
     use futures::stream::StreamFuture;
     use futures::task::Poll;
     use futures::Future;
     use std::pin::pin;
+    use wlan_common::assert_variant;
 
     struct TestValues {
         deps: CommonStateDependencies,
@@ -730,12 +730,12 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
@@ -752,8 +752,8 @@ mod tests {
         ap.stop(sender).expect("failed to make stop request");
 
         // Run the state machine and ensure that a stop request is issued by the SME proxy.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send SME stop response");
@@ -761,8 +761,8 @@ mod tests {
         );
 
         // Expect the responder to be acknowledged
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -793,12 +793,12 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
@@ -815,8 +815,8 @@ mod tests {
         ap.exit(sender).expect("failed to make stop request");
 
         // Expect the responder to be acknowledged and the state machine to exit.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -847,12 +847,12 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
@@ -877,16 +877,16 @@ mod tests {
         ap.start(req, sender).expect("failed to make stop request");
 
         // Expect that the state machine issues a stop request followed by a start request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -896,8 +896,8 @@ mod tests {
         );
 
         // Verify that the SME response is plumbed back to the caller.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -930,12 +930,12 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 6, num_clients: 0 };
@@ -947,8 +947,8 @@ mod tests {
         );
 
         // Run the state machine and ensure no update has been sent.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
@@ -984,10 +984,10 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the initial status report.
-        assert_matches!(
+        assert_variant!(
             test_values.status_reader.read_status(),
             Ok(Status::Started {
                 band: types::OperatingBand::Any,
@@ -1002,7 +1002,7 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 1, num_clients: 1 };
@@ -1014,15 +1014,15 @@ mod tests {
         );
 
         // Run the state machine and ensure an update has been sent.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Ready((Some(listener::Message::NotifyListeners(updates)), _)) => {
                 assert!(!updates.access_points.is_empty());
         });
 
         // Verify that the status has been updated.
-        assert_matches!(
+        assert_variant!(
             test_values.status_reader.read_status(),
             Ok(Status::Started {
                 band: types::OperatingBand::Any,
@@ -1068,10 +1068,10 @@ mod tests {
         let mut fut = pin!(fut);
 
         // The state machine should exit when it is unable to query status.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that a failure notification is send to listeners.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1089,7 +1089,7 @@ mod tests {
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Issue a stop request.
         let mut ap = AccessPoint::new(test_values.ap_req_sender);
@@ -1097,8 +1097,8 @@ mod tests {
         ap.stop(sender).expect("failed to make stop request");
 
         // Expect the responder to be acknowledged immediately.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1117,8 +1117,8 @@ mod tests {
         ap.exit(sender).expect("failed to make stop request");
 
         // Expect the responder to be acknowledged and the state machine to exit.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1149,8 +1149,8 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1158,15 +1158,15 @@ mod tests {
         );
 
         // An empty update should be sent after stopping.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert!(updates.access_points.is_empty());
         });
 
         // The empty update should be quickly followed by a starting update.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1174,7 +1174,7 @@ mod tests {
         });
 
         // A start request should have been issues to the SME proxy.
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1184,11 +1184,11 @@ mod tests {
         );
 
         // Verify that the SME response is plumbed back to the caller.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
 
         // There should be a pending active state notification
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1213,22 +1213,22 @@ mod tests {
         ap.exit(exit_sender).expect("failed to make stop request");
 
         // While stopping is still in progress, exit and stop should not be responded to yet.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut exit_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Pending);
 
         // Once stop AP request is finished, the state machine can terminate
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
             }
         );
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
-        assert_matches!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1243,7 +1243,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Verify that no state update is ready yet.
-        assert_matches!(&mut test_values.update_receiver.try_next(), Err(_));
+        assert_variant!(&mut test_values.update_receiver.try_next(), Err(_));
 
         // Issue a stop request.
         let mut ap = AccessPoint::new(test_values.ap_req_sender);
@@ -1254,8 +1254,8 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1263,12 +1263,12 @@ mod tests {
         );
 
         // Expect both responders to be acknowledged.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
-        assert_matches!(exec.run_until_stalled(&mut second_stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut second_stop_receiver), Poll::Ready(Ok(())));
 
         // There should be a new update indicating that no AP's are active.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert!(updates.access_points.is_empty());
@@ -1301,28 +1301,28 @@ mod tests {
         ap.start(req, start_sender).expect("failed to make stop request");
 
         // The state machine should not respond to the stop request yet until it's finished.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Pending);
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
-        let stop_responder = assert_matches!(
+        let stop_responder = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => responder
         );
 
         // The state machine should not send new request yet since stop is still unfinished
-        assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
         // After SME sends response, the state machine can proceed
         stop_responder
             .send(fidl_sme::StopApResultCode::Success)
             .expect("could not send AP stop response");
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
 
         // Expect another stop request from the state machine entering the starting state.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1330,8 +1330,8 @@ mod tests {
         );
 
         // Expect a start request
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1341,8 +1341,8 @@ mod tests {
         );
 
         // Expect the start responder to be acknowledged
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1360,11 +1360,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // The state machine should exit when it is unable to issue the stop command.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Err(_)));
 
         // There should be a new update indicating that no AP's are active.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert!(updates.access_points.is_empty());
@@ -1383,14 +1383,14 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Verify that no state update is ready yet.
-        assert_matches!(&mut test_values.update_receiver.try_next(), Err(_));
+        assert_variant!(&mut test_values.update_receiver.try_next(), Err(_));
 
         // Expect the stop request from the SME proxy
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::InternalError).expect("could not send AP stop response");
@@ -1398,11 +1398,11 @@ mod tests {
         );
 
         // The state machine should exit.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Err(_)));
 
         // There should be a new update indicating that no AP's are active.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert!(updates.access_points.is_empty());
@@ -1430,13 +1430,13 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1444,8 +1444,8 @@ mod tests {
         );
 
         // Wait for a start request, but don't reply to it yet.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let start_responder = assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let start_responder = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1458,18 +1458,18 @@ mod tests {
         ap.stop(stop_sender).expect("failed to make stop request");
 
         // Run the state machine and ensure that a stop request is not issued by the SME proxy yet.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
         // After SME responds to start request, the state machine can continue
         start_responder
             .send(fidl_sme::StartApResultCode::Success)
             .expect("could not send SME start response");
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
 
         // Stop request should be issued now to SME
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send SME stop response");
@@ -1477,11 +1477,11 @@ mod tests {
         );
 
         // Expect the responder to be acknowledged
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
 
         // The successful AP start should be logged.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
         );
@@ -1508,13 +1508,13 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1522,8 +1522,8 @@ mod tests {
         );
 
         // Wait for a start request, but don't reply to it.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let start_responder = assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let start_responder = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1545,9 +1545,9 @@ mod tests {
 
         // Run the state machine and ensure that the first start request is still pending.
         // Furthermore, no new start request is issued yet.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
-        assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
+        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
         // Respond to the first start request
         start_responder
@@ -1555,13 +1555,13 @@ mod tests {
             .expect("failed to send start response");
 
         // The first request should receive the acknowledgement, the second one shouldn't.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
-        assert_matches!(exec.run_until_stalled(&mut second_start_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut second_start_receiver), Poll::Pending);
 
         // The state machine should transition back into the starting state and issue a stop
         // request, due to the second start request.
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send SME stop response");
@@ -1569,8 +1569,8 @@ mod tests {
         );
 
         // The state machine should then issue a start request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1580,11 +1580,11 @@ mod tests {
         );
 
         // The second start request should receive the acknowledgement now.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut second_start_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut second_start_receiver), Poll::Ready(Ok(())));
 
         // The successful AP start event should be logged.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
         );
@@ -1611,13 +1611,13 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
@@ -1625,8 +1625,8 @@ mod tests {
         );
 
         // Wait for a start request, but don't reply to it.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let start_responder = assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let start_responder = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1639,21 +1639,21 @@ mod tests {
         ap.exit(exit_sender).expect("failed to make stop request");
 
         // While starting is still in progress, exit and start should not be responded to yet.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut exit_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Pending);
 
         // Once start AP request is finished, the state machine can terminate
         start_responder
             .send(fidl_sme::StartApResultCode::Success)
             .expect("could not send AP start response");
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
 
         // The AP start success event should be logged to telemetry.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
         );
@@ -1683,10 +1683,10 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine and expect it to exit
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // No metric should be logged in this case and the sender should have been dropped.
-        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(None));
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(None));
     }
 
     #[fuchsia::test]
@@ -1710,13 +1710,13 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Handle the initial disconnect request and send back a failure.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -1726,10 +1726,10 @@ mod tests {
         );
 
         // The future should complete.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // There should also be a failed state update.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1737,7 +1737,7 @@ mod tests {
         });
 
         // No metric should be logged in this case and the sender should have been dropped.
-        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(None));
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(None));
     }
 
     #[fuchsia::test]
@@ -1766,8 +1766,8 @@ mod tests {
 
         for retry_number in 0..(AP_START_MAX_RETRIES + 1) {
             // Handle the initial stop request.
-            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_matches!(
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_variant!(
                 poll_sme_req(&mut exec, &mut sme_fut),
                 Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                     responder
@@ -1777,8 +1777,8 @@ mod tests {
             );
 
             // There should also be a stopped state update.
-            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_matches!(
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_variant!(
                 test_values.update_receiver.try_next(),
                 Ok(Some(listener::Message::NotifyListeners(_)))
             );
@@ -1786,18 +1786,18 @@ mod tests {
             // If this is the first attempt, there should be a starting notification, otherwise
             // there should be no update.
             if retry_number == 0 {
-                assert_matches!(
+                assert_variant!(
                     test_values.update_receiver.try_next(),
                     Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
                     let update = updates.access_points.pop().expect("no new updates available.");
                     assert_eq!(update.state, types::OperatingState::Starting);
                 });
             } else {
-                assert_matches!(test_values.update_receiver.try_next(), Err(_));
+                assert_variant!(test_values.update_receiver.try_next(), Err(_));
             }
 
             // Wait for a start request and send back a timeout.
-            assert_matches!(
+            assert_variant!(
                 poll_sme_req(&mut exec, &mut sme_fut),
                 Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                     responder
@@ -1808,24 +1808,24 @@ mod tests {
 
             if retry_number < AP_START_MAX_RETRIES {
                 // The future should still be running.
-                assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+                assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
                 // Verify that no new message has been reported yet.
-                assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
+                assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Pending);
 
                 // The state machine should then retry following the retry interval.
-                assert_matches!(exec.wake_next_timer(), Some(_));
+                assert_variant!(exec.wake_next_timer(), Some(_));
             }
         }
 
         // The future should complete.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the start receiver got an error.
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
 
         // There should be a failure notification at the end of the retries.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1833,13 +1833,13 @@ mod tests {
         });
 
         // A metric should be logged for the failure to start the AP.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
-        assert_matches!(
+        assert_variant!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ApStartFailure { .. })))
         );
@@ -1877,8 +1877,8 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -1888,14 +1888,14 @@ mod tests {
         );
 
         // There should also be a stopped state update.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(_)))
         );
 
         // Followed by a starting update.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -1903,7 +1903,7 @@ mod tests {
         });
 
         // Wait for a start request and send back a timeout.
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -1915,26 +1915,26 @@ mod tests {
         // At this point, the state machine should pause before retrying the start request.  It
         // should also check to see if there are any incoming AP commands and find the initial stop
         // request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // A metric should be logged for the failure to start the AP.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
-        assert_matches!(
+        assert_variant!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ApStartFailure { .. })))
         );
 
         // The start sender will be dropped in this transition.
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
 
         // There should be a pending AP stop request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -1944,13 +1944,13 @@ mod tests {
         );
 
         // The future should be parked in the stopped state.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the stop receiver is acknowledged.
-        assert_matches!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
 
         // There should be a new update indicating that no AP's are active.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert!(updates.access_points.is_empty());
@@ -2000,8 +2000,8 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -2011,14 +2011,14 @@ mod tests {
         );
 
         // There should also be a stopped state update.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(_)))
         );
 
         // Followed by a starting update.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -2026,7 +2026,7 @@ mod tests {
         });
 
         // Wait for a start request and send back a timeout.
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -2038,26 +2038,26 @@ mod tests {
         // At this point, the state machine should pause before retrying the start request.  It
         // should also check to see if there are any incoming AP commands and find the initial
         // start request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // A metric should be logged for the failure to start the AP.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
-        assert_matches!(
+        assert_variant!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ApStartFailure { .. })))
         );
 
         // The original start sender will be dropped in this transition.
-        assert_matches!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Err(_)));
 
         // There should be a pending AP stop request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -2067,8 +2067,8 @@ mod tests {
         );
 
         // This should be followed by another start request that matches the requested config.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config, responder: _ }) => {
                 assert_eq!(config.ssid, requested_id.ssid);
@@ -2108,8 +2108,8 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -2119,14 +2119,14 @@ mod tests {
         );
 
         // There should also be a stopped state update.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(_)))
         );
 
         // Followed by a starting update.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -2134,7 +2134,7 @@ mod tests {
         });
 
         // Wait for a start request and send back a timeout.
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start{ config: _, responder }) => {
                 responder
@@ -2146,17 +2146,17 @@ mod tests {
         // At this point, the state machine should pause before retrying the start request.  It
         // should also check to see if there are any incoming AP commands and find the initial exit
         // request at which point it should exit.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        assert_matches!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
 
         // A metric should be logged for the failure to start the AP.
-        assert_matches!(
+        assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
-        assert_matches!(
+        assert_variant!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ApStartFailure { .. })))
         );
@@ -2183,13 +2183,13 @@ mod tests {
         let fut = perform_manual_request(test_values.deps, Some(manual_request));
         let fut = run_state_machine(async move { fut });
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // We should get a stop request
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        assert_matches!(
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder
@@ -2200,14 +2200,14 @@ mod tests {
 
         // We should then get a notification that the AP is inactive followed by a new starting
         // notification.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
                 assert!(updates.access_points.is_empty());
         });
 
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(mut updates))) => {
             let update = updates.access_points.pop().expect("no new updates available.");
@@ -2238,8 +2238,8 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine. No request is made initially.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -2268,16 +2268,16 @@ mod tests {
         drop(test_values.sme_req_stream);
 
         // Run the state machine and observe that it has terminated.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // There should be no notification of failure since no AP is actively running.
-        assert_matches!(
+        assert_variant!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
 
         // Verify that the state has been set to stopped on exit.
-        assert_matches!(test_values.status_reader.read_status(), Ok(Status::Stopped));
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopped));
     }
 
     #[fuchsia::test]
@@ -2314,25 +2314,25 @@ mod tests {
         ap.start(config, sender).expect("failed to make start request");
 
         // Expect that the state machine issues a stop request followed by a start request.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_matches!(
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success).expect("could not send AP stop response");
             }
         );
 
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // At this point, the state machine will have sent an empty notification and a starting
         // notification.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(update))) => {
                 assert!(update.access_points.is_empty());
             }
         );
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(update))) => {
                 assert_eq!(update.access_points.len(), 1);
@@ -2344,10 +2344,10 @@ mod tests {
         drop(sme_fut);
 
         // Run the state machine and observe that it has terminated.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // There should be a failure notification.
-        assert_matches!(
+        assert_variant!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(update))) => {
                 assert_eq!(update.access_points.len(), 1);
@@ -2368,7 +2368,7 @@ mod tests {
         }
 
         // And there should be no updates.
-        assert_matches!(receiver.try_next(), Err(_));
+        assert_variant!(receiver.try_next(), Err(_));
 
         // Reset the state to starting and verify that the internal state has been updated.
         let new_state = ApStateUpdate::new(
@@ -2378,7 +2378,7 @@ mod tests {
             types::OperatingBand::Any,
         );
         state.reset_state(new_state).expect("failed to reset state");
-        assert_matches!(state.inner.lock().state.as_ref(), Some(ApStateUpdate {
+        assert_variant!(state.inner.lock().state.as_ref(), Some(ApStateUpdate {
                 id: types::NetworkIdentifier {
                     ssid,
                     security_type: types::SecurityType::None,
@@ -2394,7 +2394,7 @@ mod tests {
         });
 
         // Resetting the state should result in an update.
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))) => {
             assert_eq!(access_points.len(), 1);
@@ -2429,7 +2429,7 @@ mod tests {
         state.reset_state(new_state).expect("failed to reset state");
 
         // The update should note that the AP is active.
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2457,7 +2457,7 @@ mod tests {
             .consume_sme_status_update(Cbw::Cbw20, ap_info)
             .expect("failure while updating SME status");
 
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2492,7 +2492,7 @@ mod tests {
         state.reset_state(new_state).expect("failed to reset state");
 
         // The update should note that the AP is starting.
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2514,7 +2514,7 @@ mod tests {
         state
             .update_operating_state(types::OperatingState::Starting)
             .expect("failed to send duplicate update.");
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2536,7 +2536,7 @@ mod tests {
         state
             .update_operating_state(types::OperatingState::Active)
             .expect("failed to send active update.");
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2580,7 +2580,7 @@ mod tests {
         }
 
         // Verify that an empty update has arrived.
-        assert_matches!(
+        assert_variant!(
             receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ApStatesUpdate { access_points }))
         ) => {
@@ -2634,10 +2634,10 @@ mod tests {
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the state has been set to Stopping.
-        assert_matches!(test_values.status_reader.read_status(), Ok(Status::Stopping));
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopping));
     }
 
     #[fuchsia::test]
@@ -2652,10 +2652,10 @@ mod tests {
         let fut = stopped_state(test_values.deps);
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the state has been set to Stopped.
-        assert_matches!(test_values.status_reader.read_status(), Ok(Status::Stopped));
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopped));
     }
 
     #[fuchsia::test]
@@ -2676,10 +2676,10 @@ mod tests {
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the state has been set to Starting.
-        assert_matches!(test_values.status_reader.read_status(), Ok(Status::Starting));
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Starting));
     }
 
     #[fuchsia::test]
@@ -2699,10 +2699,10 @@ mod tests {
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the state has been set to Started.
-        assert_matches!(test_values.status_reader.read_status(), Ok(Status::Started { .. }));
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Started { .. }));
     }
 
     struct InspectTestValues {
@@ -2726,7 +2726,7 @@ mod tests {
             fuchsia_inspect_contrib::inspect_log!(self.status_node, "status" => status);
             let read_fut = fuchsia_inspect::reader::read(&self.inspector);
             let mut read_fut = pin!(read_fut);
-            assert_matches!(
+            assert_variant!(
                 self.exec.run_until_stalled(&mut read_fut),
                 Poll::Ready(Ok(hierarchy)) => hierarchy
             )

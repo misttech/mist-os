@@ -108,12 +108,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use futures::channel::mpsc;
     use futures::prelude::*;
     use futures::task::Poll;
     use std::pin::pin;
+    use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync};
 
     // A collection of test utilities to test the Generic functions using Client impl
@@ -129,7 +129,7 @@ mod tests {
             F: Future<Output = ()> + Unpin,
         {
             pending_ack.send().expect("error acking update");
-            assert_matches!(exec.run_until_stalled(serve_listeners), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(serve_listeners), Poll::Pending);
         }
 
         /// Broadcasts an update to all registered listeners.
@@ -143,7 +143,7 @@ mod tests {
         {
             let clone = update.clone();
             sender.unbounded_send(Message::NotifyListeners(clone)).expect("error sending update");
-            assert_matches!(exec.run_until_stalled(serve_listeners), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(serve_listeners), Poll::Pending);
         }
 
         /// Reads and expects a status update to be available. Once the update was read it'll also be
@@ -175,7 +175,7 @@ mod tests {
             let (proxy, events) = create_proxy::<fidl_policy::ClientStateUpdatesMarker>();
             let stream = events.into_stream();
             sender.unbounded_send(Message::NewListener(proxy)).expect("error sending update");
-            assert_matches!(exec.run_until_stalled(serve_listeners), Poll::Pending);
+            assert_variant!(exec.run_until_stalled(serve_listeners), Poll::Pending);
             stream
         }
 
@@ -209,7 +209,7 @@ mod tests {
             ClientStateUpdate,
         >(listener_updates);
         let mut serve_listeners = pin!(serve_listeners);
-        assert_matches!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register listener.
         let mut l1_stream =
@@ -228,7 +228,7 @@ mod tests {
         );
 
         // Verify exactly one update was sent.
-        assert_matches!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -241,7 +241,7 @@ mod tests {
             ClientStateUpdate,
         >(listener_updates);
         let mut serve_listeners = pin!(serve_listeners);
-        assert_matches!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register #1 listener & ack initial update.
         let mut l1_stream =
@@ -274,13 +274,13 @@ mod tests {
         let summary =
             test_utils::ack_next_status_update(&mut exec, &mut l1_stream, &mut serve_listeners);
         assert_eq!(summary, expected_summary);
-        assert_matches!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
 
         // Verify #2 listeners received the update.
         let summary =
             test_utils::ack_next_status_update(&mut exec, &mut l2_stream, &mut serve_listeners);
         assert_eq!(summary, expected_summary);
-        assert_matches!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -293,7 +293,7 @@ mod tests {
             ClientStateUpdate,
         >(listener_updates);
         let mut serve_listeners = pin!(serve_listeners);
-        assert_matches!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register #1 listener & ack initial update.
         let mut l1_stream =
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(summary, expected_summary);
 
         // #2 listener should not have been sent an update.
-        assert_matches!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
 
         // #2 listener will send ack for previous update.
         test_utils::ack_update(&mut exec, l2_responder, &mut serve_listeners);
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(summary, expected_summary);
 
         // No further updates
-        assert_matches!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
-        assert_matches!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l1_stream.next()), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut l2_stream.next()), Poll::Pending);
     }
 }

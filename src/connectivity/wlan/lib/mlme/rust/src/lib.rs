@@ -553,9 +553,9 @@ mod tests {
     use super::device::FakeDevice;
     use super::test_utils::FakeMlme;
     use super::*;
-    use assert_matches::assert_matches;
     use fuchsia_async::TestExecutor;
     use std::task::Poll;
+    use wlan_common::assert_variant;
 
     // The following type definitions emulate the definition of FIDL requests and responder types.
     // In addition to testing `unbounded_send_or_respond_with_error`, these tests demonstrate how
@@ -640,7 +640,7 @@ mod tests {
             mlme_request_stream,
             device_stream,
         ));
-        assert_matches!(TestExecutor::poll_until_stalled(&mut main_loop).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut main_loop).await, Poll::Pending);
         assert_eq!(TestExecutor::poll_until_stalled(&mut init_receiver).await, Poll::Ready(Ok(())));
 
         // Create a `WlanSoftmacIfcBridge` proxy and stream in order to send a `StopBridgedDriver`
@@ -649,7 +649,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
 
         let mut stop_response_fut = softmac_ifc_bridge_proxy.stop_bridged_driver();
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
             Poll::Pending
         );
@@ -662,11 +662,11 @@ mod tests {
         device_sink
             .unbounded_send(DriverEvent::Stop { responder })
             .expect("Failed to send stop event");
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut main_loop).await,
             Poll::Ready(Ok(()))
         );
-        assert_matches!(
+        assert_variant!(
             TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
             Poll::Ready(Ok(()))
         );

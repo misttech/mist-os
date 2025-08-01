@@ -129,7 +129,6 @@ rustc_library("wlan-common") {
 
     test_deps = [
       "//src/lib/fuchsia",
-      "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:itertools",
       "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:test-case",
