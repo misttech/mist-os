@@ -9,8 +9,6 @@
 #include <lib/scsi/controller.h>
 #include <lib/sync/completion.h>
 
-#include <vector>
-
 #include <fbl/intrusive_double_list.h>
 
 #include "upiu_transactions.h"
@@ -36,6 +34,7 @@ class ScsiCommandUpiu : public CommandUpiu {
     std::memcpy(GetData<CommandUpiuData>()->cdb, cdb, cdb_length);
   }
 
+  explicit ScsiCommandUpiu(const CommandUpiuData &data) : CommandUpiu(data) {}
   ~ScsiCommandUpiu() override = default;
 
   scsi::Opcode GetOpcode() const { return scsi_cdb_->opcode; }
@@ -43,11 +42,6 @@ class ScsiCommandUpiu : public CommandUpiu {
   // Get the byte size of the PRDT data buffer to send or receive. Returns 0 if there is no buffer
   // to transfer.
   uint32_t GetTransferBytes() const { return transfer_bytes_; }
-
-  // for test
-  explicit ScsiCommandUpiu(const CommandUpiuData &data) {
-    std::memcpy(GetData(), &data, sizeof(CommandUpiuData));
-  }
 
  private:
   ScsiCommonCDB *scsi_cdb_ = reinterpret_cast<ScsiCommonCDB *>(GetData<CommandUpiuData>()->cdb);

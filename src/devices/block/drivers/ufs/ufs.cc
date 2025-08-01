@@ -16,9 +16,10 @@
 
 #include <array>
 #include <mutex>
-#include <vector>
 
 #include <safemath/safe_conversions.h>
+
+#include "src/devices/block/drivers/ufs/server.h"
 
 namespace ufs {
 namespace {
@@ -1568,55 +1569,9 @@ void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
   completer(zx::ok());
 }
 
-void Ufs::Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server) {
-  bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
-}
-
-// TODO(b/379889262): Planned for implementation of the fuchsia_hardware_ufs::Ufs protocol.
-// Currently not supported. The following methods are placeholders for future functionality.
-
-void Ufs::ReadDescriptor(ReadDescriptorRequestView request,
-                         ReadDescriptorCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::WriteDescriptor(WriteDescriptorRequestView request,
-                          WriteDescriptorCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ReadFlag(ReadFlagRequestView request, ReadFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::SetFlag(SetFlagRequestView request, SetFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ClearFlag(ClearFlagRequestView request, ClearFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ToggleFlag(ToggleFlagRequestView request, ToggleFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ReadAttribute(ReadAttributeRequestView request, ReadAttributeCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::WriteAttribute(WriteAttributeRequestView request,
-                         WriteAttributeCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::SendUicCommand(SendUicCommandRequestView request,
-                         SendUicCommandCompleter::Sync& completer) {
-  completer.Reply(0);
-}
-
-void Ufs::Request(RequestRequestView request, RequestCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+void Ufs::Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server_end) {
+  auto server_impl = std::make_unique<UfsServer>(this);
+  fidl::BindServer(dispatcher(), std::move(server_end), std::move(server_impl));
 }
 
 }  // namespace ufs

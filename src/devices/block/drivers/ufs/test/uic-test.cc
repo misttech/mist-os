@@ -37,7 +37,7 @@ TEST_F(UicTest, DmeGet) {
 }
 
 TEST_F(UicTest, DmeSet) {
-  DmeSetUicCommand dme_set_command(*dut_, 0, 0, 0);
+  DmeSetUicCommand dme_set_command(*dut_, 0, 0, 0, 0);
   ASSERT_OK(dme_set_command.SendCommand());
 
   // TODO(https://fxbug.dev/42075643): Add more tests.

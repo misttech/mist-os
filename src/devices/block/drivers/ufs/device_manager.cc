@@ -165,8 +165,8 @@ zx::result<> DeviceManager::ClearFlag(Flags type) {
   return zx::ok();
 }
 
-zx::result<uint32_t> DeviceManager::DmeGet(uint16_t mbi_attribute) {
-  DmeGetUicCommand dme_get_command(controller_, mbi_attribute, 0);
+zx::result<uint32_t> DeviceManager::DmeGet(uint16_t mib_attribute) {
+  DmeGetUicCommand dme_get_command(controller_, mib_attribute, 0);
   auto value = dme_get_command.SendCommand();
   if (value.is_error()) {
     return value.take_error();
@@ -177,8 +177,8 @@ zx::result<uint32_t> DeviceManager::DmeGet(uint16_t mbi_attribute) {
   return zx::ok(value.value().value());
 }
 
-zx::result<uint32_t> DeviceManager::DmePeerGet(uint16_t mbi_attribute) {
-  DmePeerGetUicCommand dme_peer_get_command(controller_, mbi_attribute, 0);
+zx::result<uint32_t> DeviceManager::DmePeerGet(uint16_t mib_attribute) {
+  DmePeerGetUicCommand dme_peer_get_command(controller_, mib_attribute, 0);
   auto value = dme_peer_get_command.SendCommand();
   if (value.is_error()) {
     return value.take_error();
@@ -189,8 +189,8 @@ zx::result<uint32_t> DeviceManager::DmePeerGet(uint16_t mbi_attribute) {
   return zx::ok(value.value().value());
 }
 
-zx::result<> DeviceManager::DmeSet(uint16_t mbi_attribute, uint32_t value) {
-  DmeSetUicCommand dme_set_command(controller_, mbi_attribute, 0, value);
+zx::result<> DeviceManager::DmeSet(uint16_t mib_attribute, uint32_t value) {
+  DmeSetUicCommand dme_set_command(controller_, mib_attribute, 0, 0, value);
   if (auto result = dme_set_command.SendCommand(); result.is_error()) {
     return result.take_error();
   }
@@ -630,7 +630,7 @@ zx::result<> DeviceManager::InitUniproAttributes(inspect::Node &unipro_node) {
     return host_t_activate.take_error();
   }
   // Intel Lake-field UFSHCI has a quirk. We need to add 200us to the PEER's PA_TActivate.
-  DmePeerSetUicCommand dme_peer_set_t_activate(controller_, PA_TActivate, 0,
+  DmePeerSetUicCommand dme_peer_set_t_activate(controller_, PA_TActivate, 0, 0,
                                                host_t_activate.value() + 2);
   if (auto result = dme_peer_set_t_activate.SendCommand(); result.is_error()) {
     return result.take_error();

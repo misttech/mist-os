@@ -78,26 +78,33 @@ class Ufs;
 // UFS Specification Version 3.1, section 9.4 "UniPro/UFS Control Interface (Control Plane)".
 class UicCommand {
  public:
-  explicit UicCommand(Ufs &ufs, UicCommandOpcode opcode, uint16_t mbi_attribute = 0,
-                      uint16_t gen_selector_index = 0)
-      : controller_(ufs),
-        opcode_(opcode),
-        mbi_attribute_(mbi_attribute),
-        gen_selector_index_(gen_selector_index) {}
-
+  virtual ~UicCommand() = default;
+  UicCommand() = delete;
+  explicit UicCommand(const UicCommand &) = delete;
+  UicCommand &operator=(const UicCommand &) = delete;
+  UicCommand(UicCommand &&) = delete;
+  UicCommand &operator=(UicCommand &&) = delete;
   // Among the UIC commands, the DME_GET and DME_PEER_GET commands return the value of the attribute
   // requested in the UICCMDARG3 register. The other commands do not return a value.
   zx::result<std::optional<uint32_t>> SendCommand();
+
+  UicCommandOpcode GetOpcode() const { return opcode_; }
 
   // For testing
   void SetTimeoutUsec(uint32_t time) { timeout_usec_ = time; }
 
  protected:
+  explicit UicCommand(Ufs &ufs, UicCommandOpcode opcode, uint16_t mib_attribute = 0,
+                      uint16_t gen_selector_index = 0)
+      : controller_(ufs),
+        opcode_(opcode),
+        mib_attribute_(mib_attribute),
+        gen_selector_index_(gen_selector_index) {}
+
   zx::result<> SendUicCommand();
 
   Ufs &GetController() { return controller_; }
-  UicCommandOpcode GetOpcode() const { return opcode_; }
-  uint16_t GetMbiAttribute() const { return mbi_attribute_; }
+  uint16_t GetMibAttribute() const { return mib_attribute_; }
   uint16_t GetGenSelectorIndex() const { return gen_selector_index_; }
   uint32_t GetTimeoutUsec() const { return timeout_usec_; }
 
@@ -112,7 +119,7 @@ class UicCommand {
  private:
   Ufs &controller_;
   const UicCommandOpcode opcode_;
-  const uint16_t mbi_attribute_ = 0;
+  const uint16_t mib_attribute_ = 0;
   const uint16_t gen_selector_index_ = 0;
 
   uint32_t timeout_usec_ = kUicTimeoutUsec;
@@ -120,8 +127,8 @@ class UicCommand {
 
 class DmeGetUicCommand : public UicCommand {
  public:
-  explicit DmeGetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index)
-      : UicCommand(ufs, UicCommandOpcode::kDmeGet, mbi_attribute, gen_selector_index) {}
+  explicit DmeGetUicCommand(Ufs &ufs, uint16_t mib_attribute, uint16_t gen_selector_index)
+      : UicCommand(ufs, UicCommandOpcode::kDmeGet, mib_attribute, gen_selector_index) {}
 
  protected:
   std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
@@ -130,22 +137,24 @@ class DmeGetUicCommand : public UicCommand {
 
 class DmeSetUicCommand : public UicCommand {
  public:
-  explicit DmeSetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index,
-                            uint32_t value)
-      : UicCommand(ufs, UicCommandOpcode::kDmeSet, mbi_attribute, gen_selector_index),
+  explicit DmeSetUicCommand(Ufs &ufs, uint16_t mib_attribute, uint16_t gen_selector_index,
+                            uint8_t attr_set_type, uint32_t value)
+      : UicCommand(ufs, UicCommandOpcode::kDmeSet, mib_attribute, gen_selector_index),
+        attr_set_type_(attr_set_type),
         value_(value) {}
 
  protected:
   std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
 
  private:
+  uint8_t attr_set_type_;
   uint32_t value_;
 };
 
 class DmePeerGetUicCommand : public UicCommand {
  public:
-  explicit DmePeerGetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index)
-      : UicCommand(ufs, UicCommandOpcode::kDmePeerGet, mbi_attribute, gen_selector_index) {}
+  explicit DmePeerGetUicCommand(Ufs &ufs, uint16_t mib_attribute, uint16_t gen_selector_index)
+      : UicCommand(ufs, UicCommandOpcode::kDmePeerGet, mib_attribute, gen_selector_index) {}
 
  protected:
   std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
@@ -154,15 +163,17 @@ class DmePeerGetUicCommand : public UicCommand {
 
 class DmePeerSetUicCommand : public UicCommand {
  public:
-  explicit DmePeerSetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index,
-                                uint32_t value)
-      : UicCommand(ufs, UicCommandOpcode::kDmePeerSet, mbi_attribute, gen_selector_index),
+  explicit DmePeerSetUicCommand(Ufs &ufs, uint16_t mib_attribute, uint16_t gen_selector_index,
+                                uint8_t attr_set_type, uint32_t value)
+      : UicCommand(ufs, UicCommandOpcode::kDmePeerSet, mib_attribute, gen_selector_index),
+        attr_set_type_(attr_set_type),
         value_(value) {}
 
  protected:
   std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
 
  private:
+  uint8_t attr_set_type_;
   uint32_t value_;
 };
 
