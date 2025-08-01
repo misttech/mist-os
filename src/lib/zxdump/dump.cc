@@ -886,22 +886,25 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
   void set_date(time_t date) { std::get<DateNote>(notes_).Set(date); }
 
   // This can be used from a Collect `prune_segment` callback function.
-  fit::result<Error, std::optional<SegmentDisposition::Note>> FindBuildIdNote(
-      const zx_info_maps_t& segment) {
+  using NoteResult = fit::result<Error, std::optional<SegmentDisposition::Note>>;
+  NoteResult FindBuildIdNote(const zx_info_maps_t& segment) {
+    auto on_phdrs = [this, &segment](const auto& phdrs) -> NoteResult {
+      if (!phdrs->empty()) {
+        auto id = DetectElfIdentity(process_, segment, *phdrs);
+        if (id.is_error()) {
+          return id.take_error();
+        }
+        if (id->build_id.size > 0) {
+          return fit::ok(id->build_id);
+        }
+      }
+      return fit::ok(std::nullopt);
+    };
     auto elf = DetectElf(process_, segment);
     if (elf.is_error()) {
       return elf.take_error();
     }
-    if (!elf->empty()) {
-      auto id = DetectElfIdentity(process_, segment, **elf);
-      if (id.is_error()) {
-        return id.take_error();
-      }
-      if (id->build_id.size > 0) {
-        return fit::ok(id->build_id);
-      }
-    }
-    return fit::ok(std::nullopt);
+    return std::visit(on_phdrs, *elf);
   }
 
  private:

@@ -82,6 +82,10 @@ auto IdsWithoutSoname(T&& ids) {
 
 const auto kElfSearchIdsWithoutSoname = IdsWithoutSoname(kElfSearchIds);
 
+using ForeignElf = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
+constexpr elfldltl::ElfMachine kForeignMachine = elfldltl::ElfMachine::kArm;
+constexpr uint32_t kForeignPageSize = 0x1000;
+
 TEST(ZxdumpTests, ElfSearchLive) {
   TestProcessForElfSearch process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
@@ -141,6 +145,8 @@ class TestProcessForRemoteElfSearch : public TestProcessForElfSearch {
 
   const zx::vmar& vmar() { return vmar_; }
 
+  void DumpRemote(ElfIdAtBaseList expected_elf, bool check_notes = true);
+
   ~TestProcessForRemoteElfSearch() {
     zx::unowned_process process = borrow();
     if (*process) {
@@ -167,7 +173,8 @@ class RemoteLinker {
       std::is_same_v<Elf, elfldltl::Elf<>> && Machine == elfldltl::ElfMachine::kNative;
 
   void Init(std::string_view name)
-    requires(kLocal)
+    requires(kLocal && std::is_same_v<Elf, elfldltl::Elf<>> &&
+             Machine == elfldltl::ElfMachine::kNative)
   {
     Init(name, ld::testing::GetExecutableVmo(name), zx_system_get_page_size(), GetVdso());
   }
@@ -178,6 +185,7 @@ class RemoteLinker {
 
     std::optional<std::string> libprefix = ld::testing::ConfigFromInterp(
         ld::testing::FindInterp<elfldltl::UnownedVmoFile>(executable_vmo.borrow()));
+    lib_path_ = ld::testing::GetExecutableLibPath(name, libprefix);
 
     elfldltl::testing::ExpectOkDiagnostics diag;
     linker_.set_abi_stub(
@@ -190,10 +198,8 @@ class RemoteLinker {
       return Decoded::Create(diag, std::move(vmo), page_size);
     };
 
-    auto get_dep = [name, libprefix,
-                    decode](const Linker::Module::Soname& soname) -> Linker::GetDepResult {
-      std::filesystem::path path =
-          ld::testing::GetExecutableLibPath(name, libprefix) / soname.str();
+    auto get_dep = [this, decode](const Linker::Module::Soname& soname) -> Linker::GetDepResult {
+      std::filesystem::path path = lib_path_ / soname.str();
       if (auto decoded = decode(elfldltl::testing::GetTestLibVmo(path.string()))) {
         return decoded;
       }
@@ -237,6 +243,7 @@ class RemoteLinker {
     return ElfIdAtBaseList{range.begin(), range.end()};
   }
 
+  const std::filesystem::path lib_path() const { return lib_path_; }
   const Linker::Module::List& modules() const { return linker_.modules(); }
   const Linker::InitResult& init_modules() const { return init_modules_; }
 
@@ -256,6 +263,7 @@ class RemoteLinker {
   }
 
  private:
+  std::filesystem::path lib_path_;
   Linker linker_;
   Linker::InitResult init_modules_;
 };
@@ -286,6 +294,74 @@ TEST(ZxdumpTests, ElfSearchLiveRemote) {
   EXPECT_THAT(process.found_elf(), UnorderedElementsAreArray(expected_elf));
 }
 
+// Load both 64-bit and 32-bit modules into the process.
+void LoadBiarch(TestProcessForRemoteElfSearch& process, ElfIdAtBaseList& expected_elf) {
+  auto load = [&expected_elf](auto& linker, zx::unowned_vmar vmar) {
+    ASSERT_NO_FATAL_FAILURE(linker.Load(vmar->borrow()));
+    std::ranges::move(linker.GetElfIdAtBaseList(), std::back_inserter(expected_elf));
+  };
+
+  {
+    // The kernel reserves the lowest part of the address space, so the root
+    // VMAR doesn't start at zero.  The VMAR for the 32-bit address space will
+    // not be quite 4GiB in size, so adjust to make sure it ends at exactly
+    // 4GiB.  In fact, no 32-bit userland ever expects to have a segment in the
+    // very last page, where the page-rounded vaddr+memsz wraps around to 0.
+    // So make the VMAR one page smaller to ensure nothing gets placed all the
+    // way up there.
+    const size_t kAddressLimit = (size_t{1} << 32) - zx_system_get_page_size();
+    zx_info_vmar_t root_vmar_info;
+    zx_status_t status = process.vmar().get_info(ZX_INFO_VMAR, &root_vmar_info,
+                                                 sizeof(root_vmar_info), nullptr, nullptr);
+    ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+    ASSERT_LT(root_vmar_info.base, kAddressLimit);
+
+    constexpr zx_vm_option_t kVmarOptions =
+        // Require the specific offset of 0 and allow exact placement within.
+        ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_SPECIFIC |
+        // Allow all kinds of mappings.
+        ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE;
+    const size_t vmar_size = kAddressLimit - root_vmar_info.base;
+    zx::vmar vmar;
+    uintptr_t vmar_addr;
+    status = process.vmar().allocate(kVmarOptions, 0, vmar_size, &vmar, &vmar_addr);
+    ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+    EXPECT_EQ(vmar_addr, root_vmar_info.base);
+
+    RemoteLinker<ForeignElf, kForeignMachine> linker;
+    constexpr std::string_view kForeignName = "symbol-filter-elf32";
+    const std::filesystem::path path =
+        ld::testing::GetExecutableLibPath(kForeignName) / kForeignName;
+    ASSERT_NO_FATAL_FAILURE(linker.Init(
+        kForeignName, elfldltl::testing::GetTestLibVmo(path.string()), kForeignPageSize, nullptr));
+    ASSERT_NO_FATAL_FAILURE(load(linker, vmar.borrow()));
+  }
+
+  {
+    RemoteLinker<> linker;
+    ASSERT_NO_FATAL_FAILURE(linker.Init("symbol-filter"));
+    ASSERT_NO_FATAL_FAILURE(load(linker, process.vmar().borrow()));
+  }
+}
+
+TEST(ZxdumpTests, ElfSearchLiveRemoteBiarch) {
+  TestProcessForRemoteElfSearch process;
+  ASSERT_NO_FATAL_FAILURE(process.Create());
+  ASSERT_TRUE(process.borrow()->is_valid());
+
+  ElfIdAtBaseList expected_elf;
+  ASSERT_NO_FATAL_FAILURE(LoadBiarch(process, expected_elf));
+
+  // Collect the ElfId data from the zxdump API under test.
+  TaskHolder holder;
+  auto insert_result = holder.Insert(process.handle());
+  ASSERT_TRUE(insert_result.is_ok()) << insert_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+
+  // That should match the source of truth.
+  EXPECT_THAT(process.found_elf(), UnorderedElementsAreArray(expected_elf));
+}
+
 TEST(ZxdumpTests, ElfSearchDumpRemote) {
   TestProcessForRemoteElfSearch process;
   ASSERT_NO_FATAL_FAILURE(process.Create());
@@ -295,13 +371,34 @@ TEST(ZxdumpTests, ElfSearchDumpRemote) {
   RemoteLinker<> linker;
   ASSERT_NO_FATAL_FAILURE(linker.Init("symbol-filter"));
   ASSERT_NO_FATAL_FAILURE(linker.Load(process.vmar().borrow()));
-  const ElfIdAtBaseList expected_elf = linker.GetElfIdAtBaseList();
 
+  // Make the dump and check it against the data from the RemoteLinker.
+  ASSERT_NO_FATAL_FAILURE(process.DumpRemote(linker.GetElfIdAtBaseList()));
+}
+
+TEST(ZxdumpTests, ElfSearchDumpRemoteBiarch) {
+  TestProcessForRemoteElfSearch process;
+  ASSERT_NO_FATAL_FAILURE(process.Create());
+  ASSERT_TRUE(process.borrow()->is_valid());
+
+  // Populate the process.
+  ElfIdAtBaseList expected_elf;
+  ASSERT_NO_FATAL_FAILURE(LoadBiarch(process, expected_elf));
+
+  // TODO(https://fxbug.dev/395606674): FindBuildIdNote API needs revamp to not
+  // double-report modules with first file page mapped twice in notes though
+  // main ElfSearch API is OK.  Fix & remove the flag argument from DumpRemote.
+  ASSERT_NO_FATAL_FAILURE(process.DumpRemote(std::move(expected_elf), false));
+}
+
+}  // namespace
+
+void TestProcessForRemoteElfSearch::DumpRemote(ElfIdAtBaseList expected_elf, bool check_notes) {
   // Dump the process populated by remote dynamic linking.
   TestFile file;
   {
     FdWriter writer(file.RewoundFd());
-    ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
+    ASSERT_NO_FATAL_FAILURE(Dump(writer));
   }
 
   // Check the contents of the dump, collecting found_elf().
@@ -309,22 +406,28 @@ TEST(ZxdumpTests, ElfSearchDumpRemote) {
     TaskHolder holder;
     auto read_result = holder.Insert(file.RewoundFd());
     ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
-    ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+    ASSERT_NO_FATAL_FAILURE(CheckDump(holder));
   }
 
   // That should match the source of truth exactly with no additional modules.
-  EXPECT_THAT(process.found_elf(), UnorderedElementsAreArray(expected_elf));
+  EXPECT_THAT(found_elf(), UnorderedElementsAreArray(expected_elf));
+
+  if (!check_notes) {
+    if (!::testing::Test::HasFailure()) {
+      GTEST_SUCCEED() << "TODO(https://fxbug.dev/395606674): "
+                      << "skipping NT_GNU_BUILD_ID core notes check on biarch";
+    }
+    return;
+  }
 
   // Now check NT_GNU_BUILD_ID notes directly, resetting found_elf().
-  ASSERT_NO_FATAL_FAILURE(process.CheckNotes(file.RewoundFd().get()));
+  ASSERT_NO_FATAL_FAILURE(CheckNotes(file.RewoundFd().get()));
 
   // That should also match the source of truth exactly, but without having
   // detected the SONAMEs from the notes alone.
   ElfIdAtBaseList expected_notes_elf = IdsWithoutSoname(expected_elf);
-  EXPECT_THAT(process.found_elf(), UnorderedElementsAreArray(expected_notes_elf));
+  EXPECT_THAT(found_elf(), UnorderedElementsAreArray(expected_notes_elf));
 }
-
-}  // namespace
 
 // This is called before dumping starts to make callbacks.
 void TestProcessForElfSearch::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
@@ -401,9 +504,14 @@ void TestProcessForElfSearch::CheckDump(zxdump::TaskHolder& holder) {
     auto detect = zxdump::DetectElf(read_process, segment);
     ASSERT_TRUE(detect.is_ok()) << detect.error_value();
 
-    std::span phdrs = **detect;
-    EXPECT_THAT(phdrs, Not(IsEmpty()));
-    auto identity = zxdump::DetectElfIdentity(read_process, segment, phdrs);
+    EXPECT_EQ(std::visit(
+                  [](const auto& phdrs) {
+                    EXPECT_THAT(*phdrs, Not(IsEmpty()));
+                    return phdrs->empty();
+                  },
+                  *detect),
+              detect->empty());
+    auto identity = zxdump::DetectElfIdentity(read_process, segment, *detect);
     ASSERT_TRUE(identity.is_ok()) << identity.error_value();
 
     ASSERT_GT(identity->build_id.size, zxdump::ElfIdentity::kBuildIdOffset);
