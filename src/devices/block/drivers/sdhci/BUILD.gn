@@ -66,6 +66,7 @@ source_set("sdhci-driver-source") {
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/metadata/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",

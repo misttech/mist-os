@@ -13,6 +13,8 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/sync/completion.h>
@@ -230,6 +232,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   zx_status_t PerformVendorTuningIfNeeded(uint32_t cmd_idx);
 
+  void UpdateRequestLog();
+
   zx::interrupt irq_;
   async::IrqMethod<Sdhci, &Sdhci::HandleIrq> irq_handler_;
 
@@ -269,6 +273,43 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_;
 
   fdf::Dispatcher irq_dispatcher_;
+
+  inspect::Node request_log_root_;
+
+  struct BufferInfo {
+    uint32_t id;
+    uint64_t offset;
+    uint64_t size;
+  };
+
+  struct RequestLogEntry {
+    uint32_t cmd_idx;
+    uint32_t cmd_flags;
+    uint32_t arg;
+    uint32_t response;
+    uint64_t count;
+    std::vector<BufferInfo> buffers;
+    std::vector<uint8_t> first_block;
+  };
+
+  struct RequestLogEntryNode {
+    inspect::Node node;
+    inspect::UintProperty cmd_idx;
+    inspect::StringProperty cmd_flags;
+    inspect::StringProperty arg;
+    inspect::StringProperty response;
+    inspect::UintProperty count;
+    inspect::StringArray buffers;
+    inspect::ByteVectorProperty first_block;
+  };
+
+  static constexpr uint32_t kMaxRequestLogEntries = 32;
+  std::vector<RequestLogEntry> request_log_;
+  std::vector<RequestLogEntryNode> request_log_nodes_;
+  uint32_t next_request_log_entry_ = 0;
+  uint64_t request_count_ = 0;
+
+  bool command_packing_cmd23_ = false;
 };
 
 }  // namespace sdhci
