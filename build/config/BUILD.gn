@@ -105,18 +105,21 @@ config("stack-size-section") {
       ldflags = cflags
     }
 
-    if (is_fuchsia) {
-      rust_link_prefix = ""
-    } else {
-      rust_link_prefix = "-Wl,"
+    #TODO(https://fxbug.dev/434231527): remove the is_mac guard once rustc passes the flag to the linker itself.
+    if (!is_mac) {
+      if (is_fuchsia) {
+        rust_link_prefix = ""
+      } else {
+        rust_link_prefix = "-Wl,"
+      }
+
+      rustflags = [
+        "-Zemit-stack-sizes",
+
+        #TODO(https://fxbug.dev/434231527): remove the stack-size-section workaround once the rustc does this.
+        "-Clink-arg=${rust_link_prefix}--mllvm=--stack-size-section",
+      ]
     }
-
-    rustflags = [
-      "-Zemit-stack-sizes",
-
-      #TODO(https://fxbug.dev/434231527): remove the stack-size-section workaround once the rustc does this.
-      "-Clink-arg=${rust_link_prefix}--mllvm=--stack-size-section",
-    ]
   }
 }
 
