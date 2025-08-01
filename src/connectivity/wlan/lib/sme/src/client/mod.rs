@@ -871,12 +871,6 @@ impl ClientSme {
         self.context.mlme_sink.send(MlmeRequest::GetIfaceHistogramStats(responder));
         receiver
     }
-
-    pub fn signal_report(&mut self) -> oneshot::Receiver<Result<fidl_stats::SignalReport, i32>> {
-        let (responder, receiver) = Responder::new();
-        self.context.mlme_sink.send(MlmeRequest::GetSignalReport(responder));
-        receiver
-    }
 }
 
 impl super::Station for ClientSme {

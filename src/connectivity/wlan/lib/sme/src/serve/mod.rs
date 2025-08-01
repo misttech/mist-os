@@ -534,27 +534,6 @@ mod tests {
     }
 
     #[test]
-    fn generic_sme_get_signal_report_for_client() {
-        let (mut helper, mut serve_fut) =
-            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
-        let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
-
-        // Forward request to MLME.
-        let mut report_fut = telemetry_proxy.get_signal_report();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Mock response from MLME. Use a fake error code to make the response easily verifiable.
-        let report_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let report_responder = assert_variant!(report_req, crate::MlmeRequest::GetSignalReport(responder) => responder);
-        report_responder.respond(Err(1337));
-
-        // Verify that the response made it to us without alteration.
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let report_result = assert_variant!(helper.exec.run_until_stalled(&mut report_fut), Poll::Ready(Ok(report_result)) => report_result);
-        assert_eq!(report_result, Err(1337));
-    }
-
-    #[test]
     fn generic_sme_get_telemetry_for_ap_fails() {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();

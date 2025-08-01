@@ -636,9 +636,6 @@ closed protocol MLME {
     strict GetIfaceHistogramStats() -> (struct {
         resp GetIfaceHistogramStatsResponse;
     });
-    strict GetSignalReport() -> (struct {
-        resp fuchsia.wlan.stats.SignalReport;
-    }) error zx.Status;
 
     strict ListMinstrelPeers() -> (struct {
         resp MinstrelListResponse;

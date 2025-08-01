@@ -62,7 +62,6 @@ pub enum MlmeRequest {
     Stop(fidl_mlme::StopRequest),
     GetIfaceStats(responder::Responder<fidl_mlme::GetIfaceStatsResponse>),
     GetIfaceHistogramStats(responder::Responder<fidl_mlme::GetIfaceHistogramStatsResponse>),
-    GetSignalReport(responder::Responder<Result<fidl_stats::SignalReport, i32>>),
     ListMinstrelPeers(responder::Responder<fidl_mlme::MinstrelListResponse>),
     GetMinstrelStats(
         fidl_mlme::MinstrelStatsRequest,
@@ -97,7 +96,6 @@ impl MlmeRequest {
             Self::Stop(_) => "Stop",
             Self::GetIfaceStats(_) => "GetIfaceStats",
             Self::GetIfaceHistogramStats(_) => "GetIfaceHistogramStats",
-            Self::GetSignalReport(_) => "GetSignalReport",
             Self::ListMinstrelPeers(_) => "ListMinstrelPeers",
             Self::GetMinstrelStats(_, _) => "GetMinstrelStats",
             Self::SaeHandshakeResp(_) => "SaeHandshakeResp",

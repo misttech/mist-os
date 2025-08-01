@@ -512,10 +512,6 @@ void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync
   }
 }
 
-void WlanInterface::GetSignalReport(GetSignalReportCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
 void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request,
                                      SaeHandshakeRespCompleter::Sync& completer) {
   brcmf_if_sae_handshake_resp(wdev_->netdev, request);

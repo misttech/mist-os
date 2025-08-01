@@ -43,7 +43,6 @@ pub trait DeviceOps {
     fn get_iface_histogram_stats(
         &self,
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
-    fn get_signal_report(&self) -> anyhow::Result<Result<fidl_stats::SignalReport, i32>>;
     fn sae_handshake_resp(
         &self,
         resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
@@ -210,12 +209,6 @@ impl DeviceOps for FullmacDevice {
             Err(e) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(e)),
         }
     }
-    fn get_signal_report(&self) -> anyhow::Result<Result<fidl_stats::SignalReport, i32>> {
-        self.fullmac_impl_sync_proxy
-            .get_signal_report(zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on GetSignalReport")
-    }
-
     fn sae_handshake_resp(
         &self,
         resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
@@ -269,7 +262,6 @@ pub mod test_utils {
         QueryTelemetrySupport,
         GetIfaceStats,
         GetIfaceHistogramStats,
-        GetSignalReport,
         SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
         SaeFrameTx { frame: fidl_fullmac::SaeFrame },
         WmmStatusReq,
@@ -292,7 +284,6 @@ pub mod test_utils {
         pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
         pub get_iface_stats_mock: Option<fidl_mlme::GetIfaceStatsResponse>,
         pub get_iface_histogram_stats_mock: Option<fidl_mlme::GetIfaceHistogramStatsResponse>,
-        pub get_signal_report_mock: Option<Result<fidl_stats::SignalReport, i32>>,
 
         pub fullmac_ifc_client_end: Option<ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>>,
     }
@@ -345,9 +336,6 @@ pub mod test_utils {
                         },
                     ),
                     query_telemetry_support_mock: Some(Ok(fidl_stats::TelemetrySupport {
-                        ..Default::default()
-                    })),
-                    get_signal_report_mock: Some(Ok(fidl_stats::SignalReport {
                         ..Default::default()
                     })),
                     set_keys_resp_mock: None,
@@ -494,10 +482,6 @@ pub mod test_utils {
                     zx::sys::ZX_ERR_NOT_SUPPORTED,
                 ),
             ))
-        }
-        fn get_signal_report(&self) -> anyhow::Result<Result<fidl_stats::SignalReport, i32>> {
-            self.driver_call_sender.send(DriverCall::GetSignalReport);
-            self.mocks.lock().unwrap().get_signal_report_mock.clone().ok_or(format_err!(""))
         }
         fn sae_handshake_resp(
             &self,

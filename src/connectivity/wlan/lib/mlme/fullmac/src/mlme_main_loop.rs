@@ -178,7 +178,6 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             GetIfaceHistogramStats(responder) => {
                 responder.respond(self.device.get_iface_histogram_stats()?)
             }
-            GetSignalReport(responder) => responder.respond(self.device.get_signal_report()?),
             GetMinstrelStats(_, _) => info!("GetMinstrelStats is unsupported"),
             ListMinstrelPeers(_) => info!("ListMinstrelPeers is unsupported"),
             SaeHandshakeResp(resp) => self
