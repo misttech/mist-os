@@ -131,7 +131,7 @@ impl ResourcesVisitor for DigestComputer<'_> {
                             let (_vmo, name) = e.get();
                             if bucket_definition.vmo_match(&name) {
                                 let (_, (vmo, _name)) = e.remove_entry();
-                                vmo.total_committed_bytes.unwrap_or_default()
+                                vmo.scaled_committed_bytes.unwrap_or_default()
                             } else {
                                 0
                             }
@@ -180,7 +180,7 @@ impl Digest {
                 size: digest_visitor
                     .undigested_vmos
                     .values()
-                    .filter_map(|(vmo, _)| vmo.total_committed_bytes)
+                    .filter_map(|(vmo, _)| vmo.scaled_committed_bytes)
                     .sum(),
             },
             // This bucket accounts for VMO bytes that have been allocated by the kernel, but not
@@ -263,7 +263,7 @@ mod tests {
                         parent: None,
                         private_committed_bytes: Some(1024),
                         private_populated_bytes: Some(2048),
-                        scaled_committed_bytes: Some(1024),
+                        scaled_committed_bytes: Some(512),
                         scaled_populated_bytes: Some(2048),
                         total_committed_bytes: Some(1024),
                         total_populated_bytes: Some(2048),
@@ -277,7 +277,7 @@ mod tests {
                         parent: None,
                         private_committed_bytes: Some(1024),
                         private_populated_bytes: Some(2048),
-                        scaled_committed_bytes: Some(1024),
+                        scaled_committed_bytes: Some(512),
                         scaled_populated_bytes: Some(2048),
                         total_committed_bytes: Some(1024),
                         total_populated_bytes: Some(2048),
@@ -361,7 +361,7 @@ mod tests {
         )
         .unwrap();
         let expected_buckets = vec![
-            Bucket { name: UNDIGESTED.to_string(), size: 2048 }, // The two VMOs are unmatched, 1024 + 1024
+            Bucket { name: UNDIGESTED.to_string(), size: 1024 }, // The two VMOs are unmatched, 512 + 512
             Bucket { name: ORPHANED.to_string(), size: 10000 }, // No matched VMOs => kernel's VMO bytes
             Bucket { name: KERNEL.to_string(), size: 31 }, // wired + heap + mmu + ipc + other => 3 + 4 + 7 + 8 + 9 = 31
             Bucket { name: FREE.to_string(), size: 2 },
@@ -392,9 +392,9 @@ mod tests {
         )
         .unwrap();
         let expected_buckets = vec![
-            Bucket { name: "matched".to_string(), size: 1024 }, // One VMO is matched, the other is not
-            Bucket { name: UNDIGESTED.to_string(), size: 1024 }, // One unmatched VMO
-            Bucket { name: ORPHANED.to_string(), size: 8976 }, // One matched VMO => 10000 - 1024 = 8976
+            Bucket { name: "matched".to_string(), size: 512 }, // One VMO is matched, the other is not
+            Bucket { name: UNDIGESTED.to_string(), size: 512 }, // One unmatched VMO
+            Bucket { name: ORPHANED.to_string(), size: 9488 }, // One matched VMO => 10000 - 512 = 9488
             Bucket { name: KERNEL.to_string(), size: 31 }, // wired + heap + mmu + ipc + other => 3 + 4 + 7 + 8 + 9 = 31
             Bucket { name: FREE.to_string(), size: 2 },
             Bucket { name: PAGER_TOTAL.to_string(), size: 14 },
@@ -425,9 +425,9 @@ mod tests {
         )
         .unwrap();
         let expected_buckets = vec![
-            Bucket { name: "matched".to_string(), size: 2048 }, // Both VMOs are matched => 1024 + 1024 = 2048
+            Bucket { name: "matched".to_string(), size: 1024 }, // Both VMOs are matched => 512 + 512 = 1024
             Bucket { name: UNDIGESTED.to_string(), size: 0 },   // No unmatched VMO
-            Bucket { name: ORPHANED.to_string(), size: 7952 }, // Two matched VMO => 10000 - 1024 - 1024 = 7952
+            Bucket { name: ORPHANED.to_string(), size: 8976 }, // Two matched VMO => 10000 - 512 - 512 = 8976
             Bucket { name: KERNEL.to_string(), size: 31 }, // wired + heap + mmu + ipc + other => 3 + 4 + 7 + 8 + 9 = 31
             Bucket { name: FREE.to_string(), size: 2 },
             Bucket { name: PAGER_TOTAL.to_string(), size: 14 },
@@ -458,9 +458,9 @@ mod tests {
         )
         .unwrap();
         let expected_buckets = vec![
-            Bucket { name: "matched".to_string(), size: 1024 }, // One VMO is matched, the other is not
-            Bucket { name: UNDIGESTED.to_string(), size: 1024 }, // One unmatched VMO
-            Bucket { name: ORPHANED.to_string(), size: 8976 }, // One matched VMO => 10000 - 1024 = 8976
+            Bucket { name: "matched".to_string(), size: 512 }, // One VMO is matched, the other is not
+            Bucket { name: UNDIGESTED.to_string(), size: 512 }, // One unmatched VMO
+            Bucket { name: ORPHANED.to_string(), size: 9488 }, // One matched VMO => 10000 - 512 = 9488
             Bucket { name: KERNEL.to_string(), size: 31 }, // wired + heap + mmu + ipc + other => 3 + 4 + 7 + 8 + 9 = 31
             Bucket { name: FREE.to_string(), size: 2 },
             Bucket { name: PAGER_TOTAL.to_string(), size: 14 },
