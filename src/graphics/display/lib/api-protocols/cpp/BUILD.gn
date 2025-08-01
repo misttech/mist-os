@@ -74,8 +74,6 @@ test_sources = [
   "mock-backlight.h",
   "mock-banjo-display-engine-listener.cc",
   "mock-banjo-display-engine-listener.h",
-  "mock-display-engine-for-out-of-tree.cc",
-  "mock-display-engine-for-out-of-tree.h",
   "mock-display-engine.cc",
   "mock-display-engine.h",
   "mock-fidl-display-engine-listener.cc",

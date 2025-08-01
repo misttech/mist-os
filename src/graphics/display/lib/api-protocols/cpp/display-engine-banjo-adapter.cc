@@ -135,7 +135,11 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     return display::ConfigCheckResult::kInvalidConfig.ToBanjo();
   }
 
+  // This adapter does not currently support non-identity color correction.
   display::ColorConversion color_conversion(banjo_display_config->color_conversion);
+  if (color_conversion != display::ColorConversion::kIdentity) {
+    return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
+  }
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -144,9 +148,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     layers.emplace_back(banjo_layer);
   }
 
-  display::ConfigCheckResult config_check_result =
-      engine_.CheckConfiguration(display::DisplayId(banjo_display_config->display_id),
-                                 display::ModeId(1), color_conversion, layers);
+  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
+      display::DisplayId(banjo_display_config->display_id), display::ModeId(1), layers);
   return config_check_result.ToBanjo();
 }
 
@@ -167,8 +170,9 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   // This adapter does not currently support non-identity color correction.
   ZX_DEBUG_ASSERT_MSG(display::ColorConversion::IsValid(banjo_display_config->color_conversion),
                       "Display coordinator applied rejected invalid color-correction config");
-
-  display::ColorConversion color_conversion(banjo_display_config->color_conversion);
+  ZX_DEBUG_ASSERT_MSG(display::ColorConversion(banjo_display_config->color_conversion) ==
+                          display::ColorConversion::kIdentity,
+                      "Display coordinator applied rejected non-identity color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -178,7 +182,7 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   }
 
   engine_.ApplyConfiguration(display::DisplayId(banjo_display_config->display_id),
-                             display::ModeId(1), color_conversion, layers,
+                             display::ModeId(1), layers,
                              display::DriverConfigStamp(*banjo_config_stamp));
 }
 

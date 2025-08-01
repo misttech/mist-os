@@ -53,11 +53,10 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   using ReleaseImageChecker = fit::function<void(display::DriverImageId driver_image_id)>;
   using CheckConfigurationChecker = fit::function<display::ConfigCheckResult(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers)>;
+      cpp20::span<const display::DriverLayer> layers)>;
   using ApplyConfigurationChecker = fit::function<void(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
-      display::DriverConfigStamp config_stamp)>;
+      cpp20::span<const display::DriverLayer> layers, display::DriverConfigStamp config_stamp)>;
   using SetBufferCollectionConstraintsChecker =
       fit::function<zx::result<>(const display::ImageBufferUsage& image_buffer_usage,
                                  display::DriverBufferCollectionId buffer_collection_id)>;
@@ -112,10 +111,8 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   void ReleaseImage(display::DriverImageId driver_image_id) override;
   display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      display::ColorConversion color_conversion,
       cpp20::span<const display::DriverLayer> layers) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
-                          display::ColorConversion color_conversion,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override;
   zx::result<> SetBufferCollectionConstraints(

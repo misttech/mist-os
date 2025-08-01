@@ -141,7 +141,12 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
     return;
   }
 
+  // This adapter does not currently support non-identity color correction.
   display::ColorConversion color_conversion(display_config.color_conversion);
+  if (color_conversion != display::ColorConversion::kIdentity) {
+    completer.buffer(arena).ReplyError(display::ConfigCheckResult::kUnsupportedConfig.ToFidl());
+    return;
+  }
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -151,7 +156,7 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
   }
 
   display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::DisplayId(display_config.display_id), display::ModeId(1), color_conversion, layers);
+      display::DisplayId(display_config.display_id), display::ModeId(1), layers);
 
   if (config_check_result != display::ConfigCheckResult::kOk) {
     completer.buffer(arena).ReplyError(config_check_result.ToFidl());
@@ -178,8 +183,9 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
   // This adapter does not currently support non-identity color correction.
   ZX_DEBUG_ASSERT_MSG(display::ColorConversion::IsValid(display_config.color_conversion),
                       "Display coordinator applied rejected invalid color-correction config");
-
-  display::ColorConversion color_conversion(display_config.color_conversion);
+  ZX_DEBUG_ASSERT_MSG(display::ColorConversion(display_config.color_conversion) ==
+                          display::ColorConversion::kIdentity,
+                      "Display coordinator applied rejected non-identity color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -189,8 +195,7 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
   }
 
   engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), display::ModeId(1),
-                             color_conversion, layers,
-                             display::DriverConfigStamp(request->config_stamp));
+                             layers, display::DriverConfigStamp(request->config_stamp));
   completer.buffer(arena).Reply();
 }
 

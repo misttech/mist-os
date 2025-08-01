@@ -203,7 +203,7 @@ void MockDisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 
 display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
     display::DisplayId display_id, display::ModeId display_mode_id,
-    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers) {
+    cpp20::span<const display::DriverLayer> layers) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];
@@ -211,13 +211,11 @@ display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
 
   ZX_ASSERT_MSG(call_expectation.check_configuration_checker != nullptr,
                 "Received call type does not match expected call type");
-  return call_expectation.check_configuration_checker(display_id, display_mode_id, color_conversion,
-                                                      layers);
+  return call_expectation.check_configuration_checker(display_id, display_mode_id, layers);
 }
 
 void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
                                            display::ModeId display_mode_id,
-                                           display::ColorConversion color_conversion,
                                            cpp20::span<const display::DriverLayer> layers,
                                            display::DriverConfigStamp config_stamp) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -227,8 +225,7 @@ void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
 
   ZX_ASSERT_MSG(call_expectation.apply_configuration_checker != nullptr,
                 "Received call type does not match expected call type");
-  call_expectation.apply_configuration_checker(display_id, display_mode_id, color_conversion,
-                                               layers, config_stamp);
+  call_expectation.apply_configuration_checker(display_id, display_mode_id, layers, config_stamp);
 }
 
 zx::result<> MockDisplayEngine::SetBufferCollectionConstraints(
