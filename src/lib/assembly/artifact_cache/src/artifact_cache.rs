@@ -18,7 +18,8 @@ impl ArtifactCache {
     /// Construct a new ArtifactCache.
     pub fn new() -> Self {
         let home = std::env::home_dir().unwrap();
-        let cache = Utf8PathBuf::from_path_buf(home.join(".cipd_cache")).unwrap();
+        let home = Utf8PathBuf::from_path_buf(home).unwrap();
+        let cache = home.join(".fuchsia").join("cipd");
         let ensured_artifacts = cache.join("artifacts");
         Self { cache, ensured_artifacts }
     }
