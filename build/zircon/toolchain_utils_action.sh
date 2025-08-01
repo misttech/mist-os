@@ -11,9 +11,10 @@
 # This runs PROGRAM ARG... with some special handling.
 # It always writes DEPFILE with OUTPUT as its target.
 #
-# For each ARG that is "@RSPFILE", RSPFILE should contain nothing
-# but file names, one per line.  Each such file will be added as
-# an input in the depfile.
+# For each ARG that is "@RSPFILE", RSPFILE should contain nothing but file
+# names, one per line.  Each such file will be added as an input in the
+# depfile.  If a line starts with `-` then it's treated as a switch rather than
+# a file name.
 #
 # Most toolchain utilities handle "@RSPFILE" syntax themselves, so we let them
 # do so after scanning RSPFILE to collect dependencies.  However, for certain
@@ -41,7 +42,9 @@ ARGS=()
 read_rspfile() {
   local file
   while read file; do
-    INPUTS+=("$file")
+    if [[ "$file" != -* ]]; then
+      INPUTS+=("$file")
+    fi
     if $expand_rspfile; then
       ARGS+=("$file")
     fi
