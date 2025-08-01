@@ -8,7 +8,7 @@ dill # github.com/uqfoundation/dill
 isort # github.com/PyCQA/isort
 mccabe # github.com/PyCQA/mccabe
 mypy_extensions # github.com/python/mypy_extensions
-platformdirs # github.com/platformdirs/platformdirs
+platformdirs==4.1.0 # github.com/platformdirs/platformdirs
 pyflakes # github.com/PyCQA/pyflakes
 tomlkit # github.com/sdispater/tomlkit
 typing_extensions # github.com/python/typing_extensions
