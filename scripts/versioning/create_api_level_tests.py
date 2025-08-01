@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-import update_platform_version
+import create_api_level
 
 FAKE_VERSION_HISTORY_FILE_CONTENT = """{
     "data": {
@@ -54,7 +54,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         mock_secrets.return_value = 0x1234ABC
 
         self.assertTrue(
-            update_platform_version.update_version_history(
+            create_api_level.update_version_history(
                 NEW_API_LEVEL, self.fake_version_history_file
             )
         )
@@ -83,7 +83,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
             )
 
         self.assertFalse(
-            update_platform_version.update_version_history(
+            create_api_level.update_version_history(
                 NEW_API_LEVEL, self.fake_version_history_file
             )
         )
@@ -95,7 +95,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         mock_secrets.side_effect = [0x1, 0x4321CBA]
 
         self.assertTrue(
-            update_platform_version.update_version_history(
+            create_api_level.update_version_history(
                 NEW_API_LEVEL, self.fake_version_history_file
             )
         )

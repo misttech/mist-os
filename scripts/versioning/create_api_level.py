@@ -10,6 +10,7 @@ import argparse
 import fileinput
 import json
 import os
+import pathlib
 import secrets
 import sys
 
@@ -113,18 +114,24 @@ Did you run this script from the root of the source tree?""",
         return False
 
 
+SDK_VERSION_HISTORY_PATH = "sdk/version_history.json"
+AVAILABILITY_LEVELS_INC_PATH = (
+    "zircon/system/public/zircon/availability_levels.inc"
+)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--new-api-level", type=int, required=True)
-    parser.add_argument("--sdk-version-history-path", required=True)
-    parser.add_argument("--availability-levels-file-path", required=True)
-    parser.add_argument("--root-source-dir", required=True)
+    parser.add_argument("--root-source-dir", type=pathlib.Path, required=True)
 
     args = parser.parse_args()
 
     new_level = args.new_api_level
 
-    if not update_version_history(new_level, args.sdk_version_history_path):
+    if not update_version_history(
+        new_level, args.root_source_dir.joinpath(SDK_VERSION_HISTORY_PATH)
+    ):
         return 1
 
     level_dir_path = os.path.join(
@@ -146,25 +153,15 @@ def main() -> int:
     # to regenerate `availability_levels_file_path` twice but would include a
     # preprocessor condition in the production code. Do the same for the Rust
     # macros.
-    sysroot_api_file = "zircon/public/sysroot_sdk/sysroot.api"
     if not _update_availability_levels(
-        new_level, args.availability_levels_file_path
+        new_level, args.root_source_dir.joinpath(AVAILABILITY_LEVELS_INC_PATH)
     ):
         return 1
 
-    # Before printing, rebase the paths to what a developer would use from `//`.
-    history = os.path.relpath(
-        args.sdk_version_history_path, args.root_source_dir
-    )
-    level_dir = os.path.relpath(level_dir_path, args.root_source_dir)
-    availability_levels_file = os.path.relpath(
-        args.availability_levels_file_path, args.root_source_dir
-    )
     print(
         f"""
 API level {new_level} has been added.
-Now run `fx build //zircon/public/sysroot_sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}` (unless `update_goldens=true`).
-Then run `git add -u {history} {availability_levels_file} {sysroot_api_file} && git add {level_dir}`."""
+"""
     )
     return 0
 

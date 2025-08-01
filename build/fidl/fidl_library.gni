@@ -483,28 +483,6 @@ template("fidl_library") {
   if (requires_compatibility_tests) {
     api_levels = platform_version.frozen_api_levels
 
-    # Include the next numbered API level when bumping the API level.
-    # This assumes that the highest numbered API level is frozen.
-    # Note: This only affects the per-level FIDL compilation below and does not
-    # affect the rest of the build or sub-builds.
-    if (bump_api_level) {
-      _max_frozen_api_level = 0
-      foreach(level, platform_version.frozen_api_levels) {
-        if (level > _max_frozen_api_level) {
-          _max_frozen_api_level = level
-        }
-      }
-      next_numbered_api_level = _max_frozen_api_level + 1
-
-      foreach(level, platform_version.all_numbered_api_levels) {
-        assert(
-            level < next_numbered_api_level,
-            "There is an (unfrozen) API level ${level} greater than or equal to the new API level ${next_numbered_api_level}.")
-      }
-
-      api_levels += [ next_numbered_api_level ]
-    }
-
     api_levels += [
       "NEXT",
       "HEAD",
