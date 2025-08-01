@@ -1463,33 +1463,29 @@ void Flatland::SetImageDestinationSize(ContentId image_id, fuchsia_math::SizeU s
 
 void Flatland::SetImageBlendingFunction(SetImageBlendingFunctionRequest& request,
                                         SetImageBlendingFunctionCompleter::Sync& completer) {
-  SetImageBlendMode(request.image_id(), BlendMode::From(request.blend_mode()));
+  SetImageBlendingFunction(request.image_id(), BlendMode::From(request.blend_mode()));
 }
 
-void Flatland::SetImageBlendMode(SetImageBlendModeRequest& request,
-                                 SetImageBlendModeCompleter::Sync& completer) {
-  SetImageBlendMode(request.image_id(), BlendMode::From(request.blend_mode()));
-}
-
-void Flatland::SetImageBlendMode(ContentId image_identifier, BlendMode blend_mode) {
+void Flatland::SetImageBlendingFunction(ContentId image_identifier, BlendMode blend_mode) {
   const uint64_t image_id = image_identifier.value();
 
   if (image_id == kInvalidId) {
-    error_reporter_->ERROR() << "SetImageBlendMode called with content id 0";
+    error_reporter_->ERROR() << "SetImageBlendingFunction called with content id 0";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
   auto content_kv = content_handles_.find(image_id);
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetImageBlendMode called with non-existent image_id " << image_id;
+    error_reporter_->ERROR() << "SetImageBlendingFunction called with non-existent image_id "
+                             << image_id;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
   auto image_kv = image_metadatas_.find(content_kv->second);
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "SetImageBlendMode called on non-image content.";
+    error_reporter_->ERROR() << "SetImageBlendingFunction called on non-image content.";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }

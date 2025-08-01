@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
-#include <lib/syslog/cpp/macros.h>
 
 #include <cstdint>
 
@@ -52,8 +51,6 @@ class BlendMode {
   // our supported designated initializer syntax.
   [[nodiscard]] static constexpr BlendMode From(const fuchsia_ui_composition::BlendMode& fidl_mode);
   [[nodiscard]] static constexpr BlendMode From(
-      const fuchsia_ui_composition::BlendMode2& fidl_mode);
-  [[nodiscard]] static constexpr BlendMode From(
       const fuchsia_hardware_display_types::wire::AlphaMode& fidl_mode);
 
   // Static "constructors".
@@ -73,7 +70,6 @@ class BlendMode {
   friend constexpr bool operator!=(const BlendMode& lhs, const BlendMode& rhs);
 
   constexpr fuchsia_ui_composition::BlendMode ToFlatlandBlendMode() const;
-  constexpr fuchsia_ui_composition::BlendMode2 ToFlatlandBlendMode2() const;
   constexpr fuchsia_hardware_display_types::wire::AlphaMode ToDisplayAlphaMode() const;
 
   // Used for hashing/printing/etc; not useful for general users.
@@ -92,21 +88,6 @@ constexpr BlendMode BlendMode::From(const fuchsia_ui_composition::BlendMode& fid
       return BlendMode::kReplace();
     case fuchsia_ui_composition::BlendMode::kSrcOver:
       return BlendMode::kPremultipliedAlpha();
-  }
-}
-
-// static
-constexpr BlendMode BlendMode::From(const fuchsia_ui_composition::BlendMode2& fidl_mode) {
-  switch (fidl_mode) {
-    case fuchsia_ui_composition::BlendMode2::kReplace:
-      return BlendMode::kReplace();
-    case fuchsia_ui_composition::BlendMode2::kPremultipliedAlpha:
-      return BlendMode::kPremultipliedAlpha();
-    case fuchsia_ui_composition::BlendMode2::kStraightAlpha:
-      return BlendMode::kStraightAlpha();
-    default:
-      FX_LOGS(ERROR) << "Unsupported BlendMode, defaulting to REPLACE BlendMode";
-      return BlendMode::kReplace();
   }
 }
 
@@ -150,17 +131,6 @@ constexpr fuchsia_ui_composition::BlendMode BlendMode::ToFlatlandBlendMode() con
       ZX_ASSERT_MSG(false,
                     "No conversion from kStraightAlpha to fuchsia_ui_composition::BlendMode");
       return fuchsia_ui_composition::BlendMode::kSrcOver;
-  }
-}
-
-constexpr fuchsia_ui_composition::BlendMode2 BlendMode::ToFlatlandBlendMode2() const {
-  switch (val_) {
-    case BlendMode::Enum::kReplace:
-      return fuchsia_ui_composition::BlendMode2::kReplace;
-    case BlendMode::Enum::kPremultipliedAlpha:
-      return fuchsia_ui_composition::BlendMode2::kPremultipliedAlpha;
-    case BlendMode::Enum::kStraightAlpha:
-      return fuchsia_ui_composition::BlendMode2::kStraightAlpha;
   }
 }
 

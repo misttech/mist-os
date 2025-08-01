@@ -1686,25 +1686,21 @@ TEST_F(FlatlandTest, SetImageBlendFunctionErrorCases) {
   // Zero is not a valid content ID.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageBlendMode({0}, BlendMode::kReplace());
+    flatland->SetImageBlendingFunction({0}, BlendMode::kReplace());
     PRESENT(flatland, false);
   }
 
   // Content does not exist.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageBlendMode(kIdNotCreated, BlendMode::kReplace());
+    flatland->SetImageBlendingFunction(kIdNotCreated, BlendMode::kReplace());
     PRESENT(flatland, false);
   }
 }
 
-class FlatlandParameterizedTest : public FlatlandTest,
-                                  public ::testing::WithParamInterface<BlendMode> {};
-
 // Make sure that the data for setting the blend mode gets passed to
 // the uberstruct correctly.
-TEST_P(FlatlandParameterizedTest, SetImageBlendModeUberstructTest) {
-  const BlendMode blend_mode_param = GetParam();
+TEST_F(FlatlandTest, SetImageBlendFunctionUberstructTest) {
   const ContentId kImageId1 = {1};
   const ContentId kImageId2 = {2};
   const TransformId kTransformId1 = {3};
@@ -1734,7 +1730,7 @@ TEST_P(FlatlandParameterizedTest, SetImageBlendModeUberstructTest) {
     flatland->CreateTransform(kTransformId1);
     flatland->SetRootTransform(kTransformId1);
     flatland->SetContent(kTransformId1, kImageId1);
-    flatland->SetImageBlendMode(kImageId1, BlendMode::kReplace());
+    flatland->SetImageBlendingFunction(kImageId1, BlendMode::kReplace());
     PRESENT(flatland, true);
   }
 
@@ -1755,7 +1751,7 @@ TEST_P(FlatlandParameterizedTest, SetImageBlendModeUberstructTest) {
     flatland->CreateTransform(kTransformId2);
     flatland->AddChild(kTransformId1, kTransformId2);
     flatland->SetContent(kTransformId2, kImageId2);
-    flatland->SetImageBlendMode(kImageId2, blend_mode_param);
+    flatland->SetImageBlendingFunction(kImageId2, BlendMode::kPremultipliedAlpha());
     PRESENT(flatland, true);
   }
 
@@ -1782,12 +1778,8 @@ TEST_P(FlatlandParameterizedTest, SetImageBlendModeUberstructTest) {
 
   // Make sure the opacity fields are set properly.
   EXPECT_TRUE(image_1_kv->second.blend_mode == BlendMode::kReplace());
-  EXPECT_TRUE(image_2_kv->second.blend_mode == blend_mode_param);
+  EXPECT_TRUE(image_2_kv->second.blend_mode == BlendMode::kPremultipliedAlpha());
 }
-
-INSTANTIATE_TEST_SUITE_P(SetBlendModes, FlatlandParameterizedTest,
-                         ::testing::Values(BlendMode::kPremultipliedAlpha(),
-                                           BlendMode::kStraightAlpha()));
 
 TEST_F(FlatlandTest, SetImageFlipErrorCases) {
   const ContentId kIdNotCreated = {1};

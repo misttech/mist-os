@@ -854,8 +854,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
     // When we are not in protected mode, replace any protected content with black solid color.
     if (!render_in_protected_mode && texture_ptr->image()->use_protected_memory()) {
       textures.emplace_back(local_texture_map.at(allocation::kInvalidImageId));
-      color_data.emplace_back(kProtectedReplacementColorInRGBA,
-                              escher::RectangleCompositor::Opacity::Opaque);
+      color_data.emplace_back(kProtectedReplacementColorInRGBA, /*is_opaque=*/true);
       continue;
     }
 
@@ -864,19 +863,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     const glm::vec4 multiply(image.multiply_color[0], image.multiply_color[1],
                              image.multiply_color[2], image.multiply_color[3]);
-    escher::RectangleCompositor::Opacity opacity;
-    switch (image.blend_mode.enum_value()) {
-      case BlendMode::Enum::kReplace:
-        opacity = escher::RectangleCompositor::Opacity::Opaque;
-        break;
-      case BlendMode::Enum::kPremultipliedAlpha:
-        opacity = escher::RectangleCompositor::Opacity::Translucent;
-        break;
-      case BlendMode::Enum::kStraightAlpha:
-        opacity = escher::RectangleCompositor::Opacity::NonPremultipliedTranslucent;
-        break;
-    }
-    color_data.emplace_back(multiply, opacity);
+    color_data.emplace_back(multiply, image.blend_mode == BlendMode::kReplace());
   }
 
   // Grab the output image and use it to generate a depth texture. The depth texture needs to

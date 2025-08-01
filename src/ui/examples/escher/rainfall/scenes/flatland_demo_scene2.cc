@@ -29,8 +29,7 @@ void FlatlandDemoScene2::Init() {
     float a = static_cast<float>(static_cast<double>(rand()) / (RAND_MAX));
 
     Rectangle2D renderable(vec2(x_orig, y_orig), vec2(width, height));
-    RectangleCompositor::ColorData color_data(vec4(r, g, b, a),
-                                              RectangleCompositor::Opacity::Translucent);
+    RectangleCompositor::ColorData color_data(vec4(r, g, b, a), /*is_opaque*/ false);
     renderables_.emplace_back(renderable);
     color_data_.emplace_back(color_data);
     fall_speed_[i] = rand() % 6 + 1;
@@ -50,7 +49,7 @@ void FlatlandDemoScene2::Update(const escher::Stopwatch& stopwatch) {
     vec2 origin = renderables_[i].origin;
     vec2 extent = renderables_[i].extent;
     vec4 color = color_data_[i].color;
-    RectangleCompositor::Opacity opacity = color_data_[i].opacity;
+    bool opaque = color_data_[i].is_opaque;
     origin.y += static_cast<float>(fall_speed_[i]);
     if (renderables_[i].origin.y >= 1140) {
       int x_orig = rand() % 2160;
@@ -66,7 +65,7 @@ void FlatlandDemoScene2::Update(const escher::Stopwatch& stopwatch) {
     }
 
     Rectangle2D renderable(origin, extent);
-    RectangleCompositor::ColorData meta(color, opacity);
+    RectangleCompositor::ColorData meta(color, opaque);
     renderables.emplace_back(renderable);
     color_data.emplace_back(meta);
   }

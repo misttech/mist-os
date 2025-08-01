@@ -2048,11 +2048,6 @@ bool operator<=(const glm::tvec4<int, glm::packed_highp>& a,
 }
 
 MATCHER_P2(InRange, low, high, "") { return low <= arg && arg <= high; }
-
-class VulkanRendererParameterizedMultiplyColorTest
-    : public VulkanRendererTest,
-      public ::testing::WithParamInterface<BlendMode> {};
-
 // Tests the multiply color for images, which can also affect transparency.
 // Render two overlapping rectangles, a red opaque one covered slightly by
 // a green transparent one with an alpha of 0.5. These values are set not
@@ -2066,7 +2061,7 @@ class VulkanRendererParameterizedMultiplyColorTest
 // ----------------
 // ----------------
 // ----------------
-VK_TEST_P(VulkanRendererParameterizedMultiplyColorTest, MultiplyColorTest) {
+VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
@@ -2083,7 +2078,6 @@ VK_TEST_P(VulkanRendererParameterizedMultiplyColorTest, MultiplyColorTest) {
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
 
-  const BlendMode blend_mode = GetParam();
   const uint32_t kTargetWidth = 16;
   const uint32_t kTargetHeight = 8;
 
@@ -2101,7 +2095,7 @@ VK_TEST_P(VulkanRendererParameterizedMultiplyColorTest, MultiplyColorTest) {
                                       .width = 1,
                                       .height = 1,
                                       .multiply_color = {1, 0, 0, 1},
-                                      .blend_mode = blend_mode};
+                                      .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Create the texture that will go on the transparent renderable.
   ImageMetadata transparent_texture = {.collection_id = collection_id,
@@ -2110,7 +2104,7 @@ VK_TEST_P(VulkanRendererParameterizedMultiplyColorTest, MultiplyColorTest) {
                                        .width = 1,
                                        .height = 1,
                                        .multiply_color = {0, 1, 0, 0.5},
-                                       .blend_mode = blend_mode};
+                                       .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Import all the images.
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
@@ -2142,67 +2136,39 @@ VK_TEST_P(VulkanRendererParameterizedMultiplyColorTest, MultiplyColorTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
-                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   uint8_t linear_vals[num_bytes];
-                   sRGBtoLinear(vmo_host, linear_vals, num_bytes);
+  MapHostPointer(
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        uint8_t linear_vals[num_bytes];
+        sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
-                   // Different platforms have slightly different sRGB<->linear conversions, so use
-                   // fuzzy matching. Offset for Intel Gen:
-                   constexpr uint32_t kLoOfs = -1;
-                   // Offset for ARM Mali:
-                   constexpr uint32_t kHiOfs = +1;
-                   glm::ivec4 kMultiLowVal;
-                   glm::ivec4 kMultiHighVal;
-                   glm::ivec4 kGreenLowVal;
-                   glm::ivec4 kGreenHighVal;
-                   switch (blend_mode.enum_value()) {
-                     case BlendMode::Enum::kPremultipliedAlpha:
-                       kMultiLowVal = glm::ivec4(127 + kLoOfs, 127 + kLoOfs, 0, 255);
-                       kMultiHighVal = glm::ivec4(127 + kHiOfs, 127 + kHiOfs, 0, 255);
-                       kGreenLowVal = glm::ivec4(0, 127 + kLoOfs, 0, 128);
-                       kGreenHighVal = glm::ivec4(0, 127 + kHiOfs, 0, 128);
-                       break;
-                     case BlendMode::Enum::kStraightAlpha:
-                       kMultiLowVal = glm::ivec4(127 + kLoOfs, 64 + kLoOfs, 0, 255);
-                       kMultiHighVal = glm::ivec4(127 + kHiOfs, 64 + kHiOfs, 0, 255);
-                       kGreenLowVal = glm::ivec4(0, 64 + kLoOfs, 0, 128);
-                       kGreenHighVal = glm::ivec4(0, 64 + kHiOfs, 0, 128);
-                       break;
-                     default:
-                       GTEST_FAIL() << "Unsupported blend mode";
-                       break;
-                   }
+        // Different platforms have slightly different sRGB<->linear conversions, so use fuzzy
+        // matching. Intel Gen value:
+        constexpr uint32_t kCompLow = 126;
+        // ARM Mali value:
+        constexpr uint32_t kCompHigh = 128;
+        const auto kLowValue = glm::ivec4(kCompLow, kCompLow, 0, 255);
+        const auto kHighValue = glm::ivec4(kCompHigh, kCompHigh, 0, 255);
 
-                   // Make sure the pixels are in the right order give that we rotated
-                   // the rectangle.
-                   EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 3), glm::ivec4(255, 0, 0, 255));
-                   EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 4), glm::ivec4(255, 0, 0, 255));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 3),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 4),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 8, 3),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 8, 4),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 9, 3),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 9, 4),
-                               InRange(kMultiLowVal, kMultiHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 10, 3),
-                               InRange(kGreenLowVal, kGreenHighVal));
-                   EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 10, 4),
-                               InRange(kGreenLowVal, kGreenHighVal));
+        // Make sure the pixels are in the right order give that we rotated
+        // the rectangle.
+        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 3), glm::ivec4(255, 0, 0, 255));
+        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 4), glm::ivec4(255, 0, 0, 255));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 3), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 4), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 8, 3), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 8, 4), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 9, 3), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 9, 4), InRange(kLowValue, kHighValue));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 10, 3),
+                    InRange(glm::ivec4(0, kCompLow, 0, 128), glm::ivec4(0, kCompHigh, 0, 128)));
+        EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 10, 4),
+                    InRange(glm::ivec4(0, kCompLow, 0, 128), glm::ivec4(0, kCompHigh, 0, 128)));
 
-                   // Make sure the remaining pixels are black.
-                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, 10U);
-                 });
+        // Make sure the remaining pixels are black.
+        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, 10U);
+      });
 }
-
-INSTANTIATE_TEST_SUITE_P(BlendModes, VulkanRendererParameterizedMultiplyColorTest,
-                         ::testing::Values(BlendMode::kPremultipliedAlpha(),
-                                           BlendMode::kStraightAlpha()));
 
 class VulkanRendererParameterizedYuvTest
     : public VulkanRendererTest,
