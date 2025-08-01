@@ -17,7 +17,6 @@ rustc_test("tests") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/sys/component_manager/lib/router_error",
     "//src/sys/component_manager/lib/sandbox",
 
