@@ -429,10 +429,10 @@ zx::result<> TestFidlClient::SetVirtconMode(
     fuchsia_hardware_display::wire::VirtconMode virtcon_mode) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetVirtconMode(virtcon_mode);
-  if (!fidl_status.ok()) {
-    fdf::error("SetVirtconMode() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetVirtconMode(virtcon_mode);
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetVirtconMode() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -442,11 +442,11 @@ zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event
 
   const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->ImportEvent(std::move(event), fidl_event_id);
-  if (!fidl_status.ok()) {
-    fdf::error("ImportEvent() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("ImportEvent() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -454,21 +454,22 @@ zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event
 zx::result<display::LayerId> TestFidlClient::CreateLayer() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CreateLayer> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CreateLayer> fidl_transport_result =
       coordinator_fidl_client_->CreateLayer();
-  if (!fidl_status.ok()) {
-    fdf::error("CreateLayer() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("CreateLayer() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
   const fit::result<zx_status_t, fuchsia_hardware_display::wire::CoordinatorCreateLayerResponse*>&
-      fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("CreateLayer() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+      fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("CreateLayer() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
 
-  return zx::ok(display::LayerId(fidl_value.value()->layer_id));
+  return zx::ok(display::LayerId(fidl_domain_result.value()->layer_id));
 }
 
 zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_metadata,
@@ -480,18 +481,19 @@ zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_met
       buffer_collection_id.ToFidl();
   const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_transport_result =
       coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_buffer_collection_id,
                                             buffer_index, fidl_image_id);
-  if (!fidl_status.ok()) {
-    fdf::error("ImportImage() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("ImportImage() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("ImportImage() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("ImportImage() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -510,12 +512,12 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
     fidl_layer_ids.push_back(fidl_layer_id);
   }
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetDisplayLayers(
+  const fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetDisplayLayers(
       display_id.ToFidl(),
       fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layer_ids));
-  if (!fidl_status.ok()) {
-    fdf::error("SetDisplayLayers() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetDisplayLayers() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -528,11 +530,11 @@ zx::result<> TestFidlClient::SetLayerPrimaryConfig(display::LayerId layer_id,
   const fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
       image_metadata.ToFidl();
 
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->SetLayerPrimaryConfig(fidl_layer_id, fidl_image_metadata);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -545,11 +547,11 @@ zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::I
   const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
   const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_event_id);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerImage2() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerImage2() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -568,11 +570,11 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
       .height = static_cast<uint32_t>(fullscreen_metadata.height()),
   };
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerColorConfig(
+  const fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetLayerColorConfig(
       fidl_layer_id, fidl_fallback_color, display_destination);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerColorConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerColorConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -580,22 +582,23 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
 zx::result<display::ConfigCheckResult> TestFidlClient::CheckConfig() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_transport_result =
       coordinator_fidl_client_->CheckConfig();
-  if (!fidl_status.ok()) {
-    fdf::error("CheckConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("CheckConfig() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
-  const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_result =
-      fidl_status.value();
-  fuchsia_hardware_display_types::wire::ConfigResult fidl_config_check_result = fidl_result.res;
+  const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_domain_result =
+      fidl_transport_result.value();
+  fuchsia_hardware_display_types::wire::ConfigResult fidl_config_check_result =
+      fidl_domain_result.res;
   if (!display::ConfigCheckResult::IsValid(fidl_config_check_result)) {
     fdf::error("CheckConfig() returned unrecognized code: {}",
                static_cast<uint32_t>(fidl_config_check_result));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  return zx::ok(display::ConfigCheckResult(fidl_result.res));
+  return zx::ok(display::ConfigCheckResult(fidl_domain_result.res));
 }
 
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
@@ -608,10 +611,11 @@ zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
           .stamp(fidl_config_stamp)
           .Build();
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->ApplyConfig3(std::move(request));
-  if (!fidl_status.ok()) {
-    fdf::error("ApplyConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  const fidl::OneWayStatus fidl_transport_status =
+      coordinator_fidl_client_->ApplyConfig3(std::move(request));
+  if (!fidl_transport_status.ok()) {
+    fdf::error("ApplyConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -621,11 +625,11 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
 
   const fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie =
       vsync_ack_cookie.ToFidl();
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->AcknowledgeVsync(fidl_vsync_ack_cookie.value);
-  if (!fidl_status.ok()) {
-    fdf::error("AcknowledgeVsync() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("AcknowledgeVsync() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -633,17 +637,18 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
 zx::result<> TestFidlClient::SetMinimumRgb(uint8_t minimum_rgb) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::SetMinimumRgb> fidl_status =
-      coordinator_fidl_client_->SetMinimumRgb(minimum_rgb);
-  if (!fidl_status.ok()) {
-    fdf::error("SetMinimumRgb() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::SetMinimumRgb>
+      fidl_transport_result = coordinator_fidl_client_->SetMinimumRgb(minimum_rgb);
+  if (!fidl_transport_result.ok()) {
+    fdf::error("SetMinimumRgb() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("SetMinimumRgb() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("SetMinimumRgb() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -782,15 +787,15 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
 
 zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
   EXPECT_TRUE(coordinator_fidl_client_);
-  fidl::WireResult<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp> fidl_status =
-      coordinator_fidl_client_->GetLatestAppliedConfigStamp();
-  if (!fidl_status.ok()) {
-    fdf::error("GetLatestAppliedConfigStamp() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>
+      fidl_transport_result = coordinator_fidl_client_->GetLatestAppliedConfigStamp();
+  if (!fidl_transport_result.ok()) {
+    fdf::error("GetLatestAppliedConfigStamp() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>&
-      fidl_value = fidl_status.value();
-  return zx::ok(display::ConfigStamp(fidl_value.stamp));
+      fidl_domain_result = fidl_transport_result.value();
+  return zx::ok(display::ConfigStamp(fidl_domain_result.stamp));
 }
 
 std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerConfig() {
@@ -812,19 +817,19 @@ zx::result<> TestFidlClient::ImportBufferCollection(
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
       buffer_collection_id.ToFidl();
 
-  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection> fidl_status =
-      coordinator_fidl_client_->ImportBufferCollection(fidl_buffer_collection_id,
-                                                       std::move(buffer_token));
-  if (!fidl_status.ok()) {
-    fdf::error("ImportBufferCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection>
+      fidl_transport_result = coordinator_fidl_client_->ImportBufferCollection(
+          fidl_buffer_collection_id, std::move(buffer_token));
+  if (!fidl_transport_result.ok()) {
+    fdf::error("ImportBufferCollection() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
-  if (fidl_result.is_error()) {
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
     fdf::error("ImportBufferCollection() returned error: {}",
-               zx::make_result(fidl_result.error_value()));
-    return zx::error(fidl_result.error_value());
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -838,18 +843,19 @@ zx::result<> TestFidlClient::SetBufferCollectionConstraints(
       image_buffer_usage.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::SetBufferCollectionConstraints>
-      fidl_status = coordinator_fidl_client_->SetBufferCollectionConstraints(
+      fidl_transport_result = coordinator_fidl_client_->SetBufferCollectionConstraints(
           fidl_buffer_collection_id, fidl_image_buffer_usage);
-  if (!fidl_status.ok()) {
-    fdf::error("SetBufferCollectionConstraints() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("SetBufferCollectionConstraints() failed: {}",
+               fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
-  if (fidl_result.is_error()) {
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
     fdf::error("SetBufferCollectionConstraints() failed: {}",
-               zx::make_result(fidl_result.error_value()));
-    return zx::error(fidl_result.error_value());
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -859,13 +865,13 @@ TestFidlClient::SysmemAllocateSharedCollection() {
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   fidl::Arena arena;
-  fidl::OneWayStatus fidl_status = sysmem_->AllocateSharedCollection(
+  fidl::OneWayStatus fidl_transport_status = sysmem_->AllocateSharedCollection(
       fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
           .token_request(std::move(token_server))
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("AllocateSharedCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("AllocateSharedCollection() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok(std::move(token_client));
 }
@@ -878,22 +884,23 @@ TestFidlClient::SysmemTokenDuplicateSync(
 
   fidl::Arena arena;
   static constexpr zx_rights_t kRightAttenunationMasks[] = {ZX_RIGHT_SAME_RIGHTS};
-  fidl::WireResult<fuchsia_sysmem2::BufferCollectionToken::DuplicateSync> fidl_status =
+  fidl::WireResult<fuchsia_sysmem2::BufferCollectionToken::DuplicateSync> fidl_transport_result =
       token->DuplicateSync(
           fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncRequest::Builder(arena)
               .rights_attenuation_masks(kRightAttenunationMasks)
               .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollectionToken.Duplicate() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("BufferCollectionToken.Duplicate() failed: {}",
+               fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_result =
-      fidl_status.value();
-  ZX_ASSERT(fidl_result.has_tokens());
-  ZX_ASSERT(fidl_result.tokens().size() == 1);
+  fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_domain_result =
+      fidl_transport_result.value();
+  ZX_ASSERT(fidl_domain_result.has_tokens());
+  ZX_ASSERT(fidl_domain_result.tokens().size() == 1);
 
-  return zx::ok(std::move(fidl_result.tokens()[0]));
+  return zx::ok(std::move(fidl_domain_result.tokens()[0]));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> TestFidlClient::SysmemTokenBind(
@@ -902,14 +909,14 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> TestFidlClient::S
       fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
   fidl::Arena arena;
-  fidl::OneWayStatus fidl_status = sysmem_->BindSharedCollection(
+  fidl::OneWayStatus fidl_transport_status = sysmem_->BindSharedCollection(
       fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
           .token(std::move(token))
           .buffer_collection_request(std::move(buffer_collection_server))
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BindSharedCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BindSharedCollection() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok(std::move(buffer_collection_client));
 }
@@ -919,44 +926,50 @@ zx::result<> TestFidlClient::SysmemBufferCollectionRelease(
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> buffer_collection_client(
       std::move(buffer_collection));
 
-  fidl::OneWayStatus fidl_status = buffer_collection_client->Release();
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollection.Release() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::OneWayStatus fidl_transport_status = buffer_collection_client->Release();
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BufferCollection.Release() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
 
 zx::result<size_t> TestFidlClient::SysmemWaitForAllBuffersAllocated(
     const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
-  fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated> fidl_status =
-      buffer_collection->WaitForAllBuffersAllocated();
-  if (!fidl_status.ok()) {
-    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated>
+      fidl_transport_result = buffer_collection->WaitForAllBuffersAllocated();
+  if (!fidl_transport_result.ok()) {
+    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse* fidl_result =
-      fidl_status->value();
-  ZX_DEBUG_ASSERT_MSG(fidl_result->has_buffer_collection_info(),
+  fit::result<fuchsia_sysmem2::wire::Error,
+              fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse*>&
+      fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("WaitForAllBufferAllocated() returned sysmem error code: {}",
+               static_cast<uint32_t>(fidl_domain_result.error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  ZX_DEBUG_ASSERT_MSG(fidl_domain_result.value()->has_buffer_collection_info(),
                       "Sysmem deviated from its contract");
-  ZX_DEBUG_ASSERT_MSG(fidl_result->buffer_collection_info().has_buffers(),
+  ZX_DEBUG_ASSERT_MSG(fidl_domain_result.value()->buffer_collection_info().has_buffers(),
                       "Sysmem deviated from its contract");
-  return zx::ok(fidl_result->buffer_collection_info().buffers().size());
+  return zx::ok(fidl_domain_result.value()->buffer_collection_info().buffers().size());
 }
 
 zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
     const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
   {
     fidl::Arena arena;
-    fidl::OneWayStatus fidl_status =
+    fidl::OneWayStatus fidl_transport_status =
         buffer_collection->SetName(fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena)
                                        .priority(10000u)
                                        .name("display-coordintator-tests")
                                        .Build());
-    if (!fidl_status.ok()) {
-      fdf::error("BufferCollection.SetName() failed: {}", fidl_status.status_string());
-      return zx::error(fidl_status.status());
+    if (!fidl_transport_status.ok()) {
+      fdf::error("BufferCollection.SetName() failed: {}", fidl_transport_status.status_string());
+      return zx::error(fidl_transport_status.status());
     }
   }
 
@@ -975,13 +988,14 @@ zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
                                      .ram_domain_supported(true)
                                      .Build());
 
-  fidl::OneWayStatus fidl_status = buffer_collection->SetConstraints(
+  fidl::OneWayStatus fidl_transport_status = buffer_collection->SetConstraints(
       fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
           .constraints(constraints_builder.Build())
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollection.SetConstraints() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BufferCollection.SetConstraints() failed: {}",
+               fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }

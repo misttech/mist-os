@@ -1234,13 +1234,13 @@ void Client::NotifyDisplayChanges(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
-  fidl::OneWayStatus fidl_status = coordinator_listener_->OnDisplaysChanged(
+  fidl::OneWayStatus fidl_transport_status = coordinator_listener_->OnDisplaysChanged(
       fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
           non_const_added_display_infos.data(), non_const_added_display_infos.size()),
       fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
           non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
-  if (!fidl_status.ok()) {
-    fdf::error("OnDisplaysChanged dispatch failed: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnDisplaysChanged dispatch failed: {}", fidl_transport_status.error());
   }
 }
 
@@ -1249,10 +1249,10 @@ void Client::NotifyOwnershipChange(bool client_has_ownership) {
     return;
   }
 
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
-  if (!fidl_status.ok()) {
-    fdf::error("OnClientOwnershipChange dispatch failed: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnClientOwnershipChange dispatch failed: {}", fidl_transport_status.error());
   }
 }
 
@@ -1263,10 +1263,10 @@ void Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic times
     return;
   }
 
-  fidl::OneWayStatus fidl_status = coordinator_listener_->OnVsync(
+  fidl::OneWayStatus fidl_transport_status = coordinator_listener_->OnVsync(
       display_id.ToFidl(), timestamp, config_stamp.ToFidl(), vsync_ack_cookie.ToFidl());
-  if (!fidl_status.ok()) {
-    fdf::error("OnNotifyVsync dispatch failed: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnNotifyVsync dispatch failed: {}", fidl_transport_status.error());
   }
 }
 
