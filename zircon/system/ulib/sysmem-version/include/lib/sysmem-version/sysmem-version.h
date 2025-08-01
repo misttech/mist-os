@@ -5,10 +5,6 @@
 #ifndef LIB_SYSMEM_VERSION_SYSMEM_VERSION_H_
 #define LIB_SYSMEM_VERSION_SYSMEM_VERSION_H_
 
-#ifndef _LIBCPP_ENABLE_HARDENED_MODE
-#define _LIBCPP_ENABLE_HARDENED_MODE 1
-#endif
-
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
