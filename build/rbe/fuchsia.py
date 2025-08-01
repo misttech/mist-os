@@ -622,3 +622,7 @@ def c_sysroot_files(
         libzircon_so = sysroot_dir / "lib/libzircon.so"
         if libzircon_so.is_file():
             yield libzircon_so
+
+
+def rust_source_file_listing_disabled(sources: Sequence[Path]) -> bool:
+    return len(sources) == 1 and sources[0].name == "__SKIP_ENFORCEMENT__.rs"

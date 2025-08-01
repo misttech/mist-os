@@ -287,6 +287,9 @@ template("rustc_artifact") {
       metadata = {
         test_component_manifest_program_barrier = [ ":${_actual_target_name}" ]
         link_output_barrier = [ ":${_actual_target_name}" ]
+
+        # Only include the actual target in the compilation deps metadata
+        rust_compilation_deps_barrier = [ ":${_actual_target_name}" ]
       }
     }
 

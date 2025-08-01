@@ -7304,6 +7304,7 @@ rustc_library("generator-v0_7_5") {
   visibility += [ ":loom-v0_7_1.rustdoc" ]
   visibility += [ ":loom-v0_7_1.aux.deps.deps" ]
   visibility += [ ":loom-v0_7_1.aux.deps.transdeps" ]
+  visibility += [ ":loom-v0_7_1.actual.rust_compilation_deps" ]
   testonly = true
   applicable_licenses = [ ":generator-v0_7_5.license" ]
 }
@@ -14488,18 +14489,22 @@ rustc_library("ring-v0_17_8") {
   visibility += [ ":rustls-v0_21_12.rustdoc" ]
   visibility += [ ":rustls-v0_21_12.aux.deps.deps" ]
   visibility += [ ":rustls-v0_21_12.aux.deps.transdeps" ]
+  visibility += [ ":rustls-v0_21_12.actual.rust_compilation_deps" ]
   visibility += [ ":rustls-webpki-v0_101_7.actual" ]
   visibility += [ ":rustls-webpki-v0_101_7.rustdoc" ]
   visibility += [ ":rustls-webpki-v0_101_7.aux.deps.deps" ]
   visibility += [ ":rustls-webpki-v0_101_7.aux.deps.transdeps" ]
+  visibility += [ ":rustls-webpki-v0_101_7.actual.rust_compilation_deps" ]
   visibility += [ ":sct-v0_7_1.actual" ]
   visibility += [ ":sct-v0_7_1.rustdoc" ]
   visibility += [ ":sct-v0_7_1.aux.deps.deps" ]
   visibility += [ ":sct-v0_7_1.aux.deps.transdeps" ]
+  visibility += [ ":sct-v0_7_1.actual.rust_compilation_deps" ]
   visibility += [ ":tuf-v0_3_0-beta13.actual" ]
   visibility += [ ":tuf-v0_3_0-beta13.rustdoc" ]
   visibility += [ ":tuf-v0_3_0-beta13.aux.deps.deps" ]
   visibility += [ ":tuf-v0_3_0-beta13.aux.deps.transdeps" ]
+  visibility += [ ":tuf-v0_3_0-beta13.actual.rust_compilation_deps" ]
 
   applicable_licenses = [ ":ring-v0_17_8.license" ]
 }
@@ -15616,6 +15621,7 @@ rustc_library("scoped-tls-v1_0_1") {
   visibility += [ ":loom-v0_7_1.rustdoc" ]
   visibility += [ ":loom-v0_7_1.aux.deps.deps" ]
   visibility += [ ":loom-v0_7_1.aux.deps.transdeps" ]
+  visibility += [ ":loom-v0_7_1.actual.rust_compilation_deps" ]
   testonly = true
   applicable_licenses = [ ":scoped-tls-v1_0_1.license" ]
 }

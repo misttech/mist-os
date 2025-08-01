@@ -118,6 +118,22 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help="Where to find libc++ (from clang)",
     )
 
+    # Use a GN-generated file for the transitive rlib and rmeta deps, instead
+    # of running rustc to scan for them.
+    parser.add_argument(
+        "--rust-compilation-deps-path",
+        type=Path,
+        default=None,
+        help="File of rlib, rmeta, and proc_macro paths needed for compilation",
+    )
+    # Use a GN-generated file for the set of source files needed instead
+    # of running rustc to scan for them.
+    parser.add_argument(
+        "--rust-sources-path",
+        type=Path,
+        default=None,
+        help="File of rust source files needed for compilation",
+    )
     return parser
 
 
@@ -212,7 +228,9 @@ class RustRemoteAction(object):
         host_platform: str | None = None,
         auto_reproxy: bool = True,  # Ok to disable during unit-tests
     ):
-        self._remote_action: remote_action.RemoteAction  # will be set by prepare() step
+        self._remote_action: (
+            remote_action.RemoteAction
+        )  # will be set by prepare() step
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
@@ -554,6 +572,26 @@ class RustRemoteAction(object):
     def _cleanup(self) -> None:
         _remove_files(self._cleanup_files)
 
+    def _rust_compilation_deps_inputs(self) -> Iterable[Path]:
+        """
+        Returns the list of compilation deps passed via the file given by --rust-compilation-deps-path
+        """
+        if self._main_args.rust_compilation_deps_path:
+            for (
+                p
+            ) in (
+                self._main_args.rust_compilation_deps_path.read_text().splitlines()
+            ):
+                yield Path(p)
+
+    def _rust_source_file_inputs(self) -> Iterable[Path]:
+        """
+        Returns the list of source files passed via the file given by --rust-sources-path
+        """
+        if self._main_args.rust_sources_path:
+            for p in self._main_args.rust_sources_path.read_text().splitlines():
+                yield Path(p)
+
     def _local_depfile_inputs(self) -> Iterable[Path]:
         # Generate a local depfile for the purposes of discovering
         # all transitive inputs.
@@ -563,7 +601,8 @@ class RustRemoteAction(object):
         cmd_str = cl_utils.command_quoted_str(dep_only_command)
 
         self.vmsg(f"scan-deps-only command: {cmd_str}")
-        dep_status = _make_local_depfile(dep_only_command)
+        with cl_utils.timer_cm("_make_local_depfile"):
+            dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:
             self._prepare_status = dep_status
             if self.verbose:
@@ -676,6 +715,27 @@ class RustRemoteAction(object):
         if libunwind_a.exists():
             yield self.value_verbose("libunwind", libunwind_a)
 
+    def _rust_stdlib_inputs(self) -> Iterable[Path]:
+        """Returns all the stdlib files
+
+        This is more than we need, but they'll be cached and it's faster than
+        running rustc to find out which specific files are needed.
+        """
+        if not self.target:
+            return
+        if not self.rust_sysroot:
+            raise ValueError("self.rust_sysroot is None")
+        stdlib_dir = (
+            self.rust_sysroot
+            / fuchsia.rust_stdlib_subdir(  # relative to self.working_dir
+                target_triple=self.target
+            )
+        )
+        if stdlib_dir.exists():
+            for p in stdlib_dir.iterdir():
+                if p.is_file():
+                    yield p
+
     def _inputs_from_env(self) -> Iterable[Path]:
         """Scan command environment variables for references to inputs files.
 
@@ -694,18 +754,41 @@ class RustRemoteAction(object):
 
     def _remote_inputs(self) -> Iterable[Path]:
         """Remote inputs are relative to current working dir."""
-        yield self.value_verbose(
-            "top source", self._rust_action.direct_sources[0]
-        )
+
+        _source_file_inputs = list(self._rust_source_file_inputs())
+
+        if fuchsia.rust_source_file_listing_disabled(_source_file_inputs):
+            # GN cannot provide a list of source files, so we'll need to run
+            # rustc to get the list.
+
+            with cl_utils.timer_cm("rustc scanned inputs"):
+                yield from self.yield_verbose(
+                    "rustc scan results",
+                    self._local_depfile_inputs(),
+                )
+
+            yield from self._rust_stdlib_libunwind_inputs()
+
+        else:
+            # Use GN-provided files of dependencies and source files
+            yield from self.yield_verbose(
+                "source files",
+                _source_file_inputs,
+            )
+            yield from self.yield_verbose(
+                "dependencies",
+                self._rust_compilation_deps_inputs(),
+            )
+            yield from self.yield_verbose(
+                "stdlib inputs",
+                self._rust_stdlib_inputs(),
+            )
 
         # Pass along response files without altering the original command.
         yield from self._rust_action.response_files
 
-        yield from self._local_depfile_inputs()
-
-        yield from self._remote_compiler_inputs()
-
-        yield from self._rust_stdlib_libunwind_inputs()
+        with cl_utils.timer_cm("remote_compiler_inputs"):
+            yield from self._remote_compiler_inputs()
 
         # Indirect dependencies (libraries)
         yield from self.yield_verbose(
@@ -790,7 +873,10 @@ class RustRemoteAction(object):
 
         # inputs and outputs are relative to current working dir
         try:
-            remote_inputs = list(self._remote_inputs())
+            with cl_utils.timer_cm(
+                "rustc_remote_wrapper getting remote inputs"
+            ):
+                remote_inputs = sorted(set(self._remote_inputs()))
         except RemoteInputProcessingError as e:
             msg(str(e))
             return 1

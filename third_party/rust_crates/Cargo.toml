@@ -614,6 +614,7 @@ visibility = [
   ":loom-v0_7_1.rustdoc",
   ":loom-v0_7_1.aux.deps.deps",
   ":loom-v0_7_1.aux.deps.transdeps",
+  ":loom-v0_7_1.actual.rust_compilation_deps",
 ]
 testonly = true
 deps = [
@@ -886,18 +887,22 @@ visibility = [
   ":rustls-v0_21_12.rustdoc",
   ":rustls-v0_21_12.aux.deps.deps",
   ":rustls-v0_21_12.aux.deps.transdeps",
+  ":rustls-v0_21_12.actual.rust_compilation_deps",
   ":rustls-webpki-v0_101_7.actual",
   ":rustls-webpki-v0_101_7.rustdoc",
   ":rustls-webpki-v0_101_7.aux.deps.deps",
   ":rustls-webpki-v0_101_7.aux.deps.transdeps",
+  ":rustls-webpki-v0_101_7.actual.rust_compilation_deps",
   ":sct-v0_7_1.actual",
   ":sct-v0_7_1.rustdoc",
   ":sct-v0_7_1.aux.deps.deps",
   ":sct-v0_7_1.aux.deps.transdeps",
+  ":sct-v0_7_1.actual.rust_compilation_deps",
   ":tuf-v0_3_0-beta13.actual",
   ":tuf-v0_3_0-beta13.rustdoc",
   ":tuf-v0_3_0-beta13.aux.deps.deps",
   ":tuf-v0_3_0-beta13.aux.deps.transdeps",
+  ":tuf-v0_3_0-beta13.actual.rust_compilation_deps",
 ]
 deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
 env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
@@ -989,6 +994,7 @@ visibility = [
   ":loom-v0_7_1.rustdoc",
   ":loom-v0_7_1.aux.deps.deps",
   ":loom-v0_7_1.aux.deps.transdeps",
+  ":loom-v0_7_1.actual.rust_compilation_deps",
 ]
 testonly = true
 
