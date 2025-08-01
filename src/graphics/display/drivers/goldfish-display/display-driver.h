@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_DRIVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
@@ -14,8 +15,8 @@
 #include <optional>
 
 #include "src/graphics/display/drivers/goldfish-display/display-engine.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 
 namespace goldfish {
 
@@ -35,18 +36,19 @@ class DisplayDriver : public fdf::DriverBase {
   zx::result<> Start() override;
 
  private:
+  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
   // Must outlive `display_engine_`.
   fdf::SynchronizedDispatcher display_event_dispatcher_;
 
-  // Must outlive `display_engine_` and `engine_fidl_adapter_`.
-  std::unique_ptr<display::DisplayEngineEventsFidl> engine_events_;
+  // Must outlive `display_engine_` and `engine_banjo_adapter_`.
+  std::unique_ptr<display::DisplayEngineEventsBanjo> engine_events_;
 
-  // Must outlive `engine_fidl_adapter_`.
+  // Must outlive `engine_banjo_adapter_`.
   std::unique_ptr<DisplayEngine> display_engine_;
 
-  std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
+  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
 };
 
 }  // namespace goldfish

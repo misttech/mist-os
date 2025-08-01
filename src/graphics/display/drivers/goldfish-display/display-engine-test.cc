@@ -21,7 +21,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -65,7 +65,7 @@ class GoldfishDisplayEngineTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher display_event_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
 
-  display::DisplayEngineEventsFidl engine_events_fidl_;
+  display::DisplayEngineEventsBanjo engine_events_banjo_;
   std::unique_ptr<DisplayEngine> display_engine_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
@@ -87,7 +87,7 @@ void GoldfishDisplayEngineTest::SetUp() {
   display_engine_ = std::make_unique<DisplayEngine>(
       std::move(control_client), std::move(pipe_client), std::move(sysmem_client),
       std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher(),
-      &engine_events_fidl_);
+      &engine_events_banjo_);
 
   // Call SetupPrimaryDisplayForTesting() so that we can set up the display
   // devices without any dependency on proper driver binding.
