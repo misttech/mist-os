@@ -42,7 +42,7 @@ pub struct UpdateTool {
     #[with(moniker("/core/system-update"))]
     commit_status_provider_proxy: CommitStatusProviderProxy,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    target_info: fho::Deferred<TargetInfoHolder>,
+    target_info: TargetInfoHolder,
 }
 
 fho::embedded_plugin!(UpdateTool);
@@ -92,7 +92,7 @@ impl UpdateTool {
             let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
                 self.rcs_proxy_connector.clone(),
-                self.target_info,
+                self.target_info.clone(),
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -202,7 +202,7 @@ impl UpdateTool {
             let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
                 self.rcs_proxy_connector.clone(),
-                self.target_info,
+                self.target_info.clone(),
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -784,7 +784,7 @@ mod tests {
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
-            target_info: fho::Deferred::from_output(Ok(target_info)),
+            target_info,
         };
         let buffers = TestBuffers::default();
         let writer = SimpleWriter::new_test(&buffers);
@@ -874,7 +874,7 @@ mod tests {
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
-            target_info: fho::Deferred::from_output(Ok(target_info)),
+            target_info,
         };
 
         let buffers = TestBuffers::default();

@@ -315,7 +315,7 @@ pub async fn serve_impl_validate_args(
 
 pub async fn serve_impl<W: Write + 'static>(
     rcs_proxy: Connector<RemoteControlProxyHolder>,
-    target_info: &mut fho::Deferred<TargetInfoHolder>,
+    target_info: &TargetInfoHolder,
     knocker: &impl RcsKnocker,
     cmd: StartCommand,
     context: EnvironmentContext,
@@ -513,7 +513,6 @@ pub async fn serve_impl<W: Write + 'static>(
         Ok(())
     } else {
         let tunnel_addr = cmd.tunnel_addr.clone().unwrap_or_else(|| default_tunnel_addr());
-        let target_info = target_info.await?;
         let r = target::main_connect_loop(
             &context,
             &cmd,
@@ -523,7 +522,7 @@ pub async fn serve_impl<W: Write + 'static>(
             repo_manager,
             loop_stop_rx,
             rcs_proxy,
-            &target_info,
+            target_info,
             knocker,
             &mut writer,
             tunnel_addr,
@@ -1632,7 +1631,7 @@ mod test {
             rcs_proxy_connector: Connector::try_from_env(&env)
                 .await
                 .expect("Could not make RCS test connector"),
-            target_info: fho::Deferred::from_output(Ok(target_info)),
+            target_info,
         };
 
         let buffers = TestBuffers::default();
@@ -1788,7 +1787,7 @@ mod test {
 
             Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                &mut fho::Deferred::from_output(Ok(target_info)),
+                &target_info,
                 &fake_rcs_knocker,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
@@ -1962,7 +1961,7 @@ mod test {
 
             Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                &mut fho::Deferred::from_output(Ok(target_info)),
+                &target_info,
                 &fake_rcs_knocker,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
@@ -2136,7 +2135,7 @@ mod test {
         let _task = fasync::Task::local(async move {
             Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                &mut fho::Deferred::from_output(Ok(target_info)),
+                &target_info,
                 &fake_rcs_knocker,
                 StartCommand {
                     repository: None,
@@ -2356,7 +2355,7 @@ mod test {
         assert_eq!(
             Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                &mut fho::Deferred::from_output(Ok(target_info.clone())),
+                &target_info,
                 &fake_rcs_knocker,
                 serve_cmd_without_root,
                 test_env.context.clone(),
@@ -2375,7 +2374,7 @@ mod test {
         let _task = fasync::Task::local(async move {
             Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                &mut fho::Deferred::from_output(Ok(target_info)),
+                &target_info,
                 &fake_rcs_knocker,
                 serve_cmd_with_root,
                 test_env.context.clone(),

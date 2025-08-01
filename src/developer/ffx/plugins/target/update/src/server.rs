@@ -57,7 +57,7 @@ pub(crate) struct PackageServerTask {
 
 pub(crate) async fn package_server_task(
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    target_info: fho::Deferred<TargetInfoHolder>,
+    target_info: TargetInfoHolder,
     context: EnvironmentContext,
     product_bundle: PathBuf,
     repo_port: u16,
@@ -118,7 +118,7 @@ pub(crate) async fn package_server_task(
             cmd,
             context,
             rcs_proxy_connector: connector.clone(),
-            target_info: target_info,
+            target_info: target_info.clone(),
         };
 
         let stdout = LogWriter::new("repo_server stdout");
@@ -471,7 +471,7 @@ mod tests {
     struct FakeTestEnv {
         pub context: EnvironmentContext,
         pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-        pub target_info: fho::Deferred<TargetInfoHolder>,
+        pub target_info: TargetInfoHolder,
     }
 
     impl FakeTestEnv {
@@ -503,11 +503,7 @@ mod tests {
                 nodename: Some("test_target_info".to_string()),
                 ..Default::default()
             });
-            Self {
-                context: test_env.context.clone(),
-                rcs_proxy_connector,
-                target_info: fho::Deferred::from_output(Ok(target_info)),
-            }
+            Self { context: test_env.context.clone(), rcs_proxy_connector, target_info }
         }
     }
 

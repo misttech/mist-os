@@ -8,7 +8,7 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::LocalRcsKnockerImpl;
 use ffx_writer::VerifiedMachineWriter;
-use fho::{bug, user_error, Deferred, FfxMain, FfxTool, Result};
+use fho::{bug, user_error, FfxMain, FfxTool, Result};
 use pkg::config::DEFAULT_REPO_NAME;
 use pkg::ServerMode;
 use schemars::JsonSchema;
@@ -48,7 +48,7 @@ pub struct ServerStartTool {
     #[command]
     pub cmd: StartCommand,
     pub context: EnvironmentContext,
-    pub target_info: Deferred<TargetInfoHolder>,
+    pub target_info: TargetInfoHolder,
     pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 }
 
@@ -57,7 +57,7 @@ fho::embedded_plugin!(ServerStartTool);
 #[async_trait(?Send)]
 impl FfxMain for ServerStartTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
-    async fn main(mut self, mut writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let new_logname = self.log_basename();
 
         let result: Result<Option<SocketAddr>> =
@@ -72,7 +72,7 @@ impl FfxMain for ServerStartTool {
                     return Box::pin(server::run_foreground_server(
                         self.cmd,
                         self.context,
-                        &mut self.target_info,
+                        &self.target_info,
                         &LocalRcsKnockerImpl {},
                         self.rcs_proxy_connector,
                         writer,
