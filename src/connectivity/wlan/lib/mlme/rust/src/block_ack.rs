@@ -409,8 +409,8 @@ fn read_delba_hdr<B: SplitByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, E
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use wlan_common::append::TrackedAppend;
-    use wlan_common::assert_variant;
     use wlan_statemachine as statemachine;
 
     /// A STA that can send ADDBA frames (implements the `BlockAckTx` trait).
@@ -472,12 +472,12 @@ mod tests {
         let mut station = Station::Up;
         let state = BlockAckState::from(State::new(Closed));
         let state = state.establish(&mut station);
-        assert_variant!(state, BlockAckState::Establishing(_), "not in `Establishing` state");
+        assert_matches!(state, BlockAckState::Establishing(_), "not in `Establishing` state");
 
         let mut station = Station::Down;
         let state = BlockAckState::from(State::new(Closed));
         let state = state.establish(&mut station);
-        assert_variant!(state, BlockAckState::Closed(_), "not in `Closed` state");
+        assert_matches!(state, BlockAckState::Closed(_), "not in `Closed` state");
     }
 
     #[test]
@@ -487,7 +487,7 @@ mod tests {
             is_initiator: true,
         }));
         let state = state.close(&mut station, fidl_ieee80211::ReasonCode::UnspecifiedReason.into());
-        assert_variant!(state, BlockAckState::Closed(_), "not in `Closed` state");
+        assert_matches!(state, BlockAckState::Closed(_), "not in `Closed` state");
     }
 
     #[test]
@@ -501,13 +501,13 @@ mod tests {
         let state = BlockAckState::from(State::new(Closed));
         let state =
             state.on_block_ack_frame(&mut station, mac::BlockAckAction::ADDBA_REQUEST, body);
-        assert_variant!(state, BlockAckState::Established(_), "not in `Established` state");
+        assert_matches!(state, BlockAckState::Established(_), "not in `Established` state");
 
         let mut station = Station::Down;
         let state = BlockAckState::from(State::new(Closed));
         let state =
             state.on_block_ack_frame(&mut station, mac::BlockAckAction::ADDBA_REQUEST, body);
-        assert_variant!(state, BlockAckState::Closed(_), "not in `Closed` state");
+        assert_matches!(state, BlockAckState::Closed(_), "not in `Closed` state");
     }
 
     #[test]
@@ -522,7 +522,7 @@ mod tests {
             is_initiator: false,
         }));
         let state = state.on_block_ack_frame(&mut station, mac::BlockAckAction::DELBA, body);
-        assert_variant!(state, BlockAckState::Closed(_), "not in `Closed` state");
+        assert_matches!(state, BlockAckState::Closed(_), "not in `Closed` state");
     }
 
     #[test]

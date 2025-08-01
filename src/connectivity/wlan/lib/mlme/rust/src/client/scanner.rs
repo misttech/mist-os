@@ -540,13 +540,13 @@ mod tests {
     use crate::client::TimedEvent;
     use crate::device::{FakeDevice, FakeDeviceState};
     use crate::test_utils::{fake_wlan_channel, MockWlanRxInfo};
+    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_common as fidl_common;
     use fuchsia_sync::Mutex;
     use ieee80211::{MacAddrBytes, Ssid};
     use lazy_static::lazy_static;
     use std::sync::Arc;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::sequence::SequenceManager;
     use wlan_common::timer::{self, create_timer, Timer};
 
@@ -666,7 +666,7 @@ mod tests {
             .expect("expect scan req accepted");
         let scan_req = fidl_mlme::ScanRequest { txn_id: 1338, ..passive_scan_req() };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
-        assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
+        assert_matches!(result, Err(Error::ScanError(ScanError::Busy)));
         m.fake_device_state
             .lock()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
@@ -681,7 +681,7 @@ mod tests {
 
         scanner.bind(&mut ctx).disable_scanning().await.expect("Failed to disable scanning");
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).await;
-        assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
+        assert_matches!(result, Err(Error::ScanError(ScanError::Busy)));
         m.fake_device_state
             .lock()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
@@ -704,7 +704,7 @@ mod tests {
 
         let scan_req = fidl_mlme::ScanRequest { channel_list: vec![], ..passive_scan_req() };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
-        assert_variant!(result, Err(Error::ScanError(ScanError::EmptyChannelList)));
+        assert_matches!(result, Err(Error::ScanError(ScanError::EmptyChannelList)));
         m.fake_device_state
             .lock()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
@@ -723,7 +723,7 @@ mod tests {
             ..passive_scan_req()
         };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
-        assert_variant!(result, Err(Error::ScanError(ScanError::MaxChannelTimeLtMin)));
+        assert_matches!(result, Err(Error::ScanError(ScanError::MaxChannelTimeLtMin)));
         m.fake_device_state
             .lock()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
@@ -931,7 +931,7 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).await;
-        assert_variant!(
+        assert_matches!(
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
         );
@@ -949,7 +949,7 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6])).await;
-        assert_variant!(
+        assert_matches!(
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
         );
@@ -973,7 +973,7 @@ mod tests {
             .expect("expect scan req accepted");
 
         // Verify that passive offload scan is requested
-        assert_variant!(
+        assert_matches!(
             m.fake_device_state.lock().captured_passive_scan_request,
             Some(_),
             "passive offload scan not initiated"

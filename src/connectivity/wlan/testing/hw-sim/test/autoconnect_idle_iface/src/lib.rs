@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use log::info;
-use wlan_common::assert_variant;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
 
@@ -44,7 +44,7 @@ async fn autoconnect_idle_iface() {
     )
     .await;
 
-    assert_variant!(
+    assert_matches!(
         client_controller.start_client_connections().await,
         Ok(fidl_policy::RequestStatus::Acknowledged)
     );

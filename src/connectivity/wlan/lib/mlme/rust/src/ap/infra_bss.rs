@@ -615,13 +615,13 @@ mod tests {
     use super::*;
     use crate::ap::remote_client::ClientEvent;
     use crate::device::{FakeDevice, FakeDeviceConfig, FakeDeviceState};
+    use assert_matches::assert_matches;
     use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
     use fuchsia_sync::Mutex;
     use ieee80211::Bssid;
     use lazy_static::lazy_static;
     use std::sync::Arc;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::big_endian::BigEndianU16;
     use wlan_common::mac::IntoBytesExt as _;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
@@ -1143,7 +1143,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_mgmt_frame(
                 &mut ctx,
                 mac::MgmtFrame {
@@ -1182,7 +1182,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_mgmt_frame(
                 &mut ctx,
                 mac::MgmtFrame {
@@ -1221,7 +1221,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_mgmt_frame(
                 &mut ctx,
                 mac::MgmtFrame {
@@ -1257,7 +1257,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_mgmt_frame(
                 &mut ctx,
                 mac::MgmtFrame {
@@ -1359,7 +1359,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_data_frame(
                 &mut ctx,
                 mac::DataFrame {
@@ -1465,7 +1465,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_data_frame(
                 &mut ctx,
                 mac::DataFrame {
@@ -1533,7 +1533,7 @@ mod tests {
 
         fake_device_state.lock().wlan_queue.clear();
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_data_frame(
                 &mut ctx,
                 mac::DataFrame {
@@ -1647,7 +1647,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_eth_frame(
                 &mut ctx,
                 EthernetIIHdr {
@@ -1691,7 +1691,7 @@ mod tests {
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_eth_frame(
                 &mut ctx,
                 EthernetIIHdr {
@@ -2095,7 +2095,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx).await;
-        assert_variant!(
+        assert_matches!(
             bss.handle_mlme_setkeys_req(
                 &mut ctx,
                 vec![fidl_mlme::SetKeyDescriptor {
@@ -2347,7 +2347,7 @@ mod tests {
         .await
         .expect("expected InfraBss::new ok");
 
-        assert_variant!(
+        assert_matches!(
             bss.handle_mgmt_frame(
                 &mut ctx,
                 mac::MgmtFrame {

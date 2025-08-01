@@ -145,7 +145,7 @@ pub fn write_confirm(send_confirm: u16, confirm: &[u8]) -> AuthFrameTx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wlan_common::assert_variant;
+    use assert_matches::assert_matches;
 
     #[rustfmt::skip]
     const ECC_COMMIT_BODY: &[u8] = &[
@@ -192,7 +192,7 @@ mod tests {
         let commit_msg =
             AuthFrameRx { seq: 1, status_code: StatusCode::Success, body: ECC_COMMIT_BODY };
         let parse_result = parse(&commit_msg);
-        let commit = assert_variant!(parse_result, Ok(ParseSuccess::Commit(commit)) => commit);
+        let commit = assert_matches!(parse_result, Ok(ParseSuccess::Commit(commit)) => commit);
         assert_eq!(commit.group_id, 19);
         assert_eq!(commit.scalar, &[1u8; 32][..]);
         assert_eq!(commit.element, &[2u8; 64][..]);
@@ -207,9 +207,9 @@ mod tests {
             body: ECC_COMMIT_BODY_WITH_ANTI_CLOGGING_TOKEN,
         };
         let parse_result = parse(&commit_msg);
-        let commit = assert_variant!(parse_result, Ok(ParseSuccess::Commit(commit)) => commit);
+        let commit = assert_matches!(parse_result, Ok(ParseSuccess::Commit(commit)) => commit);
         assert_eq!(commit.group_id, 19);
-        let anti_clogging_token = assert_variant!(commit.anti_clogging_token, Some(token) => token);
+        let anti_clogging_token = assert_matches!(commit.anti_clogging_token, Some(token) => token);
         assert_eq!(anti_clogging_token, &[0x4; 8]);
         assert_eq!(commit.scalar, &[1u8; 32][..]);
         assert_eq!(commit.element, &[2u8; 64][..]);
@@ -220,7 +220,7 @@ mod tests {
         let mut body = ECC_COMMIT_BODY.to_vec();
         body[0] = 0xff; // not a real group
         let commit_msg = AuthFrameRx { seq: 1, status_code: StatusCode::Success, body: &body[..] };
-        assert_variant!(parse(&commit_msg), Err(e) => {
+        assert_matches!(parse(&commit_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Unsupported SAE group ID: 255"))
         });
     }
@@ -229,12 +229,12 @@ mod tests {
     fn truncated_commit() {
         let commit_msg =
             AuthFrameRx { seq: 1, status_code: StatusCode::Success, body: &ECC_COMMIT_BODY[..20] };
-        assert_variant!(parse(&commit_msg), Err(e) => {
+        assert_matches!(parse(&commit_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Buffer truncated"))
         });
 
         let commit_msg = AuthFrameRx { seq: 1, status_code: StatusCode::Success, body: &[] };
-        assert_variant!(parse(&commit_msg), Err(e) => {
+        assert_matches!(parse(&commit_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Failed to read group ID"))
         });
     }
@@ -244,7 +244,7 @@ mod tests {
         let confirm_msg =
             AuthFrameRx { seq: 2, status_code: StatusCode::Success, body: ECC_CONFIRM_BODY };
         let parse_result = parse(&confirm_msg);
-        let confirm = assert_variant!(parse_result, Ok(ParseSuccess::Confirm(confirm)) => confirm);
+        let confirm = assert_matches!(parse_result, Ok(ParseSuccess::Confirm(confirm)) => confirm);
         assert_eq!(confirm.send_confirm, 1);
         assert_eq!(confirm.confirm, &[3u8; 32][..]);
     }
@@ -253,12 +253,12 @@ mod tests {
     fn truncated_confirm() {
         let confirm_msg =
             AuthFrameRx { seq: 2, status_code: StatusCode::Success, body: &ECC_CONFIRM_BODY[..20] };
-        assert_variant!(parse(&confirm_msg), Err(e) => {
+        assert_matches!(parse(&confirm_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Buffer truncated"))
         });
 
         let confirm_msg = AuthFrameRx { seq: 2, status_code: StatusCode::Success, body: &[] };
-        assert_variant!(parse(&confirm_msg), Err(e) => {
+        assert_matches!(parse(&confirm_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Failed to read send confirm"))
         });
     }
@@ -268,7 +268,7 @@ mod tests {
         let mut body = ECC_CONFIRM_BODY.to_vec();
         body.push(0xff);
         let confirm_msg = AuthFrameRx { seq: 2, status_code: StatusCode::Success, body: &body[..] };
-        assert_variant!(parse(&confirm_msg), Err(e) => {
+        assert_matches!(parse(&confirm_msg), Err(e) => {
             assert!(format!("{:?}", e).contains("Buffer too long"))
         });
     }
@@ -281,7 +281,7 @@ mod tests {
             body: ECC_ACT_REQUIRED_BODY,
         };
         let parse_result = parse(&act_required);
-        let act = assert_variant!(parse_result, Ok(ParseSuccess::AntiCloggingToken(act)) => act);
+        let act = assert_matches!(parse_result, Ok(ParseSuccess::AntiCloggingToken(act)) => act);
         assert_eq!(act.group_id, 19);
         assert_eq!(act.anti_clogging_token, &[0x4; 8][..]);
     }
@@ -293,19 +293,19 @@ mod tests {
             status_code: StatusCode::AntiCloggingTokenRequired,
             body: &[19, 00],
         };
-        assert_variant!(parse(&act_required), Err(e) => {
+        assert_matches!(parse(&act_required), Err(e) => {
             assert!(format!("{:?}", e).contains("no token provided"))
         });
 
         let act_required =
             AuthFrameRx { seq: 1, status_code: StatusCode::AntiCloggingTokenRequired, body: &[19] };
-        assert_variant!(parse(&act_required), Err(e) => {
+        assert_matches!(parse(&act_required), Err(e) => {
             assert!(format!("{:?}", e).contains("Failed to read group ID"))
         });
 
         let act_required =
             AuthFrameRx { seq: 1, status_code: StatusCode::AntiCloggingTokenRequired, body: &[] };
-        assert_variant!(parse(&act_required), Err(e) => {
+        assert_matches!(parse(&act_required), Err(e) => {
             assert!(format!("{:?}", e).contains("Failed to read group ID"))
         });
     }

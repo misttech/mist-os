@@ -661,11 +661,11 @@ mod tests {
         PROB_HIDDEN_IF_CONNECT_PASSIVE, PROB_HIDDEN_IF_SEEN_PASSIVE,
     };
     use crate::util::testing::{generate_random_bss, generate_string, random_connection_data};
+    use assert_matches::assert_matches;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     async fn store_and_lookup() {
@@ -987,7 +987,7 @@ mod tests {
 
         // The network should be saved with the connection recorded. We should not have recorded
         // that the network was connected to passively or actively.
-        assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
             assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
         });
@@ -1002,7 +1002,7 @@ mod tests {
             )
             .await;
         // We should now see that we connected to the network after an active scan.
-        assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
             assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_CONNECT_ACTIVE);
         });
@@ -1017,7 +1017,7 @@ mod tests {
             )
             .await;
         // The config should have a lower hidden probability after connecting after a passive scan.
-        assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
             assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_CONNECT_PASSIVE);
         });
@@ -1028,7 +1028,7 @@ mod tests {
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
-        assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
             assert!(config.has_ever_connected);
         });
     }
@@ -1062,12 +1062,12 @@ mod tests {
             )
             .await;
 
-        assert_variant!(saved_networks.lookup(&net_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&net_id).await.as_slice(), [config] => {
             assert!(config.has_ever_connected);
         });
         // If the specified network identifier is found, record_conenct_result should not mark
         // another config even if it could also have been used for the connect attempt.
-        assert_variant!(saved_networks.lookup(&net_id_also_valid).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&net_id_also_valid).await.as_slice(), [config] => {
             assert!(!config.has_ever_connected);
         });
     }
@@ -1138,7 +1138,7 @@ mod tests {
             .expect("Failed to get saved network config");
         let connect_failures =
             saved_config.perf_stats.connect_failures.get_recent_for_network(before_recording);
-        assert_variant!(connect_failures, failures => {
+        assert_matches!(connect_failures, failures => {
             // There are 2 failures. One is a general failure and one rejected credentials failure.
             assert_eq!(failures.len(), 2);
             assert!(failures.iter().any(|failure| failure.reason == FailureReason::GeneralFailure));
@@ -1236,7 +1236,7 @@ mod tests {
             .perf_stats
             .past_connections
             .get_recent_for_network(fasync::MonotonicInstant::INFINITE_PAST);
-        assert_variant!(recent_connections.as_slice(), [connection_data] => {
+        assert_matches!(recent_connections.as_slice(), [connection_data] => {
             assert_eq!(connection_data, &data);
         })
     }
@@ -1283,10 +1283,10 @@ mod tests {
             .record_scan_result(vec!["some_other_ssid".try_into().unwrap()], &results)
             .await;
 
-        assert_variant!(saved_networks.lookup(&saved_seen_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&saved_seen_id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
         });
-        assert_variant!(saved_networks.lookup(&saved_unseen_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&saved_unseen_id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
         });
     }
@@ -1316,7 +1316,7 @@ mod tests {
         )]);
         saved_networks.record_scan_result(vec![], &results).await;
         // The network was seen in a passive scan, so hidden probability should be updated.
-        assert_variant!(saved_networks.lookup(&id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
         });
     }
@@ -1347,7 +1347,7 @@ mod tests {
         saved_networks.record_scan_result(vec![], &results).await;
         // The network in the passive scan results was not compatible, so hidden probability should
         // not have been updated.
-        assert_variant!(saved_networks.lookup(&id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
         });
     }
@@ -1522,7 +1522,7 @@ mod tests {
             .is_none());
 
         // Verify assumption
-        assert_variant!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
         });
 
@@ -1534,11 +1534,11 @@ mod tests {
         saved_networks.record_scan_result(vec![saved_directed_id.ssid.clone()], &results).await;
 
         // The undirected (but seen) network is modified
-        assert_variant!(saved_networks.lookup(&saved_undirected_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&saved_undirected_id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
         });
         // The directed (but *not* seen) network is modified
-        assert_variant!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
+        assert_matches!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
             assert!(config.hidden_probability < PROB_HIDDEN_DEFAULT);
         });
     }
@@ -1675,7 +1675,7 @@ mod tests {
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let init_fut = SavedNetworksManager::new_with_storage(store, telemetry_sender);
         let mut init_fut = pin!(init_fut);
-        let saved_networks = assert_variant!(exec.run_until_stalled(&mut init_fut), Poll::Ready(snm) => {
+        let saved_networks = assert_matches!(exec.run_until_stalled(&mut init_fut), Poll::Ready(snm) => {
             snm
         });
 
@@ -1686,16 +1686,16 @@ mod tests {
         let save_fut = saved_networks.store(network_id.clone(), credential);
         let mut save_fut = pin!(save_fut);
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut save_fut),
             Poll::Ready(Err(NetworkConfigError::FileWriteError))
         );
 
         // The network should have been saved temporarily even if saving the network gives an error.
-        assert_variant!(exec.run_until_stalled(&mut saved_networks.lookup(&network_id)), Poll::Ready(configs) => {
+        assert_matches!(exec.run_until_stalled(&mut saved_networks.lookup(&network_id)), Poll::Ready(configs) => {
             assert_eq!(configs, vec![network_config(ssid, "")]);
         });
-        assert_variant!(exec.run_until_stalled(&mut saved_networks.known_network_count()), Poll::Ready(count) => {
+        assert_matches!(exec.run_until_stalled(&mut saved_networks.known_network_count()), Poll::Ready(count) => {
             assert_eq!(count, 1);
         });
     }
@@ -1757,7 +1757,7 @@ mod tests {
         saved_networks.record_periodic_metrics().await;
 
         // Verify metric is logged with two saved networks, which each have one config
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::SavedNetworkCount { saved_network_count, config_count_per_saved_network })) => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::SavedNetworkCount { saved_network_count, config_count_per_saved_network })) => {
             assert_eq!(saved_network_count, 2);
             assert_eq!(config_count_per_saved_network, [1, 1]);
         });

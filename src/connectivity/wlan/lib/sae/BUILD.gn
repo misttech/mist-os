@@ -23,6 +23,7 @@ rustc_library("wlan-sae") {
   ]
 
   test_deps = [
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:lazy_static",
   ]

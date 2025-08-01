@@ -496,6 +496,7 @@ mod tests {
     use crate::access_point::types;
     use crate::util::testing::{generate_connect_selection, poll_sme_req};
     use anyhow::format_err;
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, RequestStream};
     use futures::future::LocalBoxFuture;
     use futures::stream::StreamFuture;
@@ -506,7 +507,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::channel::Cbw;
     use wlan_common::sequestered::Sequestered;
-    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
+    use wlan_common::{random_fidl_bss_description, RadioConfig};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
@@ -646,13 +647,13 @@ mod tests {
         let disconnect_fut = test_values.iface_manager.disconnect(req.clone(), req_reason);
         let mut disconnect_fut = pin!(disconnect_fut);
 
-        assert_variant!(test_values.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
 
         // Verify that the receiver sees the command and send back a response.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::Disconnect(DisconnectRequest {
                 network_id, responder, reason
@@ -664,7 +665,7 @@ mod tests {
         );
 
         // Verify that the disconnect requestr receives the response.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Ok(()))
         );
@@ -695,11 +696,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut disconnect_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -707,7 +708,7 @@ mod tests {
         }
 
         // Verify that the disconnect requestr receives the response.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Err(_))
         );
@@ -729,13 +730,13 @@ mod tests {
         let connect_fut = test_values.iface_manager.connect(req.clone());
         let mut connect_fut = pin!(connect_fut);
 
-        assert_variant!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Pending);
 
         // Verify that the receiver sees the command and send back a response.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::Connect(ConnectRequest {
                 request, responder
@@ -746,7 +747,7 @@ mod tests {
         );
 
         // Verify that the connect requestr receives the response.
-        assert_variant!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_)));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -776,11 +777,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut connect_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -788,7 +789,7 @@ mod tests {
         }
 
         // Verify that the request completes in error.
-        assert_variant!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -800,13 +801,13 @@ mod tests {
         let idle_client_fut = test_values.iface_manager.record_idle_client(iface_id);
         let mut idle_client_fut = pin!(idle_client_fut);
 
-        assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         // Verify that the receiver sees the request.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(
                 Some(IfaceManagerRequest::RecordIdleIface(RecordIdleIfaceRequest{ iface_id: 123, responder}))
@@ -816,7 +817,7 @@ mod tests {
         );
 
         // Verify that the client sees the response.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut idle_client_fut),
             Poll::Ready(Ok(()))
         );
@@ -841,11 +842,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut idle_client_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -853,7 +854,7 @@ mod tests {
         }
 
         // Verify that the client side finishes
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut idle_client_fut),
             Poll::Ready(Err(_))
         );
@@ -866,13 +867,13 @@ mod tests {
         // Query whether there is an idle client
         let idle_client_fut = test_values.iface_manager.has_idle_client();
         let mut idle_client_fut = pin!(idle_client_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(
                 Some(IfaceManagerRequest::HasIdleIface(HasIdleIfaceRequest{ responder}))
@@ -880,7 +881,7 @@ mod tests {
         );
 
         // Verify that the client side finishes
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut idle_client_fut),
             Poll::Ready(Ok(true))
         );
@@ -895,7 +896,7 @@ mod tests {
         // Query whether there is an idle client
         let idle_client_fut = test_values.iface_manager.has_idle_client();
         let mut idle_client_fut = pin!(idle_client_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -905,11 +906,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut idle_client_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -917,7 +918,7 @@ mod tests {
         }
 
         // Verify that the request completes in error.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut idle_client_fut),
             Poll::Ready(Err(_))
         );
@@ -930,13 +931,13 @@ mod tests {
         // Add an interface
         let added_iface_fut = test_values.iface_manager.handle_added_iface(123);
         let mut added_iface_fut = pin!(added_iface_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(
                 Some(IfaceManagerRequest::AddIface(AddIfaceRequest{ iface_id: 123, responder }))
@@ -946,7 +947,7 @@ mod tests {
         );
 
         // Verify that the client side finishes
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut added_iface_fut),
             Poll::Ready(Ok(()))
         );
@@ -961,7 +962,7 @@ mod tests {
         // Add an interface
         let added_iface_fut = test_values.iface_manager.handle_added_iface(123);
         let mut added_iface_fut = pin!(added_iface_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -971,11 +972,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut added_iface_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -983,7 +984,7 @@ mod tests {
         }
 
         // Verify that the request completes in error.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut added_iface_fut),
             Poll::Ready(Err(_))
         );
@@ -996,13 +997,13 @@ mod tests {
         // Report the removal of an interface.
         let removed_iface_fut = test_values.iface_manager.handle_removed_iface(123);
         let mut removed_iface_fut = pin!(removed_iface_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(
                 Some(IfaceManagerRequest::RemoveIface(RemoveIfaceRequest{ iface_id: 123, responder }))
@@ -1012,7 +1013,7 @@ mod tests {
         );
 
         // Verify that the client side finishes
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut removed_iface_fut),
             Poll::Ready(Ok(()))
         );
@@ -1027,7 +1028,7 @@ mod tests {
         // Report the removal of an interface.
         let removed_iface_fut = test_values.iface_manager.handle_removed_iface(123);
         let mut removed_iface_fut = pin!(removed_iface_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1037,11 +1038,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut removed_iface_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1049,7 +1050,7 @@ mod tests {
         }
 
         // Verify that the client side finishes
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut removed_iface_fut),
             Poll::Ready(Err(_))
         );
@@ -1062,13 +1063,13 @@ mod tests {
         // Request a scan
         let scan_proxy_fut = test_values.iface_manager.get_sme_proxy_for_scan();
         let mut scan_proxy_fut = pin!(scan_proxy_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut scan_proxy_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut scan_proxy_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::GetScanProxy(ScanProxyRequest{
                 responder
@@ -1080,7 +1081,7 @@ mod tests {
         );
 
         // Verify that the client side gets the scan proxy
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut scan_proxy_fut),
             Poll::Ready(Ok(_))
         );
@@ -1105,11 +1106,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut scan_proxy_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1117,7 +1118,7 @@ mod tests {
         }
 
         // Verify that an error is returned.
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut scan_proxy_fut),
             Poll::Ready(Err(_))
         );
@@ -1132,13 +1133,13 @@ mod tests {
             client_types::DisconnectReason::FidlStopClientConnectionsRequest,
         );
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::StopClientConnections(StopClientConnectionsRequest{
                 responder, reason
@@ -1149,7 +1150,7 @@ mod tests {
         );
 
         // Verify that the client side gets the response.
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(())));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(())));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -1164,7 +1165,7 @@ mod tests {
             client_types::DisconnectReason::FidlStopClientConnectionsRequest,
         );
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1174,8 +1175,8 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
-                assert_variant!(
+                assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1183,7 +1184,7 @@ mod tests {
         }
 
         // Verify that the client side gets the response.
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1193,13 +1194,13 @@ mod tests {
         // Start client connections
         let start_fut = test_values.iface_manager.start_client_connections();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::StartClientConnections(StartClientConnectionsRequest{
                 responder
@@ -1209,7 +1210,7 @@ mod tests {
         );
 
         // Verify that the client side gets the response.
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(())));
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(())));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -1222,7 +1223,7 @@ mod tests {
         // Start client connections
         let start_fut = test_values.iface_manager.start_client_connections();
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1232,8 +1233,8 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
-                assert_variant!(
+                assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1241,7 +1242,7 @@ mod tests {
         }
 
         // Verify that the client side gets the response.
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
     }
 
     fn create_ap_config() -> ap_fsm::ApConfig {
@@ -1264,13 +1265,13 @@ mod tests {
         // Start an AP
         let start_fut = test_values.iface_manager.start_ap(create_ap_config());
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::StartAp(StartApRequest{
                 config, responder
@@ -1283,7 +1284,7 @@ mod tests {
         );
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(_)));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -1296,7 +1297,7 @@ mod tests {
         // Start an AP
         let start_fut = test_values.iface_manager.start_ap(create_ap_config());
         let mut start_fut = pin!(start_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1306,8 +1307,8 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
-                assert_variant!(
+                assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1315,7 +1316,7 @@ mod tests {
         }
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1327,13 +1328,13 @@ mod tests {
             .iface_manager
             .stop_ap(Ssid::try_from("foo").unwrap(), "bar".as_bytes().to_vec());
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::StopAp(StopApRequest{
                 ssid, password, responder
@@ -1346,7 +1347,7 @@ mod tests {
         );
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -1361,7 +1362,7 @@ mod tests {
             .iface_manager
             .stop_ap(Ssid::try_from("foo").unwrap(), "bar".as_bytes().to_vec());
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1371,8 +1372,8 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
-                assert_variant!(
+                assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1380,7 +1381,7 @@ mod tests {
         }
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1390,12 +1391,12 @@ mod tests {
         // Stop an AP
         let stop_fut = test_values.iface_manager.stop_all_aps();
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::StopAllAps(StopAllApsRequest{
                 responder
@@ -1405,7 +1406,7 @@ mod tests {
         );
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
     }
 
     #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
@@ -1418,7 +1419,7 @@ mod tests {
         // Stop an AP
         let stop_fut = test_values.iface_manager.stop_all_aps();
         let mut stop_fut = pin!(stop_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
@@ -1428,8 +1429,8 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
-                assert_variant!(
+                assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1437,7 +1438,7 @@ mod tests {
         }
 
         // Verify that the client gets the response
-        assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
+        assert_matches!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1447,13 +1448,13 @@ mod tests {
         // Set country code
         let set_country_fut = test_values.iface_manager.set_country(None);
         let mut set_country_fut = pin!(set_country_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
         let mut next_message = pin!(next_message);
 
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::SetCountry(SetCountryRequest{
                 country_code: None,
@@ -1464,7 +1465,7 @@ mod tests {
         );
 
         // Verify that the client gets the response
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut set_country_fut),
             Poll::Ready(Ok(_))
         );
@@ -1480,7 +1481,7 @@ mod tests {
         // Set country code
         let set_country_fut = test_values.iface_manager.set_country(None);
         let mut set_country_fut = pin!(set_country_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        assert_matches!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
         let mut service_fut = pin!(service_fut);
@@ -1489,11 +1490,11 @@ mod tests {
             NegativeTestFailureMode::RequestFailure => {}
             _ => {
                 // Run the request and the servicing of the request
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut set_country_fut),
                     Poll::Pending
                 );
-                assert_variant!(
+                assert_matches!(
                     test_values.exec.run_until_stalled(&mut service_fut),
                     Poll::Ready(())
                 );
@@ -1501,7 +1502,7 @@ mod tests {
         }
 
         // Verify that the client gets the response
-        assert_variant!(
+        assert_matches!(
             test_values.exec.run_until_stalled(&mut set_country_fut),
             Poll::Ready(Err(_))
         );
@@ -1526,10 +1527,10 @@ mod tests {
         // Issue the scan request.
         let scan_result_fut = sme.scan(&scan_request);
         let mut scan_result_fut = pin!(scan_result_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
 
         // Poll the server end of the SME and expect that a scan request has been forwarded.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, ..
@@ -1585,7 +1586,7 @@ mod tests {
         });
         let scan_result_fut = sme.scan(&scan_request);
         let mut scan_result_fut = pin!(scan_result_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
 
         // Advance the clock so that the timeout expires.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -1593,7 +1594,7 @@ mod tests {
         ));
 
         // Verify that the future returns and that a defect is logged.
-        assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut scan_result_fut), Poll::Ready(Err(_)));
         assert_eq!(
             defect_receiver.try_next().expect("missing empty scan results error"),
             Some(Defect::Iface(IfaceFailure::Timeout {
@@ -1616,11 +1617,11 @@ mod tests {
         // Request a disconnect and run the future until it stalls.
         let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ack the disconnect request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{
                 responder,
@@ -1631,7 +1632,7 @@ mod tests {
         );
 
         // Verify that the disconnect was successful.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -1647,7 +1648,7 @@ mod tests {
         // Request a disconnect and expect an immediate error return.
         let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1664,7 +1665,7 @@ mod tests {
         // Request a disconnect and run the future until it stalls.
         let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -1672,7 +1673,7 @@ mod tests {
         ));
 
         // Verify that the future returns and that a defect is logged.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         assert_eq!(
             defect_receiver.try_next().expect("missing empty scan results error"),
             Some(Defect::Iface(IfaceFailure::Timeout {
@@ -1699,7 +1700,7 @@ mod tests {
 
         // Verify SME gets the request
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Roam {
                 req, ..
@@ -1741,7 +1742,7 @@ mod tests {
 
         // Ack the connect request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
                 txn,
@@ -1800,7 +1801,7 @@ mod tests {
 
         // Ack the connect request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
                 txn,
@@ -1907,11 +1908,11 @@ mod tests {
         let fut = wait_for_connect_result(&mut response_stream);
 
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Drop server end, and verify future completes with error
         drop(remote);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1924,14 +1925,14 @@ mod tests {
         let fut = wait_for_connect_result(&mut response_stream);
 
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send some unexpected response
         let ind = fidl_internal::SignalReportIndication { rssi_dbm: -20, snr_db: 25 };
         request_handle.send_on_signal_report(&ind).unwrap();
 
         // Future should still be waiting for OnConnectResult event
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send expected ConnectResult response
         let sme_result = fidl_sme::ConnectResult {
@@ -1940,7 +1941,7 @@ mod tests {
             is_reconnect: false,
         };
         request_handle.send_on_connect_result(&sme_result).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
             assert_eq!(sme_result, response);
         });
     }
@@ -1970,11 +1971,11 @@ mod tests {
         let config = fidl_sme::ApConfig::from(create_ap_config());
         let fut = sme.start(&config);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the start request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start { responder, .. }) => {
                 responder.send(fidl_sme::StartApResultCode::Success)
@@ -1983,7 +1984,7 @@ mod tests {
         );
 
         // Verify that the start response was returned.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Ok(fidl_sme::StartApResultCode::Success))
         );
@@ -2003,7 +2004,7 @@ mod tests {
         let config = fidl_sme::ApConfig::from(create_ap_config());
         let fut = sme.start(&config);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2021,7 +2022,7 @@ mod tests {
         let config = fidl_sme::ApConfig::from(create_ap_config());
         let fut = sme.start(&config);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -2029,7 +2030,7 @@ mod tests {
         ));
 
         // Verify that the future returns and that a defect is logged.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         assert_eq!(
             defect_receiver.try_next().expect("missing connection timeout"),
             Some(Defect::Iface(IfaceFailure::Timeout {
@@ -2052,11 +2053,11 @@ mod tests {
         // Stop the AP and run the future until it stalls.
         let fut = sme.stop();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the stop request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop { responder }) => {
                 responder.send(fidl_sme::StopApResultCode::Success)
@@ -2065,7 +2066,7 @@ mod tests {
         );
 
         // Verify that the start response was returned.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Ok(fidl_sme::StopApResultCode::Success))
         );
@@ -2084,7 +2085,7 @@ mod tests {
         // Stop the AP and observe an immediate failure.
         let fut = sme.stop();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2101,7 +2102,7 @@ mod tests {
         // Stop the AP and run the future until it stalls.
         let fut = sme.stop();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -2109,7 +2110,7 @@ mod tests {
         ));
 
         // Verify that the future returns and that a defect is logged.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         assert_eq!(
             defect_receiver.try_next().expect("missing connection timeout"),
             Some(Defect::Iface(IfaceFailure::Timeout {
@@ -2132,11 +2133,11 @@ mod tests {
         // Query AP status and run the future until it stalls.
         let fut = sme.status();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the status request.
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());
-        assert_variant!(
+        assert_matches!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let response = fidl_sme::ApStatusResponse { running_ap: None };
@@ -2145,7 +2146,7 @@ mod tests {
         );
 
         // Verify that the status response was returned.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Ok(fidl_sme::ApStatusResponse { running_ap: None }))
         );
@@ -2164,7 +2165,7 @@ mod tests {
         // Query status and observe an immediate failure.
         let fut = sme.status();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2181,7 +2182,7 @@ mod tests {
         // Query AP status and run the future until it stalls.
         let fut = sme.status();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -2189,7 +2190,7 @@ mod tests {
         ));
 
         // Verify that the future returns and that a defect is logged.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         assert_eq!(
             defect_receiver.try_next().expect("missing connection timeout"),
             Some(Defect::Iface(IfaceFailure::Timeout {

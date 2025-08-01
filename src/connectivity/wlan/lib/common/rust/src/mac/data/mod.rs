@@ -76,13 +76,14 @@ pub mod harness {
 
 #[cfg(test)]
 mod tests {
+    use crate::mac;
     use crate::test_utils::fake_frames::*;
-    use crate::{assert_variant, mac};
+    use assert_matches::assert_matches;
 
     #[test]
     fn parse_data_frame() {
         let bytes = make_data_frame_single_llc(None, None);
-        assert_variant!(
+        assert_matches!(
             mac::DataFrame::parse(bytes.as_slice(), false),
             Some(mac::DataFrame { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
@@ -96,20 +97,18 @@ mod tests {
                 assert!(ht_ctrl.is_none());
                 assert_eq!(&body[..], &[7, 7, 7, 8, 8, 8, 9, 10, 11, 11, 11]);
             },
-            "failed to parse data frame",
-        );
+            "failed to parse data frame");
     }
 
     #[test]
     fn parse_data_frame_with_padding() {
         let bytes = make_data_frame_with_padding();
-        assert_variant!(
+        assert_matches!(
             mac::DataFrame::parse(bytes.as_slice(), true),
             Some(mac::DataFrame { qos_ctrl, body, .. }) => {
                 assert_eq!(qos_ctrl.expect("qos_ctrl not present").get().0, 0x0101);
                 assert_eq!(&body[..], &[7, 7, 7, 8, 8, 8, 9, 10, 11, 11, 11, 11, 11]);
             },
-            "failed to parse padded data frame",
-        );
+            "failed to parse padded data frame");
     }
 }

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::FullmacDriverFixture;
+use assert_matches::assert_matches;
 use drivers_only_common::sme_helpers;
 use fullmac_helpers::config::FullmacDriverConfig;
-use wlan_common::assert_variant;
 use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
 #[fuchsia::test]
@@ -29,7 +29,7 @@ async fn test_get_iface_stats() {
     };
 
     let driver_fut = async {
-        assert_variant!(fullmac_driver.request_stream.next().await,
+        assert_matches!(fullmac_driver.request_stream.next().await,
             fidl_fullmac::WlanFullmacImpl_Request::GetIfaceStats { responder } => {
                 responder.send(Ok(&driver_iface_stats))
                     .expect("Could not respond to GetIfaceHistogramStats");
@@ -104,7 +104,7 @@ async fn test_get_iface_histogram_stats() {
     };
 
     let driver_fut = async {
-        assert_variant!(fullmac_driver.request_stream.next().await,
+        assert_matches!(fullmac_driver.request_stream.next().await,
             fidl_fullmac::WlanFullmacImpl_Request::GetIfaceHistogramStats { responder } => {
                 responder.send(Ok(&driver_iface_histogram_stats))
                     .expect("Could not respond to GetIfaceHistogramStats");

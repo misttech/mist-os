@@ -211,9 +211,10 @@ impl RemoteClient {
 mod tests {
     use super::*;
     use crate::{test_utils, MlmeSink, MlmeStream};
+    use assert_matches::assert_matches;
     use futures::channel::mpsc;
     use lazy_static::lazy_static;
-    use wlan_common::{assert_variant, timer};
+    use wlan_common::timer;
 
     lazy_static! {
         static ref AP_ADDR: MacAddr = [6u8; 6].into();
@@ -301,7 +302,7 @@ mod tests {
             &None,
             None,
         );
-        assert_variant!(r_sta.aid(), Some(_));
+        assert_matches!(r_sta.aid(), Some(_));
         r_sta.handle_disassoc_ind(&mut ctx, &mut aid_map);
         assert_eq!(r_sta.aid(), None);
     }
@@ -323,7 +324,7 @@ mod tests {
             fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
         );
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
+        assert_matches!(mlme_event, MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
             peer_sta_address,
             result_code,
         }) => {
@@ -354,7 +355,7 @@ mod tests {
             vec![SupportedRate(1), SupportedRate(2), SupportedRate(3)],
         );
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
+        assert_matches!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
             peer_sta_address,
             result_code,
             association_id,
@@ -375,7 +376,7 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
         r_sta.send_deauthenticate_req(&mut ctx, fidl_ieee80211::ReasonCode::NoMoreStas);
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
+        assert_matches!(mlme_event, MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
             peer_sta_address,
             reason_code,
         }) => {
@@ -390,7 +391,7 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
         r_sta.send_eapol_req(&mut ctx, test_utils::eapol_key_frame());
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::Eapol(fidl_mlme::EapolRequest {
+        assert_matches!(mlme_event, MlmeRequest::Eapol(fidl_mlme::EapolRequest {
             src_addr,
             dst_addr,
             data,
@@ -407,7 +408,7 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
         r_sta.send_key(&mut ctx, &Key::Ptk(test_utils::ptk()));
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
+        assert_matches!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
             let k = keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
@@ -426,7 +427,7 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
         r_sta.send_key(&mut ctx, &Key::Gtk(test_utils::gtk()));
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
+        assert_matches!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
             let k = keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
@@ -445,7 +446,7 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
         r_sta.send_set_controlled_port_req(&mut ctx, fidl_mlme::ControlledPortState::Open);
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {
+        assert_matches!(mlme_event, MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {
             peer_sta_address,
             state,
         }) => {
@@ -465,9 +466,9 @@ mod tests {
         );
         let (_, timed_event, _) = time_stream.try_next().unwrap().expect("expected timed event");
         assert_eq!(timed_event.id, timeout_event.id());
-        assert_variant!(timed_event.event, Event::Client { addr, event } => {
+        assert_matches!(timed_event.event, Event::Client { addr, event } => {
             assert_eq!(addr, *CLIENT_ADDR);
-            assert_variant!(event, ClientEvent::AssociationTimeout);
+            assert_matches!(event, ClientEvent::AssociationTimeout);
         });
     }
 }

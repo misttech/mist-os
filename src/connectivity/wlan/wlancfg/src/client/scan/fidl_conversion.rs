@@ -173,12 +173,13 @@ pub async fn send_scan_error_over_fidl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use std::pin::pin;
+    use wlan_common::random_fidl_bss_description;
     use wlan_common::scan::{Compatible, Incompatible};
     use wlan_common::security::SecurityDescriptor;
-    use wlan_common::{assert_variant, random_fidl_bss_description};
 
     fn generate_test_fidl_data() -> Vec<fidl_policy::ScanResult> {
         const CENTER_FREQ_CHAN_1: u32 = 2412;
@@ -419,10 +420,10 @@ mod tests {
         let mut output_iter_fut = iter.get_next();
 
         // Send first chunk of scan results
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
 
         // Make sure the first chunk of results were delivered
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
             let results = result.expect("Failed to get next scan results").unwrap();
             assert_eq!(results, scan_results);
         });
@@ -436,7 +437,7 @@ mod tests {
         drop(iter);
 
         // This should not result in error, since some results were consumed
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -453,7 +454,7 @@ mod tests {
         drop(iter);
 
         // This should result in error, since no results were consumed
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -473,9 +474,9 @@ mod tests {
 
         let mut output_iter_fut = iter.get_next();
 
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
             let results = result.expect("Failed to get next scan results").unwrap();
             assert_eq!(results, fidl_scan_results);
         })
@@ -499,9 +500,9 @@ mod tests {
 
         let mut output_iter_fut = iter.get_next();
 
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
 
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -522,9 +523,9 @@ mod tests {
 
         let mut output_iter_fut = iter.get_next();
 
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
             let results = result.expect("Failed to get next scan results").unwrap();
             assert_eq!(results, fidl_scan_results);
         });
@@ -548,18 +549,18 @@ mod tests {
 
         let mut output_iter_fut = iter.get_next();
 
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
 
         let mut aggregate_results = vec![];
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
             let results = result.expect("Failed to get next scan results").unwrap();
             assert_eq!(results.len(), 7);
             aggregate_results.extend(results);
         });
 
         let mut output_iter_fut = iter.get_next();
-        assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(result) => {
             let results = result.expect("Failed to get next scan results").unwrap();
             assert_eq!(results.len(), 1);
             aggregate_results.extend(results);

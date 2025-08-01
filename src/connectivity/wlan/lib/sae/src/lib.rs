@@ -300,9 +300,9 @@ mod internal {
 mod tests {
     #![allow(unused_variables)] // Allow unused variables in tests.
     use super::*;
+    use assert_matches::assert_matches;
     use lazy_static::lazy_static;
     use std::convert::TryFrom;
-    use wlan_common::assert_variant;
     use wlan_common::ie::rsn::akm::{AKM_PSK, AKM_SAE};
 
     // IEEE 802.11-2016 Annex J.10 SAE test vector
@@ -381,36 +381,36 @@ mod tests {
 
     impl<'a> CommitRx<'a> {
         fn msg(&'a self) -> CommitMsg<'a> {
-            assert_variant!(frame::parse(&self.0),
+            assert_matches!(frame::parse(&self.0),
                 Ok(frame::ParseSuccess::Commit(commit)) => commit)
         }
     }
 
     impl<'a> ConfirmRx<'a> {
         fn msg(&'a self) -> ConfirmMsg<'a> {
-            assert_variant!(frame::parse(&self.0),
+            assert_matches!(frame::parse(&self.0),
                 Ok(frame::ParseSuccess::Confirm(confirm)) => confirm)
         }
     }
 
     fn expect_commit(sink: &mut Vec<SaeUpdate>) -> CommitTx {
-        let commit = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
-        assert_variant!(frame::parse(&to_rx(&commit)), Ok(frame::ParseSuccess::Commit(msg)));
+        let commit = assert_matches!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
+        assert_matches!(frame::parse(&to_rx(&commit)), Ok(frame::ParseSuccess::Commit(msg)));
         CommitTx(commit)
     }
 
     fn expect_confirm(sink: &mut Vec<SaeUpdate>) -> ConfirmTx {
-        let confirm = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
-        assert_variant!(frame::parse(&to_rx(&confirm)), Ok(frame::ParseSuccess::Confirm(msg)));
+        let confirm = assert_matches!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
+        assert_matches!(frame::parse(&to_rx(&confirm)), Ok(frame::ParseSuccess::Confirm(msg)));
         ConfirmTx(confirm)
     }
 
     fn expect_reset_timeout(sink: &mut Vec<SaeUpdate>, timeout: Timeout) {
-        assert_variant!(sink.remove(0), SaeUpdate::ResetTimeout(timeout));
+        assert_matches!(sink.remove(0), SaeUpdate::ResetTimeout(timeout));
     }
 
     fn expect_cancel_timeout(sink: &mut Vec<SaeUpdate>, timeout: Timeout) {
-        assert_variant!(sink.remove(0), SaeUpdate::CancelTimeout(timeout));
+        assert_matches!(sink.remove(0), SaeUpdate::CancelTimeout(timeout));
     }
 
     // Test helper to advance through successful steps of an SAE handshake.
@@ -487,7 +487,7 @@ mod tests {
             assert_eq!(sink.len(), 3);
             expect_cancel_timeout(&mut sink, Timeout::Retransmission);
             expect_reset_timeout(&mut sink, Timeout::KeyExpiration);
-            assert_variant!(sink.remove(0), SaeUpdate::Success(key) => key)
+            assert_matches!(sink.remove(0), SaeUpdate::Success(key) => key)
         }
     }
 
@@ -552,7 +552,7 @@ mod tests {
         handshake.sta1.handle_confirm(&mut sink, &confirm2.to_rx().msg());
         assert_eq!(sink.len(), 2);
         let commit1_retry = expect_commit(&mut sink);
-        assert_variant!(sink.remove(0), SaeUpdate::ResetTimeout(Timeout::Retransmission));
+        assert_matches!(sink.remove(0), SaeUpdate::ResetTimeout(Timeout::Retransmission));
 
         // We retransmit the same commit in response to a faulty confirm.
         assert_eq!(commit1, commit1_retry);
@@ -685,7 +685,7 @@ mod tests {
         let mut sink = vec![];
         handshake.sta1.handle_commit(&mut sink, &commit1_wrong);
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::AuthFailed));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::AuthFailed));
     }
 
     #[test]
@@ -712,7 +712,7 @@ mod tests {
         let mut sink = vec![];
         handshake.sta1.handle_commit(&mut sink, &commit1.to_rx().msg());
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::ResetTimeout(Timeout::Retransmission));
+        assert_matches!(sink.remove(0), SaeUpdate::ResetTimeout(Timeout::Retransmission));
     }
 
     #[test]
@@ -733,7 +733,7 @@ mod tests {
         let mut sink = vec![];
         handshake.sta2.handle_commit(&mut sink, &commit1.to_rx().msg());
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
     }
 
     #[test]
@@ -792,7 +792,7 @@ mod tests {
         expect_confirm(&mut sink);
         handshake.sta2.handle_confirm(&mut sink, &confirm1_sc2.to_rx().msg());
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
     }
 
     #[test]
@@ -840,7 +840,7 @@ mod tests {
         // This camel can't hold another straw!
         handshake.sta1.handle_timeout(&mut sink, Timeout::Retransmission);
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
     }
 
     #[test]
@@ -863,7 +863,7 @@ mod tests {
 
         handshake.sta2.handle_timeout(&mut sink, Timeout::Retransmission);
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
     }
 
     #[test]
@@ -893,7 +893,7 @@ mod tests {
         let mut sink = vec![];
         handshake.sta1.handle_timeout(&mut sink, Timeout::KeyExpiration);
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::InternalError(_)));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::InternalError(_)));
     }
 
     #[test]
@@ -908,6 +908,6 @@ mod tests {
         let mut sink = vec![];
         handshake.sta1.handle_timeout(&mut sink, Timeout::KeyExpiration);
         assert_eq!(sink.len(), 1);
-        assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::KeyExpiration));
+        assert_matches!(sink.remove(0), SaeUpdate::Reject(RejectReason::KeyExpiration));
     }
 }

@@ -1086,10 +1086,10 @@ impl RemoteClient {
 mod tests {
     use super::*;
     use crate::device::FakeDevice;
+    use assert_matches::assert_matches;
     use ieee80211::Bssid;
     use lazy_static::lazy_static;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::mac::{CapabilityInfo, IntoBytesExt as _};
     use wlan_common::test_utils::fake_frames::*;
     use wlan_common::timer::{self, create_timer};
@@ -1120,7 +1120,7 @@ mod tests {
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1150,7 +1150,7 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Deauthenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1186,7 +1186,7 @@ mod tests {
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Deauthenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1220,7 +1220,7 @@ mod tests {
             .await
             .expect("expected OK");
 
-        assert_variant!(
+        assert_matches!(
             r_sta.state.as_ref(),
             State::Associated {
                 eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Closed),
@@ -1228,7 +1228,7 @@ mod tests {
             }
         );
 
-        assert_variant!(r_sta.aid(), Some(aid) => {
+        assert_matches!(r_sta.aid(), Some(aid) => {
             assert_eq!(aid, 1);
         });
 
@@ -1337,7 +1337,7 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_variant!(
+        assert_matches!(
             r_sta.state.as_ref(),
             State::Associated { eapol_controlled_port: None, active_timeout: Some(_), .. }
         );
@@ -1360,7 +1360,7 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1395,7 +1395,7 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1425,7 +1425,7 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1453,7 +1453,7 @@ mod tests {
         r_sta
             .handle_mlme_set_controlled_port_req(fidl_mlme::ControlledPortState::Open)
             .expect("expected OK");
-        assert_variant!(
+        assert_matches!(
             r_sta.state.as_ref(),
             State::Associated {
                 eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Open),
@@ -1474,7 +1474,7 @@ mod tests {
         r_sta
             .handle_mlme_set_controlled_port_req(fidl_mlme::ControlledPortState::Closed)
             .expect("expected OK");
-        assert_variant!(
+        assert_matches!(
             r_sta.state.as_ref(),
             State::Associated {
                 eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Closed),
@@ -1500,7 +1500,7 @@ mod tests {
             ),
             zx::Status::BAD_STATE
         );
-        assert_variant!(
+        assert_matches!(
             r_sta.state.as_ref(),
             State::Associated { eapol_controlled_port: None, .. }
         );
@@ -1569,7 +1569,7 @@ mod tests {
                 locally_initiated: false,
             },
         );
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
     }
 
     #[test_case(State::Authenticating; "in authenticating state")]
@@ -1668,7 +1668,7 @@ mod tests {
             2, 0, // auth txn seq num
             13, 0, // status code
         ][..]);
-        assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Deauthenticated);
     }
 
     #[test_case(false; "from idle state")]
@@ -1701,7 +1701,7 @@ mod tests {
                 locally_initiated: false,
             }
         );
-        assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Deauthenticated);
     }
 
     #[test]
@@ -1826,7 +1826,7 @@ mod tests {
 
         r_sta.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze OK");
 
-        assert_variant!(
+        assert_matches!(
             r_sta.handle_ps_poll(&mut ctx, 2).expect_err("expected handle_ps_poll error"),
             ClientRejection::NotPermitted
         );
@@ -1845,7 +1845,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
 
-        assert_variant!(
+        assert_matches!(
             r_sta.handle_ps_poll(&mut ctx, 1).expect_err("expected handle_ps_poll error"),
             ClientRejection::NotPermitted
         );
@@ -1953,7 +1953,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Authenticated);
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_eth_frame(
                     &mut ctx,
@@ -1980,7 +1980,7 @@ mod tests {
             active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_eth_frame(
                     &mut ctx,
@@ -2042,7 +2042,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Authenticating);
         let (mut ctx, _) = make_context(fake_device);
 
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_data_frame(
                     &mut ctx,
@@ -2109,7 +2109,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Authenticated);
         let (mut ctx, _) = make_context(fake_device);
 
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_data_frame(
                     &mut ctx,
@@ -2449,7 +2449,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Authenticating);
         let (mut ctx, _) = make_context(fake_device);
 
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_mgmt_frame(
                     &mut ctx,
@@ -2519,7 +2519,7 @@ mod tests {
         });
         let (mut ctx, _) = make_context(fake_device);
 
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .handle_mgmt_frame(
                     &mut ctx,
@@ -2606,7 +2606,7 @@ mod tests {
         });
 
         r_sta.handle_bss_idle_timeout(&mut ctx).await.expect("expected OK");
-        assert_variant!(r_sta.state.as_ref(), State::Authenticated);
+        assert_matches!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -2758,7 +2758,7 @@ mod tests {
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
 
-        assert_variant!(
+        assert_matches!(
             r_sta
                 .set_power_state(&mut ctx, mac::PowerState::DOZE)
                 .expect_err("expected doze error"),

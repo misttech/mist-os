@@ -482,6 +482,7 @@ mod tests {
     use crate::util::testing::{
         generate_channel, generate_random_sme_scan_result, run_until_completion,
     };
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ControlHandle, Responder};
     use futures::future;
     use futures::task::Poll;
@@ -492,7 +493,7 @@ mod tests {
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::test_utils::fake_frames::fake_unknown_rsne;
     use wlan_common::test_utils::fake_stas::IesOverrides;
-    use wlan_common::{assert_variant, fake_bss_description, random_fidl_bss_description};
+    use wlan_common::{fake_bss_description, random_fidl_bss_description};
     use {fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync};
 
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {
@@ -748,7 +749,7 @@ mod tests {
             defects
         };
         let mut defects_fut = pin!(defects_fut);
-        assert_variant!(exec.run_until_stalled(&mut defects_fut), Poll::Ready(defects) => defects)
+        assert_matches!(exec.run_until_stalled(&mut defects_fut), Poll::Ready(defects) => defects)
     }
 
     #[fuchsia::test]
@@ -765,13 +766,13 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data
         let MockScanData { sme_results: input_aps, internal_results: _ } =
             create_scan_ap_data(types::ScanObservation::Passive);
         // Validate the SME received the scan_request and send back mock data
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -783,14 +784,14 @@ mod tests {
         );
 
         // Check for results
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
             let scan_results: Vec<fidl_sme::ScanResult> = result.expect("failed to get scan results")
                 .iter().map(|r| r.clone().into()).collect();
             assert_eq!(scan_results, input_aps);
         });
 
         // No further requests to the sme
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -813,13 +814,13 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data
         let MockScanData { sme_results: input_aps, internal_results: _ } =
             create_scan_ap_data(types::ScanObservation::Active);
         // Validate the SME received the scan_request and send back mock data
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -831,14 +832,14 @@ mod tests {
         );
 
         // Check for results
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
             let scan_results: Vec<fidl_sme::ScanResult> = result.expect("failed to get scan results")
                 .iter().map(|r| r.clone().into()).collect();
             assert_eq!(scan_results, input_aps);
         });
 
         // No further requests to the sme
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -855,10 +856,10 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Check that a scan request was sent to the sme and close the channel
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req: _, responder,
@@ -871,7 +872,7 @@ mod tests {
         );
 
         // Check for results
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(result) => {
             let error = result.expect_err("did not expect scan results");
             assert_eq!(error, types::ScanError::GeneralError);
         });
@@ -890,12 +891,12 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data and send it via the SME
         let MockScanData { sme_results: input_aps, internal_results: internal_aps } =
             create_scan_ap_data(types::ScanObservation::Passive);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -907,14 +908,14 @@ mod tests {
         );
 
         // Process scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
             assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results.unwrap(), internal_aps);
         });
 
         // Since the scanning process went off without a hitch, there should not be any defect
         // metrics logged.
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
                 assert_eq!(inspect_data, ScanEventInspectData::new());
@@ -940,10 +941,10 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Send back empty scan results via the SME
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -955,13 +956,13 @@ mod tests {
         );
 
         // Process response from SME (which is empty) and expect the future to complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
             assert_eq!(request.sme_req, sme_scan);
             assert!(results.unwrap().is_empty());
         });
 
         // Verify that an empty scan result has been logged
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
                 assert_eq!(inspect_data, ScanEventInspectData::new());
@@ -992,10 +993,10 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Send back empty scan results via the SME
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -1007,14 +1008,14 @@ mod tests {
         );
 
         // Process response from SME (which is empty) and expect the future to complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
             assert_eq!(request.sme_req, sme_scan);
             assert!(results.unwrap().is_empty());
         });
 
         // Verify that a scan defect has not been logged; this should only be logged for
         // passive scans because it is common for active scans.
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanEvent { scan_defects, .. })) => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanEvent { scan_defects, .. })) => {
             assert!(scan_defects.is_empty());
         });
 
@@ -1051,10 +1052,10 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data and send it via the SME
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -1233,10 +1234,10 @@ mod tests {
             telemetry_sender,
         );
         let mut scan_fut = pin!(scan_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Send back a failure to the scan request that was generated.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
                 // Send failed scan response.
@@ -1245,7 +1246,7 @@ mod tests {
         );
 
         // The scan future should complete with an error.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
             assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results, Err(policy_failure_mode));
         });
@@ -1270,13 +1271,13 @@ mod tests {
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Wake up the next timer, which should be the timeour on the scan request.
         assert!(exec.wake_next_timer().is_some());
 
         // Check that an error is returned for the scan and there are no location sensor results.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
             assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
@@ -1325,13 +1326,13 @@ mod tests {
                 iface_manager.get_sme_proxy_for_scan().await
             };
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(sme)) => sme)
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(sme)) => sme)
         };
 
         // Report the desired scan error or success.
         let fut = report_scan_defects_to_sme(&sme, &scan_result, &scan_request);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Based on the expected defect (or lack thereof), ensure that the correct value is obsered
         // on the receiver.
@@ -1371,30 +1372,30 @@ mod tests {
             first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut1 = pin!(scan_req_fut1);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back a failure to the scan request that was generated.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, first_req_channels)
                 });
                 // Send failed scan response.
                 responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // The scan request future should complete with an error.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
 
         // There should be no other SME requests in the queue
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Issue another request to scan.
         let second_req_channels = vec![55];
@@ -1404,30 +1405,30 @@ mod tests {
             second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut2 = pin!(scan_req_fut2);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back a failure to the scan request that was generated.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, second_req_channels)
                 });
                 // Send failed scan response.
                 responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // The scan request future should complete with an error.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Ready(results) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Ready(results) => {
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
 
         // There should be no other SME requests in the queue
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -1456,21 +1457,21 @@ mod tests {
             first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut1 = pin!(scan_req_fut1);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Check the scan request was sent to the SME.
-        let responder1 = assert_variant!(
+        let responder1 = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, first_req_channels)
                 });
                 responder
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Issue another request to scan.
         let second_req_channels = vec![55];
@@ -1480,45 +1481,45 @@ mod tests {
             second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut2 = pin!(scan_req_fut2);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Both requests are pending
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
         // There should be no other SME requests in the queue
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Send back a failed scan response.
         responder1
             .send(Err(fidl_sme::ScanErrorCode::InternalError))
             .expect("failed to send scan error");
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // There should immediately be a new SME scan for the second request
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, second_req_channels)
                 });
                 // Send failed scan response.
                 responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Both scan request futures should complete with an error.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Ready(results) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Ready(results) => {
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
 
         // There should be no other SME requests in the queue
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -1542,11 +1543,11 @@ mod tests {
         // Issue request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
         let mut scan_req_fut = pin!(scan_req_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back scan results
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
                 let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
@@ -1554,16 +1555,16 @@ mod tests {
                 responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // The scan request future should complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
             assert_eq!(results.len(), 2);
         });
 
         // Check location sensor got results
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(
             &*exec.run_singlethreaded(location_sensor_results.lock()),
             Some(ref results) => {
                 assert_eq!(results.len(), 2);
@@ -1596,11 +1597,11 @@ mod tests {
         // Issue request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
         let mut scan_req_fut = pin!(scan_req_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back scan results
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
                 let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
@@ -1608,11 +1609,11 @@ mod tests {
                 responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Check location sensor didn't get any results
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
-        assert_variant!(&*exec.run_singlethreaded(location_sensor_results.lock()), None);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(&*exec.run_singlethreaded(location_sensor_results.lock()), None);
 
         // Make location sensor *not* stalled
         *(exec.run_singlethreaded(location_sensor_stalled.lock())) = false;
@@ -1620,11 +1621,11 @@ mod tests {
         // Issue another request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
         let mut scan_req_fut = pin!(scan_req_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back scan results
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
                 let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
@@ -1632,11 +1633,11 @@ mod tests {
                 responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Check location sensor got results
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(
             &*exec.run_singlethreaded(location_sensor_results.lock()),
             Some(ref results) => {
                 assert_eq!(results.len(), 2);
@@ -1665,8 +1666,8 @@ mod tests {
         // Issue request to scan
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
         let mut scan_req_fut = pin!(scan_req_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Prepare scan results with unknown protection IEs
         let bss_description = fake_bss_description!(Wpa2, ies_overrides: IesOverrides::new().set(IeType::RSNE, fake_unknown_rsne()[2..].to_vec()));
@@ -1676,7 +1677,7 @@ mod tests {
         };
 
         // Send back scan results
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
@@ -1688,17 +1689,17 @@ mod tests {
         );
 
         // Process scan handler
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // The scan request future should complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
             assert_eq!(results.len(), 1);
         });
 
         // Verify inspect data was sent to telemetry module.
         let readable_ie: String =
             scan_result.bss_description.ies.iter().map(|n| n.to_string()).join(",");
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
                 assert_eq!(scan_defects, vec![]);
@@ -1738,41 +1739,41 @@ mod tests {
             req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut = pin!(scan_req_fut);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Check that the scan request was sent to the SME.
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, req_channels)
                 });
                 responder
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Send back a error from SME for the request.
         responder.send(Err(error_code)).expect("failed to send scan error");
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Request should return still be pending, awaiting retry.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
 
         // There should be no new SME requests yet.
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Wake up the back off timer and advance the scan request future.
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Verify the retry scan request was sent to SME.
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, req_channels)
                 });
                 responder
@@ -1786,7 +1787,7 @@ mod tests {
                 create_scan_ap_data(types::ScanObservation::Passive);
             let vmo = write_vmo(input_aps).expect("failed to write VMO");
             responder.send(Ok(vmo)).expect("failed to send scan data");
-            assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
             // Verify one defect was logged.
             let logged_defects = get_fake_defects(&mut exec, iface_mgr);
@@ -1795,7 +1796,7 @@ mod tests {
         } else {
             // Send back a error from SME.
             responder.send(Err(error_code)).expect("failed to send scan error");
-            assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
             // Verify that both defects were logged.
             let logged_defects = get_fake_defects(&mut exec, iface_mgr);
@@ -1806,10 +1807,10 @@ mod tests {
             assert_eq!(logged_defects, expected_defects);
         }
         // Request should get a response now.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(_));
 
         // There should be no new SME requests.
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -1838,15 +1839,15 @@ mod tests {
             first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut1 = pin!(scan_req_fut1);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Check the first scan request was sent to the SME.
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, first_req_channels)
                 });
                 responder
@@ -1861,35 +1862,35 @@ mod tests {
             second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
         let mut scan_req_fut2 = pin!(scan_req_fut2);
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // There should be no new SME requests in the queue.
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Send back a ShouldWait error from SME for the first request.
         responder
             .send(Err(fidl_sme::ScanErrorCode::ShouldWait))
             .expect("failed to send scan error");
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // First request still be pending, as it awaits a retry.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
 
         // There should be no new SME requests, since the first request should be backing off
         // before issuing a retry.
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Wake up the back off timer and advance the scan request future.
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // Verify the retry scan request was sent to SME.
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, first_req_channels)
                 });
                 responder
@@ -1900,27 +1901,27 @@ mod tests {
         responder
             .send(Err(fidl_sme::ScanErrorCode::ShouldWait))
             .expect("failed to send scan error");
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // The first scan req future should now be Ready, returning a Cancelled error.
-        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
+        assert_matches!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
             assert_eq!(results, Err(types::ScanError::Cancelled));
         });
 
         // There should be no SME requests in the queue, because the scan loop should be backing
         // off before serviving the next scan request.
-        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
 
         // Wake up the back off timer.
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
         // There should now be an SME scan request for the second scan req.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, .. }))) => {
                 // Make sure it's the right scan
-                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                assert_matches!(req, fidl_sme::ScanRequest::Active(req) => {
                     assert_eq!(req.channels, second_req_channels)
                 });
             }

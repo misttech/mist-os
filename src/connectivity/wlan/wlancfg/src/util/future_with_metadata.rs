@@ -42,9 +42,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use std::pin::pin;
-    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn assign_and_read_metadata_in_future_output() {
@@ -69,7 +69,7 @@ mod tests {
         test_future.metadata.has_been_written = true;
 
         // The future should resolve with the metadata
-        assert_variant!(exec.run_until_stalled(&mut test_future), Poll::Ready((fut_result, metadata)) => {
+        assert_matches!(exec.run_until_stalled(&mut test_future), Poll::Ready((fut_result, metadata)) => {
             assert!(metadata.has_been_written);
             assert_eq!(fut_result, "future result");
         });

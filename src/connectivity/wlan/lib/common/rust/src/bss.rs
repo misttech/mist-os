@@ -673,6 +673,7 @@ where
 mod tests {
     use super::*;
     use crate::channel::Cbw;
+    use crate::fake_bss_description;
     use crate::ie::fake_ies::fake_wmm_param;
     use crate::ie::IeType;
     use crate::test_utils::fake_frames::{
@@ -681,7 +682,7 @@ mod tests {
         invalid_wpa3_enterprise_192_bit_rsne, invalid_wpa3_rsne,
     };
     use crate::test_utils::fake_stas::IesOverrides;
-    use crate::{assert_variant, fake_bss_description};
+    use assert_matches::assert_matches;
     use test_case::test_case;
 
     #[test_case(fake_bss_description!(
@@ -818,7 +819,7 @@ mod tests {
                 .remove(IeType::RM_ENABLED_CAPABILITIES)
                 .set(IeType::RM_ENABLED_CAPABILITIES, rm_enabled_capabilities.clone())
         );
-        assert_variant!(bss.rm_enabled_cap(), Some(cap) => {
+        assert_matches!(bss.rm_enabled_cap(), Some(cap) => {
             assert_eq!(cap.as_bytes(), &rm_enabled_capabilities[..]);
         });
     }
@@ -1123,25 +1124,25 @@ mod tests {
         );
         assert_eq!(bss.country(), Some(&[1, 2, 3][..]));
         assert_eq!(bss.rsne(), Some(&fake_wpa2_rsne()[..]));
-        assert_variant!(bss.ht_cap(), Some(capability_info) => {
+        assert_matches!(bss.ht_cap(), Some(capability_info) => {
             assert_eq!(Ref::bytes(&capability_info), &ht_cap[..]);
         });
         assert_eq!(
             bss.raw_ht_cap().map(|capability_info| capability_info.bytes.to_vec()),
             Some(ht_cap)
         );
-        assert_variant!(bss.ht_op(), Some(op) => {
+        assert_matches!(bss.ht_op(), Some(op) => {
             assert_eq!(Ref::bytes(&op), &ht_op[..]);
         });
         assert_eq!(bss.raw_ht_op().map(|op| op.bytes.to_vec()), Some(ht_op));
-        assert_variant!(bss.vht_cap(), Some(capability_info) => {
+        assert_matches!(bss.vht_cap(), Some(capability_info) => {
             assert_eq!(Ref::bytes(&capability_info), &vht_cap[..]);
         });
         assert_eq!(
             bss.raw_vht_cap().map(|capability_info| capability_info.bytes.to_vec()),
             Some(vht_cap)
         );
-        assert_variant!(bss.vht_op(), Some(op) => {
+        assert_matches!(bss.vht_op(), Some(op) => {
             assert_eq!(Ref::bytes(&op), &vht_op[..]);
         });
         assert_eq!(bss.raw_vht_op().map(|op| op.bytes.to_vec()), Some(vht_op));

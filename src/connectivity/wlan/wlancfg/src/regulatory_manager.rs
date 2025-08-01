@@ -80,6 +80,7 @@ mod tests {
     use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
     use crate::regulatory_manager::REGION_CODE_LEN;
     use anyhow::{format_err, Error};
+    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_location_namedplace::{
@@ -92,7 +93,6 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use std::unimplemented;
-    use wlan_common::assert_variant;
 
     /// Holds all of the boilerplate required for testing RegulatoryManager.
     struct TestContext<S: Stream<Item = Result<(), Error>> + Unpin> {
@@ -145,23 +145,23 @@ mod tests {
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
         responder.send(Some("U")).expect("failed to send response");
-        assert_variant!(context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
+        assert_matches!(context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
 
-        assert_variant!(
+        assert_matches!(
             &context.executor.run_until_stalled(&mut context.regulatory_receiver),
             Poll::Pending
         );
 
         // Verify that there is a new region update request.
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        assert_variant!(
+        assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
-            Poll::Ready(Some(_)),
+            Poll::Ready(Some(_))
         );
     }
 
@@ -173,12 +173,12 @@ mod tests {
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
-        assert_variant!(responder.send(Some("USA")), Err(fidl::Error::StringTooLong { .. }));
-        assert_variant!(context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
+        assert_matches!(responder.send(Some("USA")), Err(fidl::Error::StringTooLong { .. }));
+        assert_matches!(context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -189,7 +189,7 @@ mod tests {
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let region_responder = assert_variant!(
+        let region_responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
@@ -214,7 +214,7 @@ mod tests {
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let region_responder = assert_variant!(
+        let region_responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
@@ -231,7 +231,7 @@ mod tests {
             Poll::Pending => panic!("Expected to be able to lock the IfaceManager."),
         }
 
-        assert_variant!(
+        assert_matches!(
             &context.executor.run_until_stalled(&mut context.regulatory_receiver),
             Poll::Pending
         );
@@ -255,7 +255,7 @@ mod tests {
         }
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let region_responder = assert_variant!(
+        let region_responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
@@ -274,7 +274,7 @@ mod tests {
         }
 
         // Verify that the policy API is instructed to begin serving.
-        assert_variant!(
+        assert_matches!(
             &context.executor.run_until_stalled(&mut context.regulatory_receiver),
             Poll::Ready(Ok(()))
         );
@@ -292,7 +292,7 @@ mod tests {
         // Drive the RegulatoryManager to request an update from RegulatoryRegionWatcher,
         // and deliver a RegulatoryRegion update.
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        let region_responder = assert_variant!(
+        let region_responder = assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
@@ -304,13 +304,13 @@ mod tests {
             .try_send(Err(format_err!("sending a test error")))
             .expect("internal error: failed to send fake response to StubIfaceManager");
 
-        assert_variant!(&context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
+        assert_matches!(&context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
 
         // Verify that there is a new region update request.
         let region_request_fut = &mut context.regulatory_region_requests.next();
-        assert_variant!(
+        assert_matches!(
             context.executor.run_until_stalled(region_request_fut),
-            Poll::Ready(Some(_)),
+            Poll::Ready(Some(_))
         );
     }
 
@@ -325,7 +325,7 @@ mod tests {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
             let region_request_fut = &mut context.regulatory_region_requests.next();
-            let region_responder = assert_variant!(
+            let region_responder = assert_matches!(
                 context.executor.run_until_stalled(region_request_fut),
                 Poll::Ready(Some(Ok(
                     RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
@@ -344,7 +344,7 @@ mod tests {
         }
 
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
-        assert_variant!(
+        assert_matches!(
             &context.executor.run_until_stalled(&mut context.regulatory_receiver),
             Poll::Ready(Ok(()))
         );
@@ -354,7 +354,7 @@ mod tests {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
             let region_request_fut = &mut context.regulatory_region_requests.next();
-            let region_responder = assert_variant!(
+            let region_responder = assert_matches!(
                 context.executor.run_until_stalled(region_request_fut),
                 Poll::Ready(Some(Ok(
                     RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
