@@ -4,12 +4,14 @@
 
 #include "src/graphics/display/drivers/goldfish-display/display-driver.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -18,6 +20,7 @@
 
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/display/cpp/bind.h>
@@ -25,8 +28,8 @@
 
 #include "src/graphics/display/drivers/goldfish-display/display-engine.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace goldfish {
 namespace {
@@ -157,9 +160,9 @@ zx::result<> DisplayDriver::Start() {
   display_event_dispatcher_ = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
-  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
+  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsFidl>(&alloc_checker);
   if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineEventsBanjo");
+    fdf::error("Failed to allocate memory for DisplayEngineEventsFidl");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -178,27 +181,27 @@ zx::result<> DisplayDriver::Start() {
     return init_result.take_error();
   }
 
-  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+  engine_fidl_adapter_ = fbl::make_unique_checked<display::DisplayEngineFidlAdapter>(
       &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineBanjoAdapter");
+    fdf::error("Failed to allocate memory for DisplayEngineFidlAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
-  // over the compatibility server.
-  zx::result<> compat_server_init_result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                /*banjo_config=*/engine_banjo_adapter_->CreateBanjoConfig());
-  if (compat_server_init_result.is_error()) {
-    return compat_server_init_result.take_error();
+  fuchsia_hardware_display_engine::Service::InstanceHandler service_handler(
+      {.engine = engine_fidl_adapter_->CreateHandler(*(driver_dispatcher()->get()))});
+  zx::result<> add_service_result =
+      outgoing()->AddService<fuchsia_hardware_display_engine::Service>(std::move(service_handler));
+  if (add_service_result.is_error()) {
+    fdf::error("Failed to add service: {}", add_service_result);
+    return add_service_result.take_error();
   }
 
   const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
-  const std::vector<fuchsia_driver_framework::Offer> node_offers = compat_server_.CreateOffers2();
+  const std::vector<fuchsia_driver_framework::Offer> node_offers = {
+      fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>()};
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
       AddChild(name(), node_properties, node_offers);
   if (controller_client_result.is_error()) {
