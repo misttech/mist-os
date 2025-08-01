@@ -110,8 +110,6 @@ class ClientProxy {
   // Fired after the FIDL client is unbound.
   sync_completion_t* FidlUnboundCompletionForTesting();
 
-  size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
-
   // Define these constants here so we can access them in tests.
 
   // At the moment, maximum image handles returned by any driver is 4 which is

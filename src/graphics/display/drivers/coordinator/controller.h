@@ -165,8 +165,6 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
-  size_t ImportedImagesCountForTesting() const;
-
   // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(

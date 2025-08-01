@@ -99,8 +99,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
 
-  size_t ImportedImagesCountForTesting() const { return images_.size(); }
-
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
   void ReleaseImage(ReleaseImageRequestView request,
