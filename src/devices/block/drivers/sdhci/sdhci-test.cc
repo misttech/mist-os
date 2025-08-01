@@ -70,7 +70,7 @@ class TestSdhci : public Sdhci {
   void* iobuf_virt() const { return iobuf_->virt(); }
 
   void TriggerCardInterrupt() { card_interrupt_ = true; }
-  void InjectTransferError() { inject_error_ = true; }
+  void InjectTransferError(InterruptStatus status) { inject_error_ = status.reg_value(); }
 
   zx_status_t BeginIrqAckWait(zx::unowned_interrupt irq) {
     irq_ack_wait_.set_object(irq->get());
@@ -116,9 +116,8 @@ class TestSdhci : public Sdhci {
         return;
       case RequestStatus::TRANSFER_DATA_DMA:
         interrupt_status.set_transfer_complete(1);
-        if (inject_error_) {
-          interrupt_status.set_error(1).set_data_crc_error(1);
-        }
+        interrupt_status.set_reg_value(interrupt_status.reg_value() | inject_error_);
+        inject_error_ = 0;
         interrupt_status.WriteTo(&*regs_mmio_buffer_);
         return;
       case RequestStatus::READ_DATA_PIO:
@@ -154,7 +153,7 @@ class TestSdhci : public Sdhci {
   std::atomic<uint16_t> blocks_remaining_ = 0;
   std::atomic<uint16_t> current_block_ = 0;
   std::atomic<bool> card_interrupt_ = false;
-  std::atomic<bool> inject_error_ = false;
+  std::atomic<uint32_t> inject_error_;
   async::WaitMethod<TestSdhci, &TestSdhci::InterruptAck> irq_ack_wait_;
 };
 
@@ -2079,7 +2078,8 @@ TEST_F(SdhciTest, TransferError) {
       .buffers_count = 1,
   };
 
-  driver_test().driver()->InjectTransferError();
+  driver_test().driver()->InjectTransferError(
+      InterruptStatus::Get().FromValue(0).set_error(1).set_data_crc_error(1));
   uint32_t response[4] = {};
   EXPECT_NE(ZX_OK, driver_test().driver()->SdmmcRequest(&request, response));
 
@@ -2351,6 +2351,53 @@ TEST_F(SdhciTest, BufferedWrite) {
 
   // The data port should hold the last word from the buffer.
   EXPECT_EQ(BufferData::Get().ReadFrom(driver_test().driver()->mmio_).reg_value(), kTestWord);
+
+  ASSERT_OK(StopDriver());
+}
+
+TEST_F(SdhciTest, TransferCompletePriority) {
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    Capabilities0::Get()
+        .FromValue(0)
+        .set_adma2_support(1)
+        .set_v3_64_bit_system_address_support(1)
+        .WriteTo(&env.mmio());
+  });
+
+  ASSERT_OK(StartDriver());
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(512, 0, &vmo));
+  EXPECT_OK(driver_test().driver()->SdmmcRegisterVmo(1, 0, std::move(vmo), 0, 512,
+                                                     SDMMC_VMO_RIGHT_READ | SDMMC_VMO_RIGHT_WRITE));
+
+  const sdmmc_buffer_region_t buffer{
+      .buffer =
+          {
+              .vmo_id = 1,
+          },
+      .type = SDMMC_BUFFER_TYPE_VMO_ID,
+      .offset = 0,
+      .size = 512,
+  };
+
+  // Inject a data timeout error interrupt, which will be sent at the same time as transfer
+  // complete. Transfer complete should take priority, and the request should complete successfully.
+  driver_test().driver()->InjectTransferError(
+      InterruptStatus::Get().FromValue(0).set_error(1).set_data_timeout_error(1));
+
+  const sdmmc_req_t request = {
+      .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
+      .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
+      .arg = 0x1234abcd,
+      .blocksize = 512,
+      .suppress_error_messages = false,
+      .client_id = 0,
+      .buffers_list = &buffer,
+      .buffers_count = 1,
+  };
+  uint32_t response[4] = {};
+  EXPECT_OK(driver_test().driver()->SdmmcRequest(&request, response));
 
   ASSERT_OK(StopDriver());
 }
