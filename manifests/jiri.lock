@@ -405,6 +405,11 @@
         "instance_id": "Sa5ZHZ0lAuBQ6njUrzAgGi39e_Aq-I__EbHjSSbv4z8C"
     },
     {
+        "package": "fuchsia/third_party/3pp/mcp-language-server/linux-amd64",
+        "version": "version:2@0.1.1",
+        "instance_id": "WhPGH81oXPjV-Z51rV0vwANObu0hNgeNS8EL8xuFBacC"
+    },
+    {
         "package": "fuchsia/third_party/android/aemu/release-gfxstream/linux-amd64",
         "version": "bid:13279406",
         "instance_id": "vyFeetWMDQWxFDexo-JnYBtKSDSYrUra2dry6AcWLcMC"
