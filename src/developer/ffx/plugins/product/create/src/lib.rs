@@ -87,6 +87,9 @@ struct SanitizedCreateCommand {
     /// The board config to use.
     pub board_config: String,
 
+    /// The name to give the product bundle.
+    pub name: Option<String>,
+
     /// The version of the product to use.
     pub version: Option<String>,
 
@@ -138,9 +141,10 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
                 (p, b)
             };
 
+        let name = cmd.name;
         let version = cmd.version;
         let tuf_keys = cmd.tuf_keys;
-        Ok(Self { platform, product_config, board_config, version, tuf_keys, result })
+        Ok(Self { platform, product_config, board_config, name, version, tuf_keys, result })
     }
 }
 
@@ -165,9 +169,11 @@ async fn sanitized_product_bundle_create(
         Assembly::new(&cache, cmd.platform, cmd.product_config, cmd.board_config, build_dir)?;
     writer.line(format!("Staged the artifacts\n{}", assembly.version_string()))?;
 
-    let product_name = assembly.product_config.product.release_info.info.name.clone();
-    let board_name = assembly.board_config.release_info.info.name.clone();
-    let name = format!("{}.{}", product_name, board_name);
+    let name = cmd.name.unwrap_or_else(|| {
+        let product_name = assembly.product_config.product.release_info.info.name.clone();
+        let board_name = assembly.board_config.release_info.info.name.clone();
+        format!("{}.{}", product_name, board_name)
+    });
 
     // Return early if we are only staging the inputs.
     let out = match cmd.result {

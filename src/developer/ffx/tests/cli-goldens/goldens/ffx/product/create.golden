@@ -50,6 +50,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "name"
+        }
+      },
+      "optionality": "optional",
+      "long": "--name",
+      "short": null,
+      "description": "the name to give the product bundle. Defaults to product_config.board_config.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "version"
         }
       },
