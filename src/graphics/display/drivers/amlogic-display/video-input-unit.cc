@@ -210,7 +210,7 @@ uint32_t VideoInputUnit::FloatToFixed3_10(float f) {
 }
 
 void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config) {
-  if (!config.cc_flags) {
+  if (!config.color_conversion.flags) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
                              vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) & ~(1 << 0));
@@ -222,25 +222,25 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
                            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) | (1 << 0));
 
   // Load PreOffset values (or 0 if none entered)
-  auto offset0_1 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
-                        ? (FloatToFixed2_10(config.cc_preoffsets[0]) << 16 |
-                           FloatToFixed2_10(config.cc_preoffsets[1]) << 0)
+  auto offset0_1 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
+                        ? (FloatToFixed2_10(config.color_conversion.preoffsets[0]) << 16 |
+                           FloatToFixed2_10(config.color_conversion.preoffsets[1]) << 0)
                         : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET0_1, offset0_1);
-  auto offset2 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
-                      ? (FloatToFixed2_10(config.cc_preoffsets[2]) << 0)
+  auto offset2 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
+                      ? (FloatToFixed2_10(config.color_conversion.preoffsets[2]) << 0)
                       : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
   fdf::trace("pre offset0_1={} offset2={}", offset0_1, offset2);
 
   // Load PostOffset values (or 0 if none entered)
-  offset0_1 = (config.cc_flags & COLOR_CONVERSION_POSTOFFSET
-                   ? (FloatToFixed2_10(config.cc_postoffsets[0]) << 16 |
-                      FloatToFixed2_10(config.cc_postoffsets[1]) << 0)
+  offset0_1 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET
+                   ? (FloatToFixed2_10(config.color_conversion.postoffsets[0]) << 16 |
+                      FloatToFixed2_10(config.color_conversion.postoffsets[1]) << 0)
                    : 0);
-  offset2 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
-                 ? (FloatToFixed2_10(config.cc_postoffsets[2]) << 0)
+  offset2 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
+                 ? (FloatToFixed2_10(config.color_conversion.postoffsets[2]) << 0)
                  : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET0_1, offset0_1);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET2, offset2);
@@ -255,8 +255,9 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
   };
   // clang-format on
 
-  const auto* ccm =
-      (config.cc_flags & COLOR_CONVERSION_COEFFICIENTS) ? config.cc_coefficients : identity;
+  const auto* ccm = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_COEFFICIENTS)
+                        ? config.color_conversion.coefficients
+                        : identity;
 
   // Load up the coefficient matrix registers
   auto coef00_01 = FloatToFixed3_10(ccm[0][0]) << 16 | FloatToFixed3_10(ccm[0][1]) << 0;

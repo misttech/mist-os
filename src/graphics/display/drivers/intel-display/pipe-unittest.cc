@@ -113,7 +113,10 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   display_config_t config = {
       .display_id = 1u,
       .timing = {},
-      .cc_flags = 0u,
+      .color_conversion =
+          {
+              .flags = 0u,
+          },
       .layers_list = test_layers_1,
       .layers_count = 1,
   };
@@ -138,7 +141,10 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   display_config_t config_2 = {
       .display_id = 1u,
       .timing = {},
-      .cc_flags = 0u,
+      .color_conversion =
+          {
+              .flags = 0u,
+          },
       .layers_list = test_layers_2,
       .layers_count = 1,
   };

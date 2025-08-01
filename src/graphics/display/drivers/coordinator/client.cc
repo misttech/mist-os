@@ -502,26 +502,29 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   }
   DisplayConfig& display_config = *display_configs_it;
 
-  display_config.draft_.cc_flags = 0;
+  display_config.draft_.color_conversion.flags = 0;
   if (!std::isnan(request->preoffsets[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_PREOFFSET;
-    std::memcpy(display_config.draft_.cc_preoffsets, request->preoffsets.data(),
+    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_PREOFFSET;
+    std::memcpy(display_config.draft_.color_conversion.preoffsets, request->preoffsets.data(),
                 sizeof(request->preoffsets.data_));
-    static_assert(sizeof(request->preoffsets) == sizeof(display_config.draft_.cc_preoffsets));
+    static_assert(sizeof(request->preoffsets) ==
+                  sizeof(display_config.draft_.color_conversion.preoffsets));
   }
 
   if (!std::isnan(request->coefficients[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_COEFFICIENTS;
-    std::memcpy(display_config.draft_.cc_coefficients, request->coefficients.data(),
+    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_COEFFICIENTS;
+    std::memcpy(display_config.draft_.color_conversion.coefficients, request->coefficients.data(),
                 sizeof(request->coefficients.data_));
-    static_assert(sizeof(request->coefficients) == sizeof(display_config.draft_.cc_coefficients));
+    static_assert(sizeof(request->coefficients) ==
+                  sizeof(display_config.draft_.color_conversion.coefficients));
   }
 
   if (!std::isnan(request->postoffsets[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_POSTOFFSET;
-    std::memcpy(display_config.draft_.cc_postoffsets, request->postoffsets.data(),
+    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_POSTOFFSET;
+    std::memcpy(display_config.draft_.color_conversion.postoffsets, request->postoffsets.data(),
                 sizeof(request->postoffsets.data_));
-    static_assert(sizeof(request->postoffsets) == sizeof(display_config.draft_.cc_postoffsets));
+    static_assert(sizeof(request->postoffsets) ==
+                  sizeof(display_config.draft_.color_conversion.postoffsets));
   }
 
   display_config.has_draft_nonlayer_config_change_ = true;
@@ -1326,7 +1329,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     }();
     display_config->applied_.timing = display::ToBanjoDisplayTiming(timing);
 
-    display_config->applied_.cc_flags = 0;
+    display_config->applied_.color_conversion.flags = 0;
 
     display_config->draft_ = display_config->applied_;
 

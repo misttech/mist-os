@@ -361,7 +361,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
 
-  if (display_config.cc_flags != 0) {
+  if (display_config.color_conversion.flags != 0) {
     // Color Correction is not supported, but we will pretend we do.
     // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
     // requests color correction. For now, lets pretend we support it, until a proper fix is

@@ -133,7 +133,7 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
   }
 
   // This adapter does not currently support color correction.
-  if (display_config.cc_flags != 0) {
+  if (display_config.color_conversion.flags != 0) {
     completer.buffer(arena).ReplyError(display::ConfigCheckResult::kUnsupportedConfig.ToFidl());
     return;
   }
@@ -171,7 +171,7 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
                       "Display coordinator applied rejected config with too many layers");
 
   // This adapter does not currently support color correction.
-  ZX_DEBUG_ASSERT_MSG(display_config.cc_flags == 0,
+  ZX_DEBUG_ASSERT_MSG(display_config.color_conversion.flags == 0,
                       "Display coordinator applied rejected color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>

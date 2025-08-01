@@ -240,7 +240,7 @@ type DisplayTiming = struct {
     flags uint32;
 };
 
-type ColorConversion = strict enum : uint32 {
+type ColorConversionFlags = strict enum : uint32 {
     /// If set, use the 0 vector for the color conversion preoffset
     PREOFFSET = 0x1;
     /// If set, use the identity matrix for the color conversion coefficients
@@ -249,22 +249,27 @@ type ColorConversion = strict enum : uint32 {
     POSTOFFSET = 0x4;
 };
 
+/// Color conversion is applied to each pixel according to the formula:
+///
+/// (coefficients * (pixel + preoffsets)) + postoffsets
+///
+/// where pixel is a column vector consisting of the pixel's 3 components.
+type ColorConversion = struct {
+    /// Bitmask of flags defined in the ColorConversion enum.
+    flags uint32;
+
+    preoffsets array<float32, 3>;
+    coefficients array<array<float32, 3>, 3>;
+    postoffsets array<float32, 3>;
+};
+
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
 
     timing DisplayTiming;
 
-    /// Bitmask of flags defined in the ColorConversion enum.
-    cc_flags uint32;
-    /// Color conversion is applied to each pixel according to the formula:
-    ///
-    /// (cc_coefficients * (pixel + cc_preoffsets)) + cc_postoffsets
-    ///
-    /// where pixel is a column vector consisting of the pixel's 3 components.
-    cc_preoffsets array<float32, 3>;
-    cc_coefficients array<array<float32, 3>, 3>;
-    cc_postoffsets array<float32, 3>;
+    color_conversion ColorConversion;
 
     /// Valid display configurations have at least one layer.
     layers vector<Layer>:MAX;

@@ -227,7 +227,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   layers_[0].display_destination = kDisplayArea;
   layers_[0].image_source = kDisplayArea;
   layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
+  config_.color_conversion.flags = COLOR_CONVERSION_FLAGS_POSTOFFSET;
 
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
@@ -253,7 +253,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
   layers_[0].alpha_mode = ALPHA_HW_MULTIPLY;
   layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
-  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
+  config_.color_conversion.flags = COLOR_CONVERSION_FLAGS_POSTOFFSET;
 
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);

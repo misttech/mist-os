@@ -402,14 +402,16 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
 
-  if (banjo_display_config->cc_flags) {
+  if (banjo_display_config->color_conversion.flags) {
     float zero_offset[3] = {};
-    SetColorConversionOffsets(true, banjo_display_config->cc_flags & COLOR_CONVERSION_PREOFFSET
-                                        ? banjo_display_config->cc_preoffsets
-                                        : zero_offset);
-    SetColorConversionOffsets(false, banjo_display_config->cc_flags & COLOR_CONVERSION_POSTOFFSET
-                                         ? banjo_display_config->cc_postoffsets
-                                         : zero_offset);
+    SetColorConversionOffsets(
+        true, banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
+                  ? banjo_display_config->color_conversion.preoffsets
+                  : zero_offset);
+    SetColorConversionOffsets(
+        false, banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET
+                   ? banjo_display_config->color_conversion.postoffsets
+                   : zero_offset);
 
     float identity[3][3] = {
         {
@@ -430,9 +432,10 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
     };
     for (uint32_t i = 0; i < 3; i++) {
       for (uint32_t j = 0; j < 3; j++) {
-        float val = banjo_display_config->cc_flags & COLOR_CONVERSION_COEFFICIENTS
-                        ? banjo_display_config->cc_coefficients[i][j]
-                        : identity[i][j];
+        float val =
+            banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_COEFFICIENTS
+                ? banjo_display_config->color_conversion.coefficients[i][j]
+                : identity[i][j];
 
         auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
         reg.coefficient(i, j).set(float_to_intel_display_csc_coefficient(val));
@@ -443,7 +446,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   regs.csc_mode = pipe_regs.CscMode().ReadFrom(mmio_space_).reg_value();
 
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
-  bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
+  bottom_color.set_csc_enable(!!banjo_display_config->color_conversion.flags);
   bool has_color_layer =
       banjo_display_config->layers_count &&
       (banjo_display_config->layers_list[0].image_metadata.dimensions.width == 0 ||
@@ -483,8 +486,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
         break;
       }
     }
-    ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->cc_flags, &scaler_1_claimed,
-                          &regs, config_stamp, get_gtt_region_fn, get_pixel_format);
+    ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->color_conversion.flags,
+                          &scaler_1_claimed, &regs, config_stamp, get_gtt_region_fn,
+                          get_pixel_format);
   }
   DisableCursorPlane(&regs, config_stamp);
 

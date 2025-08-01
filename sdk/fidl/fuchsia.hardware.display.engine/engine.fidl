@@ -9,7 +9,7 @@ using fuchsia.math;
 using fuchsia.sysmem2;
 using zx;
 
-type ColorConversion = strict bits : uint32 {
+type ColorConversionFlags = strict bits : uint32 {
     /// If set, use the 0 vector for the color conversion preoffset
     PREOFFSET = 0x1;
     /// If set, use the identity matrix for the color conversion coefficients
@@ -142,22 +142,29 @@ type Layer = struct {
     image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
 };
 
+/// Color conversion is applied to each pixel according to the formula:
+///
+/// (coefficients * (pixel + preoffsets)) + postoffsets
+///
+/// where pixel is a column vector consisting of the pixel's 3 components.
+//
+// The color conversion API is subject to change. Only in-tree display engine
+// drivers may use it.
+type ColorConversion = struct {
+    flags uint32;
+
+    preoffsets array<float32, 3>;
+    coefficients array<array<float32, 3>, 3>;
+    postoffsets array<float32, 3>;
+};
+
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id fuchsia.hardware.display.types.DisplayId;
 
     timing DisplayTiming;
 
-    /// Bitmask of flags defined in the ColorConversion enum.
-    cc_flags uint32;
-    /// Color conversion is applied to each pixel according to the formula:
-    ///
-    /// (cc_coefficients * (pixel + cc_preoffsets)) + cc_postoffsets
-    ///
-    /// where pixel is a column vector consisting of the pixel's 3 components.
-    cc_preoffsets array<float32, 3>;
-    cc_coefficients array<array<float32, 3>, 3>;
-    cc_postoffsets array<float32, 3>;
+    color_conversion ColorConversion;
 
     /// Valid display configurations have at least one layer.
     layers vector<Layer>:MAX;

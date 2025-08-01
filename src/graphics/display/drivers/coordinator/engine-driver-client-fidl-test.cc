@@ -246,10 +246,13 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationOk) {
               .h_addressable = 1920,
               .v_addressable = 1080,
           },
-      .cc_flags = 1,
-      .cc_preoffsets = {0.1f, 0.2f, 0.3f},
-      .cc_coefficients = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-      .cc_postoffsets = {0.4f, 0.5f, 0.6f},
+      .color_conversion =
+          {
+              .flags = 1,
+              .preoffsets = {0.1f, 0.2f, 0.3f},
+              .coefficients = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}, {7.0f, 8.0f, 9.0f}},
+              .postoffsets = {0.4f, 0.5f, 0.6f},
+          },
       .layers_list = banjo_layers[0],
       .layers_count = 1,
   };
@@ -263,20 +266,21 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationOk) {
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 
-        EXPECT_EQ(request->display_config.cc_flags, banjo_config.cc_flags);
+        EXPECT_EQ(request->display_config.color_conversion.flags,
+                  banjo_config.color_conversion.flags);
 
-        EXPECT_THAT(request->display_config.cc_preoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.preoffsets,
                     ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
 
-        ASSERT_EQ(request->display_config.cc_coefficients.size(), 3u);
-        EXPECT_THAT(request->display_config.cc_coefficients[0],
-                    ::testing::ElementsAre(1.0f, 0.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[1],
-                    ::testing::ElementsAre(0.0f, 1.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[2],
-                    ::testing::ElementsAre(0.0f, 0.0f, 1.0f));
+        ASSERT_EQ(request->display_config.color_conversion.coefficients.size(), 3u);
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[0],
+                    ::testing::ElementsAre(1.0f, 2.0f, 3.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[1],
+                    ::testing::ElementsAre(4.0f, 5.0f, 6.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[2],
+                    ::testing::ElementsAre(7.0f, 8.0f, 9.0f));
 
-        EXPECT_THAT(request->display_config.cc_postoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.postoffsets,
                     ::testing::ElementsAre(0.4f, 0.5f, 0.6f));
 
         ASSERT_EQ(request->display_config.layers.size(), 1u);
@@ -312,10 +316,13 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationError) {
               .h_addressable = 1920,
               .v_addressable = 1080,
           },
-      .cc_flags = 1,
-      .cc_preoffsets = {0.1f, 0.2f, 0.3f},
-      .cc_coefficients = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-      .cc_postoffsets = {0.4f, 0.5f, 0.6f},
+      .color_conversion =
+          {
+              .flags = 1,
+              .preoffsets = {0.1f, 0.2f, 0.3f},
+              .coefficients = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}, {7.0f, 8.0f, 9.0f}},
+              .postoffsets = {0.4f, 0.5f, 0.6f},
+          },
       .layers_list = banjo_layers[0],
       .layers_count = 1,
   };
@@ -329,20 +336,21 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationError) {
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 
-        EXPECT_EQ(request->display_config.cc_flags, banjo_config.cc_flags);
+        EXPECT_EQ(request->display_config.color_conversion.flags,
+                  banjo_config.color_conversion.flags);
 
-        EXPECT_THAT(request->display_config.cc_preoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.preoffsets,
                     ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
 
-        ASSERT_EQ(request->display_config.cc_coefficients.size(), 3u);
-        EXPECT_THAT(request->display_config.cc_coefficients[0],
-                    ::testing::ElementsAre(1.0f, 0.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[1],
-                    ::testing::ElementsAre(0.0f, 1.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[2],
-                    ::testing::ElementsAre(0.0f, 0.0f, 1.0f));
+        ASSERT_EQ(request->display_config.color_conversion.coefficients.size(), 3u);
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[0],
+                    ::testing::ElementsAre(1.0f, 2.0f, 3.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[1],
+                    ::testing::ElementsAre(4.0f, 5.0f, 6.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[2],
+                    ::testing::ElementsAre(7.0f, 8.0f, 9.0f));
 
-        EXPECT_THAT(request->display_config.cc_postoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.postoffsets,
                     ::testing::ElementsAre(0.4f, 0.5f, 0.6f));
 
         ASSERT_EQ(request->display_config.layers.size(), 1u);
@@ -379,10 +387,13 @@ TEST_F(EngineDriverClientFidlTest, ApplyConfiguration) {
               .h_addressable = 1920,
               .v_addressable = 1080,
           },
-      .cc_flags = 1,
-      .cc_preoffsets = {0.1f, 0.2f, 0.3f},
-      .cc_coefficients = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-      .cc_postoffsets = {0.4f, 0.5f, 0.6f},
+      .color_conversion =
+          {
+              .flags = 1,
+              .preoffsets = {0.1f, 0.2f, 0.3f},
+              .coefficients = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}, {7.0f, 8.0f, 9.0f}},
+              .postoffsets = {0.4f, 0.5f, 0.6f},
+          },
       .layers_list = banjo_layers[0],
       .layers_count = 1,
   };
@@ -397,20 +408,21 @@ TEST_F(EngineDriverClientFidlTest, ApplyConfiguration) {
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 
-        EXPECT_EQ(request->display_config.cc_flags, banjo_config.cc_flags);
+        EXPECT_EQ(request->display_config.color_conversion.flags,
+                  banjo_config.color_conversion.flags);
 
-        EXPECT_THAT(request->display_config.cc_preoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.preoffsets,
                     ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
 
-        ASSERT_EQ(request->display_config.cc_coefficients.size(), 3u);
-        EXPECT_THAT(request->display_config.cc_coefficients[0],
-                    ::testing::ElementsAre(1.0f, 0.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[1],
-                    ::testing::ElementsAre(0.0f, 1.0f, 0.0f));
-        EXPECT_THAT(request->display_config.cc_coefficients[2],
-                    ::testing::ElementsAre(0.0f, 0.0f, 1.0f));
+        ASSERT_EQ(request->display_config.color_conversion.coefficients.size(), 3u);
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[0],
+                    ::testing::ElementsAre(1.0f, 2.0f, 3.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[1],
+                    ::testing::ElementsAre(4.0f, 5.0f, 6.0f));
+        EXPECT_THAT(request->display_config.color_conversion.coefficients[2],
+                    ::testing::ElementsAre(7.0f, 8.0f, 9.0f));
 
-        EXPECT_THAT(request->display_config.cc_postoffsets,
+        EXPECT_THAT(request->display_config.color_conversion.postoffsets,
                     ::testing::ElementsAre(0.4f, 0.5f, 0.6f));
 
         ASSERT_EQ(request->display_config.layers.size(), 1u);

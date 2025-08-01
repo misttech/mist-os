@@ -53,15 +53,18 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
               .h_addressable = 1920,
               .v_addressable = 1080,
           },
-      .cc_flags = 1,
-      .cc_preoffsets = {0.1f, 0.2f, 0.3f},
-      .cc_coefficients =
+      .color_conversion =
           {
-              {1.0f, 0.0f, 0.0f},
-              {0.0f, 1.0f, 0.0f},
-              {0.0f, 0.0f, 1.0f},
+              .flags = 1,
+              .preoffsets = {0.1f, 0.2f, 0.3f},
+              .coefficients =
+                  {
+                      {1.0f, 2.0f, 3.0f},
+                      {4.0f, 5.0f, 6.0f},
+                      {7.0f, 8.0f, 9.0f},
+                  },
+              .postoffsets = {0.4f, 0.5f, 0.6f},
           },
-      .cc_postoffsets = {0.4f, 0.5f, 0.6f},
       .layers_list = kBanjoLayers,
       .layers_count = 2,
   };
@@ -73,13 +76,16 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
   EXPECT_EQ(fidl_config.display_id.value, 1u);
   EXPECT_EQ(fidl_config.timing.h_addressable, 1920u);
   EXPECT_EQ(fidl_config.timing.v_addressable, 1080u);
-  EXPECT_EQ(fidl_config.cc_flags, 1u);
-  EXPECT_THAT(fidl_config.cc_preoffsets, ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
-  ASSERT_EQ(fidl_config.cc_coefficients.size(), 3u);
-  EXPECT_THAT(fidl_config.cc_coefficients[0], ::testing::ElementsAre(1.0f, 0.0f, 0.0f));
-  EXPECT_THAT(fidl_config.cc_coefficients[1], ::testing::ElementsAre(0.0f, 1.0f, 0.0f));
-  EXPECT_THAT(fidl_config.cc_coefficients[2], ::testing::ElementsAre(0.0f, 0.0f, 1.0f));
-  EXPECT_THAT(fidl_config.cc_postoffsets, ::testing::ElementsAre(0.4f, 0.5f, 0.6f));
+  EXPECT_EQ(fidl_config.color_conversion.flags, 1u);
+  EXPECT_THAT(fidl_config.color_conversion.preoffsets, ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
+  ASSERT_EQ(fidl_config.color_conversion.coefficients.size(), 3u);
+  EXPECT_THAT(fidl_config.color_conversion.coefficients[0],
+              ::testing::ElementsAre(1.0f, 2.0f, 3.0f));
+  EXPECT_THAT(fidl_config.color_conversion.coefficients[1],
+              ::testing::ElementsAre(4.0f, 5.0f, 6.0f));
+  EXPECT_THAT(fidl_config.color_conversion.coefficients[2],
+              ::testing::ElementsAre(7.0f, 8.0f, 9.0f));
+  EXPECT_THAT(fidl_config.color_conversion.postoffsets, ::testing::ElementsAre(0.4f, 0.5f, 0.6f));
 
   ASSERT_EQ(fidl_config.layers.size(), 2u);
   EXPECT_EQ(display::DriverLayer(fidl_config.layers[0]), display::DriverLayer(kBanjoLayer0));

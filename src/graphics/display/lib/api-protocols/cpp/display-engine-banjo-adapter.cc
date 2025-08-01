@@ -129,7 +129,7 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   }
 
   // This adapter does not currently support color correction.
-  if (banjo_display_config->cc_flags != 0) {
+  if (banjo_display_config->color_conversion.flags != 0) {
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
@@ -160,7 +160,7 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
                       "Display coordinator applied rejected config with too many layers");
 
   // This adapter does not currently support color correction.
-  ZX_DEBUG_ASSERT_MSG(banjo_display_config->cc_flags == 0,
+  ZX_DEBUG_ASSERT_MSG(banjo_display_config->color_conversion.flags == 0,
                       "Display coordinator applied rejected color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>

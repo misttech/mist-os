@@ -59,10 +59,13 @@ fuchsia_hardware_display_engine::wire::DisplayConfig ToFidlDisplayConfig(
   return fuchsia_hardware_display_engine::wire::DisplayConfig{
       .display_id = display::DisplayId(banjo_config.display_id).ToFidl(),
       .timing = timing,
-      .cc_flags = banjo_config.cc_flags,
-      .cc_preoffsets = ToFidlPreoffsets(banjo_config.cc_preoffsets),
-      .cc_coefficients = ToFidlCoefficients(banjo_config.cc_coefficients),
-      .cc_postoffsets = ToFidlPostoffsets(banjo_config.cc_postoffsets),
+      .color_conversion =
+          {
+              .flags = banjo_config.color_conversion.flags,
+              .preoffsets = ToFidlPreoffsets(banjo_config.color_conversion.preoffsets),
+              .coefficients = ToFidlCoefficients(banjo_config.color_conversion.coefficients),
+              .postoffsets = ToFidlPostoffsets(banjo_config.color_conversion.postoffsets),
+          },
       .layers = layers,
   };
 }
