@@ -410,7 +410,7 @@
              path="third_party/perfetto"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/perfetto"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="90dc6864f12937a75b271766d21020b88b5b6a42" />
+             revision="3e0dbdb048c8313b9725ed0fc12c6c710a423bd2" />
     <project name="third_party/pigweed"
              path="third_party/pigweed/src"
              remote="https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed"
