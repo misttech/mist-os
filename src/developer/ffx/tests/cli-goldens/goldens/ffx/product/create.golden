@@ -1,6 +1,6 @@
 {
   "name": "create",
-  "description": "Construct a product bundle using a platform, product, and board.\nThe inputs can be local paths or CIPD references.\n\nArtifact formats:\n  path/to/artifacts: Use local artifact with specified path\n  cipd://path/to/artifact@1.2.3.4: Use artifact from CIPD with specified url\n\nAdditional formats for the platform:\n  <omitted>: Use default local platform\n  1.2.3.4: Use platform from CIPD with specified version",
+  "description": "Construct a product bundle using a platform, product config, and board config.\nThe inputs can be local paths or CIPD references.\n\nArtifact formats:\n  path/to/artifacts: Use local artifact with specified path\n  cipd://path/to/artifact@1.2.3.4: Use artifact from CIPD with specified url\n\nAdditional formats for the platform:\n  <omitted>: Use default local platform\n  1.2.3.4: Use platform from CIPD with specified version",
   "examples": [],
   "flags": [
     {
@@ -26,11 +26,11 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "product"
+          "arg_name": "product-config"
         }
       },
       "optionality": "optional",
-      "long": "--product",
+      "long": "--product-config",
       "short": null,
       "description": "the product config to use.",
       "hidden": false
@@ -38,11 +38,11 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "board"
+          "arg_name": "board-config"
         }
       },
       "optionality": "optional",
-      "long": "--board",
+      "long": "--board-config",
       "short": null,
       "description": "the board config to use.",
       "hidden": false
@@ -96,8 +96,8 @@
   "commands": [],
   "positionals": [
     {
-      "name": "product_board_combo",
-      "description": "product.board combination to build when inside a fuchsia checkout.",
+      "name": "product_config_board_config_combo",
+      "description": "product_config.board_config combination to build when inside a fuchsia checkout.",
       "optionality": "optional",
       "hidden": false
     }
