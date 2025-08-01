@@ -21,13 +21,11 @@ use ffx_writer::{SimpleWriter, VerifiedMachineWriter};
 use fho::{FfxMain, FfxTool, FhoEnvironment};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
-use fidl_fuchsia_developer_ffx::DaemonProxy;
 use fidl_fuchsia_developer_ffx::{
-    TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
+    DaemonProxy, TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
     TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState,
 };
-use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
 use futures::TryStreamExt;
 use serde_json::json;
@@ -222,14 +220,13 @@ pub struct ShowToolWrapper {
 
 impl ShowToolWrapper {
     async fn allocate(&mut self, target_spec: Option<String>) -> fho::Result<()> {
-        let context = self
+        let mut context = self
             .env
             .ffx_command()
             .global
             .load_context(self.env.environment_context().exe_kind())?;
-        let mut new_ffx = self.env.ffx_command().clone();
-        new_ffx.global.target = target_spec;
-        let fho_env = FhoEnvironment::new(&context, &new_ffx);
+        context.override_target_specifier(&target_spec);
+        let fho_env = FhoEnvironment::new(&context, self.env.ffx_command());
         self.inner.replace(ShowTool::from_env(fho_env, TargetShow::default()).await?);
         Ok(())
     }
@@ -273,7 +270,7 @@ impl FfxMain for DoctorTool {
         // this is to refactor `ffx doctor` to make testing things like this less cumbersome.
         // TODO(b/373723080): Add actual tests for the usage of `ffx target show` within `ffx
         // doctor`.
-        doctor_cmd_impl(self.context, self.cmd, Some(self.show_tool), stdout()).await?;
+        Box::pin(doctor_cmd_impl(self.context, self.cmd, Some(self.show_tool), stdout())).await?;
         Ok(())
     }
 }

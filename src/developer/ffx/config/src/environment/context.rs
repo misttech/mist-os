@@ -34,6 +34,8 @@ pub struct EnvironmentContext {
     env_file_path: Option<PathBuf>,
     pub(crate) cache: Arc<crate::cache::Cache<Config>>,
     self_path: PathBuf,
+    // A target spec is an Option<String>. The extra Option<> indicates whether it has been set.
+    override_target_spec: Option<Option<String>>,
     /// if true, do not read or write any environment files.
     pub(crate) no_environment: bool,
 }
@@ -47,6 +49,7 @@ impl Default for EnvironmentContext {
             runtime_args: Default::default(),
             env_file_path: Default::default(),
             cache: Default::default(),
+            override_target_spec: None,
             self_path: std::env::current_exe().unwrap(),
             no_environment: false,
         }
@@ -91,6 +94,7 @@ impl EnvironmentContext {
             runtime_args,
             env_file_path,
             cache,
+            override_target_spec: None,
             self_path: std::env::current_exe().unwrap(),
             no_environment,
         }
@@ -108,6 +112,7 @@ impl EnvironmentContext {
             env_vars: None,
             env_file_path: None,
             no_environment: true,
+            override_target_spec: None,
             cache,
             self_path: std::env::current_exe().unwrap(),
         };
@@ -583,6 +588,18 @@ impl EnvironmentContext {
     pub fn get_direct_connection_mode(&self) -> bool {
         self.get("connectivity.direct").unwrap_or(false)
     }
+
+    /// Set a specific target spec. Used in unusual circumstances (e.g. in `ffx
+    /// doctor`) when we want to create an alternate context with a specific
+    /// target specified. When this is None, the `target.default` option is
+    /// used.
+    pub fn override_target_specifier(&mut self, spec: &Option<String>) {
+        self.override_target_spec = Some(spec.clone());
+    }
+
+    pub fn get_overridden_target_specifier(&self) -> Option<Option<String>> {
+        self.override_target_spec.clone()
+    }
 }
 
 #[cfg(test)]
@@ -758,5 +775,17 @@ mod test {
         runtime_args.insert("connectivity".into(), serde_json::Value::Object(connectivity));
         let ctx = EnvironmentContext::no_context(ExecutableKind::Test, runtime_args, None, true);
         assert!(ctx.get_direct_connection_mode());
+    }
+
+    #[fuchsia::test]
+    fn test_override_target_spec() {
+        let mut ctx =
+            EnvironmentContext::no_context(ExecutableKind::Test, ConfigMap::new(), None, true);
+        assert_eq!(ctx.get_overridden_target_specifier(), None);
+        ctx.override_target_specifier(&Some("foo".to_string()));
+        assert_eq!(
+            ctx.get_overridden_target_specifier().expect("target spec unset"),
+            Some("foo".to_string())
+        )
     }
 }
