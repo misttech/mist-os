@@ -4,6 +4,8 @@
 @available(added=HEAD)
 library fuchsia.wlan.stats;
 
+using fuchsia.wlan.ieee80211;
+
 /// Histogram bucket.
 type HistBucket = struct {
     /// Index into a lookup table for each histogram type. The lookup table for each type is
@@ -211,4 +213,17 @@ type IfaceHistogramStats = table {
     3: rx_rate_index_histograms vector<RxRateIndexHistogram>:MAX_HISTOGRAMS_PER_TYPE;
     /// Signal to noise ratio (SNR) histogram(s).
     4: snr_histograms vector<SnrHistogram>:MAX_HISTOGRAMS_PER_TYPE;
+};
+
+type SignalReport = table {
+    /// Signal report related to the current connection.
+    /// May not be set if the client is not connected.
+    1: connection_signal_report ConnectionSignalReport;
+};
+
+type ConnectionSignalReport = table {
+    1: channel fuchsia.wlan.ieee80211.WlanChannel;
+    2: tx_rate_500kbps uint32;
+    3: rssi_dbm int8;
+    4: snr_db int8;
 };

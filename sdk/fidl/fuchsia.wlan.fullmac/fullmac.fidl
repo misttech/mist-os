@@ -507,6 +507,7 @@ closed protocol WlanFullmacImpl {
     strict GetIfaceHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;
     }) error zx.Status;
+    strict GetSignalReport() -> (fuchsia.wlan.stats.SignalReport) error zx.Status;
     /// Informs the driver of the result of an SAE handshake.
     strict SaeHandshakeResp(table {
         /// The peer's MAC address. Required.

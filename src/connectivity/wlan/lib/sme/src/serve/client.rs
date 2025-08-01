@@ -141,6 +141,14 @@ async fn handle_telemetry_fidl_request(
                 });
             responder.send(histogram_stats.as_ref().map_err(|e| *e))
         }
+        TelemetryRequest::GetSignalReport { responder, .. } => {
+            let signal_report_fut = sme.lock().signal_report();
+            let signal_report = signal_report_fut
+                .await
+                .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
+                .and_then(|result| result);
+            responder.send(signal_report.as_ref().map_err(|e| *e))
+        }
         TelemetryRequest::CloneInspectVmo { responder } => {
             let inspect_vmo =
                 sme.lock().on_clone_inspect_vmo().ok_or_else(|| zx::Status::INTERNAL.into_raw());
