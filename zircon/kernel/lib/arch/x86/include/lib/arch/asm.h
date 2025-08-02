@@ -38,40 +38,53 @@
 // Allow both 32-bit and 64-bit .prologue.fp and .epilogue.fp can share the
 // same implementation, since they only differ in register name and size.
 #if defined(__i386__)
-#  define RSP_LP %esp
-#  define RBP_LP %ebp
-#  define SIZEOF_LP 4
+#  define PROLOGUE_RSP %esp
+#  define PROLOGUE_RBP %ebp
+#  define PROLOGUE_REGSIZE 4
 #else
-#  define RSP_LP %rsp
-#  define RBP_LP %rbp
-#  define SIZEOF_LP 8
+#  define PROLOGUE_RSP %rsp
+#  define PROLOGUE_RBP %rbp
+#  define PROLOGUE_REGSIZE 8
 #endif
 
 // Standard prologue sequence for FP setup, with CFI.
 // Note that this realigns the SP from entry state to be ready for a call.
-.macro .prologue.fp
-  push RBP_LP
-  .cfi_adjust_cfa_offset SIZEOF_LP
-  .cfi_offset RBP_LP, -(2*SIZEOF_LP)
-  mov RSP_LP, RBP_LP
+// The argument doesn't affect the SP adjustment, it just affects the metadata
+// for frame stack size (unless `no_metadata=no-metadata` is also given).
+.macro .prologue.fp frame_extra_size_for_metadata=0, no_metadata=
+  // This counts only the FP push done here, not the call instruction's push.
+  .llvm.stack_size (\frame_extra_size_for_metadata + PROLOGUE_REGSIZE), \no_metadata
+  push PROLOGUE_RBP
+  .cfi_adjust_cfa_offset PROLOGUE_REGSIZE
+  .cfi_rel_offset PROLOGUE_RBP, 0
+#ifdef _LP64
+  mov %rsp, %rbp
+#else
+  // For x86-64 ILP32, it's more compact to use the 32-bit instruction too.
+  // The whole 64-bit registers get pushed, though their high halves are zero.
+  // But it's fine to clear the high bits of SP, they must be zero to be valid.
+  mov %esp, %ebp
+#endif
 .endm
 
-// Epilogue sequence to match .prologue.fp.
-.macro .epilogue.fp
-  pop RBP_LP
-  .cfi_same_value RBP_LP
-  .cfi_adjust_cfa_offset -SIZEOF_LP
+// Epilogue sequence to match .prologue.fp.  The argument isn't even used for
+// metadata here, but it's accepted for parity with .prologue.fp and other
+// machines where both need to take the same parameter.
+.macro .epilogue.fp frame_extra_size_for_metadata=0
+  pop PROLOGUE_RBP
+  .cfi_same_value PROLOGUE_RBP
+  .cfi_adjust_cfa_offset -PROLOGUE_REGSIZE
 .endm
 
 .macro push.spill reg
-  pushq \reg
-  .cfi_adjust_cfa_offset 8
+  push \reg
+  .cfi_adjust_cfa_offset PROLOGUE_REGSIZE
   .cfi_rel_offset \reg, 0
 .endm
 
 .macro pop.reload reg
-  popq \reg
-  .cfi_adjust_cfa_offset -8
+  pop \reg
+  .cfi_adjust_cfa_offset -PROLOGUE_REGSIZE
   .cfi_same_value \reg
 .endm
 
