@@ -35,8 +35,48 @@ Documentation for Fuchsia is in the `docs/` subdirectory and the
 struggling with a concept. Additional documentation is at https://fuchsia.dev if
 the in-tree documentation doesn't solve your problem.
 
-When generating new code, follow the existing coding style. Remember to
-build code before suggesting it as a solution to ensure it compiles.
+When generating new code, follow the existing coding style.
+
+## Code Authoring Workflow
+
+To ensure code quality and minimize errors, you must follow a strict
+"analyze-first" methodology for all code changes, regardless of the language.
+The primary goal is to prevent compilation and logic errors through proactive
+investigation of the existing codebase *before* writing new code.
+
+**The Mandatory Workflow:**
+
+1.  **Analyze and Plan:** Before writing any code, use the available tools to
+    understand the context.
+    *   Use `hover` on existing variables and function calls to understand their
+        types and read documentation.
+    *   Use `definition` to navigate to the source code of types and functions
+        to understand their complete API and implementation.
+    *   Use `references` to see how existing code uses the APIs you plan to
+        interact with.
+    *   Formulate a clear plan based on your findings.
+
+2.  **Implement and Test:** Write your code according to the plan. Add or update
+    tests to validate your changes.
+
+3.  **Verify with Build:** After implementation, run `fx --invoker=gemini build
+    -q` to confirm your changes compile correctly. This is a final verification
+    step, not a tool for initial API discovery.
+
+For language-specific guidance, see the relevant sections below or in the
+`.gemini/extensions/` directory.
+
+### C++ Development
+
+When working with C++ (`.cc`, `.h`, `.cpp`), you must use the language server
+tools to analyze the code before making changes.
+
+*   **Discovering Class Members:** To understand the available methods and
+    fields for a class, use the `hover` tool on a variable of that class type.
+    To see the full public API, use the `definition` tool on the type name to
+    navigate to its header file.
+*   **Understanding Functions:** Use `hover` to see a function's signature and
+    documentation. Use `definition` to inspect its implementation.
 
 ## Finding or moving a FIDL method
 
