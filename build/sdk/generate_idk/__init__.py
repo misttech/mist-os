@@ -145,7 +145,7 @@ class PartialIDK:
     """A model of the parts of an IDK from a single subbuild.
 
     Attributes:
-        manifest_src (pathlib.Path): Source path for the overall build manifest.
+        manifest_src (pathlib.Path): Source path for the overall IDK manifest.
             Either absolute or relative to the current working directory.
         atoms (dict[pathlib.Path, PartialAtom]): Atoms to include in the IDK,
             indexed by the path to their metadata file, relative to the final
@@ -450,11 +450,7 @@ class MergedIDK:
     def sdk_manifest_json(
         self, host_arch: str, target_arch: list[str], release_version: str
     ) -> Any:
-        """Returns the contents of manifest.json to include in the IDK.
-
-        Note that this *isn't* the same as the "build manifest" that's referred
-        to elsewhere in this file. This is the manifest that's actually included
-        in the IDK itself at `meta/manifest.json`."""
+        """Returns the contents of manifest.json to include in the IDK."""
         index = []
         for meta_path, atom in self.atoms.items():
             type = get_idk_manifest_type_file_for_atom_type(atom["type"])

@@ -5,6 +5,7 @@
 import pathlib
 import tempfile
 import unittest
+from pathlib import Path
 
 import generate_idk
 
@@ -28,7 +29,7 @@ class GenerateIdkTests(unittest.TestCase):
     def test_unmergables_error(self) -> None:
         for atom_type in UNMERGABLE_TYPES:
             a: generate_idk.PartialIDK = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -41,7 +42,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b: generate_idk.PartialIDK = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -61,7 +62,7 @@ class GenerateIdkTests(unittest.TestCase):
     def test_unmergables_pass(self) -> None:
         for atom_type in UNMERGABLE_TYPES:
             a: generate_idk.PartialIDK = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -82,7 +83,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b: generate_idk.PartialIDK = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -126,7 +127,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_cc_prebuilt_library_pass(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -145,7 +146,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -191,7 +192,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_package_pass(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -208,7 +209,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -246,7 +247,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_loadable_module_pass(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -262,7 +263,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -299,7 +300,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_sysroot_pass(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -318,7 +319,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -364,7 +365,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_variants_cc_prebuilt_library_pass(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -380,7 +381,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -419,7 +420,7 @@ class GenerateIdkTests(unittest.TestCase):
     def test_merge_binaries_fail(self) -> None:
         for atom_type in ["cc_prebuilt_library", "loadable_module"]:
             a = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "atom0.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/atom0.json"),
@@ -435,7 +436,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "atom0.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/atom0.json"),
@@ -458,7 +459,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_versions_fail(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -474,7 +475,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -498,7 +499,7 @@ class GenerateIdkTests(unittest.TestCase):
     def test_merge_variants_fail(self) -> None:
         for atom_type in ["cc_prebuilt_library", "sysroot"]:
             a = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "atom0.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/atom0.json"),
@@ -514,7 +515,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "atom0.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/atom0.json"),
@@ -537,7 +538,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_variants_package_fail(self) -> None:
         a = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -553,7 +554,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "atom0.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/atom0.json"),
@@ -576,7 +577,7 @@ class GenerateIdkTests(unittest.TestCase):
 
     def test_merge_files(self) -> None:
         a: generate_idk.PartialIDK = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "foo/bar.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/foo/bar.json"),
@@ -591,7 +592,7 @@ class GenerateIdkTests(unittest.TestCase):
             },
         )
         b: generate_idk.PartialIDK = generate_idk.PartialIDK(
-            manifest_src="thingy.sdk",
+            manifest_src=Path("thingy/meta/manifest.json"),
             atoms={
                 "foo/bar.json": generate_idk.PartialAtom(
                     meta_src=pathlib.Path("src/foo/bar.json"),
@@ -635,7 +636,7 @@ class GenerateIdkTests(unittest.TestCase):
             file_b.write_text("foo")
 
             a = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -649,7 +650,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -687,7 +688,7 @@ class GenerateIdkTests(unittest.TestCase):
             file_b.write_text("bar")
 
             a = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
@@ -701,7 +702,7 @@ class GenerateIdkTests(unittest.TestCase):
                 },
             )
             b = generate_idk.PartialIDK(
-                manifest_src="thingy.sdk",
+                manifest_src=Path("thingy/meta/manifest.json"),
                 atoms={
                     "foo/bar.json": generate_idk.PartialAtom(
                         meta_src=pathlib.Path("src/foo/bar.json"),
