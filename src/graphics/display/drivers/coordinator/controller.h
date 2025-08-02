@@ -122,8 +122,8 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   // `GetDisplayPreferredModes()` and `GetDisplayTimings()` is non-empty.
   //
   // `mtx()` must be held for as long as the return value is retained.
-  zx::result<std::span<const display::Mode>> GetDisplayPreferredModes(display::DisplayId display_id)
-      __TA_REQUIRES(mtx());
+  zx::result<std::span<const display::ModeAndId>> GetDisplayPreferredModes(
+      display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   // The display timings are guaranteed to be valid as long as the display with
   // `display_id` is valid.

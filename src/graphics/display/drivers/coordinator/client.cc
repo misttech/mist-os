@@ -58,6 +58,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -357,6 +358,21 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
 namespace {
 
+// Returns `ModeId` that corresponds to the provided `target_mode` in
+// `display_preferred_modes`.
+//
+// Returns `kInvalidModeId` if the `target_mode` cannot be found.
+display::ModeId GetPreferredModeIdForMode(
+    std::span<const display::ModeAndId> display_preferred_modes, const display::Mode& target_mode) {
+  auto mode_it = std::ranges::find_if(
+      display_preferred_modes,
+      [&](const display::ModeAndId& mode_and_id) { return mode_and_id.mode() == target_mode; });
+  if (mode_it != display_preferred_modes.end()) {
+    return mode_it->id();
+  }
+  return display::kInvalidModeId;
+}
+
 // Converts `mode` to a "placeholder" `DisplayTiming` struct.
 //
 // The returned `DisplayTiming` may not represent the actual display timing
@@ -386,9 +402,11 @@ display::DisplayTiming ToPlaceholderDisplayTiming(const display::Mode& mode) {
 //    `display_timings`, return that `DisplayTiming` value.
 // 3. Otherwise, return nullopt.
 std::optional<display::DisplayTiming> GetDisplayTimingForMode(
-    std::span<const display::Mode> display_preferred_modes,
+    std::span<const display::ModeAndId> display_preferred_modes,
     std::span<const display::DisplayTiming> display_timings, const display::Mode& target_mode) {
-  auto display_preferred_mode_it = std::ranges::find(display_preferred_modes, target_mode);
+  auto display_preferred_mode_it = std::ranges::find_if(
+      display_preferred_modes,
+      [&](const display::ModeAndId& mode_and_id) { return mode_and_id.mode() == target_mode; });
   if (display_preferred_mode_it != display_preferred_modes.end()) {
     fdf::info("Found supported display preferred mode for {}", target_mode);
     return ToPlaceholderDisplayTiming(target_mode);
@@ -444,7 +462,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   display::Mode target_mode = display::Mode::From(request->mode);
 
   fbl::AutoLock lock(controller_.mtx());
-  zx::result<std::span<const display::Mode>> display_preferred_modes_result =
+  zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
       controller_.GetDisplayPreferredModes(display_id);
   if (display_preferred_modes_result.is_error()) {
     fdf::error("Failed to get display preferred modes for display ID {}: {}", display_id.value(),
@@ -452,7 +470,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     TearDown(display_preferred_modes_result.status_value());
     return;
   }
-  std::span<const display::Mode> display_preferred_modes =
+  std::span<const display::ModeAndId> display_preferred_modes =
       std::move(display_preferred_modes_result).value();
 
   zx::result<std::span<const display::DisplayTiming>> display_timings_result =
@@ -468,6 +486,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
   const size_t display_total_modes_count = display_timings.size() + display_preferred_modes.size();
 
+  display::ModeId mode_id = GetPreferredModeIdForMode(display_preferred_modes, target_mode);
   std::optional<display::DisplayTiming> display_timing =
       GetDisplayTimingForMode(display_preferred_modes, display_timings, target_mode);
 
@@ -486,6 +505,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
+  display_config.draft_.mode_id = mode_id.ToBanjo();
   display_config.draft_.timing = display::ToBanjoDisplayTiming(*display_timing);
   display_config.has_draft_nonlayer_config_change_ = true;
   draft_display_config_was_validated_ = false;
@@ -1061,6 +1081,8 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
 
   // Frame used for checking that each layer's `display_destination` lies
   // entirely within the display output.
+  // TODO(https://fxbug.dev/435313315): Replace `timing` with Mode information
+  // of the given display.
   const rect_u_t display_area = {
       .x = 0,
       .y = 0,
@@ -1294,7 +1316,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       continue;
     }
 
-    zx::result<std::span<const display::Mode>> display_preferred_modes_result =
+    zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
         controller_.GetDisplayPreferredModes(display_config->id());
     if (display_preferred_modes_result.is_error()) {
       fdf::warn("Failed to get display preferred modes when processing hotplug: {}",
@@ -1313,19 +1335,21 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     display_config->applied_.layers_list = nullptr;
     display_config->applied_.layers_count = 0;
 
-    display::DisplayTiming timing = [&] {
-      std::span<const display::Mode> display_preferred_modes =
-          std::move(display_preferred_modes_result).value();
-      if (!display_preferred_modes.empty()) {
-        const display::Mode& preferred_mode = display_preferred_modes[0];
-        return ToPlaceholderDisplayTiming(preferred_mode);
-      }
-      std::span<const display::DisplayTiming> display_timings =
-          std::move(display_timings_result).value();
+    std::span<const display::ModeAndId> display_preferred_modes =
+        std::move(display_preferred_modes_result).value();
+    std::span<const display::DisplayTiming> display_timings =
+        std::move(display_timings_result).value();
+    if (!display_preferred_modes.empty()) {
+      const display::ModeAndId preferred_mode_and_id = display_preferred_modes[0];
+      display_config->applied_.mode_id = preferred_mode_and_id.id().ToBanjo();
+      const display::DisplayTiming placeholder_timing =
+          ToPlaceholderDisplayTiming(preferred_mode_and_id.mode());
+      display_config->applied_.timing = display::ToBanjoDisplayTiming(placeholder_timing);
+    } else {
       ZX_DEBUG_ASSERT(!display_timings.empty());
-      return display_timings[0];
-    }();
-    display_config->applied_.timing = display::ToBanjoDisplayTiming(timing);
+      display_config->applied_.mode_id = INVALID_MODE_ID;
+      display_config->applied_.timing = display::ToBanjoDisplayTiming(display_timings[0]);
+    }
     display_config->applied_.color_conversion = display::ColorConversion::kIdentity.ToBanjo();
 
     display_config->draft_ = display_config->applied_;
@@ -1356,7 +1380,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     fhd::wire::Info fidl_display_info;
     fidl_display_info.id = display_config.id().ToFidl();
 
-    zx::result<std::span<const display::Mode>> display_preferred_modes_result =
+    zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
         controller_.GetDisplayPreferredModes(display_config.id());
     ZX_DEBUG_ASSERT(display_preferred_modes_result.is_ok());
 
@@ -1364,7 +1388,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
         controller_.GetDisplayTimings(display_config.id());
     ZX_DEBUG_ASSERT(display_timings_result.is_ok());
 
-    std::span<const display::Mode> display_preferred_modes =
+    std::span<const display::ModeAndId> display_preferred_modes =
         std::move(display_preferred_modes_result).value();
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
@@ -1373,8 +1397,8 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     std::vector<fuchsia_hardware_display_types::wire::Mode> modes;
 
     modes.reserve(display_preferred_modes.size() + display_timings.size());
-    for (const display::Mode& mode : display_preferred_modes) {
-      modes.emplace_back(mode.ToFidl());
+    for (const display::ModeAndId& mode_and_id : display_preferred_modes) {
+      modes.emplace_back(mode_and_id.mode().ToFidl());
     }
     for (const display::DisplayTiming& timing : display_timings) {
       modes.emplace_back(fuchsia_hardware_display_types::wire::Mode{

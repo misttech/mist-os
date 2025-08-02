@@ -122,6 +122,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
     test_layer.display_destination.width = width;
     test_layer.display_destination.height = height;
 
+    test_config.mode_id = INVALID_MODE_ID;
     test_config.timing = display::ToBanjoDisplayTiming(edid_timing);
 
     display::ConfigCheckResult config_check_result =
@@ -599,7 +600,7 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-zx::result<std::span<const display::Mode>> Controller::GetDisplayPreferredModes(
+zx::result<std::span<const display::ModeAndId>> Controller::GetDisplayPreferredModes(
     display::DisplayId display_id) {
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
