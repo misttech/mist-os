@@ -48,6 +48,7 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
 
   const display_config_t kBanjoConfig = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -73,6 +74,7 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
       ToFidlDisplayConfig(kBanjoConfig, arena);
 
   EXPECT_EQ(fidl_config.display_id.value, 1u);
+  EXPECT_EQ(fidl_config.mode_id.value, 2u);
   EXPECT_EQ(fidl_config.timing.h_addressable, 1920u);
   EXPECT_EQ(fidl_config.timing.v_addressable, 1080u);
   EXPECT_THAT(fidl_config.color_conversion.preoffsets, ::testing::ElementsAre(0.1f, 0.2f, 0.3f));

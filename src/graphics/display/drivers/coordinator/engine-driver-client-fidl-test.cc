@@ -241,6 +241,7 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationOk) {
   const layer_t* banjo_layers[] = {&kBanjoLayer0};
   display_config_t banjo_config = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -262,6 +263,7 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationOk) {
           testing::MockEngineFidl::CheckConfigurationCompleter::Sync& completer) {
         EXPECT_EQ(display::DisplayId(request->display_config.display_id), display::DisplayId(1));
 
+        EXPECT_EQ(request->display_config.mode_id.value, banjo_config.mode_id);
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 
@@ -307,6 +309,7 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationError) {
   const layer_t* banjo_layers[] = {&kBanjoLayer0};
   display_config_t banjo_config = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -328,6 +331,7 @@ TEST_F(EngineDriverClientFidlTest, CheckConfigurationError) {
           testing::MockEngineFidl::CheckConfigurationCompleter::Sync& completer) {
         EXPECT_EQ(display::DisplayId(request->display_config.display_id), display::DisplayId(1));
 
+        EXPECT_EQ(request->display_config.mode_id.value, banjo_config.mode_id);
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 
@@ -374,6 +378,7 @@ TEST_F(EngineDriverClientFidlTest, ApplyConfiguration) {
   const layer_t* banjo_layers[] = {&kBanjoLayer0};
   display_config_t banjo_config = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -396,6 +401,7 @@ TEST_F(EngineDriverClientFidlTest, ApplyConfiguration) {
           testing::MockEngineFidl::ApplyConfigurationCompleter::Sync& completer) {
         EXPECT_EQ(display::DisplayId(request->display_config.display_id), display::DisplayId(1));
 
+        EXPECT_EQ(request->display_config.mode_id.value, banjo_config.mode_id);
         EXPECT_EQ(request->display_config.timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(request->display_config.timing.v_addressable, banjo_config.timing.v_addressable);
 

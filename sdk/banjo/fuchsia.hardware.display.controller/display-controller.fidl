@@ -255,6 +255,13 @@ type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
 
+    /// Identifies the display mode provided by the panel.
+    ///
+    /// `timing` is used to set the timing parameters iff `mode_id` is
+    /// `INVALID_MODE_ID`.
+    mode_id uint16;
+
+    /// Fallback timing parameters when `mode_id` is invalid.
     timing DisplayTiming;
 
     color_conversion ColorConversion;

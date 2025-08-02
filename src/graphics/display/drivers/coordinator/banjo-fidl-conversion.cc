@@ -12,6 +12,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace display_coordinator {
 
@@ -28,6 +29,7 @@ fuchsia_hardware_display_engine::wire::DisplayConfig ToFidlDisplayConfig(
 
   return fuchsia_hardware_display_engine::wire::DisplayConfig{
       .display_id = display::DisplayId(banjo_config.display_id).ToFidl(),
+      .mode_id = display::ModeId(banjo_config.mode_id).ToFidl(),
       .timing = timing,
       .color_conversion = display::ColorConversion(banjo_config.color_conversion).ToFidl(),
       .layers = layers,

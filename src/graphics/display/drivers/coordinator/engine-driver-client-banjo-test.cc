@@ -349,6 +349,7 @@ TEST_F(EngineDriverClientBanjoTest, CheckConfiguration) {
   static const layer_t* banjo_layers[] = {&kBanjoLayer};
   display_config_t banjo_config = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -369,6 +370,7 @@ TEST_F(EngineDriverClientBanjoTest, CheckConfiguration) {
 
     EXPECT_EQ(display::DisplayId(display_config->display_id), display::DisplayId(1));
 
+    EXPECT_EQ(display_config->mode_id, banjo_config.mode_id);
     EXPECT_EQ(display_config->timing.h_addressable, banjo_config.timing.h_addressable);
     EXPECT_EQ(display_config->timing.v_addressable, banjo_config.timing.v_addressable);
 
@@ -413,6 +415,7 @@ TEST_F(EngineDriverClientBanjoTest, ApplyConfiguration) {
   static const layer_t* banjo_layers[] = {&kBanjoLayer};
   display_config_t banjo_config = {
       .display_id = 1,
+      .mode_id = 2,
       .timing =
           {
               .h_addressable = 1920,
@@ -436,6 +439,7 @@ TEST_F(EngineDriverClientBanjoTest, ApplyConfiguration) {
 
         EXPECT_EQ(display::DisplayId(display_config->display_id), display::DisplayId(1));
 
+        EXPECT_EQ(display_config->mode_id, banjo_config.mode_id);
         EXPECT_EQ(display_config->timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(display_config->timing.v_addressable, banjo_config.timing.v_addressable);
 
