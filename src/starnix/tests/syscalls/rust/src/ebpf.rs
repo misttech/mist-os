@@ -517,7 +517,12 @@ mod tests {
         );
     }
 
+    // This test assumes that `close()` will destroy the corresponding object
+    // before returning. This assumption may be violated if another threads
+    // forks the current process (as in that case the socket FD gets duped to
+    // the new process). The test is marked `serial` to workaround this issue.
     #[test]
+    #[serial]
     fn sock_release_prog() {
         root_required!();
 
