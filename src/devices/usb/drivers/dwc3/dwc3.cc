@@ -733,6 +733,7 @@ void Dwc3::HandleDisconnectedEvent() {
 }
 
 void Dwc3::Stop() {
+  FDF_LOG(INFO, "Stop()");
   irq_handler_.Cancel();
   ReleaseResources();
 }
