@@ -25,6 +25,7 @@
             protocol: [ "fuchsia.net.policy.properties.DefaultNetwork" ],
             from: "#netcfg",
             to: [ "#socket-proxy" ],
+            dependency: "weak",
         },
         {
             protocol: [ "fuchsia.posix.socket.Provider" ],
