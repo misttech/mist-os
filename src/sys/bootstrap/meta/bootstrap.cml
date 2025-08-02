@@ -155,6 +155,11 @@
             from: "#critical-services",
         },
         {
+            protocol: "fuchsia.power.cpu.manager.Boost",
+            from: "#cpu_manager",
+            source_availability: "unknown",
+        },
+        {
             dictionary: "diagnostics-accessors",
             from: "#archivist",
         },

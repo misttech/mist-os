@@ -36,12 +36,15 @@ pub enum Message {
     GetOperatingPoint,
 
     /// Set the new operating point
-    /// Arg: a value in the range [0 - x] where x is an upper bound defined in the
+    /// Args: a value in the range [0 - x] where x is an upper bound defined in the
     /// dev_control_handler crate. An increasing value indicates a lower operating point.
     SetOperatingPoint(u32),
 
     /// Communicate a thermal load value
     UpdateThermalLoad(ThermalLoad),
+
+    /// Whether or not to enable cpu boost
+    SetBoost(bool),
 }
 
 /// Defines the return values for each of the Message types from above
@@ -76,6 +79,9 @@ pub enum MessageReturn {
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
     UpdateThermalLoad,
+
+    /// There is no arg in this MessageReturn type. It only serves as an ACK.
+    SetBoost,
 }
 
 pub type MessageResult = Result<MessageReturn, crate::error::CpuManagerError>;

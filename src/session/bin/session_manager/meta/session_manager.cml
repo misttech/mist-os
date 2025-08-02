@@ -146,6 +146,7 @@
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.button.Monitor",
+                "fuchsia.power.cpu.manager.Boost",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.power.systemmode.ClientConfigurator",

@@ -268,7 +268,10 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.power.broker.Topology",
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.cpu.manager.Boost",
+            ],
             from: "parent",
             to: "#session-manager",
             availability: "same_as_target",
