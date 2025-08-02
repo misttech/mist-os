@@ -241,20 +241,33 @@ constexpr display::DriverLayer CreateValidLayerWithSeed(int seed) {
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSingleLayerSuccess) {
   static constexpr display::DisplayId kDisplayId(42);
+  const display::ColorConversion kColorConversion = {
+      {
+          .preoffsets = {1.0f, 2.0f, 3.0f},
+          .coefficients =
+              {
+                  std::array<float, 3>{4.0f, 5.0f, 6.0f},
+                  std::array<float, 3>{7.0f, 8.0f, 9.0f},
+                  std::array<float, 3>{10.0f, 11.0f, 12.0f},
+              },
+          .postoffsets = {13.0f, 14.0f, 15.0f},
+      },
+  };
   static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
-
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
   const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .color_conversion = kColorConversion.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     display::ColorConversion color_conversion,
                                      cpp20::span<const display::DriverLayer> layers) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(kColorConversion, color_conversion);
     EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
     return display::ConfigCheckResult::kOk;
   });
@@ -279,9 +292,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     display::ColorConversion color_conversion,
                                      cpp20::span<const display::DriverLayer> layers) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
     EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
     return display::ConfigCheckResult::kOk;
   });
@@ -327,6 +342,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationEngineError) {
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     display::ColorConversion color_conversion,
                                      cpp20::span<const display::DriverLayer> layers) {
     return display::ConfigCheckResult::kUnsupportedDisplayModes;
   });
@@ -335,25 +351,67 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationEngineError) {
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorInvalidColorConversion) {
+  static constexpr display::DisplayId kDisplayId(42);
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {CreateValidLayerWithSeed(0).ToBanjo()};
+  const display_config_t kBanjoDisplayConfig = {
+      .display_id = kDisplayId.ToBanjo(),
+      .color_conversion =
+          {
+              .preoffsets = {std::nanf("1"), 2.0f, 3.0f},
+              .coefficients =
+                  {
+                      {1.0f, 2.0f, 3.0f},
+                      {4.0f, 5.0f, 6.0f},
+                      {7.0f, 8.0f, 9.0f},
+                  },
+              .postoffsets = {1.0f, 2.0f, 3.0f},
+          },
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
+  };
+
+  // CheckConfiguration() is never called on the MockDisplayEngine, because the
+  // color conversion check in `DisplayEngineBanjoAdapter` has failed.
+
+  EXPECT_EQ(display::ConfigCheckResult::kInvalidConfig.ToBanjo(),
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
+}
+
 TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationSingleLayer) {
   static constexpr display::DisplayId kDisplayId(42);
+  const display::ColorConversion kColorConversion = {
+      {
+          .preoffsets = {1.0f, 2.0f, 3.0f},
+          .coefficients =
+              {
+                  std::array<float, 3>{4.0f, 5.0f, 6.0f},
+                  std::array<float, 3>{7.0f, 8.0f, 9.0f},
+                  std::array<float, 3>{10.0f, 11.0f, 12.0f},
+              },
+          .postoffsets = {13.0f, 14.0f, 15.0f},
+      },
+  };
   static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
   static constexpr display::DriverConfigStamp kConfigStamp(4242);
 
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
   const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .color_conversion = kColorConversion.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
   };
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     display::ColorConversion color_conversion,
                                      cpp20::span<const display::DriverLayer> layers,
                                      display::DriverConfigStamp config_stamp) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(kColorConversion, color_conversion);
     EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
@@ -378,10 +436,12 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     display::ColorConversion color_conversion,
                                      cpp20::span<const display::DriverLayer> layers,
                                      display::DriverConfigStamp config_stamp) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
     EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
