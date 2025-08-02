@@ -37,8 +37,8 @@ import("//build/python/python_action.gni")
 template("sdk_noop_atom") {
   assert(defined(invoker.category), "Must define an SDK category")
 
-  meta_target_name = "${target_name}_meta"
-  meta_file = "${target_gen_dir}/${target_name}.meta.json"
+  # Records common metadata for the two definitions below.
+  metadata_target_name = "${target_name}_metadata"
 
   if (defined(invoker.id)) {
     _atom_id = invoker.id
@@ -57,12 +57,7 @@ template("sdk_noop_atom") {
     category = invoker.category
   }
 
-  generated_file(meta_target_name) {
-    contents = {
-    }
-    outputs = [ meta_file ]
-    output_conversion = "json"
-
+  group(metadata_target_name) {
     metadata = {
       # Used by idk_prebuild_manifest() template.
       idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
@@ -81,7 +76,7 @@ template("sdk_noop_atom") {
       depfile = "${manifest_file}.d"
       binary_label = "//build/sdk:create_atom_manifest"
 
-      public_deps = [ ":${meta_target_name}" ]
+      public_deps = [ ":${metadata_target_name}" ]
 
       _areas_file = "//docs/contribute/governance/areas/_areas.yaml"
 
@@ -128,7 +123,7 @@ template("sdk_noop_atom") {
       }
       outputs = [ manifest_file ]
       output_conversion = "json"
-      public_deps = [ ":${meta_target_name}" ]
+      public_deps = [ ":${metadata_target_name}" ]
     }
 
     not_needed(invoker, "*")
