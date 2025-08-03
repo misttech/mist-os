@@ -94,7 +94,7 @@ use starnix_uapi::{
 };
 use std::cell::Cell;
 use std::collections::btree_map::Entry;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
@@ -285,7 +285,7 @@ impl FileOps for BinderConnection {
     ) -> Result<SyscallResult, Errno> {
         let binder_process = self.proc(current_task)?;
         release_after!(binder_process, current_task.kernel(), {
-            self.device.ioctl(locked, current_task, &binder_process, None, request, arg)
+            self.device.ioctl(locked, current_task, &binder_process, None, request, arg, Vec::new())
         })
     }
 
@@ -395,6 +395,7 @@ impl RemoteBinderConnection {
         request: u32,
         arg: SyscallArg,
         vmo: zx::Vmo,
+        files: Vec<fbinder::FileHandle>,
     ) -> Result<Vec<fbinder::IoctlWrite>, Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
         release_after!(binder_process, current_task.kernel(), {
@@ -406,6 +407,7 @@ impl RemoteBinderConnection {
                 Some(&remote_ioctl),
                 request,
                 arg,
+                files,
             )?;
             Ok(remote_ioctl.ioctl_writes.take())
         })
@@ -3734,6 +3736,7 @@ impl BinderDriver {
         remote_ioctl: Option<&RemoteIoctl>,
         request: u32,
         arg: SyscallArg,
+        mut files: Vec<fbinder::FileHandle>,
     ) -> Result<SyscallResult, Errno> {
         trace_duration!(CATEGORY_STARNIX, NAME_BINDER_IOCTL, "request" => request);
         let user_arg = UserAddress::from(arg);
@@ -3819,6 +3822,7 @@ impl BinderDriver {
                                     binder_proc,
                                     &binder_thread,
                                     memory_accessor,
+                                    &mut files,
                                     &mut cursor,
                                 )?;
                                 has_consumed_write = true;
@@ -4014,6 +4018,7 @@ impl BinderDriver {
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
         memory_accessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno>
     where
@@ -4084,6 +4089,7 @@ impl BinderDriver {
                     binder_proc,
                     binder_thread,
                     memory_accessor,
+                    files,
                     binder_transaction_data_sg { transaction_data: data, buffers_size: 0 },
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4097,6 +4103,7 @@ impl BinderDriver {
                     binder_proc,
                     binder_thread,
                     memory_accessor,
+                    files,
                     binder_transaction_data_sg { transaction_data: data, buffers_size: 0 },
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4110,6 +4117,7 @@ impl BinderDriver {
                     binder_proc,
                     binder_thread,
                     memory_accessor,
+                    files,
                     data,
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4123,6 +4131,7 @@ impl BinderDriver {
                     binder_proc,
                     binder_thread,
                     memory_accessor,
+                    files,
                     data,
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4167,6 +4176,7 @@ impl BinderDriver {
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
         memory_acessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
@@ -4233,6 +4243,7 @@ impl BinderDriver {
                     memory_acessor,
                     binder_proc,
                     binder_thread,
+                    files,
                     target_proc.get_resource_accessor(target_task.deref()),
                     &target_proc,
                     &data,
@@ -4383,6 +4394,7 @@ impl BinderDriver {
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
         memory_acessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
@@ -4403,6 +4415,7 @@ impl BinderDriver {
                     memory_acessor,
                     binder_proc,
                     binder_thread,
+                    files,
                     target_proc.get_resource_accessor(target_task.deref()),
                     &target_proc,
                     &data,
@@ -4618,6 +4631,7 @@ impl BinderDriver {
         source_memory_acessor: &dyn MemoryAccessor,
         source_proc: &BinderProcess,
         source_thread: &BinderThread,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
@@ -4672,6 +4686,7 @@ impl BinderDriver {
             source_memory_acessor,
             source_proc,
             source_thread,
+            source_files,
             target_resource_accessor,
             target_proc,
             allocations.offsets_buffer.as_bytes(),
@@ -4687,6 +4702,7 @@ impl BinderDriver {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         fds: Vec<FdNumber>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -4694,13 +4710,51 @@ impl BinderDriver {
     where
         L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
+        // Create a map of FD to index into `source_files`. This is used to check if the already
+        // file exists in `source_files`, allowing us to avoid fetching it via the
+        // `source_resource_accessor`.
+        let source_map = source_files
+            .iter()
+            .enumerate()
+            .map(|(i, file)| (file.fd.unwrap(), i))
+            .collect::<HashMap<_, _>>();
+        // Create a vector of FDs to fetch via the `source_resource_accessor`.
+        let fds_to_get = fds
+            .iter()
+            .filter(|fd| !source_map.contains_key(&fd.raw()))
+            .copied()
+            .collect::<Vec<_>>();
         let locked = locked.cast_locked::<ResourceAccessorLevel>();
-        let source_files =
-            source_resource_accessor.get_files_with_flags(locked, current_task, fds)?;
+        let mut get_files = if fds_to_get.is_empty() {
+            Vec::new()
+        } else {
+            source_resource_accessor.get_files_with_flags(locked, current_task, fds_to_get)?
+        };
+        let mut drain = get_files.drain(0..);
+        // Merge `source_files` and `get_files` together.
+        let mut target_files = Vec::with_capacity(fds.len());
+        for fd in fds {
+            let file = if let Some(pos) = source_map.get(&fd.raw()) {
+                let source_file = std::mem::replace(&mut source_files[*pos], Default::default());
+                let flags = source_file.flags.ok_or_else(|| errno!(ENOENT))?.into_fidl();
+                let new_file = if let Some(file) = source_file.file {
+                    new_remote_file(locked, current_task, file, flags)?
+                } else {
+                    new_null_file(locked, current_task, flags)
+                };
+                (new_file, FdFlags::empty())
+            } else if let Some(file) = drain.next() {
+                file
+            } else {
+                return error!(ENOENT);
+            };
+            target_files.push(file);
+        }
+        // Finally add the files to the `target_resource_accessor`.
         target_resource_accessor.add_files_with_flags(
             locked,
             current_task,
-            source_files,
+            target_files,
             add_action,
         )
     }
@@ -4730,6 +4784,7 @@ impl BinderDriver {
         source_memory_accessor: &dyn MemoryAccessor,
         source_proc: &BinderProcess,
         source_thread: &BinderThread,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         offsets: &[binder_uintptr_t],
@@ -4933,6 +4988,7 @@ impl BinderDriver {
                             locked,
                             current_task,
                             source_resource_accessor,
+                            source_files,
                             target_resource_accessor,
                             fd_array.iter().map(|fd| FdNumber::from_raw(*fd as i32)).collect(),
                             // Close this FD if the transaction ends either by success or failure.
@@ -4953,6 +5009,7 @@ impl BinderDriver {
                 locked,
                 current_task,
                 source_resource_accessor,
+                source_files,
                 target_resource_accessor,
                 files.iter().map(|TransientFile { fd, .. }| *fd).collect(),
                 // Close this FD if the transaction fails.
@@ -5585,6 +5642,7 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
+    use fidl_fuchsia_starnix_binder::FileFlags;
     use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
@@ -6765,6 +6823,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &transaction,
@@ -6841,6 +6900,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -6936,6 +6996,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -7020,6 +7081,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -7141,6 +7203,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -7297,6 +7360,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     current_task,
                     &receiver.proc,
                     &input,
@@ -7403,6 +7467,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -7488,6 +7553,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -7621,6 +7687,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     input,
                 )
                 .expect("transaction queued");
@@ -7826,6 +7893,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     input,
                 )
                 .expect("transaction queued");
@@ -7957,6 +8025,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -8006,6 +8075,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[0 as binder_uintptr_t],
@@ -8044,6 +8114,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[0 as binder_uintptr_t],
@@ -8093,6 +8164,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[
@@ -8478,6 +8550,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8530,6 +8603,79 @@ pub mod tests {
     }
 
     #[fuchsia::test]
+    async fn send_fd_in_transaction_with_prefetched_files() {
+        spawn_kernel_and_run(|locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+
+            // Open a file in the sender process.
+            let file = new_null_file(locked, &current_task, OpenFlags::empty());
+            let sender_fd =
+                current_task.add_file(locked, file.clone(), FdFlags::empty()).expect("add file");
+
+            let mut source_files = vec![fbinder::FileHandle {
+                file: file.to_handle(current_task).expect("to_handle"),
+                flags: Some(FileFlags::empty()),
+                fd: Some(sender_fd.raw()),
+                ..Default::default()
+            }];
+
+            // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
+            // driver doesn't touch them/passes them through.
+            let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            });
+            let offsets = [0];
+
+            let transient_transaction_state = device
+                .translate_objects(
+                    locked,
+                    &current_task,
+                    current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &sender.proc,
+                    &sender.thread,
+                    &mut source_files,
+                    receiver.task(),
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
+
+            // Simulate success by converting the transient state.
+            let transaction_state = transient_transaction_state.into_state();
+
+            // The receiver should now have a file.
+            let receiver_fd = receiver
+                .task()
+                .files
+                .get_all_fds()
+                .first()
+                .cloned()
+                .expect("receiver should have FD");
+
+            let expected_transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: receiver_fd.raw() as u32,
+            });
+
+            assert_eq!(expected_transaction_data, transaction_data);
+            transaction_state.release(());
+        });
+    }
+
+    #[fuchsia::test]
     async fn cleanup_fd_in_failed_transaction() {
         spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
@@ -8561,6 +8707,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8618,6 +8765,7 @@ pub mod tests {
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8715,6 +8863,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8756,6 +8905,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("transaction queued");
@@ -8859,6 +9009,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8869,6 +9020,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8914,6 +9066,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("sync transaction queued");
@@ -8974,6 +9127,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9059,6 +9213,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9069,6 +9224,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     second_transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9171,6 +9327,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9241,6 +9398,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9329,6 +9487,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9377,6 +9536,7 @@ pub mod tests {
                         &receiver.proc,
                         &receiver.thread,
                         current_task.as_memory_accessor().expect("as_memory_accessor"),
+                        &mut Vec::new(),
                         reply
                     )
                     .expect_err("transaction should have failed"),
@@ -9649,6 +9809,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9709,6 +9870,7 @@ pub mod tests {
                     None,
                     uapi::BINDER_FREEZE,
                     freeze_info_address.into(),
+                    Vec::new(),
                 )
                 .expect("BINDER_FREEZE ioctl");
 
@@ -9731,6 +9893,7 @@ pub mod tests {
                     &sender.proc,
                     &sender.thread,
                     current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 ),
                 Err(TransactionError::Frozen)
@@ -9758,6 +9921,7 @@ pub mod tests {
                     None,
                     uapi::BINDER_GET_FROZEN_INFO,
                     frozen_status_info_address.into(),
+                    Vec::new(),
                 )
                 .expect("BINDER_GET_FROZEN_INFO ioctl");
             let read_frozen_status_info = receiver

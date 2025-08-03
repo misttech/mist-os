@@ -218,6 +218,7 @@ enum TaskRequest {
         arg: u64,
         koid: u64,
         vmo: zx::Vmo,
+        files: Vec<fbinder::FileHandle>,
         // a synchronous function avoids thread hops.
         #[derivative(Debug = "ignore")]
         responder: SynchronousResponder<Vec<fbinder::IoctlWrite>>,
@@ -576,7 +577,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 );
                 waiter.await;
             }
-            fbinder::BinderRequest::Ioctl { tid, request, arg, responder, vmo } => {
+            fbinder::BinderRequest::Ioctl { tid, request, arg, vmo, files, responder } => {
                 trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_SEND_WORK, "request" => request);
                 trace_flow_begin!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into(), "request" => request);
 
@@ -603,6 +604,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         arg,
                         koid: tid,
                         vmo,
+                        files,
                         responder,
                     },
                 });
@@ -1112,6 +1114,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     arg,
                     koid,
                     vmo,
+                    files,
                     responder,
                 } => {
                     trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS);
@@ -1122,6 +1125,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         request,
                         arg.into(),
                         vmo,
+                        files,
                     );
                     // Once the potentially blocking calls is made, the task is ready to handle the
                     // next request.
@@ -1421,8 +1425,9 @@ mod tests {
             let version_ref = &mut version as *mut uapi::binder_version;
             let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("Vmo::create");
             let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate_handle");
+            let files = Vec::new();
             let user_writes = binder
-                .ioctl(42, uapi::BINDER_VERSION, version_ref as u64, vmo)
+                .ioctl(42, uapi::BINDER_VERSION, version_ref as u64, vmo, files)
                 .await
                 .expect("ioctl")
                 .expect("ioctl");

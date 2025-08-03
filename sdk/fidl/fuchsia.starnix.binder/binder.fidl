@@ -11,6 +11,7 @@ using fuchsia.unknown;
 
 const MAX_PATH_LENGTH uint64 = 4095;
 const MAX_REQUEST_COUNT uint64 = 16;
+const MAX_FILE_HANDLE_COUNT uint64 = 16;
 const MAX_IOCTL_WRITE_COUNT uint64 = 16;
 const MAX_WRITE_BYTES uint64 = 32768;
 
@@ -41,6 +42,9 @@ type FileHandle = resource table {
 
     /// The flags associated with the opened file.
     3: flags FileFlags;
+
+    /// Optional. The file descriptor to help with translation between processes.
+    4: fd Fd;
 };
 
 /// Protocol that gives the binder driver access to the client process'
@@ -232,6 +236,8 @@ open protocol Binder {
         arg uint64;
         /// The VMO to return writes for this ioctl through.
         vmo zx.Handle:VMO;
+        /// The files being transfered by the ioctl.
+        files vector<FileHandle>:MAX_FILE_HANDLE_COUNT;
     }) -> (struct {
         ioctl_writes vector<IoctlWrite>:MAX_IOCTL_WRITE_COUNT;
     }) error fuchsia.posix.Errno;
