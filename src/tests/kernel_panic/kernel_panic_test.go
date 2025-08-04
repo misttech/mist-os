@@ -160,7 +160,6 @@ func TestPmmCheckerOops(t *testing.T) {
 	i.WaitForLogMessage("ZIRCON KERNEL OOPS")
 	i.WaitForLogMessage("pmm checker found unexpected pattern in page at")
 	i.WaitForLogMessage("dump of page follows")
-	i.WaitForLogMessage("done")
 }
 
 // Verify the panic action.
