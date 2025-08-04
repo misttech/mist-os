@@ -76,6 +76,13 @@ type TraceOptions = table {
 
     /// The triggers to run against this trace.
     2: triggers vector<Trigger>:MAX;
+
+    /// The requested categories for the trace. These could include
+    /// groups, or nothing. These categories are expanded and the expanded
+    /// list is in the TraceConfig. This list is used to support the nice UX of
+    /// explicitly checking for events with these categories and warn the
+    /// user if the no events were captured for any of these categories.
+    3: requested_categories fuchsia.tracing.EnabledCategoryList;
 };
 
 @discoverable

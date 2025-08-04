@@ -25,6 +25,8 @@ pub struct TraceTask {
     debug_tag: String,
     /// Trace configuration.
     config: trace::TraceConfig,
+    /// Requested categories. These are unexpanded from the user.
+    requested_categories: Vec<String>,
     /// Duration to capture trace. None indicates capture until canceled.
     duration: Option<Duration>,
     /// Triggers for terminating the trace.
@@ -57,6 +59,7 @@ impl TraceTask {
         config: trace::TraceConfig,
         duration: Option<Duration>,
         triggers: Vec<Trigger>,
+        requested_categories: Option<Vec<String>>,
         provisioner: trace::ProvisionerProxy,
     ) -> Result<Self, TracingError>
     where
@@ -132,6 +135,7 @@ impl TraceTask {
             proxy: Some(client_end),
             duration,
             triggers: triggers.clone(),
+            requested_categories: requested_categories.unwrap_or_default(),
             terminate_result: terminate_result.clone(),
             start_time: Instant::now(),
             shutdown_sender,
@@ -253,6 +257,10 @@ impl TraceTask {
         self.duration.clone()
     }
 
+    pub fn requested_categories(&self) -> Vec<String> {
+        self.requested_categories.clone()
+    }
+
     pub async fn wait_for_completion(self) -> Result<StopResult, TracingError> {
         match self.await {
             Some(result) => Ok(result),
@@ -343,6 +351,7 @@ mod tests {
             trace::TraceConfig::default(),
             None,
             vec![],
+            None,
             provisioner,
         )
         .await
@@ -367,6 +376,7 @@ mod tests {
             trace::TraceConfig::default(),
             None,
             vec![],
+            None,
             provisioner,
         )
         .await
@@ -391,6 +401,7 @@ mod tests {
             trace::TraceConfig::default(),
             None,
             vec![],
+            None,
             provisioner,
         )
         .await
@@ -414,6 +425,7 @@ mod tests {
             trace::TraceConfig::default(),
             Some(Duration::from_millis(100)),
             vec![],
+            None,
             provisioner,
         )
         .await
@@ -449,6 +461,7 @@ mod tests {
                 alert: Some(alert_name.into()),
                 action: Some(TriggerAction::Terminate),
             }],
+            None,
             provisioner,
         )
         .await
