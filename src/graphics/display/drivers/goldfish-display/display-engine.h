@@ -145,8 +145,8 @@ class DisplayEngine final : public display::DisplayEngineInterface {
   };
 
   zx::result<display::DriverImageId> ImportVmoImage(
-      const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
-      zx::vmo vmo, size_t offset);
+      const display::ImageMetadata& image_metadata,
+      const fuchsia_images2::PixelFormat& pixel_format, zx::vmo vmo, size_t offset);
 
   zx_status_t SetupPrimaryDisplay();
   zx_status_t PresentPrimaryDisplayConfig(const DisplayConfig& display_config);

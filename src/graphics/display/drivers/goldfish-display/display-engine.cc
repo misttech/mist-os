@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/cpp/wait.h>
@@ -157,10 +156,11 @@ uint32_t GetColorBufferFormatFromSysmemPixelFormat(
 }  // namespace
 
 zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
-    const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
+    const display::ImageMetadata& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
     zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
-  color_buffer->is_linear_format = image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR;
+  color_buffer->is_linear_format =
+      image_metadata.tiling_type() == display::ImageTilingType::kLinear;
   const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
 
   fidl::Arena unused_arena;
@@ -168,21 +168,21 @@ zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
       PixelFormatAndModifier(pixel_format,
                              /* ignored */
                              fuchsia_images2::PixelFormatModifier::kLinear));
-  color_buffer->size = fbl::round_up(
-      image_metadata.dimensions.width * image_metadata.dimensions.height * bytes_per_pixel,
-      static_cast<uint32_t>(PAGE_SIZE));
+  color_buffer->size =
+      fbl::round_up(image_metadata.width() * image_metadata.height() * bytes_per_pixel,
+                    static_cast<uint32_t>(PAGE_SIZE));
 
   // Linear images must be pinned.
   color_buffer->pinned_vmo =
       rc_->pipe_io()->PinVmo(vmo, ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, offset, color_buffer->size);
 
   color_buffer->vmo = std::move(vmo);
-  color_buffer->width = image_metadata.dimensions.width;
-  color_buffer->height = image_metadata.dimensions.height;
+  color_buffer->width = image_metadata.width();
+  color_buffer->height = image_metadata.height();
   color_buffer->format = color_buffer_format;
 
-  zx::result<HostColorBufferId> create_result = rc_->CreateColorBuffer(
-      image_metadata.dimensions.width, image_metadata.dimensions.height, color_buffer_format);
+  zx::result<HostColorBufferId> create_result =
+      rc_->CreateColorBuffer(image_metadata.width(), image_metadata.height(), color_buffer_format);
   if (create_result.is_error()) {
     fdf::error("failed to create color buffer: {}", create_result);
     return create_result.take_error();
@@ -292,7 +292,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
       bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL) {
     const auto& pixel_format =
         collection_info->settings()->image_format_constraints()->pixel_format();
-    return ImportVmoImage(image_metadata.ToBanjo(), pixel_format.value(), std::move(vmo), offset);
+    return ImportVmoImage(image_metadata, pixel_format.value(), std::move(vmo), offset);
   }
 
   if (offset != 0) {
