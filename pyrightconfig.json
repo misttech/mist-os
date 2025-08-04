@@ -40,7 +40,8 @@
         "third_party/mako",
         "third_party/mobly/src",
         "third_party/parameterized/src",
-        "third_party/pyyaml/src"
+        "third_party/pyyaml/src",
+        "third_party/snippet-uiautomator/src"
         // keep-sorted end
     ],
     "exclude": [
