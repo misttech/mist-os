@@ -1557,23 +1557,36 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   }
   const display::ColorConversion color_conversion(banjo_display_config.color_conversion);
 
-  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
-  bool merge_all = false;
-  if (banjo_display_config.layers_count > 3) {
-    bool layer0_is_solid_color_fill =
-        (banjo_display_config.layers_list[0].image_metadata.dimensions.width == 0 ||
-         banjo_display_config.layers_list[0].image_metadata.dimensions.height == 0);
-    merge_all = banjo_display_config.layers_count > 4 || layer0_is_solid_color_fill;
+  // This overrides all checks about multi-layers.
+  if (banjo_display_config.layers_count > 1) {
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
-  if (!merge_all) {
-    for (float preoffset : color_conversion.preoffsets()) {
-      merge_all |= preoffset <= -1;
-      merge_all |= preoffset >= 1;
+  if (banjo_display_config.layers_count > 4) {
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+  }
+
+  bool layer0_is_solid_color_fill =
+      (banjo_display_config.layers_list[0].image_metadata.dimensions.width == 0 ||
+       banjo_display_config.layers_list[0].image_metadata.dimensions.height == 0);
+  if (banjo_display_config.layers_count == 4 && layer0_is_solid_color_fill) {
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+  }
+
+  for (float preoffset : color_conversion.preoffsets()) {
+    if (preoffset <= -1) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    for (float postoffset : color_conversion.postoffsets()) {
-      merge_all |= postoffset <= -1;
-      merge_all |= postoffset >= 1;
+    if (preoffset >= 1) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+  }
+  for (float postoffset : color_conversion.postoffsets()) {
+    if (postoffset <= -1) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (postoffset >= 1) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
   }
 
@@ -1587,12 +1600,13 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         // Linear and x tiled images don't support 90/270 rotation
         if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
             layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
-      } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
-                 layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
+      }
+      if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
+          layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
         // Cover unsupported rotations
-        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
 
       uint32_t src_width, src_height;
@@ -1608,7 +1622,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         max_width = 4096;
       }
       if (src_width > max_width) {
-        merge_all = true;
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
 
       if (layer.display_destination.width != src_width ||
@@ -1640,28 +1654,20 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
             src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
             max_width < layer.display_destination.width ||
             max_height < layer.display_destination.height) {
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        } else {
-          total_scalers_needed += scalers_needed;
+          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
+        total_scalers_needed += scalers_needed;
       }
       break;
     }
 
-    if (j != 0) {
-      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
     const auto format =
         static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
     if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
         format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
-      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     break;
-  }
-
-  if (merge_all) {
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
   // CalculateMinimumAllocations ignores layers after kImagePlaneCount. That's fine, since
@@ -1683,11 +1689,10 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         continue;
       }
 
-      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      break;
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
   }
-  return check_result;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 bool Controller::CalculatePipeAllocation(
