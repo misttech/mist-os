@@ -106,7 +106,6 @@ void DebugAgent::TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedSt
   adapter_->set_stream(&stream->stream());
   stream->set_data_available_callback([this]() { adapter_->OnStreamReadable(); });
   stream->set_error_callback([this]() {
-    LOGS(Info) << "Stream closed, DebugAgent is exiting.";
     // Unconditionally quit when the debug_ipc socket is closed.
     Disconnect();
     ClearState();
@@ -1175,7 +1174,6 @@ void DebugAgent::RemoveObserver(DebugAgentObserver* observer) {
 
   // If we just removed the last server and there is no debug_ipc client, it's time to exit.
   if (!observers_.might_have_observers() && !is_connected()) {
-    LOGS(Info) << "Observer unregistered and DEBUG_IPC is not connected, shutting down DebugAgent!";
     ClearState();
     debug::MessageLoop::Current()->QuitNow();
   }

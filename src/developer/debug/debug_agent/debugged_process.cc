@@ -97,7 +97,7 @@ DebuggedProcess::~DebuggedProcess() {
 }
 
 void DebuggedProcess::DetachFromProcess() {
-  LOGS(Info) << LogPreamble(this) << "DetachFromProcess";
+  DEBUG_LOG(Process) << LogPreamble(this) << "DetachFromProcess";
 
   // 1. Remove installed software breakpoints. We need to tell each thread that this will happen.
   for (auto& [address, breakpoint] : software_breakpoints_) {
@@ -315,7 +315,7 @@ void DebuggedProcess::SuspendAndSendModules() {
   notify.modules = module_list_.modules();
   notify.timestamp = GetNowTimestamp();
 
-  LOGS(Info) << LogPreamble(this) << "Sending " << notify.modules.size() << " modules.";
+  DEBUG_LOG(Process) << LogPreamble(this) << "Sending " << notify.modules.size() << " modules.";
 
   debug_agent_->SendNotification(notify);
 }
@@ -643,7 +643,7 @@ void DebuggedProcess::InjectThreadForTest(std::unique_ptr<DebuggedThread> thread
 
 std::vector<debug_ipc::ProcessThreadId> DebuggedProcess::ClientSuspendAllThreads(
     zx_koid_t except_thread) {
-  LOGS(Info) << LogPreamble(this) << "DebuggedProcess::ClientSuspendAllThreads";
+  DEBUG_LOG(Process) << LogPreamble(this) << "DebuggedProcess::ClientSuspendAllThreads";
   // Also suspend new threads.
   suspend_new_threads_ = true;
 

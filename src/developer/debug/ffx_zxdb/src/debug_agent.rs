@@ -72,19 +72,14 @@ impl DebugAgentSocket {
             loop {
                 let n = unix_rx.read(&mut buffer).await?;
                 if n == 0 {
-                    eprintln!("unix_rx.read returned 0!");
                     return Ok(()) as Result<()>;
                 }
-                eprintln!("unix_rx.read got {} bytes!", n);
                 let mut ofs = 0;
                 while ofs != n {
-                    eprintln!("written {} to fidl_tx!", ofs);
                     let wrote =
                         futures::io::AsyncWriteExt::write(&mut fidl_tx, &buffer[ofs..n]).await?;
-                    eprintln!("fidl_tx.write wrote {}!", wrote);
                     ofs += wrote;
                     if wrote == 0 {
-                        eprintln!("fidl_tx.write returned 0!");
                         return Ok(()) as Result<()>;
                     }
                 }
@@ -97,7 +92,6 @@ impl DebugAgentSocket {
             loop {
                 let n = futures::io::AsyncReadExt::read(&mut fidl_rx, &mut buffer).await?;
                 if n == 0 {
-                    eprintln!("fidl_rx.read returned 0!");
                     return Ok(()) as Result<()>;
                 }
                 let mut ofs = 0;
@@ -105,7 +99,6 @@ impl DebugAgentSocket {
                     let wrote = unix_tx.write(&buffer[ofs..n]).await?;
                     ofs += wrote;
                     if wrote == 0 {
-                        eprintln!("unix_tx.write returned 0!");
                         return Ok(()) as Result<()>;
                     }
                 }
@@ -114,14 +107,8 @@ impl DebugAgentSocket {
 
         // Exit on close or any error.
         futures::select! {
-            res = unix_to_fidl.fuse() => {
-                eprintln!("unix_to_fidl loop exited!");
-                res?
-            },
-            res = fidl_to_unix.fuse() => {
-                eprintln!("fidl_to_unix loop exited!");
-                res?
-            },
+            res = unix_to_fidl.fuse() => res?,
+            res = fidl_to_unix.fuse() => res?,
         };
 
         Ok(())
