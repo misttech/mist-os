@@ -10,12 +10,11 @@ import shutil
 import subprocess
 import sys
 from os import path
-from typing import Any
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Runs clidoc for the commands found in the sdk molecule manifest.",
+        description="Runs clidoc for the host tools in the IDK manifest.",
     )
     parser.add_argument(
         "--clidoc",
@@ -35,7 +34,6 @@ def main() -> int:
         required=True,
         help="Output location where the contents should be listed.",
     )
-
     parser.add_argument(
         "--depfile",
         type=str,
@@ -59,24 +57,35 @@ def main() -> int:
     if not os.path.exists(args.input):
         raise ValueError(f"{args.input} does not exist.")
 
-    contents = read_sdk_molecule(args.input)
+    contents, meta_files_read = read_sdk_molecule(args.input)
 
     run_clidoc(args, contents)
+
+    # Clidoc creates a new depfile, so append the meta files after it has run.
+    with open(args.depfile, "a") as dep_file:
+        for f in meta_files_read:
+            dep_file.write(f"{args.output}: {f}\n")
+
     return 0
 
 
-def run_clidoc(args, cmd_list):
+def run_clidoc(args: argparse.Namespace, cmd_list: list[str]) -> None:
     outdir = path.join(args.isolate_dir, "docs")
     if path.exists(outdir):
         shutil.rmtree(outdir)
     os.makedirs(outdir)
 
-    cmds = [c.split("/")[-1] for c in cmd_list]
-    cmds = [c for c in cmds if c not in args.excludes]
+    # The `split` gets just the command without the path for checking against
+    # the exclude list.
+    cmds = [c for c in cmd_list if c.split("/")[-1] not in args.excludes]
+
+    idk_base_dir = os.path.dirname(os.path.dirname(args.input))
 
     clidoc_args = [
         args.clidoc,
         "--quiet",
+        "--in-dir",
+        idk_base_dir,
         "--out-dir",
         outdir,
         "--archive-path",
@@ -89,18 +98,24 @@ def run_clidoc(args, cmd_list):
     subprocess.run(clidoc_args)
 
 
-def read_sdk_molecule(manifest: str) -> list[Any]:
+def read_sdk_molecule(manifest: str) -> tuple[list[str], list[str]]:
     with open(manifest) as f:
         data = json.load(f)
 
-    cmds = []
-    for atom in data["atoms"]:
-        if atom["type"] == "host_tool":
-            for f in atom["files"]:
-                if not f["source"].endswith(".json"):
-                    cmds += [f["source"]]
+    idk_base_dir = os.path.dirname(os.path.dirname(manifest))
 
-    return cmds
+    cmds = []
+    meta_files_read = []
+    for part in data["parts"]:
+        if part["type"] == "host_tool":
+            meta_path = os.path.join(idk_base_dir, part["meta"])
+            meta_files_read.append(meta_path)
+            with open(meta_path) as meta_f:
+                meta_data = json.load(meta_f)
+                for f in meta_data["files"]:
+                    if not f.endswith(".json"):
+                        cmds.append(f)
+    return cmds, meta_files_read
 
 
 if __name__ == "__main__":
