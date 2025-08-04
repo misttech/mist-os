@@ -25,10 +25,3 @@ class Test(TestCase):
             (self._path / "quebec/struct.Quebec.html").is_file(),
             msg=f"expected `quebec/struct.Quebec.html` to be a file in {repr(self._path)}",
         )
-
-    def testFileContainsRaw1(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "Quebec",
-            found,
-        )

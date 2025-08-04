@@ -246,6 +246,7 @@ template("rustc_binary") {
                              [
                                "name",
                                "disable_rustdoc",
+                               "define_rustdoc_test_override",
                                "assert_no_deps",
                                "link_args",
                                "output_name",
@@ -289,6 +290,7 @@ template("rustc_binary") {
                              "sources",
                              "testonly",
                              "visibility",
+                             "define_rustdoc_test_override",
                            ])
 
     target_type = "executable"

@@ -14,4 +14,11 @@ group("rustdoc") {
     "//build/rust/tests/rustdoc/working_dir_examples",
     "//build/rust/tests/rustdoc/write_docs_somewhere_else",
   ]
+  metadata = {
+    # Exclude the test universe crates from the global
+    # rust_target_mapping.json. These crates aren't meaningful to
+    # consumers of the Fuchsia rustdoc index, who are looking for
+    # API documentation.
+    rust_test_barrier = []
+  }
 }

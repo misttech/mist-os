@@ -20,55 +20,14 @@ class Test(TestCase):
     def setUpClass(cls) -> None:
         cls._path = Path(_doc_zip)
 
-    def testFileExists0(self) -> None:
-        self.assertTrue(
-            (self._path / "index.html").is_file(),
-            msg=f"expected `index.html` to be a file in {repr(self._path)}",
-        )
-
-    def testFileContains1(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "List of all crates",
-            found,
-        )
-
-    def testFileContains2(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertNotIn(
-            "charlie",
-            found,
-        )
-
     def testFileExists3(self) -> None:
         self.assertFalse(
             (self._path / "charlie/constant.CHARLIE.html").is_file(),
             msg=f"expected `charlie/constant.CHARLIE.html` to not be a file in {repr(self._path)}",
         )
 
-    def testFileContainsRaw4(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "CHARLIE",
-            found,
-        )
-
-    def testFileContains5(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "march",
-            found,
-        )
-
     def testFileExists6(self) -> None:
         self.assertTrue(
             (self._path / "march/macro.make_constant.html").is_file(),
             msg=f"expected `march/macro.make_constant.html` to be a file in {repr(self._path)}",
-        )
-
-    def testFileContainsRaw7(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "make_constant",
-            found,
         )

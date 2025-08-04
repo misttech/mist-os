@@ -200,7 +200,6 @@ template("rustc_artifact") {
                                  "quiet_clippy",
                                  "quiet_rustdoc",
                                  "rustdoc_args",
-                                 "rustdoc_merge",
                                  "rustdoc_out_dir",
                                  "rustenv",
                                  "sources",

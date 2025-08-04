@@ -20,12 +20,6 @@ class Test(TestCase):
     def setUpClass(cls) -> None:
         cls._path = Path(_doc_zip)
 
-    def testFileExists0(self) -> None:
-        self.assertFalse(
-            (self._path / "index.html").is_file(),
-            msg=f"expected `index.html` to not be a file in {repr(self._path)}",
-        )
-
     def testFileExists1(self) -> None:
         self.assertFalse(
             (self._path / "quebec/struct.Quebec.html").is_file(),
@@ -48,33 +42,5 @@ class Test(TestCase):
         found = (self._path / "sierra/struct.Sierra.html").read_text()
         self.assertIn(
             "Tango",
-            found,
-        )
-
-    def testFileContainsRaw5(self) -> None:
-        found = (self._path / "trait.impl/tango/trait.Tango.js").read_text()
-        self.assertIn(
-            "struct.Sierra.html",
-            found,
-        )
-
-    def testFileContainsRaw6(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "Tango",
-            found,
-        )
-
-    def testFileContainsRaw7(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "Quebec",
-            found,
-        )
-
-    def testFileContainsRaw8(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "Sierra",
             found,
         )
