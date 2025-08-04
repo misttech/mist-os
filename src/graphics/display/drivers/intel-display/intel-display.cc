@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>

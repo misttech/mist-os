@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
@@ -18,7 +17,7 @@
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -71,7 +70,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   MockAllocator sysmem_;
 
   // Must outlive `display_`.
-  display::DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsFidl engine_events_;
   Controller display_;
 };
 
@@ -187,7 +186,7 @@ TEST(IntelDisplay, ImportImage) {
   // Initialize display controller and sysmem allocator.
 
   // Must outlive `display`.
-  display::DisplayEngineEventsBanjo display_events;
+  display::DisplayEngineEventsFidl display_events;
   Controller display(&display_events, inspect::Inspector{});
   ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
 

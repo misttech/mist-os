@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PIPE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PIPE_H_
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>

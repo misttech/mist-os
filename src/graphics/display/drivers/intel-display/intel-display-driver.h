@@ -16,8 +16,8 @@
 #include <memory>
 
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace intel_display {
 
@@ -52,19 +52,17 @@ class IntelDisplayDriver : public fdf::DriverBase {
   void PrepareStopOnPowerStateTransition(fuchsia_system_state::SystemPowerState power_state,
                                          fdf::PrepareStopCompleter completer);
 
-  // Must outlive `controller_` and `engine_banjo_adapter_`.
-  display::DisplayEngineEventsBanjo engine_events_;
+  // Must outlive `controller_` and `engine_fidl_adapter_`.
+  display::DisplayEngineEventsFidl engine_events_;
 
-  // Must outlive `engine_banjo_adapter_`.
+  // Must outlive `engine_fidl_adapter_`.
   std::unique_ptr<Controller> controller_;
 
-  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
+  std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
 
   std::optional<zbi_swfb_t> framebuffer_info_;
   zx::resource mmio_resource_;
   zx::resource ioport_resource_;
-
-  compat::SyncInitializedDeviceServer display_compat_server_;
 
   std::optional<compat::BanjoServer> gpu_banjo_server_;
   compat::SyncInitializedDeviceServer gpu_compat_server_;

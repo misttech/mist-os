@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DISPLAY_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>

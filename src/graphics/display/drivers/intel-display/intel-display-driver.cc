@@ -156,7 +156,7 @@ zx::result<> IntelDisplayDriver::InitController() {
   controller_ = std::move(controller_result).value();
 
   fbl::AllocChecker alloc_checker;
-  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+  engine_fidl_adapter_ = fbl::make_unique_checked<display::DisplayEngineFidlAdapter>(
       &alloc_checker, controller_.get(), &engine_events_);
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for DisplayEngineFidlAdapter");
@@ -240,36 +240,30 @@ void IntelDisplayDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
 void IntelDisplayDriver::Stop() {}
 
 zx::result<ddk::AnyProtocol> IntelDisplayDriver::GetProtocol(uint32_t proto_id) {
-  if (proto_id == ZX_PROTOCOL_DISPLAY_ENGINE) {
-    display_engine_protocol_t protocol = engine_banjo_adapter_->GetProtocol();
-    return zx::ok(ddk::AnyProtocol{
-        .ops = protocol.ops,
-        .ctx = protocol.ctx,
-    });
-  }
   return controller_->GetProtocol(proto_id);
 }
 
 zx::result<> IntelDisplayDriver::InitDisplayNode() {
   ZX_DEBUG_ASSERT(!display_node_controller_.is_valid());
 
-  // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
+  // Serves the [`fuchsia.hardware.display.engine/Service`] service
   // over the compatibility server.
-  static constexpr std::string_view kDisplayChildNodeName = "intel-display-controller";
-  zx::result<> compat_server_init_result = display_compat_server_.Initialize(
-      incoming(), outgoing(), node_name(), kDisplayChildNodeName,
-      /*forward_metadata=*/compat::ForwardMetadata::None(),
-      /*banjo_config=*/engine_banjo_adapter_->CreateBanjoConfig());
-  if (compat_server_init_result.is_error()) {
-    fdf::error("Failed to initialize the compatibility server: {}", compat_server_init_result);
-    return compat_server_init_result.take_error();
+  fuchsia_hardware_display_engine::Service::InstanceHandler service_handler(
+      {.engine = engine_fidl_adapter_->CreateHandler(*(driver_dispatcher()->get()))});
+  zx::result<> add_service_result =
+      outgoing()->AddService<fuchsia_hardware_display_engine::Service>(std::move(service_handler));
+  if (add_service_result.is_error()) {
+    fdf::error("Failed to add service: {}", add_service_result);
+    return add_service_result.take_error();
   }
 
+  static constexpr std::string_view kDisplayChildNodeName = "intel-display-controller";
   const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
-  const std::vector<fuchsia_driver_framework::Offer> node_offers =
-      display_compat_server_.CreateOffers2();
+  const std::vector<fuchsia_driver_framework::Offer> node_offers = {
+      fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>(),
+  };
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
       display_node_controller_client_result =
           AddChild(kDisplayChildNodeName, node_properties, node_offers);

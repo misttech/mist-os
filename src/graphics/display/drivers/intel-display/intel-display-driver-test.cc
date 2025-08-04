@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.kernel/cpp/test_base.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fidl/fuchsia.system.state/cpp/test_base.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -175,7 +173,15 @@ class IntegrationTest : public ::testing::Test {
   MockAllocator* sysmem() { return &sysmem_; }
   fake_framebuffer::FakeBootItems* boot_items() { return &boot_items_; }
 
+  fidl::ClientEnd<fuchsia_io::Directory> ConnectToDriverSvcDir();
+
  protected:
+  void SetUpFakeFramebuffer();
+  void SetUpFakeSysmem();
+  void SetUpFakePci();
+  void SetUpFakeDevices();
+  void SetUpEnvironment();
+
   fdf_testing::DriverRuntime driver_runtime_;
   fdf::UnownedSynchronizedDispatcher pci_dispatcher_ = driver_runtime_.StartBackgroundDispatcher();
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = driver_runtime_.StartBackgroundDispatcher();
@@ -199,14 +205,7 @@ class IntegrationTest : public ::testing::Test {
   FakeSystemStateTransition fake_system_state_transition_;
 
   fuchsia_driver_framework::DriverStartArgs start_args_;
-
- private:
- protected:
-  void SetUpFakeFramebuffer();
-  void SetUpFakeSysmem();
-  void SetUpFakePci();
-  void SetUpFakeDevices();
-  void SetUpEnvironment();
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 };
 
 void IntegrationTest::SetUpFakeFramebuffer() { boot_items_.SetFramebuffer({}); }
@@ -243,6 +242,18 @@ void IntegrationTest::SetUpFakeDevices() {
   SetUpFakePci();
 }
 
+fidl::ClientEnd<fuchsia_io::Directory> IntegrationTest::ConnectToDriverSvcDir() {
+  // Open the svc directory in the driver's outgoing, and store a client to it.
+  auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  zx_status_t status = fdio_open3_at(
+      driver_outgoing_.handle()->get(), "/svc",
+      static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::Flags::kProtocolDirectory),
+      svc_endpoints.server.TakeChannel().release());
+  EXPECT_OK(status);
+  return std::move(svc_endpoints.client);
+}
+
 void IntegrationTest::SetUpEnvironment() {
   zx::result create_start_args_zx_result =
       node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
@@ -251,6 +262,7 @@ void IntegrationTest::SetUpEnvironment() {
   auto [start_args, incoming_directory_server, outgoing_directory_client] =
       std::move(create_start_args_zx_result).value();
   start_args_ = std::move(start_args);
+  driver_outgoing_ = std::move(outgoing_directory_client);
 
   zx::result<> add_sysmem_result =
       test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
@@ -468,31 +480,42 @@ TEST_F(IntegrationTest, SysmemImport) {
                        (std::move(start_args_))));
   ASSERT_OK(start_result);
 
-  zx::result<ddk::AnyProtocol> display_protocol_result =
-      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
-        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
-      });
-  ASSERT_OK(display_protocol_result);
-  ddk::AnyProtocol display_protocol = std::move(display_protocol_result).value();
-  ddk::DisplayEngineProtocolClient display(
-      reinterpret_cast<const display_engine_protocol_t*>(&display_protocol));
+  // TODO(https://fxbug.dev/435890974): Instead of using the internal
+  // DriverTransportConnect() method, use the testing framework in
+  // //sdk/lib/driver/testing/cpp/driver_test.h .
+  zx::result<fdf::ClientEnd<fuchsia_hardware_display_engine::Engine>> connect_engine_result =
+      fdf::internal::DriverTransportConnect<fuchsia_hardware_display_engine::Service::Engine>(
+          ConnectToDriverSvcDir(), component::kDefaultInstance);
+  ASSERT_OK(connect_engine_result);
+
+  fdf::WireSyncClient display(std::move(connect_engine_result).value());
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
-  zx_status_t import_status = display.ImportBufferCollection(kBanjoBufferCollectionId,
-                                                             std::move(token_client).TakeChannel());
-  ASSERT_OK(import_status);
+  fdf::Arena arena('TEST');
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ImportBufferCollection>
+      import_fidl_transport_result = display.buffer(arena)->ImportBufferCollection(
+          kBufferCollectionId.ToFidl(), std::move(token_client));
+  ASSERT_TRUE(import_fidl_transport_result.ok());
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  zx_status_t set_constraints_status =
-      display.SetBufferCollectionConstraints(&kDisplayUsage, kBanjoBufferCollectionId);
-  ASSERT_OK(set_constraints_status);
+  fit::result<zx_status_t> import_fidl_domain_result = import_fidl_transport_result.value();
+  ASSERT_TRUE(import_fidl_domain_result.is_ok());
+
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::SetBufferCollectionConstraints>
+      set_constraints_fidl_transport_result = display.buffer(arena)->SetBufferCollectionConstraints(
+          kDisplayUsage.ToFidl(), kBufferCollectionId.ToFidl());
+  ASSERT_TRUE(set_constraints_fidl_transport_result.ok());
+
+  fit::result<zx_status_t> set_constraints_fidl_domain_result =
+      set_constraints_fidl_transport_result.value();
+  ASSERT_TRUE(set_constraints_fidl_domain_result.is_ok());
 
   MockAllocator& allocator = *sysmem();
   driver_runtime_.RunUntil([&] {
@@ -505,23 +528,36 @@ TEST_F(IntegrationTest, SysmemImport) {
       .height = kImageHeight,
       .tiling_type = display::ImageTilingType::kLinear,
   });
-  static constexpr image_metadata_t kBanjoDisplayImageMetadata = kDisplayImageMetadata.ToBanjo();
-  uint64_t image_handle = 0;
-  zx_status_t import_image_status = display.ImportImage(
-      &kBanjoDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
-  ASSERT_OK(import_image_status);
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ImportImage>
+      import_image_fidl_transport_result = display.buffer(arena)->ImportImage(
+          kDisplayImageMetadata.ToFidl(), kBufferCollectionId.ToFidl(), /*index=*/0);
+  ASSERT_TRUE(import_image_fidl_transport_result.ok());
+
+  fit::result import_image_fidl_domain_result = import_image_fidl_transport_result.value();
+  ASSERT_TRUE(import_image_fidl_domain_result.is_ok());
+  display::DriverImageId image_id(import_image_fidl_domain_result->image_id);
 
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, display::DriverImageId(image_handle),
-            display::CoordinateTransformation::kIdentity);
+            kDisplayImageMetadata, image_id, display::CoordinateTransformation::kIdentity);
         return region.bytes_per_row();
       });
   EXPECT_LT(kDisplayImageMetadata.dimensions().width() * 4, int32_t{kBytesPerRowDivisor});
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
-  display.ReleaseImage(image_handle);
+  fidl::OneWayStatus release_image_fidl_transport_result =
+      display.buffer(arena)->ReleaseImage(image_id.ToFidl());
+  ASSERT_TRUE(release_image_fidl_transport_result.ok());
+
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ReleaseBufferCollection>
+      release_collection_fidl_transport_result =
+          display.buffer(arena)->ReleaseBufferCollection(kBufferCollectionId.ToFidl());
+  ASSERT_TRUE(release_collection_fidl_transport_result.ok());
+
+  fit::result<zx_status_t> release_collection_fidl_domain_result =
+      release_collection_fidl_transport_result.value();
+  ASSERT_TRUE(release_collection_fidl_domain_result.is_ok());
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
       driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
@@ -547,32 +583,43 @@ TEST_F(IntegrationTest, SysmemRotated) {
                        (std::move(start_args_))));
   ASSERT_OK(start_result);
 
-  zx::result<ddk::AnyProtocol> display_protocol_result =
-      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
-        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
-      });
-  ASSERT_OK(display_protocol_result);
-  ddk::AnyProtocol display_protocol = std::move(display_protocol_result).value();
-  ddk::DisplayEngineProtocolClient display(
-      reinterpret_cast<const display_engine_protocol_t*>(&display_protocol));
+  // TODO(https://fxbug.dev/435890974): Instead of using the internal
+  // DriverTransportConnect() method, use the testing framework in
+  // //sdk/lib/driver/testing/cpp/driver_test.h .
+  zx::result<fdf::ClientEnd<fuchsia_hardware_display_engine::Engine>> connect_engine_result =
+      fdf::internal::DriverTransportConnect<fuchsia_hardware_display_engine::Service::Engine>(
+          ConnectToDriverSvcDir(), component::kDefaultInstance);
+  ASSERT_OK(connect_engine_result);
+
+  fdf::WireSyncClient display(std::move(connect_engine_result).value());
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
-  zx_status_t import_status = display.ImportBufferCollection(kBanjoBufferCollectionId,
-                                                             std::move(token_client).TakeChannel());
-  ASSERT_OK(import_status);
+  fdf::Arena arena('TEST');
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ImportBufferCollection>
+      import_fidl_transport_result = display.buffer(arena)->ImportBufferCollection(
+          kBufferCollectionId.ToFidl(), std::move(token_client));
+  ASSERT_TRUE(import_fidl_transport_result.ok());
 
-  static constexpr image_buffer_usage_t kTiledDisplayUsage = {
+  fit::result<zx_status_t> import_fidl_domain_result = import_fidl_transport_result.value();
+  ASSERT_TRUE(import_fidl_domain_result.is_ok());
+
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       // Must be y or yf tiled so rotation is allowed.
-      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
-  };
-  zx_status_t set_constraints_status =
-      display.SetBufferCollectionConstraints(&kTiledDisplayUsage, kBanjoBufferCollectionId);
-  ASSERT_OK(set_constraints_status);
+      .tiling_type = display::ImageTilingType(IMAGE_TILING_TYPE_Y_LEGACY_TILED),
+  });
+
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::SetBufferCollectionConstraints>
+      set_constraints_fidl_transport_result = display.buffer(arena)->SetBufferCollectionConstraints(
+          kDisplayUsage.ToFidl(), kBufferCollectionId.ToFidl());
+  ASSERT_TRUE(set_constraints_fidl_transport_result.ok());
+
+  fit::result<zx_status_t> set_constraints_fidl_domain_result =
+      set_constraints_fidl_transport_result.value();
+  ASSERT_TRUE(set_constraints_fidl_domain_result.is_ok());
 
   MockAllocator& allocator = *sysmem();
   driver_runtime_.RunUntil([&] {
@@ -585,24 +632,37 @@ TEST_F(IntegrationTest, SysmemRotated) {
       .height = kImageHeight,
       .tiling_type = display::ImageTilingType(IMAGE_TILING_TYPE_Y_LEGACY_TILED),
   });
-  static constexpr image_metadata_t kBanjoDisplayImageMetadata = kDisplayImageMetadata.ToBanjo();
-  uint64_t image_handle = 0;
-  zx_status_t import_image_status = display.ImportImage(
-      &kBanjoDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
-  ASSERT_OK(import_image_status);
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ImportImage>
+      import_image_fidl_transport_result = display.buffer(arena)->ImportImage(
+          kDisplayImageMetadata.ToFidl(), kBufferCollectionId.ToFidl(), /*index=*/0);
+  ASSERT_TRUE(import_image_fidl_transport_result.ok());
+
+  fit::result import_image_fidl_domain_result = import_image_fidl_transport_result.value();
+  ASSERT_TRUE(import_image_fidl_domain_result.is_ok());
+  display::DriverImageId image_id(import_image_fidl_domain_result->image_id);
 
   // Check that rotating the image doesn't hang.
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, display::DriverImageId(image_handle),
-            display::CoordinateTransformation::kRotateCcw90);
+            kDisplayImageMetadata, image_id, display::CoordinateTransformation::kRotateCcw90);
         return region.bytes_per_row();
       });
   EXPECT_LT(kDisplayImageMetadata.dimensions().width() * 4, int32_t{kBytesPerRowDivisor});
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
-  display.ReleaseImage(image_handle);
+  fidl::OneWayStatus release_image_fidl_transport_result =
+      display.buffer(arena)->ReleaseImage(image_id.ToFidl());
+  ASSERT_TRUE(release_image_fidl_transport_result.ok());
+
+  fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::ReleaseBufferCollection>
+      release_collection_fidl_transport_result =
+          display.buffer(arena)->ReleaseBufferCollection(kBufferCollectionId.ToFidl());
+  ASSERT_TRUE(release_collection_fidl_transport_result.ok());
+
+  fit::result<zx_status_t> release_collection_fidl_domain_result =
+      release_collection_fidl_transport_result.value();
+  ASSERT_TRUE(release_collection_fidl_domain_result.is_ok());
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
       driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));

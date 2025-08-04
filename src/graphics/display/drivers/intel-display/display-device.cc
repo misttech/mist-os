@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-display/display-device.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>

@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
@@ -52,7 +52,7 @@ class PipeManagerTest : public ::testing::Test {
   std::optional<fdf::MmioBuffer> mmio_buffer_;
 
   // Must outlive `controller_`.
-  display::DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsFidl engine_events_;
   Controller controller_;
 };
 
