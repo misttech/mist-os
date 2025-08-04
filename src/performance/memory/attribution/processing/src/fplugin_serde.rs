@@ -45,6 +45,95 @@ impl Into<fplugin::KernelStatistics> for KernelStatistics {
     }
 }
 
+// TODO(https://github.com/serde-rs/serde/issues/723): Use remote serialization
+// with fkernel::KernelStatistics when supported inside options.
+#[derive(PartialEq, Debug, Clone, Serialize)]
+#[serde(remote = "fidl_fuchsia_memory_attribution_plugin::ResourceType")]
+pub enum ResourceTypeDef {
+    #[serde(with = "JobDef")]
+    Job(fplugin::Job),
+    #[serde(with = "ProcessDef")]
+    Process(fplugin::Process),
+    #[serde(with = "VmoDef")]
+    Vmo(fplugin::Vmo),
+    #[doc(hidden)]
+    #[serde(skip)]
+    __SourceBreaking { unknown_ordinal: u64 },
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize)]
+#[serde(remote = "fidl_fuchsia_memory_attribution_plugin::Job")]
+pub struct JobDef {
+    pub child_jobs: Option<Vec<u64>>,
+    pub processes: Option<Vec<u64>>,
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize)]
+#[serde(remote = "fidl_fuchsia_memory_attribution_plugin::Process")]
+pub struct ProcessDef {
+    pub vmos: Option<Vec<u64>>,
+    #[serde(with = "option_vec_mapping_def")]
+    pub mappings: Option<Vec<fplugin::Mapping>>,
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+// As [Process::mappings] is an Option<Vec<fplugin::Mapping>> instead of a pure struct, we can't
+// easily derive a serializer and need to provide a custom one.
+mod option_vec_mapping_def {
+    use super::{fplugin, MappingDef};
+    use serde::ser::SerializeSeq;
+    use serde::{Serialize, Serializer};
+
+    pub fn serialize<S>(
+        opt_vec: &Option<Vec<fplugin::Mapping>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a>(#[serde(with = "MappingDef")] &'a fplugin::Mapping);
+
+        match opt_vec {
+            Some(vec) => {
+                let mut seq = serializer.serialize_seq(Some(vec.len()))?;
+                for element in vec {
+                    seq.serialize_element(&Wrapper(element))?;
+                }
+                seq.end()
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize)]
+#[serde(remote = "fidl_fuchsia_memory_attribution_plugin::Mapping")]
+pub struct MappingDef {
+    pub vmo: Option<u64>,
+    pub address_base: Option<u64>,
+    pub size: Option<u64>,
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize)]
+#[serde(remote = "fidl_fuchsia_memory_attribution_plugin::Vmo")]
+pub struct VmoDef {
+    pub parent: Option<u64>,
+    pub private_committed_bytes: Option<u64>,
+    pub private_populated_bytes: Option<u64>,
+    pub scaled_committed_bytes: Option<u64>,
+    pub scaled_populated_bytes: Option<u64>,
+    pub total_committed_bytes: Option<u64>,
+    pub total_populated_bytes: Option<u64>,
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

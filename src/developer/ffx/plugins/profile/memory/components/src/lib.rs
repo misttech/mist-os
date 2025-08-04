@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod detailed;
 mod json;
 mod output;
 
@@ -9,7 +10,7 @@ mod output;
 extern crate prettytable;
 use anyhow::Result;
 use async_trait::async_trait;
-use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
+use attribution_processing::summary::{ComponentSummaryProfileResult, MemorySummary};
 use attribution_processing::{
     digest, AttributionData, AttributionDataProvider, Principal, Resource, ResourcesVisitor, ZXName,
 };
@@ -25,6 +26,8 @@ use serde::Serialize;
 use std::io::Write;
 use target_holders::moniker;
 use zerocopy::transmute_ref;
+
+use crate::detailed::process_snapshot_detailed;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
@@ -48,6 +51,12 @@ where
     fn machine(&mut self, output: T) -> Result<()>;
     fn stderr(&mut self) -> &mut dyn Write;
     fn stdout(&mut self) -> &mut dyn Write;
+}
+
+#[derive(Serialize)]
+pub enum ComponentProfileResult {
+    Summary(ComponentSummaryProfileResult),
+    Detailed(detailed::ComponentDetailedProfileResult),
 }
 
 impl PluginOutput<ComponentProfileResult> for MachineWriter<ComponentProfileResult> {
@@ -98,9 +107,20 @@ impl MemoryComponentsTool {
             return Ok(());
         }
 
-        let profile_result = process_snapshot(snapshot);
+        if self.cmd.detailed {
+            if !writer.is_machine() {
+                return Err(fho::Error::User(anyhow::anyhow!(
+                    "--detailed requires machine output"
+                )));
+            }
+            let output = process_snapshot_detailed(snapshot)?;
+            writer.machine(ComponentProfileResult::Detailed(output))?;
+            return Ok(());
+        }
+
+        let profile_result = process_snapshot_summary(snapshot);
         if writer.is_machine() {
-            writer.machine(profile_result)?;
+            writer.machine(ComponentProfileResult::Summary(profile_result))?;
         } else {
             output::write_summary(&mut writer.stdout(), self.cmd.csv, &profile_result)
                 .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
@@ -172,7 +192,7 @@ impl<'a> AttributionDataProvider for SnapshotAttributionDataProvider<'a> {
     }
 }
 
-fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
+fn process_snapshot_summary(snapshot: fplugin::Snapshot) -> ComponentSummaryProfileResult {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -218,7 +238,7 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
             attributions,
         })
         .summary();
-    ComponentProfileResult {
+    ComponentSummaryProfileResult {
         kernel: snapshot.kernel_statistics.unwrap().into(),
         principals,
         unclaimed,
@@ -596,8 +616,8 @@ mod tests {
             ..Default::default()
         };
 
-        let ComponentProfileResult { principals, unclaimed, performance, digest, .. } =
-            process_snapshot(snapshot);
+        let ComponentSummaryProfileResult { principals, unclaimed, performance, digest, .. } =
+            process_snapshot_summary(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
         // unclaimed.
@@ -983,7 +1003,8 @@ mod tests {
             ..Default::default()
         };
 
-        let ComponentProfileResult { principals, unclaimed, .. } = process_snapshot(snapshot);
+        let ComponentSummaryProfileResult { principals, unclaimed, .. } =
+            process_snapshot_summary(snapshot);
 
         assert_eq!(unclaimed, 0);
         assert_eq!(principals.len(), 3);

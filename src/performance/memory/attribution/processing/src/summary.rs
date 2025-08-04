@@ -18,7 +18,7 @@ use std::fmt::Display;
 const FLOAT_COMPARISON_EPSILON: f64 = 1e-10;
 
 #[derive(Debug, Default, PartialEq, Serialize)]
-pub struct ComponentProfileResult {
+pub struct ComponentSummaryProfileResult {
     pub kernel: fplugin_serde::KernelStatistics,
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.

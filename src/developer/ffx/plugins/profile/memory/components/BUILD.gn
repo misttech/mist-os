@@ -10,6 +10,7 @@ ffx_plugin("ffx_profile_memory_components") {
   edition = "2021"
 
   sources = [
+    "src/detailed.rs",
     "src/json.rs",
     "src/lib.rs",
     "src/output.rs",

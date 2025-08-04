@@ -28,4 +28,7 @@ pub struct ComponentsCommand {
 
     #[argh(switch, description = "prints a bucketized digest of the memory usage.")]
     pub buckets: bool,
+
+    #[argh(switch, description = "outputs a detailed output, machine only.")]
+    pub detailed: bool,
 }

@@ -15,12 +15,11 @@ use crate::write_csv_output::write_csv_output;
 use crate::write_human_readable_output::write_human_readable_output;
 use anyhow::Result;
 use async_trait::async_trait;
-use attribution_processing::summary::ComponentProfileResult;
 use digest::{processed, raw};
 use errors::ffx_bail;
 use ffx_optional_moniker::optional_moniker;
 use ffx_profile_memory_args::{Backend, MemoryCommand};
-use ffx_profile_memory_components::{MemoryComponentsTool, PluginOutput};
+use ffx_profile_memory_components::{ComponentProfileResult, MemoryComponentsTool, PluginOutput};
 use ffx_profile_memory_components_args::ComponentsCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{FfxMain, FfxTool};
@@ -39,8 +38,13 @@ struct ComponentProfileResultWriter {
 
 impl PluginOutput<ComponentProfileResult> for ComponentProfileResultWriter {
     fn machine(&mut self, output: ComponentProfileResult) -> Result<()> {
-        self.writer.machine(&ProfileMemoryOutput::ComponentDigest(output))?;
-        Ok(())
+        match output {
+            ComponentProfileResult::Summary(summary) => {
+                self.writer.machine(&ProfileMemoryOutput::ComponentDigest(summary))?;
+                Ok(())
+            }
+            _ => unimplemented!(),
+        }
     }
 
     fn stderr(&mut self) -> &mut dyn Write {
@@ -107,6 +111,7 @@ impl FfxMain for MemoryTool {
                         debug_json: self.cmd.debug_json,
                         csv: self.cmd.csv,
                         buckets: self.cmd.buckets,
+                        detailed: false,
                     },
                     monitor_proxy: mm2,
                 };

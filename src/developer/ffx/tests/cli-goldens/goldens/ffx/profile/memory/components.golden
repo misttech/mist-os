@@ -42,6 +42,14 @@
       "short": null,
       "description": "prints a bucketized digest of the memory usage.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--detailed",
+      "short": null,
+      "description": "outputs a detailed output, machine only.",
+      "hidden": false
     }
   ],
   "notes": [],
