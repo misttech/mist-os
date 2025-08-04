@@ -602,6 +602,9 @@ zx_status_t SdmmcBlockDevice::ReadWriteAttempt(std::vector<Request>& requests,
     rw_multiple_block.buffers[0] = *std::move(buffer_region);
   } else {
     // Form packed command header (section 6.6.29.1, eMMC standard 5.1)
+    memset(readwrite_metadata_.packed_command_header_data, 0,
+           sizeof(*readwrite_metadata_.packed_command_header_data));
+    readwrite_metadata_.packed_command_header_data->version = 1;
     readwrite_metadata_.packed_command_header_data->rw = is_read ? 1 : 2;
     // Safe because requests.size() <= kMaxPackedCommandsFor512ByteBlockSize.
     readwrite_metadata_.packed_command_header_data->num_entries =

@@ -73,8 +73,6 @@ struct ReadWriteMetadata {
     }
 
     packed_command_header_data = static_cast<PackedCommand*>(packed_command_header_mapper.start());
-    memset(packed_command_header_data, 0, block_size);
-    packed_command_header_data->version = 1;
     return ZX_OK;
   }
 
