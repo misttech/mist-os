@@ -78,8 +78,6 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> NetworkConnector<T> {
 }
 
 impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for NetworkConnector<T> {
-    /// TODO(b/432297777)
-    #[allow(clippy::await_holding_lock)]
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
             if self.connection.load().is_some() {
@@ -98,8 +96,6 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
         e
     }
 
-    /// TODO(b/432297777)
-    #[allow(clippy::await_holding_lock)]
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>> {
         Box::pin(async {
             let guard = self.connection.load();
@@ -107,8 +103,6 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
         })
     }
 
-    /// TODO(b/432297777)
-    #[allow(clippy::await_holding_lock)]
     fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>> {
         Box::pin(async {
             let guard = self.connection.load();
