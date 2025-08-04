@@ -34,15 +34,6 @@ pub struct FeedbackConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub remote_device_id_provider: bool,
 
-    /// The URL of the component, if any, that connects the fuchsia.feedback.DeviceIdProvider and
-    /// google.flashts.Reader protocols and should be added to the core realm. This cannot be used
-    /// in conjunction with sysinfo_feedback_id_component_url.
-    ///
-    /// TODO(https://fxbug.dev/427264599): remove once all products have migrated to
-    /// feedback_id_component_url.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub flash_ts_feedback_id_component_url: Option<String>,
-
     /// The URL of the component, if any, that exposes the fuchsia.feedback.DeviceIdProvider
     /// protocol and should be added to the core realm.
     #[serde(skip_serializing_if = "crate::common::is_default")]

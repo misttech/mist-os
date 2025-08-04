@@ -91,21 +91,6 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             }
         }
 
-        if config.feedback.flash_ts_feedback_id_component_url.is_some()
-            && config.feedback.feedback_id_component_url != FeedbackIdComponentUrl::None
-        {
-            anyhow::bail!("flash_ts_feedback_id_component_url and feedback_id_component_url cannot both be specified.");
-        }
-
-        if let Some(url) = &config.feedback.flash_ts_feedback_id_component_url {
-            util::add_platform_declared_product_provided_component(
-                url,
-                "flash_ts_feedback_id.core_shard.cml.template",
-                context,
-                builder,
-            )?;
-        }
-
         match &config.feedback.feedback_id_component_url {
             FeedbackIdComponentUrl::FlashTs(url) => {
                 util::add_platform_declared_product_provided_component(
@@ -217,72 +202,6 @@ mod test {
             ForensicsSubsystem::define_configuration(&context, &forensics_config, &mut builder);
 
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn flash_ts_feedback_id_component_url_and_feedback_id_component_url_cannot_both_be_specified() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSetLevel::Standard,
-            build_type: &BuildType::UserDebug,
-            board_config: &Default::default(),
-            gendir: Default::default(),
-            resource_dir: Default::default(),
-            developer_only_options: Default::default(),
-        };
-
-        let forensics_config = ForensicsConfig {
-            feedback: FeedbackConfig {
-                flash_ts_feedback_id_component_url: Some(
-                    "fuchsia-pkg://fuchsia.com/test-package#meta/test-component.cm".to_string(),
-                ),
-                feedback_id_component_url: FeedbackIdComponentUrl::SysInfo(
-                    "fuchsia-pkg://fuchsia.com/test-package#meta/test-component.cm".to_string(),
-                ),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mut builder: ConfigurationBuilderImpl = Default::default();
-        let result =
-            ForensicsSubsystem::define_configuration(&context, &forensics_config, &mut builder);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn flash_ts_feedback_id_component_url_adds_core_shard() {
-        let resource_dir = tempfile::TempDir::new().unwrap();
-        std::fs::File::create(
-            resource_dir.path().join("flash_ts_feedback_id.core_shard.cml.template"),
-        )
-        .unwrap();
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSetLevel::Standard,
-            build_type: &BuildType::Eng,
-            board_config: &Default::default(),
-            gendir: Default::default(),
-            resource_dir: Utf8Path::from_path(resource_dir.path()).unwrap().to_path_buf(),
-            developer_only_options: Default::default(),
-        };
-
-        let forensics_config = ForensicsConfig {
-            feedback: FeedbackConfig {
-                flash_ts_feedback_id_component_url: Some(
-                    "fuchsia-pkg://fuchsia.com/test-package#meta/test-component.cm".to_string(),
-                ),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mut builder: ConfigurationBuilderImpl = Default::default();
-        let result =
-            ForensicsSubsystem::define_configuration(&context, &forensics_config, &mut builder);
-
-        assert!(result.is_ok());
-        assert!(builder
-            .build()
-            .core_shards
-            .contains(&"flash_ts_feedback_id.core_shard.cml.template.rendered.cml".into()));
     }
 
     #[test]
