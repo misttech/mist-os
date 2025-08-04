@@ -106,7 +106,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
         }
         fidl_wlanix::WifiChipRequest::GetStaIfaceNames { responder } => {
             // TODO(b/323586414): Unit test once we actually support this.
-            info!("fidl_wlanix::WifiChipRequest::GetStaIfaceNames");
+            debug!("fidl_wlanix::WifiChipRequest::GetStaIfaceNames");
             let ifaces = iface_manager.list_ifaces();
             // TODO(b/298030634): Serve actual interface names.
             let response = fidl_wlanix::WifiChipGetStaIfaceNamesResponse {
@@ -117,7 +117,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
         }
         fidl_wlanix::WifiChipRequest::GetStaIface { payload, responder } => {
             // TODO(b/323586414): Unit test once we actually support this.
-            info!("fidl_wlanix::WifiChipRequest::GetStaIface");
+            debug!("fidl_wlanix::WifiChipRequest::GetStaIface");
             match payload.iface {
                 Some(iface) => {
                     // TODO(b/298030634): Use the iface name to identify the correct iface here.
@@ -211,14 +211,14 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
         }
         // TODO(https://fxbug.dev/366028666): GetMode is hardcoded.
         fidl_wlanix::WifiChipRequest::GetMode { responder } => {
-            info!("fidl_wlanix::WifiChipRequest::GetMode");
+            debug!("fidl_wlanix::WifiChipRequest::GetMode");
             let response =
                 fidl_wlanix::WifiChipGetModeResponse { mode: Some(0), ..Default::default() };
             responder.send(&response).context("send GetMode response")?;
         }
         // TODO(https://fxbug.dev/366027491): GetCapabilities is hardcoded.
         fidl_wlanix::WifiChipRequest::GetCapabilities { responder } => {
-            info!("fidl_wlanix::WifiChipRequest::GetCapabilities");
+            debug!("fidl_wlanix::WifiChipRequest::GetCapabilities");
             let response = fidl_wlanix::WifiChipGetCapabilitiesResponse {
                 capabilities_mask: Some(0),
                 ..Default::default()
@@ -392,7 +392,7 @@ async fn handle_wifi_request<I: IfaceManager>(
         }
 
         fidl_wlanix::WifiRequest::GetState { responder } => {
-            info!("fidl_wlanix::WifiRequest::GetState");
+            debug!("fidl_wlanix::WifiRequest::GetState");
             let response = fidl_wlanix::WifiGetStateResponse {
                 is_started: Some(state.lock().started),
                 ..Default::default()
@@ -400,7 +400,7 @@ async fn handle_wifi_request<I: IfaceManager>(
             responder.send(&response).context("send GetState response")?;
         }
         fidl_wlanix::WifiRequest::GetChipIds { responder } => {
-            info!("fidl_wlanix::WifiRequest::GetChipIds");
+            debug!("fidl_wlanix::WifiRequest::GetChipIds");
             let phy_ids = iface_manager.list_phys().await?;
             let response = fidl_wlanix::WifiGetChipIdsResponse {
                 chip_ids: Some(phy_ids.into_iter().map(Into::into).collect()),
@@ -409,7 +409,7 @@ async fn handle_wifi_request<I: IfaceManager>(
             responder.send(&response).context("send GetChipIds response")?;
         }
         fidl_wlanix::WifiRequest::GetChip { payload, responder } => {
-            info!("fidl_wlanix::WifiRequest::GetChip - chip_id {:?}", payload.chip_id);
+            debug!("fidl_wlanix::WifiRequest::GetChip - chip_id {:?}", payload.chip_id);
             match (payload.chip_id, payload.chip) {
                 (Some(chip_id), Some(chip)) => {
                     let chip_stream = chip.into_stream();
@@ -1231,7 +1231,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
     };
     match message.payload.cmd {
         Nl80211Cmd::GetWiphy => {
-            info!("Nl80211Cmd::GetWiphy");
+            debug!("Nl80211Cmd::GetWiphy");
             let phys = iface_manager.list_phys().await?;
             let mut resp = vec![];
             for phy_id in phys {
