@@ -766,7 +766,8 @@ zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_respon
     }
   }
   if (interrupt_status.data_timeout_error()) {
-    FDF_LOG(ERROR, "Data timeout error cmd%u", request.cmd_idx);
+    FDF_LOG(ERROR, "Data timeout error cmd%u (%zu buffers)", request.cmd_idx,
+            request.buffers_count);
   }
   if (interrupt_status.command_index_error()) {
     FDF_LOG(ERROR, "Command index error cmd%u", request.cmd_idx);
