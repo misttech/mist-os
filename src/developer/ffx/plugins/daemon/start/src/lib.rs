@@ -3,51 +3,36 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_config::EnvironmentContext;
 use ffx_daemon::DaemonConfig;
 use ffx_daemon_start_args::StartCommand;
-use fho::{user_error, FfxContext, FfxMain, FfxTool, FhoEnvironment, TryFromEnv};
+use fho::{user_error, FfxContext, FfxMain, FfxTool, FhoEnvironment};
 use target_holders::DaemonProxyHolder;
 
-// The field in this tuple is never read because getting a daemon proxy is sufficient enough to
-// determine that a connection is valid (this requires a version negotiation handshake).
-pub struct DefaultDaemonProvider(#[allow(dead_code)] DaemonProxyHolder);
-
-#[async_trait(?Send)]
-impl TryFromEnv for DefaultDaemonProvider {
-    async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
-        Ok(Self(DaemonProxyHolder::try_from_env(env).await?))
-    }
-}
-
 #[derive(FfxTool)]
-pub struct DaemonStartTool<T: TryFromEnv + 'static> {
+pub struct DaemonStartTool {
     #[command]
     cmd: StartCommand,
-    context: EnvironmentContext,
-    daemon_checker: fho::Deferred<T>,
+    fho_env: FhoEnvironment,
 }
 
-fho::embedded_plugin!(DaemonStartTool<DefaultDaemonProvider>);
+fho::embedded_plugin!(DaemonStartTool);
 const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_millis(500);
 
-#[async_trait::async_trait(?Send)]
-impl<T: TryFromEnv + 'static> FfxMain for DaemonStartTool<T> {
+#[async_trait(?Send)]
+impl FfxMain for DaemonStartTool {
     type Writer = ffx_writer::SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         if self.cmd.background {
-            log::debug!("invoking daemon background start");
-            drop(self.daemon_checker.await.user_message("Unable to connect to daemon proxy")?);
-            return Ok(());
+            return self.start_in_background().await;
         }
-        log::debug!("in daemon start main");
         let node = overnet_core::Router::new(Some(CIRCUIT_REFRESH_RATE))
             .user_message("Failed to initialize overnet")?;
         let ascendd_path = match self.cmd.path {
             Some(path) => path,
             None => self
-                .context
+                .fho_env
+                .environment_context()
                 .get_ascendd_path()
                 .await
                 .user_message("Could not load daemon socket path")?,
@@ -67,60 +52,78 @@ impl<T: TryFromEnv + 'static> FfxMain for DaemonStartTool<T> {
     }
 }
 
+impl DaemonStartTool {
+    async fn start_in_background(self) -> fho::Result<()> {
+        log::debug!("invoking daemon background start");
+        let target_env = ffx_target::fho::target_interface(&self.fho_env);
+        if target_env.behavior().is_none() {
+            let env_context = self.fho_env.environment_context();
+            let b = target_holders::init_daemon_connection_behavior(env_context).await?;
+            target_env.set_behavior(b)?;
+        }
+        let _ = target_env
+            .injector::<DaemonProxyHolder>(&self.fho_env)
+            .await?
+            .daemon_factory_force_autostart()
+            .await
+            .user_message("Unable to connect to daemon proxy")?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::EnvironmentContext;
+    use ffx_target::fho::{target_interface, FhoConnectionBehavior};
+    use std::sync::Arc;
+    use target_holders::{fake_proxy, FakeInjector};
 
-    struct AutoSucceedFakeDaemonProvider;
+    fn create_fake_injector_with_result(
+        context: &EnvironmentContext,
+        succeeds: bool,
+    ) -> FhoEnvironment {
+        let fake_injector = FakeInjector {
+            daemon_factory_force_autostart_closure: Box::new(move || {
+                Box::pin(async move {
+                    if succeeds {
+                        let fake_daemon_proxy = fake_proxy(|_req| unimplemented!());
+                        Ok(fake_daemon_proxy)
+                    } else {
+                        anyhow::bail!("daemon failed")
+                    }
+                })
+            }),
+            ..Default::default()
+        };
 
-    #[async_trait(?Send)]
-    impl TryFromEnv for AutoSucceedFakeDaemonProvider {
-        async fn try_from_env(_env: &FhoEnvironment) -> fho::Result<Self> {
-            Ok(Self)
-        }
-    }
-
-    struct AutoFailFakeDaemonProvider;
-
-    #[async_trait(?Send)]
-    impl TryFromEnv for AutoFailFakeDaemonProvider {
-        async fn try_from_env(_env: &FhoEnvironment) -> fho::Result<Self> {
-            fho::return_user_error!("Oh no it broke!");
-        }
+        let fho_env = FhoEnvironment::new_with_args(context, &["some", "test"]);
+        let target_env = target_interface(&fho_env);
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
+        fho_env
     }
 
     #[fuchsia::test]
-    async fn test_background_succeeds_when_daemon_connection_established() {
+    async fn test_background_start_succeeds() {
         let config_env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { path: None, background: true };
-
-        let tool_env = FhoEnvironment::new_with_args(&config_env.context, &["some", "test"]);
-        let tool = DaemonStartTool {
-            cmd,
-            context: config_env.context.clone(),
-            daemon_checker: fho::Deferred::<AutoSucceedFakeDaemonProvider>::try_from_env(&tool_env)
-                .await
-                .unwrap(),
-        };
+        let fho_env = create_fake_injector_with_result(&config_env.context, true);
+        let tool = DaemonStartTool { cmd, fho_env };
         let test_buffers = ffx_writer::TestBuffers::default();
         let writer = ffx_writer::SimpleWriter::new_test(&test_buffers);
-        assert!(tool.main(writer).await.is_ok());
+        tool.main(writer).await.unwrap();
     }
 
     #[fuchsia::test]
-    async fn test_background_fails_when_daemon_connection_fails() {
+    async fn test_background_start_fails() {
         let config_env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { path: None, background: true };
-        let tool_env = FhoEnvironment::new_with_args(&config_env.context, &["some", "test"]);
-        let tool = DaemonStartTool {
-            cmd,
-            context: config_env.context.clone(),
-            daemon_checker: fho::Deferred::<AutoFailFakeDaemonProvider>::try_from_env(&tool_env)
-                .await
-                .unwrap(),
-        };
+        let fho_env = create_fake_injector_with_result(&config_env.context, false);
+        let tool = DaemonStartTool { cmd, fho_env };
         let test_buffers = ffx_writer::TestBuffers::default();
         let writer = ffx_writer::SimpleWriter::new_test(&test_buffers);
-        assert!(tool.main(writer).await.is_err());
+        tool.main(writer).await.unwrap_err();
     }
 }
