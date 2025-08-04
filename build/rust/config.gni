@@ -76,10 +76,9 @@ declare_args() {
   # `include_rustdoc`
 
   # Final destination of docs generated with `fx rustdoc-link`, as a URL. May
-  # use the file:/// scheme for local testing. Rustdoc will generate links
-  # relative to this path, appending "/host" for host toolchains.
-  rustdoc_extern_html_root_url_base =
-      "https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index"
+  # use the file:/// scheme for local testing. Rustdoc will generate some links
+  # based on this path, appending "/host" for host toolchains.
+  rustdoc_extern_html_root_url_base = "https://fuchsia-docs.firebaseapp.com"
 
   # By default building clippy targets prints lints as well as any rustc diagnostics
   # that were emitted by check-building the crate. This flag makes the output in the

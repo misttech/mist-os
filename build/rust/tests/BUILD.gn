@@ -16,8 +16,9 @@ group("tests") {
   deps = [
     ":clippy_test($host_toolchain)",
 
-    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-    # ":rustdoc-link-assertions($host_toolchain)",
+    # This tests fx rustdoc-link
+    ":rustdoc-link-assertions($host_toolchain)",
+
     # This tests the .rustdoc subtargets
     "//build/rust/tests/rustdoc($host_toolchain)",
   ]
@@ -42,9 +43,7 @@ rustc_library("b") {
   edition = "2021"
   name = "b"
   deps = [ ":c" ]
-
-  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-  #define_rustdoc_test_override = true
+  define_rustdoc_test_override = true
   source_root = "b/lib.rs"
   sources = [ "b/lib.rs" ]
   quiet_clippy = true
@@ -53,9 +52,7 @@ rustc_library("b") {
 rustc_library("c") {
   edition = "2021"
   name = "c"
-
-  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-  #define_rustdoc_test_override = true
+  define_rustdoc_test_override = true
   source_root = "c/lib.rs"
   sources = [ "c/lib.rs" ]
   quiet_clippy = true
@@ -65,9 +62,7 @@ if (is_host) {
   rustc_library("d") {
     edition = "2021"
     name = "d"
-
-    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-    #define_rustdoc_test_override = true
+    define_rustdoc_test_override = true
     source_root = "d/lib.rs"
     sources = [ "d/lib.rs" ]
     quiet_clippy = true
@@ -171,20 +166,18 @@ if (is_host) {
   # and contains basic things from the docs (index.html, item docs, source
   # files). The files checked should be stable across rustdoc versions.
 
-  _rustdoc_link_output = "$target_gen_dir/rustdoc-link.doc"
-  action("rustdoc-link") {
-    hermetic_deps = false
+  _rust_target_mapping = "$target_gen_dir/rust_target_mapping.json"
 
+  _rustdoc_link_output = "$target_gen_dir/doc"
+  action("rustdoc-link") {
     testonly = true
     public_deps = [
-      ":b.actual($default_toolchain)",
-      ":b.actual.rustdoc($default_toolchain)",
-      ":c.actual($default_toolchain)",
-      ":c.actual.rustdoc($default_toolchain)",
-      ":d.actual($host_toolchain)",
-      ":d.actual.rustdoc($host_toolchain)",
+      ":b.rustdoc($default_toolchain)",
+      ":c.rustdoc($default_toolchain)",
+      ":d.rustdoc($host_toolchain)",
       ":gen_rust_target_mapping",
     ]
+    hermetic_deps = false
     script = "//tools/devshell/contrib/lib/rust/rustdoc-link.py"
     outputs = [ _rustdoc_link_output ]
     _rebased_fuchsia_dir = rebase_path("//", root_build_dir)
@@ -194,10 +187,9 @@ if (is_host) {
       "--build-dir=$_rebased_build_dir",
       "--quiet",
       "--no-build",
+      "--no-use-xargs",  # Not all test bots have xargs.
       "--destination",
-      rebase_path("$_rustdoc_link_output", root_build_dir),
-      "--touch",
-      rebase_path("$target_gen_dir/touch", root_build_dir),
+      rebase_path(_rustdoc_link_output, root_build_dir),
       "--rust-target-mapping",
       rebase_path("$_rust_target_mapping", root_build_dir),
       "--rustdoc-executable",
@@ -234,8 +226,7 @@ if (is_host) {
     outputs = [ _output ]
     args = [
       "--directory",
-      rebase_path("$_rustdoc_link_output", root_build_dir),
-      "--glob-pattern=src/d",
+      rebase_path("$_rustdoc_link_output/host/src/d", root_build_dir),
       "--contains=lib.rs.html",
       "--touch",
       rebase_path(_output, root_build_dir),
@@ -304,10 +295,10 @@ if (is_host) {
     testonly = true
     public_deps = [
       ":rustdoc-link-has-b-src",
-      #":rustdoc-link-has-d-src",
-      #":rustdoc-link-has-fuchsia-item",
-      #":rustdoc-link-has-host-item",
-      #":rustdoc-link-host-separate-from-fuchsia",
+      ":rustdoc-link-has-d-src",
+      ":rustdoc-link-has-fuchsia-item",
+      ":rustdoc-link-has-host-item",
+      ":rustdoc-link-host-separate-from-fuchsia",
     ]
   }
 }

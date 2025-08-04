@@ -27,12 +27,8 @@ HOST_PLATFORM = (
 
 class GnTarget:
     def __init__(self, gn_target, fuchsia_dir=None):
-        # [\w-] is a valid GN name. We also accept '/' and '.' in paths.
-        # For the toolchain suffix, we take the whole label name at once, so we allow ':'.
-        match = re.match(
-            r"([\w/.-]*)" + r"(:([\w.-]+))?" + r"(\(([\w./:+-]+)\))?$",
-            gn_target,
-        )
+        build_label_regex = get_build_label_regex()
+        match = re.match(build_label_regex, gn_target)
         if match is None:
             print(f"Invalid GN label '{gn_target}'")
             raise ValueError(gn_target)
@@ -111,6 +107,30 @@ class GnTarget:
             self.__actual_ninja_target().encode("utf-8")
         ).hexdigest()
         return Path(build_dir) / "cargo" / hashed_gn_path / "Cargo.toml"
+
+
+@lru_cache
+def get_build_label_regex():
+    """get a regular expression for parsing build target labels"""
+    # [\w-] is a valid GN name. We also accept '/' and '.' in paths.
+    # For the toolchain suffix, we take the whole label name at once, so we allow ':'.
+    build_label_regex = (
+        r"([\w/.-]*)" + r"(:([+\w.-]+))?" + r"(\(([\w./:+-]+)\))?$"
+    )
+    # Here are some examples of matching labels
+    assert (
+        re.match(
+            build_label_regex,
+            "//third_party/rust_crates:zstd-v0_11_2+zstd_1_5_2.rustdoc(//build/toolchain/fuchsia:x64)",
+        )
+        is not None
+    )
+    assert re.match(build_label_regex, "//src/lib/fuchsia-async") is not None
+    assert (
+        re.match(build_label_regex, "//build/rust/tests:clippy_test")
+        is not None
+    )
+    return re.compile(build_label_regex)
 
 
 @lru_cache
