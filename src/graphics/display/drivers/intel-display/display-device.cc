@@ -5,25 +5,30 @@
 #include "src/graphics/display/drivers/intel-display/display-device.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/fit/function.h>
-#include <lib/zx/result.h>
-#include <lib/zx/vmo.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
-#include <zircon/errors.h>
 
 #include <cfloat>
-#include <cinttypes>
-#include <cmath>
+#include <cstdint>
+#include <tuple>
+#include <utility>
 
+#include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"
+#include "src/graphics/display/drivers/intel-display/dpll.h"
+#include "src/graphics/display/drivers/intel-display/gtt.h"
+#include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
-#include "src/graphics/display/drivers/intel-display/registers-dpll.h"
-#include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
-#include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/drivers/intel-display/pipe.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace intel_display {
 
@@ -146,33 +151,29 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   return !controller()->dpll_manager()->DdiPllMatchesConfig(ddi_id(), desired_pll_config);
 }
 
-void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_config,
+void DisplayDevice::ApplyConfiguration(const display::DisplayTiming& display_timing,
+                                       const display::ColorConversion& color_conversion,
+                                       cpp20::span<const display::DriverLayer> layers,
                                        display::DriverConfigStamp config_stamp) {
-  ZX_ASSERT(banjo_display_config);
-
-  const display::DisplayTiming display_timing_params =
-      display::ToDisplayTiming(banjo_display_config->timing);
-  if (CheckNeedsModeset(display_timing_params)) {
+  if (CheckNeedsModeset(display_timing)) {
     if (pipe_) {
       // TODO(https://fxbug.dev/42067272): When ApplyConfiguration() early returns on the
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
-      if (!DdiModeset(display_timing_params)) {
+      if (!DdiModeset(display_timing)) {
         fdf::error("Display {}: Modeset failed; ApplyConfiguration() aborted.", id().value());
         return;
       }
 
-      if (!PipeConfigPreamble(display_timing_params, pipe_->pipe_id(),
-                              pipe_->connected_transcoder_id())) {
+      if (!PipeConfigPreamble(display_timing, pipe_->pipe_id(), pipe_->connected_transcoder_id())) {
         fdf::error(
             "Display %lu: Transcoder configuration failed before pipe setup; "
             "ApplyConfiguration() aborted.",
             id().value());
         return;
       }
-      pipe_->ApplyModeConfig(display_timing_params);
-      if (!PipeConfigEpilogue(display_timing_params, pipe_->pipe_id(),
-                              pipe_->connected_transcoder_id())) {
+      pipe_->ApplyModeConfig(display_timing);
+      if (!PipeConfigEpilogue(display_timing, pipe_->pipe_id(), pipe_->connected_transcoder_id())) {
         fdf::error(
             "Display %lu: Transcoder configuration failed after pipe setup; "
             "ApplyConfiguration() aborted.",
@@ -180,18 +181,18 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
         return;
       }
     }
-    info_ = display_timing_params;
+    info_ = display_timing;
   }
 
   if (pipe_) {
     pipe_->ApplyConfiguration(
-        banjo_display_config, config_stamp,
-        [controller = controller_](const image_metadata_t& image_metadata, uint64_t image_handle,
-                                   uint32_t rotation) -> const GttRegion& {
-          return controller->SetupGttImage(image_metadata, image_handle, rotation);
+        color_conversion, layers, config_stamp,
+        [controller = controller_](
+            const display::ImageMetadata& image_metadata, display::DriverImageId image_id,
+            display::CoordinateTransformation coordinate_transformation) -> const GttRegion& {
+          return controller->SetupGttImage(image_metadata, image_id, coordinate_transformation);
         },
-        [controller = controller_](uint64_t image_handle) -> PixelFormatAndModifier {
-          const display::DriverImageId image_id = display::DriverImageId(image_handle);
+        [controller = controller_](display::DriverImageId image_id) -> PixelFormatAndModifier {
           return controller->GetImportedImagePixelFormat(image_id);
         });
   }

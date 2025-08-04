@@ -26,7 +26,7 @@ namespace intel_display {
 
 namespace {
 
-void NopPipeVsyncCallback(PipeId, zx_instant_mono_t) {}
+void NopPipeVsyncCallback(PipeId, zx::time_monotonic) {}
 void NopHotplugCallback(DdiId, bool) {}
 void NopIrqCallback(void*, uint32_t, uint64_t) {}
 

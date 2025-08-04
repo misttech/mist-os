@@ -43,6 +43,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 
 namespace intel_display {
 
@@ -157,7 +158,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   IgdOpRegion* igd_opregion_for_testing() { return &igd_opregion_; }
 
   void HandleHotplug(DdiId ddi_id, bool long_pulse);
-  void HandlePipeVsync(PipeId pipe_id_num, zx_instant_mono_t timestamp);
+  void HandlePipeVsync(PipeId pipe_id_num, zx::time_monotonic timestamp);
 
   void ResetPipePlaneBuffers(PipeId pipe_id);
   bool ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_id);
@@ -183,8 +184,9 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   // For every frame, in order to use the imported image, it is required to set
   // up the image based on given rotation in GTT and use the handle offset in
   // GTT. Returns the Gtt region representing the image.
-  const GttRegion& SetupGttImage(const image_metadata_t& image_metadata, uint64_t image_handle,
-                                 uint32_t rotation);
+  const GttRegion& SetupGttImage(const display::ImageMetadata& image_metadata,
+                                 display::DriverImageId image_id,
+                                 display::CoordinateTransformation coordinate_transformation);
 
   // The pixel format negotiated by sysmem for an imported image.
   //
@@ -204,7 +206,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   // Long-running initialization is performed in the DdkInit hook.
   zx_status_t Init();
 
-  const std::unique_ptr<GttRegionImpl>& GetGttRegionImpl(uint64_t handle);
+  const std::unique_ptr<GttRegionImpl>& GetGttRegionImpl(display::DriverImageId image_id);
   void InitDisplays();
 
   // Reads the memory latency information needed to confiugre pipes and planes.
@@ -228,14 +230,20 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void InitDisplayBuffers();
   DisplayDevice* FindDevice(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
 
-  // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
-  bool GetPlaneLayer(Pipe* pipe, uint32_t plane, const display_config_t& banjo_display_config,
-                     const layer_t** layer_out) __TA_REQUIRES(display_lock_);
+  // Returns the `Pipe` that `display_id` is bound to.
+  //
+  // Returns nullptr if the `display_id` is not bound to any Pipe.
+  Pipe* GetPipeForDisplay(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
+
+  // Gets the DriverLayer config for the given pipe/plane. Return false if there is no layer.
+  std::optional<display::DriverLayer> GetDriverLayerForPlane(
+      uint32_t plane, cpp20::span<const display::DriverLayer> layers) __TA_REQUIRES(display_lock_);
+
   uint16_t CalculateBuffersPerPipe(size_t active_pipe_count);
   // Returns false if no allocation is possible. When that happens,
   // plane 0 of the failing displays will be set to UINT16_MAX.
   bool CalculateMinimumAllocations(
-      const display_config_t& banjo_display_config,
+      display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
       uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                          [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
   // Updates plane_buffers_ based pipe_buffers_ and the given parameters
@@ -252,15 +260,18 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
       buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
   // Reallocates plane buffers based on the given layer config.
-  void ReallocatePlaneBuffers(const display_config_t& banjo_display_config, bool reallocate_pipes)
+  void ReallocatePlaneBuffers(display::DisplayId display_id,
+                              cpp20::span<const display::DriverLayer> layers, bool reallocate_pipes)
       __TA_REQUIRES(display_lock_);
 
   // Validates that a basic layer configuration can be supported for the
   // given modes of the displays.
-  bool CheckDisplayLimits(const display_config_t& banjo_display_config)
+  bool CheckDisplayLimits(display::DisplayId display_id,
+                          const display::DisplayTiming& display_timing,
+                          cpp20::span<const display::DriverLayer> layers)
       __TA_REQUIRES(display_lock_);
 
-  bool CalculatePipeAllocation(const display_config_t& banjo_display_config,
+  bool CalculatePipeAllocation(display::DisplayId display_id,
                                cpp20::span<display::DisplayId> display_allocated_to_pipe)
       __TA_REQUIRES(display_lock_);
 

@@ -8,11 +8,13 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fidl/fuchsia.system.state/cpp/test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
+#include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/driver.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -21,14 +23,31 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
+#include <limits.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
 #include <zircon/syscalls/resource.h>
+#include <zircon/types.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <bind/fuchsia/intel/platform/gpucore/cpp/bind.h>
+#include <ddktl/device.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
+#include "src/graphics/display/drivers/intel-display/gtt.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
@@ -36,6 +55,9 @@
 #include "src/graphics/display/drivers/intel-display/testing/fake-framebuffer.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace {
@@ -478,22 +500,25 @@ TEST_F(IntegrationTest, SysmemImport) {
     return collection && collection->HasConstraints();
   });
 
-  static constexpr image_metadata_t kDisplayImageMetadata = {
-      .dimensions = {.width = kImageWidth, .height = kImageHeight},
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
+  static constexpr display::ImageMetadata kDisplayImageMetadata({
+      .width = kImageWidth,
+      .height = kImageHeight,
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  static constexpr image_metadata_t kBanjoDisplayImageMetadata = kDisplayImageMetadata.ToBanjo();
   uint64_t image_handle = 0;
   zx_status_t import_image_status = display.ImportImage(
-      &kDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
+      &kBanjoDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
   ASSERT_OK(import_image_status);
 
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_IDENTITY);
+            kDisplayImageMetadata, display::DriverImageId(image_handle),
+            display::CoordinateTransformation::kIdentity);
         return region.bytes_per_row();
       });
-  EXPECT_LT(kDisplayImageMetadata.dimensions.width * 4, kBytesPerRowDivisor);
+  EXPECT_LT(kDisplayImageMetadata.dimensions().width() * 4, int32_t{kBytesPerRowDivisor});
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
   display.ReleaseImage(image_handle);
@@ -555,23 +580,26 @@ TEST_F(IntegrationTest, SysmemRotated) {
     return collection && collection->HasConstraints();
   });
 
-  static constexpr image_metadata_t kDisplayImageMetadata = {
-      .dimensions = {.width = kImageWidth, .height = kImageHeight},
-      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
-  };
+  static constexpr display::ImageMetadata kDisplayImageMetadata({
+      .width = kImageWidth,
+      .height = kImageHeight,
+      .tiling_type = display::ImageTilingType(IMAGE_TILING_TYPE_Y_LEGACY_TILED),
+  });
+  static constexpr image_metadata_t kBanjoDisplayImageMetadata = kDisplayImageMetadata.ToBanjo();
   uint64_t image_handle = 0;
   zx_status_t import_image_status = display.ImportImage(
-      &kDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
+      &kBanjoDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle);
   ASSERT_OK(import_image_status);
 
   // Check that rotating the image doesn't hang.
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_ROTATE_CCW_90);
+            kDisplayImageMetadata, display::DriverImageId(image_handle),
+            display::CoordinateTransformation::kRotateCcw90);
         return region.bytes_per_row();
       });
-  EXPECT_LT(kDisplayImageMetadata.dimensions.width * 4, kBytesPerRowDivisor);
+  EXPECT_LT(kDisplayImageMetadata.dimensions().width() * 4, int32_t{kBytesPerRowDivisor});
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
   display.ReleaseImage(image_handle);

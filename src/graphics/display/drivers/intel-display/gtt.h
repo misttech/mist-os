@@ -17,6 +17,9 @@
 #include <hwreg/mmio.h>
 #include <region-alloc/region-alloc.h>
 
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+
 namespace intel_display {
 
 // The offset into the MMIO space (at BAR 0) where the GTT is stored.
@@ -43,7 +46,8 @@ class GttRegionImpl : public GttRegion {
   GttRegionImpl(Gtt* gtt, RegionAllocator::Region::UPtr region);
   ~GttRegionImpl() override;
 
-  void SetRotation(uint32_t rotation, const image_metadata_t& image_metadata);
+  void SetRotation(display::CoordinateTransformation coordinate_transformation,
+                   const display::ImageMetadata& image_metadata);
 
   zx_status_t PopulateRegion(zx_handle_t vmo, uint64_t page_offset, uint64_t length,
                              bool writable = false);
