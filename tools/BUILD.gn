@@ -117,6 +117,7 @@ group("tests_no_e2e") {
     "//tools/fidlcat/tests",
     "//tools/fuzz:tests",
     "//tools/gn_desc:host_tests($host_toolchain)",
+    "//tools/go_test_parser:tests($host_toolchain)",
     "//tools/host_test_component:tests($host_toolchain)",
     "//tools/integration:tests($host_toolchain)",
     "//tools/jq5:tests($host_toolchain)",

@@ -203,12 +203,21 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 	profileAbsDir := filepath.Join(t.localOutputDir, profileRelDir)
 	os.MkdirAll(profileAbsDir, os.ModePerm)
 
+	testOutputSummaryDir := filepath.Join(t.localOutputDir, "test_output_summary", test.Path)
+	if err := os.MkdirAll(testOutputSummaryDir, os.ModePerm); err != nil {
+		testResult.FailReason = err.Error()
+		return testResult, nil
+	}
+	defer os.RemoveAll(filepath.Join(t.localOutputDir, "test_output_summary"))
+	testOutputSummaryPath := filepath.Join(testOutputSummaryDir, "test_output_summary_path.json")
+
 	r := newRunner(t.dir, append(
 		t.env,
 		fmt.Sprintf("%s=%s", constants.TestOutDirEnvKey, outDir),
 		// When host-side tests are instrumented for profiling, executing
 		// them will write a profile to the location under this environment variable.
 		fmt.Sprintf("%s=%s", llvmProfileEnvKey, filepath.Join(profileAbsDir, "%m"+llvmProfileExtension)),
+		fmt.Sprintf("%s=%s", constants.TestOutputSummaryPathEnvKey, testOutputSummaryPath),
 	))
 	if test.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -332,9 +341,10 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 		// Also override FUCHSIA_TEST_OUTDIR with the outdir specific to this
 		// test.
 		envOverrides := map[string]string{
-			"TMPDIR":                   "/tmp",
-			constants.TestOutDirEnvKey: outDir,
-			llvmProfileEnvKey:          filepath.Join(profileAbsDir, "%m"+llvmProfileExtension),
+			"TMPDIR":                              "/tmp",
+			constants.TestOutDirEnvKey:            outDir,
+			llvmProfileEnvKey:                     filepath.Join(profileAbsDir, "%m"+llvmProfileExtension),
+			constants.TestOutputSummaryPathEnvKey: testOutputSummaryPath,
 		}
 		for _, key := range environment.TempDirEnvVars() {
 			envOverrides[key] = "/tmp"
@@ -451,6 +461,20 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 	} else {
 		testResult.FailReason = err.Error()
 	}
+
+	if bytes, err := os.ReadFile(testOutputSummaryPath); !os.IsNotExist(err) {
+		if err != nil {
+			return testResult, fmt.Errorf("failed to read test case summary: %s", err)
+		} else {
+			var caseResults []runtests.TestCaseResult
+			if err := json.Unmarshal(bytes, &caseResults); err != nil {
+				return testResult, fmt.Errorf("failed to unmarshal case results: %s", err)
+			} else {
+				testResult.Cases = caseResults
+			}
+		}
+	}
+
 	return testResult, nil
 }
 

@@ -24,7 +24,6 @@ func Parse(stdout []byte) []runtests.TestCaseResult {
 		dartSystemTestPreamblePattern,
 		trfTestPreamblePattern,
 		googleTestPreamblePattern,
-		goTestPreamblePattern,
 		rustTestPreamblePattern,
 		zirconUtestPreamblePattern,
 		parseoutput.TestPreamblePattern,
@@ -43,8 +42,6 @@ func Parse(stdout []byte) []runtests.TestCaseResult {
 		cases = parseTrfTest(lines)
 	case googleTestPreamblePattern:
 		cases = parseGoogleTest(remainingLines)
-	case goTestPreamblePattern:
-		cases = parseGoTest(remainingLines)
 	case rustTestPreamblePattern:
 		cases = parseRustTest(remainingLines)
 	case zirconUtestPreamblePattern:

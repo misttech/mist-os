@@ -10,7 +10,6 @@ go_library("testparser") {
   sources = [
     "dartsystemtest.go",
     "googletest.go",
-    "gotest.go",
     "moblytest.go",
     "networkconformancetest.go",
     "rusttest.go",

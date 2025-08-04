@@ -1,10 +1,11 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package testparser
+package go_test_parser
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"time"
@@ -17,6 +18,20 @@ var (
 	goTestCasePattern     = regexp.MustCompile(`^\s*--- (\w*?): (.[^/]*)(?:/?)(.*?) \((.*?)\)$`)
 	goTestPanicPattern    = regexp.MustCompile(`^panic: test timed out after (\S+)$`)
 )
+
+// Parse takes stdout from a go test program and returns structured results.
+// If no structured results were identified, an empty slice is returned.
+func Parse(stdout []byte) []runtests.TestCaseResult {
+	lines := bytes.Split(stdout, []byte{'\n'})
+	cases := parseGoTest(lines)
+
+	// Ensure that an empty set of cases is serialized to JSON as an empty
+	// array, not as null.
+	if cases == nil {
+		cases = []runtests.TestCaseResult{}
+	}
+	return cases
+}
 
 func parseGoTest(lines [][]byte) []runtests.TestCaseResult {
 	var res []runtests.TestCaseResult

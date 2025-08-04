@@ -15,6 +15,8 @@ const (
 
 	// A directory that will be automatically archived on completion of a task.
 	TestOutDirEnvKey = "FUCHSIA_TEST_OUTDIR"
+	// A path that host tests can write structured test case results to.
+	TestOutputSummaryPathEnvKey = "TEST_OUTPUT_SUMMARY_PATH"
 	// A factor to multiply test timeouts by. Used when it is expected that tests will run
 	// slower on specific target types/environments.
 	TestTimeoutScaleFactor = "TEST_TIMEOUT_SCALE_FACTOR"
