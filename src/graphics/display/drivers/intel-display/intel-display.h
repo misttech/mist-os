@@ -229,14 +229,13 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   DisplayDevice* FindDevice(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
 
   // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
-  bool GetPlaneLayer(Pipe* pipe, uint32_t plane,
-                     cpp20::span<const display_config_t> banjo_display_configs,
+  bool GetPlaneLayer(Pipe* pipe, uint32_t plane, const display_config_t& banjo_display_config,
                      const layer_t** layer_out) __TA_REQUIRES(display_lock_);
   uint16_t CalculateBuffersPerPipe(size_t active_pipe_count);
   // Returns false if no allocation is possible. When that happens,
   // plane 0 of the failing displays will be set to UINT16_MAX.
   bool CalculateMinimumAllocations(
-      cpp20::span<const display_config_t> banjo_display_configs,
+      const display_config_t& banjo_display_config,
       uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                          [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
   // Updates plane_buffers_ based pipe_buffers_ and the given parameters
@@ -253,15 +252,15 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
       buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
   // Reallocates plane buffers based on the given layer config.
-  void ReallocatePlaneBuffers(cpp20::span<const display_config_t> banjo_display_configs,
-                              bool reallocate_pipes) __TA_REQUIRES(display_lock_);
+  void ReallocatePlaneBuffers(const display_config_t& banjo_display_config, bool reallocate_pipes)
+      __TA_REQUIRES(display_lock_);
 
   // Validates that a basic layer configuration can be supported for the
   // given modes of the displays.
-  bool CheckDisplayLimits(cpp20::span<const display_config_t> banjo_display_configs)
+  bool CheckDisplayLimits(const display_config_t& banjo_display_config)
       __TA_REQUIRES(display_lock_);
 
-  bool CalculatePipeAllocation(cpp20::span<const display_config_t> banjo_display_configs,
+  bool CalculatePipeAllocation(const display_config_t& banjo_display_config,
                                cpp20::span<display::DisplayId> display_allocated_to_pipe)
       __TA_REQUIRES(display_lock_);
 
