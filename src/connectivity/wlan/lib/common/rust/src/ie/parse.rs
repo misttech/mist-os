@@ -235,6 +235,12 @@ pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<Vendo
     Ok(vendor_ie)
 }
 
+pub fn parse_rsnxe<B: SplitByteSlice>(raw_body: B) -> RsnxeView<B> {
+    let mut reader = BufferReader::new(raw_body);
+    let rsnxe_octet_1 = reader.read();
+    RsnxeView { rsnxe_octet_1, remaining: reader.into_remaining() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -728,6 +734,18 @@ mod tests {
         assert_eq!(231, vht_op.vht_cbw.0);
         assert_eq!(232, vht_op.center_freq_seg0);
         assert_eq!(233, vht_op.center_freq_seg1);
+    }
+
+    #[test]
+    fn rsnxe_ok() {
+        let data = [0b00100001, 0x00, 0x00, 0x40];
+        let rsnxe = parse_rsnxe(&data[..]);
+        assert_matches!(rsnxe.rsnxe_octet_1, Some(oct1) => {
+            assert_eq!(oct1.field_length(), 1);
+            assert!(!oct1.protected_twt_operations_support());
+            assert!(oct1.sae_hash_to_element());
+        });
+        assert_eq!(rsnxe.remaining, &[0x00, 0x00, 0x40]);
     }
 
     #[test]

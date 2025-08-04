@@ -142,6 +142,7 @@ pub struct BssDescription {
     ext_cap_range: Option<Range<usize>>,
     vht_cap_range: Option<Range<usize>>,
     vht_op_range: Option<Range<usize>>,
+    rsnxe_range: Option<Range<usize>>,
 }
 
 impl BssDescription {
@@ -239,6 +240,10 @@ impl BssDescription {
             let bytes: VhtOpArray = vht_op.as_bytes().try_into().unwrap();
             fidl_ieee80211::VhtOperation { bytes }
         })
+    }
+
+    pub fn rsnxe(&self) -> Option<ie::RsnxeView<&[u8]>> {
+        self.rsnxe_range.clone().map(|range| ie::parse_rsnxe(&self.ies[range]))
     }
 
     pub fn ies(&self) -> &[u8] {
@@ -547,6 +552,7 @@ impl TryFrom<fidl_common::BssDescription> for BssDescription {
         let mut ext_cap_range = None;
         let mut vht_cap_range = None;
         let mut vht_op_range = None;
+        let mut rsnxe_range = None;
 
         for (ie_type, range) in ie::IeSummaryIter::new(&bss.ies[..]) {
             let body = &bss.ies[range.clone()];
@@ -593,6 +599,9 @@ impl TryFrom<fidl_common::BssDescription> for BssDescription {
                     ie::parse_vht_operation(body)?;
                     vht_op_range = Some(range);
                 }
+                IeType::RSNXE => {
+                    rsnxe_range = Some(range);
+                }
                 _ => (),
             }
         }
@@ -621,6 +630,7 @@ impl TryFrom<fidl_common::BssDescription> for BssDescription {
             ext_cap_range,
             vht_cap_range,
             vht_op_range,
+            rsnxe_range,
         })
     }
 }
@@ -1098,6 +1108,7 @@ mod tests {
             0xea, 0xff, 0x00, 0x00, 0xea, 0xff, 0x00, 0x00, // VHT Supported MCS Set
         ];
         let vht_op = vec![0x01, 0x9b, 0x00, 0xfc, 0xff];
+        let rsnxe = vec![0b00100001];
 
         let bss = fake_bss_description!(Wpa2,
             ies_overrides: IesOverrides::new()
@@ -1109,6 +1120,7 @@ mod tests {
                 .set(IeType::HT_OPERATION, ht_op.clone())
                 .set(IeType::VHT_CAPABILITIES, vht_cap.clone())
                 .set(IeType::VHT_OPERATION, vht_op.clone())
+                .set(IeType::RSNXE, rsnxe.clone())
         );
         assert_eq!(bss.ssid, Ssid::try_from("ssidie").unwrap());
         assert_eq!(
@@ -1146,6 +1158,9 @@ mod tests {
             assert_eq!(Ref::bytes(&op), &vht_op[..]);
         });
         assert_eq!(bss.raw_vht_op().map(|op| op.bytes.to_vec()), Some(vht_op));
+        assert_matches!(bss.rsnxe(), Some(r) => {
+            assert_eq!(Ref::bytes(&r.rsnxe_octet_1.expect("no octet 1")), &rsnxe[..]);
+        });
     }
 
     #[test]

@@ -11,7 +11,9 @@ use ieee80211::MacAddr;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 use wlan_bitfield::bitfield;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
+use zerocopy::{
+    ByteSlice, FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned,
+};
 
 macro_rules! pub_const {
     ($name:ident, $val:expr) => {
@@ -1248,6 +1250,25 @@ impl VhtChannelBandwidth {
     pub_const!(CBW_80P80, 3); // deprecated
                               // 4-255 reserved
 }
+
+// IEEE Std 802.11-2020, 9.4.2.241
+#[derive(Debug)]
+pub struct RsnxeView<B: ByteSlice> {
+    pub rsnxe_octet_1: Option<Ref<B, RsnxeOctet1>>,
+    pub remaining: B,
+}
+
+#[bitfield(
+    0..=3   field_length,
+    4       protected_twt_operations_support,
+    5       sae_hash_to_element,
+    6..=7   _,
+)]
+#[repr(C)]
+#[derive(
+    PartialEq, Eq, Hash, IntoBytes, KnownLayout, FromBytes, Immutable, Clone, Copy, Unaligned,
+)]
+pub struct RsnxeOctet1(pub u8);
 
 #[cfg(test)]
 mod tests {
