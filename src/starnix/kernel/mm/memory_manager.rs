@@ -1760,12 +1760,7 @@ impl MemoryManagerState {
             let mut mapping = mapping.clone();
 
             // Handle mappings that start before the region to be locked.
-            if range.start < start_addr {
-                // Mappings know about their starting location within the backing memory, so
-                // clamping the range isn't enough.
-                mapping.split_prefix_off(self, range.start, (start_addr - range.start) as u64);
-                range.start = start_addr;
-            }
+            range.start = std::cmp::max(range.start, start_addr);
             // Handle mappings that extend past the region to be locked.
             range.end = std::cmp::min(range.end, end_addr);
 
@@ -1792,7 +1787,7 @@ impl MemoryManagerState {
                         let (vmo, offset) = match self.get_mapping_backing(&mapping) {
                             MappingBacking::Memory(m) => (
                                 m.memory().as_vmo().ok_or_else(|| errno!(ENOMEM))?,
-                                m.memory_offset(),
+                                m.address_to_offset(range.start),
                             ),
                             #[cfg(feature = "alternate_anon_allocs")]
                             MappingBacking::PrivateAnonymous => (
@@ -1884,12 +1879,7 @@ impl MemoryManagerState {
             let mut mapping = mapping.clone();
 
             // Handle mappings that start before the region to be locked.
-            if range.start < start_addr {
-                // Mappings know about their starting location within the backing memory, so
-                // clamping the range isn't enough.
-                mapping.split_prefix_off(self, range.start, (start_addr - range.start) as u64);
-                range.start = start_addr;
-            }
+            range.start = std::cmp::max(range.start, start_addr);
             // Handle mappings that extend past the region to be locked.
             range.end = std::cmp::min(range.end, end_addr);
 
