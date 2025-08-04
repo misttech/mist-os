@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
@@ -28,7 +29,7 @@ namespace intel_display {
 
 class PipeManagerTest : public ::testing::Test {
  public:
-  PipeManagerTest() : controller_(inspect::Inspector{}) {}
+  PipeManagerTest() : controller_(&engine_events_, inspect::Inspector{}) {}
 
   void SetUp() override {
     mmio_buffer_.emplace(reg_region_.GetMmioBuffer());
@@ -49,6 +50,9 @@ class PipeManagerTest : public ::testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
   fake_mmio::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
+
+  // Must outlive `controller_`.
+  display::DisplayEngineEventsBanjo engine_events_;
   Controller controller_;
 };
 
@@ -61,15 +65,11 @@ class FakeDisplay final : public DisplayDevice {
   // DisplayDevice overrides:
   bool Query() final { return true; }
   bool InitWithDdiPllConfig(const DdiPllConfig& pll_config) final { return true; }
-  raw_display_info_t CreateRawDisplayInfo() final {
-    return raw_display_info_t{
-        .display_id = id().ToBanjo(),
-        .preferred_modes_list = nullptr,
-        .preferred_modes_count = 0,
-        .edid_bytes_list = nullptr,
-        .edid_bytes_count = 0,
-        .pixel_formats_list = nullptr,
-        .pixel_formats_count = 0,
+  AddedDisplayInfo CreateAddedDisplayInfo() final {
+    return AddedDisplayInfo{
+        .display_id = id(),
+        .preferred_modes = {},
+        .edid = {},
     };
   }
 

@@ -149,11 +149,19 @@ zx::result<> IntelDisplayDriver::InitController() {
 
   zx::result<std::unique_ptr<Controller>> controller_result =
       Controller::Create(std::move(sysmem), std::move(pci), std::move(resources), framebuffer_info_,
-                         inspector().inspector());
+                         &engine_events_, inspector().inspector());
   if (controller_result.is_error()) {
     return controller_result.take_error();
   }
   controller_ = std::move(controller_result).value();
+
+  fbl::AllocChecker alloc_checker;
+  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+      &alloc_checker, controller_.get(), &engine_events_);
+  if (!alloc_checker.check()) {
+    fdf::error("Failed to allocate memory for DisplayEngineFidlAdapter");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
 
   return zx::ok();
 }
@@ -232,6 +240,13 @@ void IntelDisplayDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
 void IntelDisplayDriver::Stop() {}
 
 zx::result<ddk::AnyProtocol> IntelDisplayDriver::GetProtocol(uint32_t proto_id) {
+  if (proto_id == ZX_PROTOCOL_DISPLAY_ENGINE) {
+    display_engine_protocol_t protocol = engine_banjo_adapter_->GetProtocol();
+    return zx::ok(ddk::AnyProtocol{
+        .ops = protocol.ops,
+        .ctx = protocol.ctx,
+    });
+  }
   return controller_->GetProtocol(proto_id);
 }
 
@@ -240,21 +255,11 @@ zx::result<> IntelDisplayDriver::InitDisplayNode() {
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
-  zx::result<ddk::AnyProtocol> protocol_result =
-      controller_->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
-  ZX_DEBUG_ASSERT(protocol_result.is_ok());
-  ddk::AnyProtocol protocol = std::move(protocol_result).value();
-
-  display_banjo_server_ =
-      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, protocol.ctx, protocol.ops);
-  compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = display_banjo_server_->callback();
-
   static constexpr std::string_view kDisplayChildNodeName = "intel-display-controller";
-  zx::result<> compat_server_init_result =
-      display_compat_server_.Initialize(incoming(), outgoing(), node_name(), kDisplayChildNodeName,
-                                        /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                        /*banjo_config=*/std::move(banjo_config));
+  zx::result<> compat_server_init_result = display_compat_server_.Initialize(
+      incoming(), outgoing(), node_name(), kDisplayChildNodeName,
+      /*forward_metadata=*/compat::ForwardMetadata::None(),
+      /*banjo_config=*/engine_banjo_adapter_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
     fdf::error("Failed to initialize the compatibility server: {}", compat_server_init_result);
     return compat_server_init_result.take_error();

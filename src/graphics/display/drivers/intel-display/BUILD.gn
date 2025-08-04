@@ -121,6 +121,7 @@ source_set("common_srcs") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
+    "//src/graphics/display/lib/api-protocols/cpp",
     "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/driver-utils",
     "//src/graphics/display/lib/edid",

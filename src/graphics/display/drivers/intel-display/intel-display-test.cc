@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -39,7 +40,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   FakeSysmemSingleThreadedTest()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),
         sysmem_(loop_.dispatcher()),
-        display_(inspect::Inspector{}) {}
+        display_(&engine_events_, inspect::Inspector{}) {}
 
   void SetUp() override {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
@@ -68,6 +69,9 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   async::Loop loop_;
 
   MockAllocator sysmem_;
+
+  // Must outlive `display_`.
+  display::DisplayEngineEventsBanjo engine_events_;
   Controller display_;
 };
 
@@ -83,14 +87,13 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
-  constexpr uint64_t kBanjoValidBufferCollectionId = kValidBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
-                                                         token1_endpoints->client.TakeChannel()));
+  EXPECT_OK(display_.ImportBufferCollection(kValidBufferCollectionId,
+                                            std::move(token1_endpoints->client)));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display_.DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
-                                                         token2_endpoints->client.TakeChannel()),
-            ZX_ERR_ALREADY_EXISTS);
+  EXPECT_STATUS(display_.ImportBufferCollection(kValidBufferCollectionId,
+                                                std::move(token2_endpoints->client)),
+                zx::error(ZX_ERR_ALREADY_EXISTS));
 
   loop_.RunUntilIdle();
 
@@ -118,10 +121,9 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
-  EXPECT_STATUS(display_.DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
-                ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_.DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
+  EXPECT_STATUS(display_.ReleaseBufferCollection(kInvalidBufferCollectionId),
+                zx::error(ZX_ERR_NOT_FOUND));
+  EXPECT_OK(display_.ReleaseBufferCollection(kValidBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -183,7 +185,10 @@ TEST(IntelDisplay, ImportImage) {
   });
 
   // Initialize display controller and sysmem allocator.
-  Controller display(inspect::Inspector{});
+
+  // Must outlive `display`.
+  display::DisplayEngineEventsBanjo display_events;
+  Controller display(&display_events, inspect::Inspector{});
   ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
 
   // Initialize the GTT to the smallest allowed size (which is 2MB with the |gtt_size| bits of the
@@ -198,55 +203,54 @@ TEST(IntelDisplay, ImportImage) {
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
-  EXPECT_OK(display.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                        token_endpoints->client.TakeChannel()));
+  EXPECT_OK(
+      display.ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints->client)));
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(display.DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_OK(display.SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   // Invalid import: bad collection id
-  static constexpr image_metadata_t kDisplayImageMetadata = {
-      .dimensions = {.width = 32, .height = 32},
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  static constexpr uint64_t kBanjoInvalidCollectionId = 100;
-  uint64_t image_handle = 0;
-  EXPECT_EQ(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoInvalidCollectionId, 0,
-                                             &image_handle),
-            ZX_ERR_NOT_FOUND);
+  static constexpr display::ImageMetadata kDisplayImageMetadata = {{
+      .width = 32,
+      .height = 32,
+      .tiling_type = display::ImageTilingType::kLinear,
+  }};
+  static constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
+
+  zx::result<display::DriverImageId> import_result =
+      display.ImportImage(kDisplayImageMetadata, kInvalidCollectionId, 0);
+  EXPECT_STATUS(import_result, zx::error(ZX_ERR_NOT_FOUND));
 
   // Invalid import: bad index
   static constexpr uint32_t kInvalidIndex = 100;
-  image_handle = 0;
-  EXPECT_EQ(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
-                                             kInvalidIndex, &image_handle),
-            ZX_ERR_OUT_OF_RANGE);
+  import_result = display.ImportImage(kDisplayImageMetadata, kBufferCollectionId, kInvalidIndex);
+  EXPECT_STATUS(import_result, zx::error(ZX_ERR_OUT_OF_RANGE));
 
   // Invalid import: bad type
-  static constexpr image_metadata_t kInvalidTilingTypeMetadata = {
-      .dimensions = {.width = 32, .height = 32},
-      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-  };
-  EXPECT_EQ(display.DisplayEngineImportImage(&kInvalidTilingTypeMetadata, kBanjoBufferCollectionId,
-                                             /*index=*/0, &image_handle),
-            ZX_ERR_INVALID_ARGS);
+  static constexpr display::ImageMetadata kInvalidTilingTypeMetadata = {{
+      .width = 32,
+      .height = 32,
+      .tiling_type = display::ImageTilingType::kCapture,
+  }};
+  import_result = display.ImportImage(kInvalidTilingTypeMetadata, kBufferCollectionId,
+                                      /*index=*/0);
+  EXPECT_STATUS(import_result, zx::error(ZX_ERR_INVALID_ARGS));
 
   // Valid import
-  image_handle = 0;
-  EXPECT_OK(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId, 0,
-                                             &image_handle));
-  EXPECT_NE(image_handle, 0u);
+  import_result = display.ImportImage(kDisplayImageMetadata, kBufferCollectionId, 0);
+  ASSERT_OK(import_result);
 
-  display.DisplayEngineReleaseImage(image_handle);
+  display::DriverImageId image_id = import_result.value();
+  EXPECT_NE(image_id.value(), 0u);
+
+  display.ReleaseImage(image_id);
 
   // Release buffer collection.
-  EXPECT_OK(display.DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
+  EXPECT_OK(display.ReleaseBufferCollection(kBufferCollectionId));
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
@@ -258,17 +262,15 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                         token_endpoints->client.TakeChannel()));
+  EXPECT_OK(
+      display_.ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints->client)));
 
   loop_.RunUntilIdle();
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(display_.DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                 kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_OK(display_.SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -283,17 +285,16 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                         token_endpoints->client.TakeChannel()));
+  EXPECT_OK(
+      display_.ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints->client)));
 
   loop_.RunUntilIdle();
 
-  static constexpr image_buffer_usage_t kInvalidTilingUsage = {
-      .tiling_type = 1000000,
-  };
-  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, display_.DisplayEngineSetBufferCollectionConstraints(
-                                         &kInvalidTilingUsage, kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kInvalidTilingUsage({
+      .tiling_type = display::ImageTilingType(1000000),
+  });
+  EXPECT_STATUS(zx::error(ZX_ERR_INVALID_ARGS),
+                display_.SetBufferCollectionConstraints(kInvalidTilingUsage, kBufferCollectionId));
 
   loop_.RunUntilIdle();
 

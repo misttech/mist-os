@@ -177,9 +177,7 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     display::DisplayId removed_display_id = device->id();
     RemoveDisplay(std::move(device));
 
-    if (engine_listener_.is_valid()) {
-      engine_listener_.OnDisplayRemoved(removed_display_id.ToBanjo());
-    }
+    engine_events_.OnDisplayRemoved(removed_display_id);
     return;
   }
 
@@ -197,18 +195,13 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     return;
   }
 
-  if (engine_listener_.is_valid()) {
-    const raw_display_info_t banjo_display_info = new_device_ptr->CreateRawDisplayInfo();
-    engine_listener_.OnDisplayAdded(&banjo_display_info);
-  }
+  const AddedDisplayInfo added_display_info = new_device_ptr->CreateAddedDisplayInfo();
+  engine_events_.OnDisplayAdded(added_display_info.display_id, added_display_info.preferred_modes,
+                                added_display_info.edid, kPixelFormatTypes);
 }
 
 void Controller::HandlePipeVsync(PipeId pipe_id, zx::time_monotonic timestamp) {
   fbl::AutoLock lock(&display_lock_);
-
-  if (!engine_listener_.is_valid()) {
-    return;
-  }
 
   display::DisplayId pipe_attached_display_id = display::kInvalidDisplayId;
 
@@ -241,9 +234,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx::time_monotonic timestamp) {
 
   if (pipe_attached_display_id != display::kInvalidDisplayId &&
       vsync_config_stamp != display::kInvalidDriverConfigStamp) {
-    const uint64_t banjo_display_id = pipe_attached_display_id.ToBanjo();
-    const config_stamp_t banjo_config_stamp = vsync_config_stamp.ToBanjo();
-    engine_listener_.OnDisplayVsync(banjo_display_id, timestamp.get(), &banjo_config_stamp);
+    engine_events_.OnDisplayVsync(pipe_attached_display_id, timestamp, vsync_config_stamp);
   }
 }
 
@@ -784,29 +775,19 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
 
 // DisplayEngine methods
 
-void Controller::DisplayEngineCompleteCoordinatorConnection(
-    const display_engine_listener_protocol_t* display_engine_listener,
-    engine_info_t* out_banjo_engine_info) {
-  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
-  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
-
+display::EngineInfo Controller::CompleteCoordinatorConnection() {
   fbl::AutoLock lock(&display_lock_);
-  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
 
-  // If `SetListener` occurs **after** driver initialization (i.e.
-  // `driver_initialized_` is true), `SetListener` should be responsible for
-  // notifying the coordinator of existing display devices.
-  //
-  // Otherwise, the driver initialization logic (`DdkInit()`) should be
-  // responsible for notifying the coordinator of existing display devices.
-  if (driver_initialized_ && !display_devices_.is_empty()) {
+  if (!display_devices_.is_empty()) {
     for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
-      const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
-      engine_listener_.OnDisplayAdded(&banjo_display_info);
+      const AddedDisplayInfo added_display_info = display_device->CreateAddedDisplayInfo();
+      engine_events_.OnDisplayAdded(added_display_info.display_id,
+                                    added_display_info.preferred_modes, added_display_info.edid,
+                                    kPixelFormatTypes);
     }
   }
 
-  *out_banjo_engine_info = {
+  return display::EngineInfo({
       // Each Tiger Lake pipe supports at most 8 layers (7 planes + 1 cursor).
       //
       // The total limit equals the pipe limit while we only support a single display. This
@@ -814,12 +795,7 @@ void Controller::DisplayEngineCompleteCoordinatorConnection(
       .max_layer_count = 8,
       .max_connected_display_count = 1,
       .is_capture_supported = false,
-  };
-}
-
-void Controller::DisplayEngineUnsetListener() {
-  fbl::AutoLock lock(&display_lock_);
-  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
+  });
 }
 
 static bool ConvertPixelFormatToTilingType(
@@ -857,13 +833,12 @@ static bool ConvertPixelFormatToTilingType(
   }
 }
 
-zx_status_t Controller::DisplayEngineImportBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
-  display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
-  if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
-    return ZX_ERR_ALREADY_EXISTS;
+zx::result<> Controller::ImportBufferCollection(
+    display::DriverBufferCollectionId buffer_collection_id,
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) {
+  if (buffer_collections_.find(buffer_collection_id) != buffer_collections_.end()) {
+    fdf::error("Buffer Collection (id={}) already exists", buffer_collection_id.value());
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
   ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
@@ -875,45 +850,38 @@ zx_status_t Controller::DisplayEngineImportBufferCollection(
   auto bind_result = sysmem_->BindSharedCollection(
       fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
           .buffer_collection_request(std::move(collection_server_endpoint))
-          .token(
-              fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
+          .token(fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
+              std::move(buffer_collection_token)))
           .Build());
   if (!bind_result.ok()) {
     fdf::error("Cannot complete FIDL call BindSharedCollection: {}", bind_result.status_string());
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  buffer_collections_[driver_buffer_collection_id] =
+  buffer_collections_[buffer_collection_id] =
       fidl::WireSyncClient(std::move(collection_client_endpoint));
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Controller::DisplayEngineReleaseBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id) {
-  display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
-  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
+zx::result<> Controller::ReleaseBufferCollection(
+    display::DriverBufferCollectionId buffer_collection_id) {
+  if (buffer_collections_.find(buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
-               driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+               buffer_collection_id.value());
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
-  buffer_collections_.erase(driver_buffer_collection_id);
-  return ZX_OK;
+  buffer_collections_.erase(buffer_collection_id);
+  return zx::ok();
 }
 
-zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_image_metadata,
-                                                 uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t index, uint64_t* out_image_handle) {
-  ZX_DEBUG_ASSERT(banjo_image_metadata != nullptr);
-  display::ImageMetadata image_metadata(*banjo_image_metadata);
-
-  display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
-  const auto it = buffer_collections_.find(driver_buffer_collection_id);
+zx::result<display::DriverImageId> Controller::ImportImage(
+    const display::ImageMetadata& image_metadata,
+    display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
+  const auto it = buffer_collections_.find(buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
-               driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+               buffer_collection_id.value());
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
@@ -922,7 +890,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
         image_metadata.tiling_type() ==
             display::ImageTilingType(IMAGE_TILING_TYPE_Y_LEGACY_TILED) ||
         image_metadata.tiling_type() == display::ImageTilingType(IMAGE_TILING_TYPE_YF_TILED))) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fidl::WireResult check_result = collection->CheckAllBuffersAllocated();
@@ -931,14 +899,14 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   // unified.
   if (!check_result.ok()) {
     fdf::error("Failed to check buffers allocated, {}", check_result.FormatDescription());
-    return check_result.status();
+    return zx::error(check_result.status());
   }
   const auto& check_response = check_result.value();
   if (check_response.is_error()) {
     if (check_response.error_value() == fuchsia_sysmem2::wire::Error::kPending) {
-      return ZX_ERR_SHOULD_WAIT;
+      return zx::error(ZX_ERR_SHOULD_WAIT);
     }
-    return sysmem::V1CopyFromV2Error(check_response.error_value());
+    return zx::error(sysmem::V1CopyFromV2Error(check_response.error_value()));
   }
 
   fidl::WireResult wait_result = collection->WaitForAllBuffersAllocated();
@@ -947,14 +915,14 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   // unified.
   if (!wait_result.ok()) {
     fdf::error("Failed to wait for buffers allocated, {}", wait_result.FormatDescription());
-    return wait_result.status();
+    return zx::error(wait_result.status());
   }
   const auto& wait_response = wait_result.value();
   if (wait_response.is_error()) {
     if (wait_response.error_value() == fuchsia_sysmem2::wire::Error::kPending) {
-      return ZX_ERR_SHOULD_WAIT;
+      return zx::error(ZX_ERR_SHOULD_WAIT);
     }
-    return sysmem::V1CopyFromV2Error(wait_response.error_value());
+    return zx::error(sysmem::V1CopyFromV2Error(wait_response.error_value()));
   }
   const auto& wait_value = wait_response.value();
   fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
@@ -962,20 +930,20 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
 
   if (!collection_info.settings().has_image_format_constraints()) {
     fdf::error("No image format constraints");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  if (index >= collection_info.buffers().size()) {
-    fdf::error("Invalid index {} greater than buffer count {}", index,
+  if (buffer_index >= collection_info.buffers().size()) {
+    fdf::error("Invalid index {} greater than buffer count {}", buffer_index,
                collection_info.buffers().size());
-    return ZX_ERR_OUT_OF_RANGE;
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  zx::vmo vmo = std::move(collection_info.buffers().at(index).vmo());
+  zx::vmo vmo = std::move(collection_info.buffers().at(buffer_index).vmo());
 
-  uint64_t offset = collection_info.buffers().at(index).vmo_usable_start();
+  uint64_t offset = collection_info.buffers().at(buffer_index).vmo_usable_start();
   if (offset % PAGE_SIZE != 0) {
     fdf::error("Invalid offset");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   ZX_DEBUG_ASSERT(collection_info.settings().image_format_constraints().pixel_format() !=
@@ -987,19 +955,19 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   if (!ConvertPixelFormatToTilingType(collection_info.settings().image_format_constraints(),
                                       &image_tiling_type)) {
     fdf::error("Invalid pixel format modifier");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (image_metadata.tiling_type() != image_tiling_type) {
     fdf::error("Incompatible image type from image {} and sysmem {}", image_metadata.tiling_type(),
                image_tiling_type);
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::AutoLock lock(&gtt_lock_);
   fbl::AllocChecker ac;
   imported_images_.reserve(imported_images_.size() + 1, &ac);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   fidl::Arena arena;
@@ -1009,7 +977,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
                                static_cast<uint32_t>(image_metadata.dimensions().height()));
   if (!format.is_ok()) {
     fdf::error("Failed to get format from constraints");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   const uint32_t length = [&]() {
@@ -1040,7 +1008,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   zx_status_t status = gtt_.AllocRegion(length, align, &gtt_region);
   if (status != ZX_OK) {
     fdf::error("Failed to allocate GTT region, status {}", zx::make_result(status));
-    return status;
+    return zx::error(status);
   }
 
   // The vsync logic requires that images not have base == 0
@@ -1048,7 +1016,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
     std::unique_ptr<GttRegionImpl> alt_gtt_region;
     zx_status_t status = gtt_.AllocRegion(length, align, &alt_gtt_region);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     gtt_region = std::move(alt_gtt_region);
   }
@@ -1056,7 +1024,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   status = gtt_region->PopulateRegion(vmo.release(), offset / PAGE_SIZE, length);
   if (status != ZX_OK) {
     fdf::error("Failed to populate GTT region, status {}", zx::make_result(status));
-    return status;
+    return zx::error(status);
   }
 
   gtt_region->set_bytes_per_row(format.value().bytes_per_row());
@@ -1069,18 +1037,19 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* banjo_i
   imported_image_pixel_formats_.emplace(image_id,
                                         PixelFormatAndModifierFromImageFormat(format.value()));
 
-  *out_image_handle = image_id.ToBanjo();
-  return ZX_OK;
+  return zx::ok(image_id);
 }
 
-void Controller::DisplayEngineReleaseImage(uint64_t image_handle) {
-  const uint64_t gtt_region_base = image_handle;
-  const display::DriverImageId image_id(gtt_region_base);
+zx::result<display::DriverCaptureImageId> Controller::ImportImageForCapture(
+    display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
 
+void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
   fbl::AutoLock lock(&gtt_lock_);
-  imported_image_pixel_formats_.erase(image_id);
+  imported_image_pixel_formats_.erase(driver_image_id);
   for (unsigned i = 0; i < imported_images_.size(); i++) {
-    if (imported_images_[i]->base() == gtt_region_base) {
+    if (imported_images_[i]->base() == driver_image_id.value()) {
       imported_images_[i]->ClearRegion();
       imported_images_.erase(i);
       return;
@@ -1572,47 +1541,25 @@ bool Controller::CheckDisplayLimits(display::DisplayId display_id,
   return true;
 }
 
-config_check_result_t Controller::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_config_ptr) {
+display::ConfigCheckResult Controller::CheckConfiguration(
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
+    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers) {
   fbl::AutoLock lock(&display_lock_);
 
-  const display_config_t& banjo_display_config = *banjo_display_config_ptr;
-  const display::DisplayId display_id(banjo_display_config.display_id);
-
-  if (!display::IsBanjoDisplayTimingValid(banjo_display_config.timing)) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+  if (!std::holds_alternative<display::DisplayTiming>(display_mode)) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
-  const display::DisplayTiming display_timing =
-      display::ToDisplayTiming(banjo_display_config.timing);
-
-  if (!display::ColorConversion::IsValid(banjo_display_config.color_conversion)) {
-    return CONFIG_CHECK_RESULT_INVALID_CONFIG;
-  }
-  const display::ColorConversion color_conversion(banjo_display_config.color_conversion);
-
-  static constexpr int kMaxLayersCount = 4;
-  cpp20::span<const layer_t> banjo_layers(banjo_display_config.layers_list,
-                                          banjo_display_config.layers_count);
-  if (banjo_layers.size() > kMaxLayersCount) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-  }
-
-  fbl::static_vector<display::DriverLayer, kMaxLayersCount> layers;
-  for (const layer_t& banjo_layer : banjo_layers) {
-    if (!display::DriverLayer::IsValid(banjo_layer)) {
-      return CONFIG_CHECK_RESULT_INVALID_CONFIG;
-    }
-    layers.push_back(display::DriverLayer(banjo_layer));
-  }
+  const display::DisplayTiming display_timing = std::get<display::DisplayTiming>(display_mode);
 
   std::array<display::DisplayId, PipeIds<registers::Platform::kKabyLake>().size()>
       display_allocated_to_pipe;
   if (!CalculatePipeAllocation(display_id, display_allocated_to_pipe)) {
-    return CONFIG_CHECK_RESULT_TOO_MANY;
+    return display::ConfigCheckResult::kTooManyDisplays;
   }
 
   if (!CheckDisplayLimits(display_id, display_timing, layers)) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
   DisplayDevice* display = nullptr;
@@ -1624,39 +1571,39 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   }
   if (display == nullptr) {
     fdf::info("Got config with no display - assuming hotplug and skipping");
-    return CONFIG_CHECK_RESULT_OK;
+    return display::ConfigCheckResult::kOk;
   }
 
   // This overrides all checks about multi-layers.
   if (layers.size() > 1) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
 
   static constexpr int kMaxPlaneCount = 3;
   if (layers.size() > kMaxPlaneCount + 1) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
 
   bool layer0_is_solid_color_fill = (layers[0].image_metadata().dimensions().width() == 0 ||
                                      layers[0].image_metadata().dimensions().height() == 0);
   if (layers.size() == kMaxPlaneCount + 1 && !layer0_is_solid_color_fill) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
 
   for (float preoffset : color_conversion.preoffsets()) {
     if (preoffset <= -1) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
     if (preoffset >= 1) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
   }
   for (float postoffset : color_conversion.postoffsets()) {
     if (postoffset <= -1) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
     if (postoffset >= 1) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
   }
 
@@ -1670,13 +1617,13 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         if (layer.image_metadata().tiling_type() == display::ImageTilingType::kLinear ||
             layer.image_metadata().tiling_type() ==
                 display::ImageTilingType(IMAGE_TILING_TYPE_X_TILED)) {
-          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+          return display::ConfigCheckResult::kUnsupportedConfig;
         }
       }
       if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity &&
           layer.image_source_transformation() != display::CoordinateTransformation::kRotateCcw180) {
         // Cover unsupported rotations
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+        return display::ConfigCheckResult::kUnsupportedConfig;
       }
 
       uint32_t src_width, src_height;
@@ -1693,7 +1640,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         max_width = 4096;
       }
       if (src_width > max_width) {
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+        return display::ConfigCheckResult::kUnsupportedConfig;
       }
 
       if (layer.display_destination().width() != static_cast<int32_t>(src_width) ||
@@ -1724,7 +1671,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
             src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
             max_width < layer.display_destination().width() ||
             max_height < layer.display_destination().height()) {
-          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+          return display::ConfigCheckResult::kUnsupportedConfig;
         }
         total_scalers_needed += scalers_needed;
       }
@@ -1733,7 +1680,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
 
     const display::PixelFormat format = layer.fallback_color().format();
     if (format != display::PixelFormat::kB8G8R8A8 && format != display::PixelFormat::kR8G8B8A8) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
     break;
   }
@@ -1755,10 +1702,10 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         continue;
       }
 
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
   }
-  return CONFIG_CHECK_RESULT_OK;
+  return display::ConfigCheckResult::kOk;
 }
 
 bool Controller::CalculatePipeAllocation(
@@ -1806,33 +1753,19 @@ uint16_t Controller::DataBufferBlockCount() const {
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
 }
 
-void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config_ptr,
-                                                 const config_stamp_t* banjo_config_stamp) {
+void Controller::ApplyConfiguration(
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
+    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+    display::DriverConfigStamp driver_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
-  ZX_DEBUG_ASSERT(banjo_display_config_ptr != nullptr);
+
   ZX_DEBUG_ASSERT(display_devices_.size() <= kMaximumConnectedDisplayCount);
   display::DisplayId fake_vsync_display_ids[kMaximumConnectedDisplayCount];
   size_t fake_vsync_size = 0;
 
-  const display_config_t& banjo_display_config = *banjo_display_config_ptr;
-  const display::DisplayId display_id(banjo_display_config.display_id);
-
-  ZX_DEBUG_ASSERT(display::IsBanjoDisplayTimingValid(banjo_display_config.timing));
-  const display::DisplayTiming display_timing =
-      display::ToDisplayTiming(banjo_display_config.timing);
-
-  ZX_DEBUG_ASSERT(display::ColorConversion::IsValid(banjo_display_config.color_conversion));
-  const display::ColorConversion color_conversion(banjo_display_config.color_conversion);
-
-  static constexpr int kMaxLayersCount = 4;
-  fbl::static_vector<display::DriverLayer, kMaxLayersCount> layers;
-  cpp20::span<const layer_t> banjo_layers(banjo_display_config.layers_list,
-                                          banjo_display_config.layers_count);
-  ZX_DEBUG_ASSERT(banjo_layers.size() <= kMaxLayersCount);
-  for (const layer_t& banjo_layer : banjo_layers) {
-    ZX_DEBUG_ASSERT(display::DriverLayer::IsValid(banjo_layer));
-    layers.push_back(display::DriverLayer(banjo_layer));
-  }
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::DisplayTiming>(display_mode));
+  const display::DisplayTiming display_timing = std::get<display::DisplayTiming>(display_mode);
 
   ReallocatePlaneBuffers(display_id, layers,
                          /* reallocate_pipes */ pipe_manager_->PipeReallocated());
@@ -1846,8 +1779,7 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
       }
       continue;
     }
-    const display::DriverConfigStamp config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
-    display->ApplyConfiguration(display_timing, color_conversion, layers, config_stamp);
+    display->ApplyConfiguration(display_timing, color_conversion, layers, driver_config_stamp);
 
     // The hardware only gives vsyncs if at least one plane is enabled, so
     // fake one if we need to, to inform the client that we're done with the
@@ -1873,27 +1805,21 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
     }
   }
 
-  if (engine_listener_.is_valid()) {
-    zx_instant_mono_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
-    for (size_t i = 0; i < fake_vsync_size; i++) {
-      const uint64_t banjo_display_id = fake_vsync_display_ids[i].ToBanjo();
-      engine_listener_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);
-    }
+  zx::time_monotonic now =
+      (fake_vsync_size > 0) ? zx::clock::get_monotonic() : zx::time_monotonic(0);
+  for (size_t i = 0; i < fake_vsync_size; i++) {
+    engine_events_.OnDisplayVsync(fake_vsync_display_ids[i], now, driver_config_stamp);
   }
 }
 
-zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
-    const image_buffer_usage_t* banjo_usage, uint64_t banjo_driver_buffer_collection_id) {
-  ZX_DEBUG_ASSERT(banjo_usage != nullptr);
-  display::ImageBufferUsage usage(*banjo_usage);
-
-  display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
+zx::result<> Controller::SetBufferCollectionConstraints(
+    const display::ImageBufferUsage& usage,
+    display::DriverBufferCollectionId driver_buffer_collection_id) {
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
                driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
@@ -1941,7 +1867,7 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
   }
   if (image_constraints_vec.empty()) {
     fdf::error("Config has unsupported tiling type {}", usage.tiling_type());
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   for (unsigned i = 0; i < std::size(kYuvPixelFormatTypes); ++i) {
     auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
@@ -1978,10 +1904,10 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
 
   if (!result.ok()) {
     fdf::error("Failed to set constraints, {}", result.FormatDescription());
-    return result.status();
+    return zx::error(result.status());
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 // Intel GPU core methods
@@ -2108,20 +2034,6 @@ void Controller::Start(fdf::StartCompleter completer) {
 
   {
     fbl::AutoLock lock(&display_lock_);
-
-    // If `SetListener` occurs **before** driver initialization (i.e.
-    // `engine_listener_` is valid), `DdkInit()` should be responsible for
-    // notifying the coordinator of existing display devices.
-    //
-    // Otherwise, `SetListener` should be responsible for notifying the
-    // coordinator of existing display devices.
-    if ((!display_devices_.is_empty()) && engine_listener_.is_valid()) {
-      for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
-        const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
-        engine_listener_.OnDisplayAdded(&banjo_display_info);
-      }
-    }
-
     driver_initialized_ = true;
   }
 
@@ -2352,11 +2264,6 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
           .ops = &intel_gpu_core_protocol_ops_,
           .ctx = this,
       });
-    case ZX_PROTOCOL_DISPLAY_ENGINE:
-      return zx::ok(ddk::AnyProtocol{
-          .ops = &display_engine_protocol_ops_,
-          .ctx = this,
-      });
   }
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
@@ -2364,14 +2271,22 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
 Controller::Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                        fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
                        ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                       display::DisplayEngineEventsInterface* engine_events,
                        inspect::Inspector inspector)
     : resources_(std::move(resources)),
       framebuffer_info_(framebuffer_info),
       sysmem_(std::move(sysmem)),
+      engine_events_(*engine_events),
       pci_(std::move(pci)),
-      inspector_(std::move(inspector)) {}
+      inspector_(std::move(inspector)) {
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
+}
 
-Controller::Controller(inspect::Inspector inspector) : inspector_(std::move(inspector)) {}
+Controller::Controller(display::DisplayEngineEventsInterface* engine_events,
+                       inspect::Inspector inspector)
+    : engine_events_(*engine_events), inspector_(std::move(inspector)) {
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
+}
 
 Controller::~Controller() {
   interrupts_.Destroy();
@@ -2387,11 +2302,14 @@ Controller::~Controller() {
 zx::result<std::unique_ptr<Controller>> Controller::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
     fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-    std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector) {
+    std::optional<zbi_swfb_t> framebuffer_info,
+    display::DisplayEngineEventsInterface* engine_events, inspect::Inspector inspector) {
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
+
   fbl::AllocChecker alloc_checker;
-  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem),
-                                                         std::move(pci), std::move(resources),
-                                                         framebuffer_info, std::move(inspector));
+  auto controller = fbl::make_unique_checked<Controller>(
+      &alloc_checker, std::move(sysmem), std::move(pci), std::move(resources), framebuffer_info,
+      engine_events, std::move(inspector));
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

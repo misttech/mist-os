@@ -40,6 +40,8 @@
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
@@ -60,8 +62,8 @@ struct ControllerResources {
   zx::unowned_resource ioport;
 };
 
-class Controller : public ddk::DisplayEngineProtocol<Controller>,
-                   public ddk::IntelGpuCoreProtocol<Controller> {
+class Controller final : public display::DisplayEngineInterface,
+                         public ddk::IntelGpuCoreProtocol<Controller> {
  public:
   // Creates a `Controller` instance and performs short-running initialization
   // of all subcomponents.
@@ -71,20 +73,28 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   // `sysmem` must be non-null.
   // `pci` must be non-null.
   // `resources` must be valid while the Controller instance is alive.
+  // `engine_events` must be non-null and must outlive the created `Controller`
+  // instance.
   static zx::result<std::unique_ptr<Controller>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-      std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector);
+      std::optional<zbi_swfb_t> framebuffer_info,
+      display::DisplayEngineEventsInterface* engine_events, inspect::Inspector inspector);
 
   // Prefer to use the `Create()` factory function in production code.
   explicit Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
                       ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                      display::DisplayEngineEventsInterface* engine_events,
                       inspect::Inspector inspector);
 
   // Creates a Controller with no valid FIDL clients and no resources for
   // testing purpose only.
-  explicit Controller(inspect::Inspector inspector);
+  //
+  // `engine_events` must be non-null and must outlive the created `Controller`
+  // instance.
+  explicit Controller(display::DisplayEngineEventsInterface* engine_events,
+                      inspect::Inspector inspector);
 
   ~Controller();
 
@@ -98,34 +108,32 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void PrepareStopOnPowerStateTransition(fuchsia_system_state::SystemPowerState power_state,
                                          fdf::PrepareStopCompleter completer);
 
-  // ddk::DisplayEngineProtocol
-  void DisplayEngineCompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t* display_engine_listener,
-      engine_info_t* out_banjo_engine_info);
-  void DisplayEngineUnsetListener();
-  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
-                                                  zx::channel collection_token);
-  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-                                       uint64_t* out_image_handle);
-  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t index, uint64_t* out_capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  void DisplayEngineReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_config);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config,
-                                       const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayEngineSetBufferCollectionConstraints(
-      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
+  // `display::DisplayEngineInterface`:
+  display::EngineInfo CompleteCoordinatorConnection() override;
+  zx::result<> ImportBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
+  zx::result<> ReleaseBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id) override;
+  zx::result<display::DriverImageId> ImportImage(
+      const display::ImageMetadata& image_metadata,
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  void ReleaseImage(display::DriverImageId driver_image_id) override;
+  display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
+      display::ColorConversion color_conversion,
+      cpp20::span<const display::DriverLayer> layers) override;
+  void ApplyConfiguration(display::DisplayId display_id,
+                          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+                          display::ColorConversion color_conversion,
+                          cpp20::span<const display::DriverLayer> layers,
+                          display::DriverConfigStamp driver_config_stamp) override;
+  zx::result<> SetBufferCollectionConstraints(
+      const display::ImageBufferUsage& image_buffer_usage,
+      display::DriverBufferCollectionId buffer_collection_id) override;
 
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);
@@ -289,10 +297,9 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
                      fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
-  ddk::DisplayEngineListenerProtocolClient engine_listener_ __TA_GUARDED(display_lock_);
+  display::DisplayEngineEventsInterface& engine_events_ __TA_GUARDED(display_lock_);
 
-  // True iff the driver initialization (Bind() and DdkInit()) is fully
-  // completed.
+  // True iff the driver initialization is fully completed.
   bool driver_initialized_ __TA_GUARDED(display_lock_) = false;
 
   // Pixel formats of imported images.

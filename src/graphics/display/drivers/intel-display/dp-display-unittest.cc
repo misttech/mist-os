@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/intel-display/power.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace intel_display {
@@ -136,7 +137,7 @@ class TestDdiPhysicalLayer final : public DdiPhysicalLayer {
 class DpDisplayTest : public ::testing::Test {
  protected:
   DpDisplayTest()
-      : controller_(inspect::Inspector{}),
+      : controller_(&engine_events_, inspect::Inspector{}),
         mmio_buffer_({
             .vaddr = FakeMmioPtr(buffer_),
             .offset = 0,
@@ -197,6 +198,9 @@ class DpDisplayTest : public ::testing::Test {
 
  private:
   fdf_testing::ScopedGlobalLogger logger_;
+
+  // Must outlive `controller_`.
+  display::DisplayEngineEventsBanjo engine_events_;
 
   // TODO(https://fxbug.dev/42164736): Remove DpDisplay's dependency on Controller which will remove
   // the need for much of what's in SetUp() and TearDown().

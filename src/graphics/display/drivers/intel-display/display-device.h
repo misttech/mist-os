@@ -24,10 +24,18 @@
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 
 namespace intel_display {
 
 class Controller;
+
+struct AddedDisplayInfo {
+  display::DisplayId display_id;
+  fbl::Vector<display::ModeAndId> preferred_modes;
+  fbl::Vector<uint8_t> edid;
+};
+
 class DisplayDevice {
  public:
   enum class Type {
@@ -105,7 +113,7 @@ class DisplayDevice {
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
 
-  virtual raw_display_info_t CreateRawDisplayInfo() = 0;
+  virtual AddedDisplayInfo CreateAddedDisplayInfo() = 0;
 
  protected:
   // Attempts to initialize the ddi.
