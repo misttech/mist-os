@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/perf/test.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/starnix/tests/build/starnix_host_test_component.gni")
+import("//src/starnix/tests/build/starnix_linux_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//zircon/vdso/vdso.gni")
@@ -165,6 +165,7 @@ executable("no_op_executable") {
   sources = [ "no_op_executable.cc" ]
   deps = []
   public_deps = []
+  emit_tool_path = false
 }
 
 # "Helper" executable used to implement the context_switch_overhead benchmark.
@@ -307,7 +308,7 @@ fuchsia_component_perf_test("fuchsia_microbenchmarks_shared_process_test") {
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.shared_process.txt"
 }
 
-if (is_linux) {
+if (is_linux && is_host) {
   host_test("fuchsia_microbenchmarks_host") {
     binary_path = "$root_out_dir/fuchsia_microbenchmarks"
     deps = [
@@ -334,16 +335,17 @@ if (host_os == "linux" && !is_asan) {
     output_name = "starnix_microbenchmarks"
     testonly = true
     sources = fuchsia_microbenchmark_sources + [ "starnix_filesystem.cc" ]
-    deps = fuchsia_microbenchmark_deps
+    deps =
+        fuchsia_microbenchmark_deps + [ "//zircon/system/ulib/zx-panic-libc" ]
   }
 
-  starnix_host_test_component("starnix_microbenchmarks_component") {
+  starnix_linux_test_component("starnix_microbenchmarks_component") {
     test_label = ":starnix_microbenchmarks_bin"
     test_binary = "starnix_microbenchmarks"
 
     manifest = "meta/starnix_microbenchmarks.cml"
     component_name = "starnix_microbenchmarks"
-    deps = [ ":no_op_executable_in_test_dir($host_toolchain_for_target_arch)" ]
+    deps = [ ":no_op_executable_in_test_dir($target_linux_toolchain)" ]
     is_starnix_benchmark = true
     test_type = "starnix"
   }
