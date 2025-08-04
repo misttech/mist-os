@@ -206,6 +206,7 @@ template("rustc_artifact") {
                                  "sources",
                                  "testonly",
                                  "visibility",
+                                 "rustdoc_parts_dir",
                                  "zip_rustdoc_to",
                                ])
 

@@ -38,6 +38,7 @@ class Metadata:
     rustdoc_label: str
     target: str
     rustdoc_out_dir: Path
+    rustdoc_parts_dir: Path
     touch: Path
     searchdir: str
     extern: str  # looks like --extern=CRATE_NAME=PATH
@@ -64,6 +65,7 @@ class Metadata:
             target=m["target"],
             touch=Path(f"{rustdoc_out_dir}.touch"),
             rustdoc_out_dir=rustdoc_out_dir,
+            rustdoc_parts_dir=Path(args.build_dir, m["rustdoc_parts_dir"]),
             extern=m["extern"],
             searchdir=m["searchdir"],
             disable_rustdoc=m["disable_rustdoc"],
@@ -201,6 +203,7 @@ def rustdoc_link(meta: list[Metadata], args: Namespace):
             if "fuchsia" in target
             else args.destination / "host"
         )
+
         extern = set(m.extern_arg_as_rmeta for m in meta)
 
         if not args.quiet:
@@ -208,6 +211,9 @@ def rustdoc_link(meta: list[Metadata], args: Namespace):
         with TemporaryDirectory() as tmp:
             crate_root = Path(tmp, "lib.rs")
             crate_names = [f"extern crate {m.crate_name};" for m in meta]
+            rustdoc_parts_dir = [
+                f"--include-parts-dir={m.rustdoc_parts_dir}" for m in meta
+            ]
             crate_root.write_text("\n".join(crate_names))
             argfile = Path(tmp, "argfile")
             flags = [
@@ -220,6 +226,8 @@ def rustdoc_link(meta: list[Metadata], args: Namespace):
                 f"--target={target}",
                 "-Zunstable-options",
                 f"--out-dir={dst}",
+                "--merge=finalize",
+                *rustdoc_parts_dir,
                 "--enable-index-page",
                 *extra_rustdoc_args,
             ]

@@ -258,6 +258,7 @@ template("rustc_library") {
                              "configs",
                              "data_deps",
                              "define_rustdoc_test_override",
+                             "rustdoc_parts_dir",
                              "disable_clippy",
                              "disable_rbe",
                              "edition",
