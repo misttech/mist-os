@@ -42,7 +42,6 @@ ffx_plugin("ffx_update") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/target:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
