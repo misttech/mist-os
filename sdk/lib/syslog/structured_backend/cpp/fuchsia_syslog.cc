@@ -564,13 +564,11 @@ void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
 }
 
 bool LogBuffer::FlushRecord(FlushConfig flush_config) {
-  EndRecord();
-  auto* state = RecordState::CreatePtr(&data_);
-  if (!state->encode_success) {
+  if (EndRecord().empty()) {
     return false;
   }
+  auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
-  Encoder<ExternalDataBuffer> encoder(external_buffer);
   auto slice = external_buffer.GetSlice();
   zx_status_t status;
   while (true) {
@@ -597,15 +595,20 @@ bool LogBuffer::FlushRecord(FlushConfig flush_config) {
   return status != ZX_ERR_BAD_STATE && status != ZX_ERR_PEER_CLOSED;
 }
 
-void LogBuffer::EndRecord() {
+cpp20::span<const uint8_t> LogBuffer::EndRecord() {
   auto* state = RecordState::CreatePtr(&data_);
-  if (state->ended) {
-    return;
-  }
-  state->ended = true;
   ExternalDataBuffer external_buffer(&data_);
-  Encoder<ExternalDataBuffer> encoder(external_buffer);
-  encoder.End(*state);
+  if (!state->ended) {
+    state->ended = true;
+    Encoder<ExternalDataBuffer> encoder(external_buffer);
+    encoder.End(*state);
+  }
+  if (!state->encode_success) {
+    return {};
+  }
+  auto slice = external_buffer.GetSlice();
+  return cpp20::span(reinterpret_cast<const uint8_t*>(slice.data()),
+                     slice.slice().ToByteOffset().unsafe_get());
 }
 
 }  // namespace fuchsia_syslog

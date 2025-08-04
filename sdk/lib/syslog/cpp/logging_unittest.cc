@@ -29,6 +29,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/async/wait.h>
 #include <lib/fpromise/promise.h>
+#include <lib/syslog/structured_backend/cpp/log_connection.h>
 #include <lib/zx/socket.h>
 
 #include <cinttypes>
@@ -349,6 +350,122 @@ TEST(StructuredLogging, FlushAndReset) {
   ASSERT_EQ(header->RemainingSpace(),
             syslog_runtime::LogBuffer::data_size() - 2);  // last byte reserved for NULL terminator
 }
+#endif
+
+#ifdef __Fuchsia__
+
+class TestLogSink : public fidl::Server<fuchsia_logger::LogSink> {
+ public:
+  zx::socket& socket() {
+    std::unique_lock lock(mutex_);
+    condition_.wait(lock, [this] { return socket_.is_valid(); });
+    return socket_;
+  }
+
+ private:
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override { FAIL(); }
+
+  void ConnectStructured(ConnectStructuredRequest& request,
+                         ConnectStructuredCompleter::Sync& completer) override {
+    std::unique_lock lock(mutex_);
+    socket_ = std::move(request.socket());
+    condition_.notify_all();
+  }
+
+  void WaitForInterestChange(WaitForInterestChangeCompleter::Sync& completer) override { FAIL(); }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_logger::LogSink> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL();
+  }
+
+  std::mutex mutex_;
+  std::condition_variable condition_;
+  zx::socket socket_;
+};
+
+TEST(LogConnection, Basic) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread();
+  zx::channel client, server;
+  ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
+
+  TestLogSink log_sink;
+  auto binding = fidl::BindServer(
+      loop.dispatcher(), fidl::ServerEnd<fuchsia_logger::LogSink>(std::move(server)), &log_sink);
+
+  auto connection =
+      LogConnection::Create(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(client)));
+  ASSERT_EQ(connection.status_value(), ZX_OK);
+
+  ASSERT_TRUE(connection->is_valid());
+
+  fuchsia_syslog::LogBuffer buffer;
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, {}, "foo", 1, 2, 3);
+  ASSERT_EQ(connection->FlushBuffer(buffer).status_value(), ZX_OK);
+
+  uint8_t buf[256];
+  size_t actual;
+  ASSERT_EQ(log_sink.socket().read(0, buf, std::size(buf), &actual), ZX_OK);
+
+  std::span<const uint8_t> span = buffer.EndRecord();
+  ASSERT_EQ(actual, span.size());
+  EXPECT_EQ(memcmp(buf, span.data(), actual), 0);
+}
+
+TEST(LogConnection, BlockIfFull) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread();
+
+  zx::channel client, server;
+  ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
+
+  TestLogSink log_sink;
+  auto binding = fidl::BindServer(
+      loop.dispatcher(), fidl::ServerEnd<fuchsia_logger::LogSink>(std::move(server)), &log_sink);
+
+  auto connection =
+      LogConnection::Create(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(client)));
+  ASSERT_EQ(connection.status_value(), ZX_OK);
+
+  ASSERT_TRUE(connection->is_valid());
+
+  // Keep logging and we should eventually get ZX_ERR_SHOULD_WAIT.
+  fuchsia_syslog::LogBuffer buffer;
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, {}, "foo", 1, 2, 3);
+
+  int count = 0;
+  for (;;) {
+    auto result = connection->FlushBuffer(buffer);
+    if (result.is_error()) {
+      ASSERT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
+      break;
+    }
+    ++count;
+  }
+
+  zx::socket socket;
+  ASSERT_EQ(connection->socket().duplicate(ZX_RIGHT_SAME_RIGHTS, &socket), ZX_OK);
+  LogConnection connection2(std::move(socket), {.block_if_full = true});
+
+  std::thread thread([&] {
+    // Delay reading the socket to make it more likely that we block when flushing the buffer.
+    usleep(10000);
+
+    uint8_t buf[256];
+    size_t actual;
+    for (int i = 0; i < count; ++i) {
+      ASSERT_EQ(log_sink.socket().read(0, buf, std::size(buf), &actual), ZX_OK);
+    }
+  });
+
+  for (int i = 0; i < count; ++i) {
+    ASSERT_EQ(connection2.FlushBuffer(buffer).status_value(), ZX_OK);
+  }
+
+  thread.join();
+}
+
 #endif
 
 }  // namespace

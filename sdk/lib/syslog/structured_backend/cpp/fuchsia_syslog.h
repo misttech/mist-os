@@ -5,6 +5,7 @@
 #ifndef LIB_SYSLOG_STRUCTURED_BACKEND_CPP_FUCHSIA_SYSLOG_H_
 #define LIB_SYSLOG_STRUCTURED_BACKEND_CPP_FUCHSIA_SYSLOG_H_
 
+#include <lib/stdcompat/span.h>
 #include <lib/syslog/structured_backend/fuchsia_syslog.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
@@ -73,6 +74,12 @@ class LogBuffer final {
                    unsigned int line, std::optional<std::string_view> message,
                    zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
+  void BeginRecord(FuchsiaLogSeverity severity, std::optional<std::string_view> file_name,
+                   unsigned int line, std::optional<std::string_view> message,
+                   uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
+    BeginRecord(severity, file_name, line, message, {}, dropped_count, pid, tid);
+  }
+
   // Writes a key/value pair to the buffer.
   void WriteKeyValue(std::string_view key, const char* value) {
     WriteKeyValue(key, std::string_view(value, strlen(value)));
@@ -95,9 +102,11 @@ class LogBuffer final {
   // Writes the LogBuffer to the socket.
   bool FlushRecord(FlushConfig flush_config = {});
 
- private:
-  void EndRecord();
+  // Ends the record and returns a span for it. This is safe to be called multiple times.
+  // If an encoding error has occurred an empty span will be returned.
+  cpp20::span<const uint8_t> EndRecord();
 
+ private:
   internal::LogBufferData data_;
 };
 

@@ -14,11 +14,16 @@ sdk_source_set("structured_backend") {
 
   deps = []
 
-  public_deps = [ "//zircon/system/ulib/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//zircon/system/ulib/zx",
+  ]
 
   sources = [
     "cpp/fuchsia_syslog.cc",
     "cpp/fuchsia_syslog.h",
+    "cpp/log_connection.cc",
+    "cpp/log_connection.h",
     "fuchsia_syslog.h",
   ]
 
