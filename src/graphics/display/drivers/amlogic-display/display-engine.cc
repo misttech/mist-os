@@ -43,6 +43,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/capture.h"
+#include "src/graphics/display/drivers/amlogic-display/display-timing-mode-conversion.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
@@ -51,6 +52,8 @@
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -150,14 +153,6 @@ bool IsFullHardwareResetRequired(
 }
 
 }  // namespace
-
-bool DisplayEngine::IgnoreDisplayMode() const {
-  // The DSI specification doesn't support switching display modes. The display
-  // mode is provided by the peripheral supplier through side channels and
-  // should be fixed while the display device is available.
-  ZX_DEBUG_ASSERT(vout_ != nullptr);
-  return vout_->type() == VoutType::kDsi;
-}
 
 bool DisplayEngine::IsNewDisplayTiming(const display::DisplayTiming& timing) {
   return current_display_timing_ != timing;
@@ -447,8 +442,27 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
-  if (!IgnoreDisplayMode()) {
+  display::ModeId mode_id = display::ModeId(display_config.mode_id);
+  if (mode_id != display::kInvalidModeId) {
+    // The DSI specification doesn't support switching display modes. The display
+    // mode is provided by the peripheral supplier through side channels and
+    // should be fixed while the display device is available.
+    //
+    // TODO(https://fxbug.dev/316631158): This assumes preferred modes have
+    // `ModeId`s from 1 to `preferred_modes.size()`. Instead, the coordinator
+    // should use the ModeId <-> Mode mappings agreed on between the coordinator
+    // and the engine driver.
+    if (mode_id != display::ModeId(1)) {
+      fdf::warn("CheckConfig failure: mode id {} not supported", mode_id);
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    }
+  } else {
+    // Fall back to `display_config.timing`.
+    if (!display::IsBanjoDisplayTimingValid(display_config.timing)) {
+      fdf::warn("CheckConfig failure: display timing invalid");
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    }
+    display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
     // `current_display_timing_` is already applied to the display so it's
     // guaranteed to be supported. We only perform the timing check if there
     // is a new `display_timing`.
@@ -457,6 +471,14 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
     }
   }
+
+  display::Mode target_display_mode = [&] {
+    if (mode_id != display::kInvalidModeId) {
+      return vout_->CurrentDisplayMode();
+    }
+    display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
+    return ToDisplayMode(display_timing);
+  }();
 
   config_check_result_t check_result = [&] {
     if (display_config.layers_count > 1) {
@@ -487,16 +509,19 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       }
     }
 
-    const uint32_t display_width = display_timing.horizontal_active_px;
-    const uint32_t display_height = display_timing.vertical_active_lines;
-
     // Make sure the layer configuration is supported.
     const layer_t& layer = display_config.layers_list[0];
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison operators.
     const rect_u_t display_area = {
-        .x = 0, .y = 0, .width = display_width, .height = display_height};
+        .x = 0,
+        .y = 0,
+        // `width` and `height` are guaranteed to be positive, so the
+        // static_cast won't cause any UB or overflow.
+        .width = static_cast<uint32_t>(target_display_mode.active_area().width()),
+        .height = static_cast<uint32_t>(target_display_mode.active_area().height()),
+    };
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
@@ -508,20 +533,22 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       fdf::warn("CheckConfig failure: coordinate transformation not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.dimensions.width != display_width ||
-        layer.image_metadata.dimensions.height != display_height) {
+    if (layer.image_metadata.dimensions.width !=
+            static_cast<uint32_t>(target_display_mode.active_area().width()) ||
+        layer.image_metadata.dimensions.height !=
+            static_cast<uint32_t>(target_display_mode.active_area().height())) {
       // TODO(https://fxbug.dev/409473403): Restore to `warn` level once the infrastructure issue
       // is resolved.
-      fdf::debug("CheckConfig failure: image metadata dimensions {}x{} do not match {}x{} display",
+      fdf::debug("CheckConfig failure: image metadata dimensions {}x{} do not match display {}",
                  layer.image_metadata.dimensions.width, layer.image_metadata.dimensions.height,
-                 display_width, display_height);
+                 target_display_mode);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
       fdf::warn(
-          "CheckConfig failure: layer output {}x{} at ({}, {}) does not cover entire {}x{} display",
+          "CheckConfig failure: layer output {}x{} at ({}, {}) does not cover entire display {}",
           layer.display_destination.width, layer.display_destination.height,
-          layer.display_destination.x, layer.display_destination.y, display_width, display_height);
+          layer.display_destination.x, layer.display_destination.y, target_display_mode);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (layer.image_source.width == 0 || layer.image_source.height == 0) {
@@ -549,15 +576,22 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   const display::DriverConfigStamp config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
 
-  fbl::AutoLock lock(&display_mutex_);
+  ZX_DEBUG_ASSERT(display::ColorConversion::IsValid(display_config.color_conversion));
+  display::ColorConversion color_conversion(display_config.color_conversion);
 
+  fbl::AutoLock lock(&display_mutex_);
   if (display_config.layers_count) {
-    if (!IgnoreDisplayMode()) {
+    display::ModeId mode_id(display_config.mode_id);
+    if (mode_id == display::ModeId(1)) {
+      // For displays with preferred ModeId(1), there's no need to reset display
+      // timing information. This should be a no-op.
+    } else if (mode_id == display::kInvalidModeId) {
       // Perform Vout modeset iff there's a new display mode.
       //
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
+      ZX_DEBUG_ASSERT(display::IsBanjoDisplayTimingValid(display_config.timing));
       display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
       if (IsNewDisplayTiming(display_timing)) {
         zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
@@ -567,7 +601,10 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
         }
         current_display_timing_ = display_timing;
       }
+    } else {
+      ZX_DEBUG_ASSERT_MSG(false, "Unsupported mode_id %" PRIu16, mode_id.value());
     }
+    display::Mode display_mode = vout_->CurrentDisplayMode();
 
     // The only way a checked configuration could now be invalid is if display was
     // unplugged. If that's the case, then the upper layers will give a new configuration
@@ -575,10 +612,10 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
     if (!display_attached_ || display::DisplayId(display_config.display_id) != display_id_) {
       return;
     }
-
     // Since Amlogic does not support plug'n play (fixed display), there is no way
     // a checked configuration could be invalid at this point.
-    video_input_unit_->FlipOnVsync(display_config, config_stamp);
+    video_input_unit_->FlipOnVsync(display::DriverLayer(display_config.layers_list[0]),
+                                   display_mode, color_conversion, config_stamp);
   } else {
     if (fully_initialized()) {
       {

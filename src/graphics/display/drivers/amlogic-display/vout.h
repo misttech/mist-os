@@ -23,6 +23,7 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace amlogic_display {
@@ -75,6 +76,8 @@ class Vout {
 
   zx::result<> UpdateStateOnDisplayConnected();
   void DisplayDisconnected();
+
+  display::Mode CurrentDisplayMode() const;
 
   // Vout must be of `kHdmi` type.
   bool IsDisplayTimingSupported(const display::DisplayTiming& timing);

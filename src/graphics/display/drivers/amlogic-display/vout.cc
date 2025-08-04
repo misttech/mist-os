@@ -23,6 +23,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/display-timing-mode-conversion.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/logging.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
@@ -45,17 +46,6 @@ constexpr supported_features_t kDsiSupportedFeatures = supported_features_t{
 constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .hpd = true,
 };
-
-display::Mode ToDisplayMode(const display::DisplayTiming& timing) {
-  int32_t active_width = timing.horizontal_active_px;
-  int32_t active_height = timing.vertical_active_lines;
-  int32_t refresh_rate_millihertz = timing.vertical_field_refresh_rate_millihertz();
-  return display::Mode({
-      .active_width = active_width,
-      .active_height = active_height,
-      .refresh_rate_millihertz = refresh_rate_millihertz,
-  });
-}
 
 }  // namespace
 
@@ -310,6 +300,16 @@ zx::result<> Vout::SetFrameVisibility(bool frame_visible) {
       }
       return zx::ok();
   }
+}
+
+display::Mode Vout::CurrentDisplayMode() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return ToDisplayMode(dsi_.panel_config.display_timing);
+    case VoutType::kHdmi:
+      return ToDisplayMode(hdmi_.current_display_timing_);
+  }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %" PRIu8, static_cast<uint8_t>(type_));
 }
 
 bool Vout::IsDisplayTimingSupported(const display::DisplayTiming& timing) {

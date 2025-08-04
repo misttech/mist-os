@@ -28,6 +28,7 @@
 #include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace amlogic_display {
 
@@ -210,8 +211,8 @@ uint32_t VideoInputUnit::FloatToFixed3_10(float f) {
   return fixed_num & kFloatToFixed3_10Mask;
 }
 
-void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config) {
-  display::ColorConversion color_conversion(config.color_conversion);
+void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx,
+                                        const display::ColorConversion& color_conversion) {
   if (color_conversion == display::ColorConversion::kIdentity) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
@@ -263,15 +264,15 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
              coef00_01, coef02_10, coef11_12, coef20_21, coef22);
 }
 
-void VideoInputUnit::FlipOnVsync(const display_config_t& config,
+void VideoInputUnit::FlipOnVsync(const display::DriverLayer& layer,
+                                 const display::Mode& display_mode,
+                                 const display::ColorConversion& color_conversion,
                                  display::DriverConfigStamp config_stamp) {
   // TODO(https://fxbug.dev/401286733): color layers not yet supported.
-  ZX_DEBUG_ASSERT_MSG(config.layers_list[0].image_source.width != 0,
-                      "Solid color fill layers not supported");
-  ZX_DEBUG_ASSERT_MSG(config.layers_list[0].image_source.height != 0,
-                      "Solid color fill layers not supported");
+  ZX_DEBUG_ASSERT_MSG(layer.image_source().width() != 0, "Solid color fill layers not supported");
+  ZX_DEBUG_ASSERT_MSG(layer.image_source().height() != 0, "Solid color fill layers not supported");
 
-  auto info = reinterpret_cast<ImageInfo*>(config.layers_list[0].image_handle);
+  ImageInfo* info = reinterpret_cast<ImageInfo*>(layer.image_id().value());
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
     fdf::error("No table available!");
@@ -281,14 +282,12 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
   fdf::trace("Table index {} used", next_table_idx);
   fdf::trace("AFBC {}", info->is_afbc ? "enabled" : "disabled");
 
-  const display::DisplayTiming display_timing = display::ToDisplayTiming(config.timing);
-
-  PixelGridSize2D display_contents_size = {.width = display_timing.horizontal_active_px,
-                                           .height = display_timing.vertical_active_lines};
+  PixelGridSize2D display_contents_size = {.width = display_mode.active_area().width(),
+                                           .height = display_mode.active_area().height()};
 
   // TODO(https://fxbug.dev/317922128): Use the (unscaled) layer source frame size.
-  PixelGridSize2D layer_image_size = {.width = display_timing.horizontal_active_px,
-                                      .height = display_timing.vertical_active_lines};
+  PixelGridSize2D layer_image_size = {.width = display_mode.active_area().width(),
+                                      .height = display_mode.active_area().height()};
 
   if (ConfigNeededForSingleNonscaledLayer(layer_image_size, display_contents_size)) {
     fdf::info("Mode change ({} x {}) to ({} x {})", display_contents_size_.width,
@@ -356,14 +355,12 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
   osd_ctrl_stat_val.set_global_alpha(kMaximumAlpha);
 
   // This is guaranteed by DisplayEngine::CheckConfiguration().
-  ZX_DEBUG_ASSERT(config.layers_count > 0);
-  ZX_DEBUG_ASSERT(config.layers_list[0].image_metadata.dimensions.width != 0);
-  ZX_DEBUG_ASSERT(config.layers_list[0].image_metadata.dimensions.height != 0);
-  const layer_t& primary_layer = config.layers_list[0];
-  if (primary_layer.alpha_mode != ALPHA_DISABLE) {
+  ZX_DEBUG_ASSERT(layer.image_metadata().dimensions().width() != 0);
+  ZX_DEBUG_ASSERT(layer.image_metadata().dimensions().height() != 0);
+  if (layer.alpha_mode() != display::AlphaMode::kDisable) {
     // If a global alpha value is provided, apply it.
-    if (!isnan(primary_layer.alpha_layer_val)) {
-      auto num = static_cast<uint8_t>(round(primary_layer.alpha_layer_val * kMaximumAlpha));
+    if (!isnan(layer.alpha_coefficient())) {
+      auto num = static_cast<uint8_t>(round(layer.alpha_coefficient() * kMaximumAlpha));
       osd_ctrl_stat_val.set_global_alpha(num);
     }
   }
@@ -426,7 +423,7 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
         AfbcCommandReg::Get(VPU_MAFBC_COMMAND).FromValue(0).set_direct_swap(0).reg_value());
   }
 
-  SetColorCorrection(next_table_idx, config);
+  SetColorCorrection(next_table_idx, color_conversion);
 
   // update last element of table which will be used to indicate whether RDMA operation was
   // completed or not

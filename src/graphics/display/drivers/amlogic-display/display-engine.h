@@ -203,12 +203,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
 
-  // If true, the driver ignores the `mode` field in the
-  // `fuchsia.hardware.display.controller/DisplayConfig` struct.
-  //
-  // `vout_` must be initialized.
-  bool IgnoreDisplayMode() const;
-
   // Whether `timing` is a new display timing different from the timing
   // currently applied to the display.
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);

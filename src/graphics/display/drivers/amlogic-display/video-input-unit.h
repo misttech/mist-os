@@ -16,7 +16,10 @@
 
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace amlogic_display {
 
@@ -61,7 +64,9 @@ class VideoInputUnit {
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
-  void FlipOnVsync(const display_config_t& config, display::DriverConfigStamp config_stamp);
+  void FlipOnVsync(const display::DriverLayer& layer, const display::Mode& display_mode,
+                   const display::ColorConversion& color_conversion,
+                   display::DriverConfigStamp config_stamp);
 
   // Returns the image handle that was most recently processed by the RDMA engine. If RDMA is
   // determined to be in progress and incomplete, then the previously applied image is returned. If
@@ -124,7 +129,8 @@ class VideoInputUnit {
   bool ConfigNeededForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
                                            PixelGridSize2D display_contents_size) const;
 
-  void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config);
+  void SetColorCorrection(uint32_t rdma_table_idx,
+                          const display::ColorConversion& color_conversion);
 
   void DumpNonRdmaRegisters();
 
