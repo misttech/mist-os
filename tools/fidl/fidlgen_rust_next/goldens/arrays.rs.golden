@@ -1367,4 +1367,105 @@ impl<'de> ::core::fmt::Debug for WireOptionalUnionSmallArray<'de> {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::StructLargeArray> for ::fidl_test_arrays::StructLargeArray {
+        #[inline]
+        fn compat_from(value: crate::StructLargeArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::StructLargeArray> for crate::StructLargeArray {
+        #[inline]
+        fn compat_from(value: ::fidl_test_arrays::StructLargeArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructSmallArray> for ::fidl_test_arrays::StructSmallArray {
+        #[inline]
+        fn compat_from(value: crate::StructSmallArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::StructSmallArray> for crate::StructSmallArray {
+        #[inline]
+        fn compat_from(value: ::fidl_test_arrays::StructSmallArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableLargeArray> for ::fidl_test_arrays::TableLargeArray {
+        fn compat_from(value: crate::TableLargeArray) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::TableLargeArray> for crate::TableLargeArray {
+        fn compat_from(value: ::fidl_test_arrays::TableLargeArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableSmallArray> for ::fidl_test_arrays::TableSmallArray {
+        fn compat_from(value: crate::TableSmallArray) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::TableSmallArray> for crate::TableSmallArray {
+        fn compat_from(value: ::fidl_test_arrays::TableSmallArray) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionLargeArray> for ::fidl_test_arrays::UnionLargeArray {
+        fn compat_from(value: crate::UnionLargeArray) -> Self {
+            match value {
+                crate::UnionLargeArray::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::UnionLargeArray> for crate::UnionLargeArray {
+        fn compat_from(value: ::fidl_test_arrays::UnionLargeArray) -> Self {
+            match value {
+                ::fidl_test_arrays::UnionLargeArray::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionSmallArray> for ::fidl_test_arrays::UnionSmallArray {
+        fn compat_from(value: crate::UnionSmallArray) -> Self {
+            match value {
+                crate::UnionSmallArray::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_arrays::UnionSmallArray> for crate::UnionSmallArray {
+        fn compat_from(value: ::fidl_test_arrays::UnionSmallArray) -> Self {
+            match value {
+                ::fidl_test_arrays::UnionSmallArray::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+}

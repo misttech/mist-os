@@ -9424,16 +9424,908 @@ impl<'de> ::core::fmt::Debug for WireOptionalUnionWithAttributes<'de> {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::Empty> for ::fidl_test_union::Empty {
+        #[inline]
+        fn compat_from(value: crate::Empty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::Empty> for crate::Empty {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::Empty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyFlexibleUnion> for ::fidl_test_union::EmptyFlexibleUnion {
+        fn compat_from(value: crate::EmptyFlexibleUnion) -> Self {
+            match value {
+                crate::EmptyFlexibleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::EmptyFlexibleUnion> for crate::EmptyFlexibleUnion {
+        fn compat_from(value: ::fidl_test_union::EmptyFlexibleUnion) -> Self {
+            match value {
+                ::fidl_test_union::EmptyFlexibleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExplicitFlexibleUnion>
+        for ::fidl_test_union::ExplicitFlexibleUnion
+    {
+        fn compat_from(value: crate::ExplicitFlexibleUnion) -> Self {
+            match value {
+                crate::ExplicitFlexibleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitFlexibleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitFlexibleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ExplicitFlexibleUnion>
+        for crate::ExplicitFlexibleUnion
+    {
+        fn compat_from(value: ::fidl_test_union::ExplicitFlexibleUnion) -> Self {
+            match value {
+                ::fidl_test_union::ExplicitFlexibleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitFlexibleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitFlexibleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExplicitFoo> for ::fidl_test_union::ExplicitFoo {
+        fn compat_from(value: crate::ExplicitFoo) -> Self {
+            match value {
+                crate::ExplicitFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitFoo::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ExplicitFoo> for crate::ExplicitFoo {
+        fn compat_from(value: ::fidl_test_union::ExplicitFoo) -> Self {
+            match value {
+                ::fidl_test_union::ExplicitFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitFoo::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Pizza> for ::fidl_test_union::Pizza {
+        #[inline]
+        fn compat_from(value: crate::Pizza) -> Self {
+            Self { toppings: ::fidl_next::CompatFrom::compat_from(value.toppings) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::Pizza> for crate::Pizza {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::Pizza) -> Self {
+            Self { toppings: ::fidl_next::CompatFrom::compat_from(value.toppings) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Pasta> for ::fidl_test_union::Pasta {
+        #[inline]
+        fn compat_from(value: crate::Pasta) -> Self {
+            Self { sauce: ::fidl_next::CompatFrom::compat_from(value.sauce) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::Pasta> for crate::Pasta {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::Pasta) -> Self {
+            Self { sauce: ::fidl_next::CompatFrom::compat_from(value.sauce) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExplicitPizzaOrPasta>
+        for ::fidl_test_union::ExplicitPizzaOrPasta
+    {
+        fn compat_from(value: crate::ExplicitPizzaOrPasta) -> Self {
+            match value {
+                crate::ExplicitPizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitPizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ExplicitPizzaOrPasta>
+        for crate::ExplicitPizzaOrPasta
+    {
+        fn compat_from(value: ::fidl_test_union::ExplicitPizzaOrPasta) -> Self {
+            match value {
+                ::fidl_test_union::ExplicitPizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitPizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExplicitStrictFoo> for ::fidl_test_union::ExplicitStrictFoo {
+        fn compat_from(value: crate::ExplicitStrictFoo) -> Self {
+            match value {
+                crate::ExplicitStrictFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitStrictFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ExplicitStrictFoo> for crate::ExplicitStrictFoo {
+        fn compat_from(value: ::fidl_test_union::ExplicitStrictFoo) -> Self {
+            match value {
+                ::fidl_test_union::ExplicitStrictFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitStrictFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExplicitUnion> for ::fidl_test_union::ExplicitUnion {
+        fn compat_from(value: crate::ExplicitUnion) -> Self {
+            match value {
+                crate::ExplicitUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ExplicitUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ExplicitUnion> for crate::ExplicitUnion {
+        fn compat_from(value: ::fidl_test_union::ExplicitUnion) -> Self {
+            match value {
+                ::fidl_test_union::ExplicitUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ExplicitUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::FieldCollision> for ::fidl_test_union::FieldCollision {
+        fn compat_from(value: crate::FieldCollision) -> Self {
+            match value {
+                crate::FieldCollision::FieldCollisionTag(value) => {
+                    Self::FieldCollisionTag(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::FieldCollision> for crate::FieldCollision {
+        fn compat_from(value: ::fidl_test_union::FieldCollision) -> Self {
+            match value {
+                ::fidl_test_union::FieldCollision::FieldCollisionTag(value) => {
+                    Self::FieldCollisionTag(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::FlexibleFoo> for ::fidl_test_union::FlexibleFoo {
+        fn compat_from(value: crate::FlexibleFoo) -> Self {
+            match value {
+                crate::FlexibleFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleFoo::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::FlexibleFoo> for crate::FlexibleFoo {
+        fn compat_from(value: ::fidl_test_union::FlexibleFoo) -> Self {
+            match value {
+                ::fidl_test_union::FlexibleFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexibleFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexibleFoo::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::FlexiblePizzaOrPasta>
+        for ::fidl_test_union::FlexiblePizzaOrPasta
+    {
+        fn compat_from(value: crate::FlexiblePizzaOrPasta) -> Self {
+            match value {
+                crate::FlexiblePizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexiblePizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexiblePizzaOrPasta::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::FlexiblePizzaOrPasta>
+        for crate::FlexiblePizzaOrPasta
+    {
+        fn compat_from(value: ::fidl_test_union::FlexiblePizzaOrPasta) -> Self {
+            match value {
+                ::fidl_test_union::FlexiblePizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexiblePizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexiblePizzaOrPasta::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::FlexibleUnion> for ::fidl_test_union::FlexibleUnion {
+        fn compat_from(value: crate::FlexibleUnion) -> Self {
+            match value {
+                crate::FlexibleUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleUnion::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+
+                crate::FlexibleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::FlexibleUnion> for crate::FlexibleUnion {
+        fn compat_from(value: ::fidl_test_union::FlexibleUnion) -> Self {
+            match value {
+                ::fidl_test_union::FlexibleUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexibleUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::FlexibleUnion::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+
+                ::fidl_test_union::FlexibleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::NewerSimpleUnion> for ::fidl_test_union::NewerSimpleUnion {
+        fn compat_from(value: crate::NewerSimpleUnion) -> Self {
+            match value {
+                crate::NewerSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::NewerSimpleUnion::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::NewerSimpleUnion::V(value) => {
+                    Self::V(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::NewerSimpleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::NewerSimpleUnion> for crate::NewerSimpleUnion {
+        fn compat_from(value: ::fidl_test_union::NewerSimpleUnion) -> Self {
+            match value {
+                ::fidl_test_union::NewerSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::NewerSimpleUnion::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::NewerSimpleUnion::V(value) => {
+                    Self::V(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::NewerSimpleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::NullableUnionStruct>
+        for ::fidl_test_union::NullableUnionStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::NullableUnionStruct) -> Self {
+            Self { the_union: ::fidl_next::CompatFrom::compat_from(value.the_union) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::NullableUnionStruct>
+        for crate::NullableUnionStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::NullableUnionStruct) -> Self {
+            Self { the_union: ::fidl_next::CompatFrom::compat_from(value.the_union) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::OlderSimpleUnion> for ::fidl_test_union::OlderSimpleUnion {
+        fn compat_from(value: crate::OlderSimpleUnion) -> Self {
+            match value {
+                crate::OlderSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::OlderSimpleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::OlderSimpleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::OlderSimpleUnion> for crate::OlderSimpleUnion {
+        fn compat_from(value: ::fidl_test_union::OlderSimpleUnion) -> Self {
+            match value {
+                ::fidl_test_union::OlderSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::OlderSimpleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::OlderSimpleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::PizzaOrPasta> for ::fidl_test_union::PizzaOrPasta {
+        fn compat_from(value: crate::PizzaOrPasta) -> Self {
+            match value {
+                crate::PizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::PizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::PizzaOrPasta> for crate::PizzaOrPasta {
+        fn compat_from(value: ::fidl_test_union::PizzaOrPasta) -> Self {
+            match value {
+                ::fidl_test_union::PizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::PizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ReverseOrdinalUnion>
+        for ::fidl_test_union::ReverseOrdinalUnion
+    {
+        fn compat_from(value: crate::ReverseOrdinalUnion) -> Self {
+            match value {
+                crate::ReverseOrdinalUnion::First(value) => {
+                    Self::First(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ReverseOrdinalUnion::Second(value) => {
+                    Self::Second(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::ReverseOrdinalUnion>
+        for crate::ReverseOrdinalUnion
+    {
+        fn compat_from(value: ::fidl_test_union::ReverseOrdinalUnion) -> Self {
+            match value {
+                ::fidl_test_union::ReverseOrdinalUnion::First(value) => {
+                    Self::First(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::ReverseOrdinalUnion::Second(value) => {
+                    Self::Second(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictBoundedUnion> for ::fidl_test_union::StrictBoundedUnion {
+        fn compat_from(value: crate::StrictBoundedUnion) -> Self {
+            match value {
+                crate::StrictBoundedUnion::V(value) => {
+                    Self::V(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StrictBoundedUnion> for crate::StrictBoundedUnion {
+        fn compat_from(value: ::fidl_test_union::StrictBoundedUnion) -> Self {
+            match value {
+                ::fidl_test_union::StrictBoundedUnion::V(value) => {
+                    Self::V(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictFoo> for ::fidl_test_union::StrictFoo {
+        fn compat_from(value: crate::StrictFoo) -> Self {
+            match value {
+                crate::StrictFoo::S(value) => Self::S(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::StrictFoo::I(value) => Self::I(::fidl_next::CompatFrom::compat_from(value)),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StrictFoo> for crate::StrictFoo {
+        fn compat_from(value: ::fidl_test_union::StrictFoo) -> Self {
+            match value {
+                ::fidl_test_union::StrictFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictPizzaOrPasta> for ::fidl_test_union::StrictPizzaOrPasta {
+        fn compat_from(value: crate::StrictPizzaOrPasta) -> Self {
+            match value {
+                crate::StrictPizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::StrictPizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StrictPizzaOrPasta> for crate::StrictPizzaOrPasta {
+        fn compat_from(value: ::fidl_test_union::StrictPizzaOrPasta) -> Self {
+            match value {
+                ::fidl_test_union::StrictPizzaOrPasta::Pizza(value) => {
+                    Self::Pizza(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictPizzaOrPasta::Pasta(value) => {
+                    Self::Pasta(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictSimpleUnion> for ::fidl_test_union::StrictSimpleUnion {
+        fn compat_from(value: crate::StrictSimpleUnion) -> Self {
+            match value {
+                crate::StrictSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::StrictSimpleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::StrictSimpleUnion::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StrictSimpleUnion> for crate::StrictSimpleUnion {
+        fn compat_from(value: ::fidl_test_union::StrictSimpleUnion) -> Self {
+            match value {
+                ::fidl_test_union::StrictSimpleUnion::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictSimpleUnion::F(value) => {
+                    Self::F(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictSimpleUnion::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictUnion> for ::fidl_test_union::StrictUnion {
+        fn compat_from(value: crate::StrictUnion) -> Self {
+            match value {
+                crate::StrictUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::StrictUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::StrictUnion::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StrictUnion> for crate::StrictUnion {
+        fn compat_from(value: ::fidl_test_union::StrictUnion) -> Self {
+            match value {
+                ::fidl_test_union::StrictUnion::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictUnion::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::StrictUnion::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableUnion>
+        for ::fidl_test_union::StructWithNullableUnion
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableUnion) -> Self {
+            Self { x1: ::fidl_next::CompatFrom::compat_from(value.x1) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::StructWithNullableUnion>
+        for crate::StructWithNullableUnion
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::StructWithNullableUnion) -> Self {
+            Self { x1: ::fidl_next::CompatFrom::compat_from(value.x1) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            crate::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        > for ::fidl_test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::CompatFrom::compat_from(value.xu) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        > for crate::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::CompatFrom::compat_from(value.xu) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            crate::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        > for ::fidl_test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::CompatFrom::compat_from(value.xu) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        > for crate::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::CompatFrom::compat_from(value.xu) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `TestProtocol`
     /// protocol.
-    pub type TestProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::TestProtocol>;
+    pub type TestProtocolProxy = ::fidl_next::ClientSender<crate::TestProtocol>;
 
-    impl ::core::convert::From<crate::TestProtocol> for ::fidl_test_union::TestProtocolMarker {
-        #[inline]
-        fn from(_: crate::TestProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::TestProtocol> for ::fidl_test_union::TestProtocolMarker {
+        fn compat_from(_: crate::TestProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::TestProtocolMarker> for crate::TestProtocol {
+        fn compat_from(_: ::fidl_test_union::TestProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_union::TestProtocolProxy> for crate::TestProtocol {
+        fn client_compat_from(
+            proxy: ::fidl_test_union::TestProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Union> for ::fidl_test_union::Union {
+        fn compat_from(value: crate::Union) -> Self {
+            match value {
+                crate::Union::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::Union::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::Union::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::Union> for crate::Union {
+        fn compat_from(value: ::fidl_test_union::Union) -> Self {
+            match value {
+                ::fidl_test_union::Union::Primitive(value) => {
+                    Self::Primitive(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::Union::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::Union::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::CompatFrom::compat_from(
+                        value,
+                    ))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionContainingEmptyStruct>
+        for ::fidl_test_union::UnionContainingEmptyStruct
+    {
+        fn compat_from(value: crate::UnionContainingEmptyStruct) -> Self {
+            match value {
+                crate::UnionContainingEmptyStruct::Empty(value) => {
+                    Self::Empty(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnionContainingEmptyStruct::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::UnionContainingEmptyStruct>
+        for crate::UnionContainingEmptyStruct
+    {
+        fn compat_from(value: ::fidl_test_union::UnionContainingEmptyStruct) -> Self {
+            match value {
+                ::fidl_test_union::UnionContainingEmptyStruct::Empty(value) => {
+                    Self::Empty(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::UnionContainingEmptyStruct::__SourceBreaking {
+                    unknown_ordinal,
+                } => Self::UnknownOrdinal_(unknown_ordinal),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionSandwich> for ::fidl_test_union::UnionSandwich {
+        #[inline]
+        fn compat_from(value: crate::UnionSandwich) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                u: ::fidl_next::CompatFrom::compat_from(value.u),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::UnionSandwich> for crate::UnionSandwich {
+        #[inline]
+        fn compat_from(value: ::fidl_test_union::UnionSandwich) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                u: ::fidl_next::CompatFrom::compat_from(value.u),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionWithAttributes>
+        for ::fidl_test_union::UnionWithAttributes
+    {
+        fn compat_from(value: crate::UnionWithAttributes) -> Self {
+            match value {
+                crate::UnionWithAttributes::X(value) => {
+                    Self::X(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnionWithAttributes::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_union::UnionWithAttributes>
+        for crate::UnionWithAttributes
+    {
+        fn compat_from(value: ::fidl_test_union::UnionWithAttributes) -> Self {
+            match value {
+                ::fidl_test_union::UnionWithAttributes::X(value) => {
+                    Self::X(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_union::UnionWithAttributes::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
         }
     }
 }

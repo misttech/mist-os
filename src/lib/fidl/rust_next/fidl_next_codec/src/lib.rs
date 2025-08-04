@@ -253,6 +253,8 @@ pub use bitflags::bitflags;
 pub use munge::munge;
 
 pub use self::chunk::*;
+#[cfg(feature = "compat")]
+pub use self::compat::*;
 pub use self::copy_optimization::*;
 pub use self::decode::*;
 pub use self::decoded::*;

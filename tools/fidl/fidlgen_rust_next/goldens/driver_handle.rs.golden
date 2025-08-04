@@ -892,15 +892,22 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `DriverProtocol`
     /// protocol.
-    pub type DriverProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>;
+    pub type DriverProtocolProxy = ::fidl_next::ClientSender<crate::DriverProtocol>;
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::DriverProtocol>
+    impl ::fidl_next::CompatFrom<crate::DriverProtocol>
         for ::fidl_test_driverhandle::DriverProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::DriverProtocol) -> Self {
+        fn compat_from(_: crate::DriverProtocol) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_driverhandle::DriverProtocolMarker>
+        for crate::DriverProtocol
+    {
+        fn compat_from(_: ::fidl_test_driverhandle::DriverProtocolMarker) -> Self {
             Self
         }
     }

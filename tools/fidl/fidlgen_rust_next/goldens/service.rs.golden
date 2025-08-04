@@ -442,26 +442,62 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `FirstProtocol`
     /// protocol.
-    pub type FirstProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>;
+    pub type FirstProtocolProxy = ::fidl_next::ClientSender<crate::FirstProtocol>;
 
-    impl ::core::convert::From<crate::FirstProtocol> for ::fidl_test_service::FirstProtocolMarker {
-        #[inline]
-        fn from(_: crate::FirstProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::FirstProtocol> for ::fidl_test_service::FirstProtocolMarker {
+        fn compat_from(_: crate::FirstProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_service::FirstProtocolMarker> for crate::FirstProtocol {
+        fn compat_from(_: ::fidl_test_service::FirstProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_service::FirstProtocolProxy>
+        for crate::FirstProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_service::FirstProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SecondProtocol`
     /// protocol.
-    pub type SecondProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>;
+    pub type SecondProtocolProxy = ::fidl_next::ClientSender<crate::SecondProtocol>;
 
-    impl ::core::convert::From<crate::SecondProtocol> for ::fidl_test_service::SecondProtocolMarker {
-        #[inline]
-        fn from(_: crate::SecondProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::SecondProtocol> for ::fidl_test_service::SecondProtocolMarker {
+        fn compat_from(_: crate::SecondProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_service::SecondProtocolMarker> for crate::SecondProtocol {
+        fn compat_from(_: ::fidl_test_service::SecondProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_service::SecondProtocolProxy>
+        for crate::SecondProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_service::SecondProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

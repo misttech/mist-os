@@ -1703,18 +1703,190 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::FlexibleFoo>
+        for ::fidl_test_requestflexibleenvelope::FlexibleFoo
+    {
+        fn compat_from(value: crate::FlexibleFoo) -> Self {
+            match value {
+                crate::FlexibleFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::FlexibleFoo::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_requestflexibleenvelope::FlexibleFoo>
+        for crate::FlexibleFoo
+    {
+        fn compat_from(value: ::fidl_test_requestflexibleenvelope::FlexibleFoo) -> Self {
+            match value {
+                ::fidl_test_requestflexibleenvelope::FlexibleFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_requestflexibleenvelope::FlexibleFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_requestflexibleenvelope::FlexibleFoo::__SourceBreaking {
+                    unknown_ordinal,
+                } => Self::UnknownOrdinal_(unknown_ordinal),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictFoo> for ::fidl_test_requestflexibleenvelope::StrictFoo {
+        fn compat_from(value: crate::StrictFoo) -> Self {
+            match value {
+                crate::StrictFoo::S(value) => Self::S(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::StrictFoo::I(value) => Self::I(::fidl_next::CompatFrom::compat_from(value)),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_requestflexibleenvelope::StrictFoo> for crate::StrictFoo {
+        fn compat_from(value: ::fidl_test_requestflexibleenvelope::StrictFoo) -> Self {
+            match value {
+                ::fidl_test_requestflexibleenvelope::StrictFoo::S(value) => {
+                    Self::S(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_requestflexibleenvelope::StrictFoo::I(value) => {
+                    Self::I(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ProtocolRequestStrictResponseFlexibleRequest>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ProtocolRequestStrictResponseFlexibleRequest) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest,
+        > for crate::ProtocolRequestStrictResponseFlexibleRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest,
+        ) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ProtocolRequestStrictResponseFlexibleResponse>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ProtocolRequestStrictResponseFlexibleResponse) -> Self {
+            Self { f: ::fidl_next::CompatFrom::compat_from(value.f) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse,
+        > for crate::ProtocolRequestStrictResponseFlexibleResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse,
+        ) -> Self {
+            Self { f: ::fidl_next::CompatFrom::compat_from(value.f) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ProtocolRequestFlexibleResponseStrictRequest>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ProtocolRequestFlexibleResponseStrictRequest) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest,
+        > for crate::ProtocolRequestFlexibleResponseStrictRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest,
+        ) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ProtocolRequestFlexibleResponseStrictResponse>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ProtocolRequestFlexibleResponseStrictResponse) -> Self {
+            Self { f: ::fidl_next::CompatFrom::compat_from(value.f) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse,
+        > for crate::ProtocolRequestFlexibleResponseStrictResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse,
+        ) -> Self {
+            Self { f: ::fidl_next::CompatFrom::compat_from(value.f) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
-    pub type ProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+    pub type ProtocolProxy = ::fidl_next::ClientSender<crate::Protocol>;
 
-    impl ::core::convert::From<crate::Protocol>
+    impl ::fidl_next::CompatFrom<crate::Protocol>
         for ::fidl_test_requestflexibleenvelope::ProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::Protocol) -> Self {
+        fn compat_from(_: crate::Protocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_requestflexibleenvelope::ProtocolMarker>
+        for crate::Protocol
+    {
+        fn compat_from(_: ::fidl_test_requestflexibleenvelope::ProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_requestflexibleenvelope::ProtocolProxy>
+        for crate::Protocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_requestflexibleenvelope::ProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

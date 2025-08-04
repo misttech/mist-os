@@ -632,4 +632,65 @@ impl<'de> ::core::fmt::Debug for WireComplexInstants<'de> {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::AllInstants> for ::fidl_test_time::AllInstants {
+        #[inline]
+        fn compat_from(value: crate::AllInstants) -> Self {
+            Self {
+                monotonic: ::fidl_next::CompatFrom::compat_from(value.monotonic),
+
+                boot: ::fidl_next::CompatFrom::compat_from(value.boot),
+
+                monotonic_ticks: ::fidl_next::CompatFrom::compat_from(value.monotonic_ticks),
+
+                boot_ticks: ::fidl_next::CompatFrom::compat_from(value.boot_ticks),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_time::AllInstants> for crate::AllInstants {
+        #[inline]
+        fn compat_from(value: ::fidl_test_time::AllInstants) -> Self {
+            Self {
+                monotonic: ::fidl_next::CompatFrom::compat_from(value.monotonic),
+
+                boot: ::fidl_next::CompatFrom::compat_from(value.boot),
+
+                monotonic_ticks: ::fidl_next::CompatFrom::compat_from(value.monotonic_ticks),
+
+                boot_ticks: ::fidl_next::CompatFrom::compat_from(value.boot_ticks),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ComplexInstants> for ::fidl_test_time::ComplexInstants {
+        fn compat_from(value: crate::ComplexInstants) -> Self {
+            Self {
+                monotonic: ::fidl_next::CompatFrom::compat_from(value.monotonic),
+
+                boot: ::fidl_next::CompatFrom::compat_from(value.boot),
+
+                monotonic_ticks: ::fidl_next::CompatFrom::compat_from(value.monotonic_ticks),
+
+                boot_ticks: ::fidl_next::CompatFrom::compat_from(value.boot_ticks),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_time::ComplexInstants> for crate::ComplexInstants {
+        fn compat_from(value: ::fidl_test_time::ComplexInstants) -> Self {
+            Self {
+                monotonic: ::fidl_next::CompatFrom::compat_from(value.monotonic),
+
+                boot: ::fidl_next::CompatFrom::compat_from(value.boot),
+
+                monotonic_ticks: ::fidl_next::CompatFrom::compat_from(value.monotonic_ticks),
+
+                boot_ticks: ::fidl_next::CompatFrom::compat_from(value.boot_ticks),
+            }
+        }
+    }
+}

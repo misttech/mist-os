@@ -21954,108 +21954,1860 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarDriverProtocol`
     /// protocol.
-    pub type UnknownInteractionsAjarDriverProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsAjarDriverProtocol,
-    >;
+    pub type UnknownInteractionsAjarDriverProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsAjarDriverProtocol>;
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::UnknownInteractionsAjarDriverProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarDriverProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsAjarDriverProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsAjarDriverProtocol) -> Self {
             Self
         }
     }
+
+    #[cfg(feature = "driver")]
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolMarker,
+        > for crate::UnknownInteractionsAjarDriverProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolMarker,
+        ) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::UnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> for crate::UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        ) -> Self {
+            match value {
+                crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest::SomeField(value) => {
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        > for crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolStrictEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsAjarProtocolStrictEventTableRequest,
+        ) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest,
+        > for crate::UnknownInteractionsAjarProtocolStrictEventTableRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> for crate::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
+        match value {
+
+                crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> for crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+    fn compat_from(value: crate::UnknownInteractionsAjarProtocolFlexibleEventTableRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> for crate::UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarProtocol`
     /// protocol.
-    pub type UnknownInteractionsAjarProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsAjarProtocol,
-    >;
+    pub type UnknownInteractionsAjarProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsAjarProtocol>;
 
-    impl ::core::convert::From<crate::UnknownInteractionsAjarProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsAjarProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsAjarProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsAjarProtocol) -> Self {
             Self
         }
     }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolMarker,
+        > for crate::UnknownInteractionsAjarProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolMarker,
+        ) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl
+        ::fidl_next::ClientCompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolProxy,
+        > for crate::UnknownInteractionsAjarProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedDriverProtocol`
     /// protocol.
-    pub type UnknownInteractionsClosedDriverProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsClosedDriverProtocol,
-    >;
+    pub type UnknownInteractionsClosedDriverProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsClosedDriverProtocol>;
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::UnknownInteractionsClosedDriverProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedDriverProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsClosedDriverProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsClosedDriverProtocol) -> Self {
             Self
         }
     }
+
+    #[cfg(feature = "driver")]
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolMarker,
+        > for crate::UnknownInteractionsClosedDriverProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolMarker,
+        ) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> for crate::UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
+        match value {
+
+                crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest> for crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocolStrictEventTableRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest {
+    fn compat_from(value: crate::UnknownInteractionsClosedProtocolStrictEventTableRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> for crate::UnknownInteractionsClosedProtocolStrictEventTableRequest {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedProtocol`
     /// protocol.
-    pub type UnknownInteractionsClosedProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsClosedProtocol,
-    >;
+    pub type UnknownInteractionsClosedProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsClosedProtocol>;
 
-    impl ::core::convert::From<crate::UnknownInteractionsClosedProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsClosedProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsClosedProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsClosedProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolMarker,
+        > for crate::UnknownInteractionsClosedProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolMarker,
+        ) -> Self {
             Self
         }
     }
 
     #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsDriverProtocol`
-    /// protocol.
-    pub type UnknownInteractionsDriverProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsDriverProtocol,
-    >;
+
+    impl
+        ::fidl_next::ClientCompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolProxy,
+        > for crate::UnknownInteractionsClosedProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::UnknownInteractionsDriverProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> for crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsDriverProtocol`
+    /// protocol.
+    pub type UnknownInteractionsDriverProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsDriverProtocol>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsDriverProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsDriverProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsDriverProtocol) -> Self {
             Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolMarker,
+        > for crate::UnknownInteractionsDriverProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolMarker,
+        ) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayFieldsResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+        > for crate::UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
+            match value {
+                crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse::SomeField(value) => {
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        > for crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayTableResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolStrictTwoWayTableResponse) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse,
+        > for crate::UnknownInteractionsProtocolStrictTwoWayTableResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> for crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
+        ) -> Self {
+            match value {
+                crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::SomeField(
+                    value,
+                ) => Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> for crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictTwoWayTableErrResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
+        ) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> for crate::UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> for crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        ) -> Self {
+            match value {
+                crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::SomeField(value) => {
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        > for crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+    {
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        ) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        > for crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> for crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+    #[inline]
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> for crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+        match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+    fn compat_from(value: crate::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> for crate::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+    fn compat_from(value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse) -> Self {
+        Self {
+
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::UnknownInteractionsProtocolStrictEventFieldsRequest) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest,
+        > for crate::UnknownInteractionsProtocolStrictEventFieldsRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
+            match value {
+                crate::UnknownInteractionsProtocolStrictEventUnionRequest::SomeField(value) => {
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnknownInteractionsProtocolStrictEventUnionRequest::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest,
+        > for crate::UnknownInteractionsProtocolStrictEventUnionRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolStrictEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolStrictEventTableRequest) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest,
+        > for crate::UnknownInteractionsProtocolStrictEventTableRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::UnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        > for crate::UnknownInteractionsProtocolFlexibleEventFieldsRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
+            match value {
+                crate::UnknownInteractionsProtocolFlexibleEventUnionRequest::SomeField(value) => {
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnknownInteractionsProtocolFlexibleEventUnionRequest::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest,
+        > for crate::UnknownInteractionsProtocolFlexibleEventUnionRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::SomeField(value) =>
+                    Self::SomeField(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocolFlexibleEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest
+    {
+        fn compat_from(value: crate::UnknownInteractionsProtocolFlexibleEventTableRequest) -> Self {
+            Self {
+                some_field: ::fidl_next::CompatFrom::compat_from(value.some_field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest,
+        > for crate::UnknownInteractionsProtocolFlexibleEventTableRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::CompatFrom::compat_from(value.some_field) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsProtocol`
     /// protocol.
-    pub type UnknownInteractionsProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::UnknownInteractionsProtocol,
-    >;
+    pub type UnknownInteractionsProtocolProxy =
+        ::fidl_next::ClientSender<crate::UnknownInteractionsProtocol>;
 
-    impl ::core::convert::From<crate::UnknownInteractionsProtocol>
+    impl ::fidl_next::CompatFrom<crate::UnknownInteractionsProtocol>
         for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::UnknownInteractionsProtocol) -> Self {
+        fn compat_from(_: crate::UnknownInteractionsProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unknowninteractions::UnknownInteractionsProtocolMarker>
+        for crate::UnknownInteractionsProtocol
+    {
+        fn compat_from(
+            _: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolMarker,
+        ) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl
+        ::fidl_next::ClientCompatFrom<
+            ::fidl_test_unknowninteractions::UnknownInteractionsProtocolProxy,
+        > for crate::UnknownInteractionsProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_unknowninteractions::UnknownInteractionsProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

@@ -432,13 +432,96 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::ObjType> for ::fidl_test_aliases::ObjType {
-        #[inline]
-        fn from(from: crate::ObjType) -> Self {
-            match crate::ObjType::from(from) {
+    impl ::fidl_next::CompatFrom<crate::ObjType> for ::fidl_test_aliases::ObjType {
+        fn compat_from(value: crate::ObjType) -> Self {
+            match value {
                 crate::ObjType::None => Self::None,
 
                 crate::ObjType::Channel => Self::Channel,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_aliases::ObjType> for crate::ObjType {
+        fn compat_from(value: ::fidl_test_aliases::ObjType) -> Self {
+            match value {
+                ::fidl_test_aliases::ObjType::None => Self::None,
+
+                ::fidl_test_aliases::ObjType::Channel => Self::Channel,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleOfUseOfAliases>
+        for ::fidl_test_aliases::ExampleOfUseOfAliases
+    {
+        #[inline]
+        fn compat_from(value: crate::ExampleOfUseOfAliases) -> Self {
+            Self {
+                field_of_u32: ::fidl_next::CompatFrom::compat_from(value.field_of_u32),
+
+                field_of_vec_of_strings: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings,
+                ),
+
+                field_of_vec_of_strings_at_most_nine: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings_at_most_nine,
+                ),
+
+                field_of_vec_of_strings_at_most_5: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings_at_most_5,
+                ),
+
+                field_of_vec_of_ref_me_at_most_5: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_ref_me_at_most_5,
+                ),
+
+                field_of_channel: ::fidl_next::CompatFrom::compat_from(value.field_of_channel),
+
+                field_of_client_end: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_client_end,
+                ),
+
+                field_of_nullable_client_end: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_nullable_client_end,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_aliases::ExampleOfUseOfAliases>
+        for crate::ExampleOfUseOfAliases
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_aliases::ExampleOfUseOfAliases) -> Self {
+            Self {
+                field_of_u32: ::fidl_next::CompatFrom::compat_from(value.field_of_u32),
+
+                field_of_vec_of_strings: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings,
+                ),
+
+                field_of_vec_of_strings_at_most_nine: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings_at_most_nine,
+                ),
+
+                field_of_vec_of_strings_at_most_5: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_strings_at_most_5,
+                ),
+
+                field_of_vec_of_ref_me_at_most_5: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_vec_of_ref_me_at_most_5,
+                ),
+
+                field_of_channel: ::fidl_next::CompatFrom::compat_from(value.field_of_channel),
+
+                field_of_client_end: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_client_end,
+                ),
+
+                field_of_nullable_client_end: ::fidl_next::CompatFrom::compat_from(
+                    value.field_of_nullable_client_end,
+                ),
             }
         }
     }

@@ -1246,16 +1246,126 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::Empty> for ::fidl_test_emptystruct::Empty {
+        #[inline]
+        fn compat_from(value: crate::Empty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::Empty> for crate::Empty {
+        #[inline]
+        fn compat_from(value: ::fidl_test_emptystruct::Empty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyProtocolSendRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::EmptyProtocolSendRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::EmptyProtocolSendRequest>
+        for crate::EmptyProtocolSendRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_emptystruct::EmptyProtocolSendRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyProtocolReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolReceiveRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::EmptyProtocolReceiveRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::EmptyProtocolReceiveRequest>
+        for crate::EmptyProtocolReceiveRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_emptystruct::EmptyProtocolReceiveRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyProtocolSendAndReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::EmptyProtocolSendAndReceiveRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::EmptyProtocolSendAndReceiveRequest>
+        for crate::EmptyProtocolSendAndReceiveRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveRequest) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyProtocolSendAndReceiveResponse>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::EmptyProtocolSendAndReceiveResponse) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::EmptyProtocolSendAndReceiveResponse>
+        for crate::EmptyProtocolSendAndReceiveResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveResponse,
+        ) -> Self {
+            Self { e: ::fidl_next::CompatFrom::compat_from(value.e) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `EmptyProtocol`
     /// protocol.
-    pub type EmptyProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::EmptyProtocol>;
+    pub type EmptyProtocolProxy = ::fidl_next::ClientSender<crate::EmptyProtocol>;
 
-    impl ::core::convert::From<crate::EmptyProtocol> for ::fidl_test_emptystruct::EmptyProtocolMarker {
-        #[inline]
-        fn from(_: crate::EmptyProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::EmptyProtocol>
+        for ::fidl_test_emptystruct::EmptyProtocolMarker
+    {
+        fn compat_from(_: crate::EmptyProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_emptystruct::EmptyProtocolMarker>
+        for crate::EmptyProtocol
+    {
+        fn compat_from(_: ::fidl_test_emptystruct::EmptyProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_emptystruct::EmptyProtocolProxy>
+        for crate::EmptyProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_emptystruct::EmptyProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

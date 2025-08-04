@@ -2287,4 +2287,247 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::UnionSize12Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize12Alignment4
+    {
+        fn compat_from(value: crate::UnionSize12Alignment4) -> Self {
+            match value {
+                crate::UnionSize12Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::UnionSize12Alignment4>
+        for crate::UnionSize12Alignment4
+    {
+        fn compat_from(value: ::fidl_test_unionsandwich::UnionSize12Alignment4) -> Self {
+            match value {
+                ::fidl_test_unionsandwich::UnionSize12Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SandwichUnionSize12Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize12Alignment4
+    {
+        #[inline]
+        fn compat_from(value: crate::SandwichUnionSize12Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::SandwichUnionSize12Alignment4>
+        for crate::SandwichUnionSize12Alignment4
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_unionsandwich::SandwichUnionSize12Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructSize16Alignment8>
+        for ::fidl_test_unionsandwich::StructSize16Alignment8
+    {
+        #[inline]
+        fn compat_from(value: crate::StructSize16Alignment8) -> Self {
+            Self {
+                f1: ::fidl_next::CompatFrom::compat_from(value.f1),
+
+                f2: ::fidl_next::CompatFrom::compat_from(value.f2),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::StructSize16Alignment8>
+        for crate::StructSize16Alignment8
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_unionsandwich::StructSize16Alignment8) -> Self {
+            Self {
+                f1: ::fidl_next::CompatFrom::compat_from(value.f1),
+
+                f2: ::fidl_next::CompatFrom::compat_from(value.f2),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionSize24Alignment8>
+        for ::fidl_test_unionsandwich::UnionSize24Alignment8
+    {
+        fn compat_from(value: crate::UnionSize24Alignment8) -> Self {
+            match value {
+                crate::UnionSize24Alignment8::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::UnionSize24Alignment8>
+        for crate::UnionSize24Alignment8
+    {
+        fn compat_from(value: ::fidl_test_unionsandwich::UnionSize24Alignment8) -> Self {
+            match value {
+                ::fidl_test_unionsandwich::UnionSize24Alignment8::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SandwichUnionSize24Alignment8>
+        for ::fidl_test_unionsandwich::SandwichUnionSize24Alignment8
+    {
+        #[inline]
+        fn compat_from(value: crate::SandwichUnionSize24Alignment8) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::SandwichUnionSize24Alignment8>
+        for crate::SandwichUnionSize24Alignment8
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_unionsandwich::SandwichUnionSize24Alignment8) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionSize36Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize36Alignment4
+    {
+        fn compat_from(value: crate::UnionSize36Alignment4) -> Self {
+            match value {
+                crate::UnionSize36Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::UnionSize36Alignment4>
+        for crate::UnionSize36Alignment4
+    {
+        fn compat_from(value: ::fidl_test_unionsandwich::UnionSize36Alignment4) -> Self {
+            match value {
+                ::fidl_test_unionsandwich::UnionSize36Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SandwichUnionSize36Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize36Alignment4
+    {
+        #[inline]
+        fn compat_from(value: crate::SandwichUnionSize36Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::SandwichUnionSize36Alignment4>
+        for crate::SandwichUnionSize36Alignment4
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_unionsandwich::SandwichUnionSize36Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionSize8Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize8Alignment4
+    {
+        fn compat_from(value: crate::UnionSize8Alignment4) -> Self {
+            match value {
+                crate::UnionSize8Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::UnionSize8Alignment4>
+        for crate::UnionSize8Alignment4
+    {
+        fn compat_from(value: ::fidl_test_unionsandwich::UnionSize8Alignment4) -> Self {
+            match value {
+                ::fidl_test_unionsandwich::UnionSize8Alignment4::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SandwichUnionSize8Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize8Alignment4
+    {
+        #[inline]
+        fn compat_from(value: crate::SandwichUnionSize8Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_unionsandwich::SandwichUnionSize8Alignment4>
+        for crate::SandwichUnionSize8Alignment4
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_unionsandwich::SandwichUnionSize8Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::CompatFrom::compat_from(value.before),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                after: ::fidl_next::CompatFrom::compat_from(value.after),
+            }
+        }
+    }
+}

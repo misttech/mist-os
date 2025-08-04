@@ -438,31 +438,51 @@ impl ::core::convert::From<StrictBits> for WireStrictBits {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::EmptyBits> for ::fidl_test_bits::EmptyBits {
-        #[inline]
-        fn from(from: crate::EmptyBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::EmptyBits> for ::fidl_test_bits::EmptyBits {
+        fn compat_from(value: crate::EmptyBits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::FlexibleBits> for ::fidl_test_bits::FlexibleBits {
-        #[inline]
-        fn from(from: crate::FlexibleBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<::fidl_test_bits::EmptyBits> for crate::EmptyBits {
+        fn compat_from(value: ::fidl_test_bits::EmptyBits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::MyBits> for ::fidl_test_bits::MyBits {
-        #[inline]
-        fn from(from: crate::MyBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::FlexibleBits> for ::fidl_test_bits::FlexibleBits {
+        fn compat_from(value: crate::FlexibleBits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::StrictBits> for ::fidl_test_bits::StrictBits {
-        #[inline]
-        fn from(from: crate::StrictBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<::fidl_test_bits::FlexibleBits> for crate::FlexibleBits {
+        fn compat_from(value: ::fidl_test_bits::FlexibleBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyBits> for ::fidl_test_bits::MyBits {
+        fn compat_from(value: crate::MyBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bits::MyBits> for crate::MyBits {
+        fn compat_from(value: ::fidl_test_bits::MyBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictBits> for ::fidl_test_bits::StrictBits {
+        fn compat_from(value: crate::StrictBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bits::StrictBits> for crate::StrictBits {
+        fn compat_from(value: ::fidl_test_bits::StrictBits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 }

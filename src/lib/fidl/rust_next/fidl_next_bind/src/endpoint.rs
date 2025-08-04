@@ -231,17 +231,6 @@ macro_rules! endpoint {
                 })
             }
         }
-
-        #[cfg(feature = "compat")]
-        impl<P1, P2, T> From<$name<P1, T>> for ::fidl::endpoints::$name<P2>
-        where
-            ::fidl::Channel: From<T>,
-            P2: From<P1>,
-        {
-            fn from(from: $name<P1, T>) -> Self {
-                Self::new(from.transport.into())
-            }
-        }
     };
 }
 

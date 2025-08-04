@@ -1,15 +1,22 @@
-{#
-{% let table = self.schema().table_declarations[ident] %}
-{{ restriction }}
-impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
-    #[inline]
-    fn from(from: crate::{{ name }}) -> Self {
+{{ denylist }}
+impl ::fidl_next::CompatFrom<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    fn compat_from(value: crate::{{ name }}) -> Self {
         Self {
             {% for member in table.members %}
-                {{ member.name|compat_snake }}: {{ member.name|snake }}.map(::core::convert::From::from),
+                {{ member.name|compat_snake }}: ::fidl_next::CompatFrom::compat_from(value.{{ member.name|snake }}),
             {% endfor %}
             __source_breaking: ::fidl::marker::SourceBreaking,
         }
     }
 }
-#}
+
+{{ denylist }}
+impl ::fidl_next::CompatFrom<::{{ compat.crate_name }}::{{ compat_name }}> for crate::{{ name }} {
+    fn compat_from(value: ::{{ compat.crate_name }}::{{ compat_name }}) -> Self {
+        Self {
+            {% for member in table.members %}
+                {{ member.name|snake }}: ::fidl_next::CompatFrom::compat_from(value.{{ member.name|compat_snake }}),
+            {% endfor %}
+        }
+    }
+}

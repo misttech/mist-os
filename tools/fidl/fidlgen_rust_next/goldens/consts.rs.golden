@@ -301,20 +301,34 @@ pub const ENUM_VAL: crate::EnumType = crate::EnumType::Value;
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::BitsType> for ::fidl_test_consts::BitsType {
-        #[inline]
-        fn from(from: crate::BitsType) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::BitsType> for ::fidl_test_consts::BitsType {
+        fn compat_from(value: crate::BitsType) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::EnumType> for ::fidl_test_consts::EnumType {
-        #[inline]
-        fn from(from: crate::EnumType) -> Self {
-            match crate::EnumType::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_consts::BitsType> for crate::BitsType {
+        fn compat_from(value: ::fidl_test_consts::BitsType) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EnumType> for ::fidl_test_consts::EnumType {
+        fn compat_from(value: crate::EnumType) -> Self {
+            match value {
                 crate::EnumType::Value => Self::Value,
 
                 crate::EnumType::True => Self::True_,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_consts::EnumType> for crate::EnumType {
+        fn compat_from(value: ::fidl_test_consts::EnumType) -> Self {
+            match value {
+                ::fidl_test_consts::EnumType::Value => Self::Value,
+
+                ::fidl_test_consts::EnumType::True_ => Self::True,
             }
         }
     }

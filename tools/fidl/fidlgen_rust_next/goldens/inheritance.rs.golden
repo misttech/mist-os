@@ -757,28 +757,93 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::SuperFooRequest> for ::fidl_test_inheritance::SuperFooRequest {
+        #[inline]
+        fn compat_from(value: crate::SuperFooRequest) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritance::SuperFooRequest> for crate::SuperFooRequest {
+        #[inline]
+        fn compat_from(value: ::fidl_test_inheritance::SuperFooRequest) -> Self {
+            Self { s: ::fidl_next::CompatFrom::compat_from(value.s) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SuperFooResponse>
+        for ::fidl_test_inheritance::SuperFooResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::SuperFooResponse) -> Self {
+            Self { y: ::fidl_next::CompatFrom::compat_from(value.y) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritance::SuperFooResponse>
+        for crate::SuperFooResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_inheritance::SuperFooResponse) -> Self {
+            Self { y: ::fidl_next::CompatFrom::compat_from(value.y) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Super`
     /// protocol.
-    pub type SuperProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Super>;
+    pub type SuperProxy = ::fidl_next::ClientSender<crate::Super>;
 
-    impl ::core::convert::From<crate::Super> for ::fidl_test_inheritance::Super_Marker {
-        #[inline]
-        fn from(_: crate::Super) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Super> for ::fidl_test_inheritance::Super_Marker {
+        fn compat_from(_: crate::Super) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritance::Super_Marker> for crate::Super {
+        fn compat_from(_: ::fidl_test_inheritance::Super_Marker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_inheritance::Super_Proxy> for crate::Super {
+        fn client_compat_from(
+            proxy: ::fidl_test_inheritance::Super_Proxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Sub`
     /// protocol.
-    pub type SubProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Sub>;
+    pub type SubProxy = ::fidl_next::ClientSender<crate::Sub>;
 
-    impl ::core::convert::From<crate::Sub> for ::fidl_test_inheritance::SubMarker {
-        #[inline]
-        fn from(_: crate::Sub) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Sub> for ::fidl_test_inheritance::SubMarker {
+        fn compat_from(_: crate::Sub) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritance::SubMarker> for crate::Sub {
+        fn compat_from(_: ::fidl_test_inheritance::SubMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_inheritance::SubProxy> for crate::Sub {
+        fn client_compat_from(
+            proxy: ::fidl_test_inheritance::SubProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

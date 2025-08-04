@@ -1025,26 +1025,130 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Child`
     /// protocol.
-    pub type ChildProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Child>;
+    pub type ChildProxy = ::fidl_next::ClientSender<crate::Child>;
 
-    impl ::core::convert::From<crate::Child> for ::fidl_test_protocolrequest::ChildMarker {
-        #[inline]
-        fn from(_: crate::Child) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Child> for ::fidl_test_protocolrequest::ChildMarker {
+        fn compat_from(_: crate::Child) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ChildMarker> for crate::Child {
+        fn compat_from(_: ::fidl_test_protocolrequest::ChildMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocolrequest::ChildProxy> for crate::Child {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocolrequest::ChildProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ParentGetChildResponse>
+        for ::fidl_test_protocolrequest::ParentGetChildResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ParentGetChildResponse) -> Self {
+            Self { c: ::fidl_next::CompatFrom::compat_from(value.c) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ParentGetChildResponse>
+        for crate::ParentGetChildResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocolrequest::ParentGetChildResponse) -> Self {
+            Self { c: ::fidl_next::CompatFrom::compat_from(value.c) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ParentGetChildRequestResponse>
+        for ::fidl_test_protocolrequest::ParentGetChildRequestResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ParentGetChildRequestResponse) -> Self {
+            Self { r: ::fidl_next::CompatFrom::compat_from(value.r) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ParentGetChildRequestResponse>
+        for crate::ParentGetChildRequestResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocolrequest::ParentGetChildRequestResponse) -> Self {
+            Self { r: ::fidl_next::CompatFrom::compat_from(value.r) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ParentTakeChildRequest>
+        for ::fidl_test_protocolrequest::ParentTakeChildRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ParentTakeChildRequest) -> Self {
+            Self { c: ::fidl_next::CompatFrom::compat_from(value.c) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ParentTakeChildRequest>
+        for crate::ParentTakeChildRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocolrequest::ParentTakeChildRequest) -> Self {
+            Self { c: ::fidl_next::CompatFrom::compat_from(value.c) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ParentTakeChildRequestRequest>
+        for ::fidl_test_protocolrequest::ParentTakeChildRequestRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ParentTakeChildRequestRequest) -> Self {
+            Self { r: ::fidl_next::CompatFrom::compat_from(value.r) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ParentTakeChildRequestRequest>
+        for crate::ParentTakeChildRequestRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocolrequest::ParentTakeChildRequestRequest) -> Self {
+            Self { r: ::fidl_next::CompatFrom::compat_from(value.r) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Parent`
     /// protocol.
-    pub type ParentProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Parent>;
+    pub type ParentProxy = ::fidl_next::ClientSender<crate::Parent>;
 
-    impl ::core::convert::From<crate::Parent> for ::fidl_test_protocolrequest::ParentMarker {
-        #[inline]
-        fn from(_: crate::Parent) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Parent> for ::fidl_test_protocolrequest::ParentMarker {
+        fn compat_from(_: crate::Parent) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocolrequest::ParentMarker> for crate::Parent {
+        fn compat_from(_: ::fidl_test_protocolrequest::ParentMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocolrequest::ParentProxy> for crate::Parent {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocolrequest::ParentProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

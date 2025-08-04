@@ -374,4 +374,49 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::BasicStruct> for ::fidl_test_struct::BasicStruct {
+        #[inline]
+        fn compat_from(value: crate::BasicStruct) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_struct::BasicStruct> for crate::BasicStruct {
+        #[inline]
+        fn compat_from(value: ::fidl_test_struct::BasicStruct) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Simple> for ::fidl_test_struct::Simple {
+        #[inline]
+        fn compat_from(value: crate::Simple) -> Self {
+            Self {
+                f1: ::fidl_next::CompatFrom::compat_from(value.f1),
+
+                f2: ::fidl_next::CompatFrom::compat_from(value.f2),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_struct::Simple> for crate::Simple {
+        #[inline]
+        fn compat_from(value: ::fidl_test_struct::Simple) -> Self {
+            Self {
+                f1: ::fidl_next::CompatFrom::compat_from(value.f1),
+
+                f2: ::fidl_next::CompatFrom::compat_from(value.f2),
+            }
+        }
+    }
+}

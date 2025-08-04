@@ -12778,22 +12778,662 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::Bits> for ::fidl_test_typesinprotocols::Bits {
+    impl ::fidl_next::CompatFrom<crate::ArrayBasic> for ::fidl_test_typesinprotocols::ArrayBasic {
         #[inline]
-        fn from(from: crate::Bits) -> Self {
-            Self::from_bits_retain(from.bits())
+        fn compat_from(value: crate::ArrayBasic) -> Self {
+            Self {
+                array_uint8: ::fidl_next::CompatFrom::compat_from(value.array_uint8),
+
+                array_uint16: ::fidl_next::CompatFrom::compat_from(value.array_uint16),
+
+                array_uint32: ::fidl_next::CompatFrom::compat_from(value.array_uint32),
+
+                array_uint64: ::fidl_next::CompatFrom::compat_from(value.array_uint64),
+
+                array_int8: ::fidl_next::CompatFrom::compat_from(value.array_int8),
+
+                array_int16: ::fidl_next::CompatFrom::compat_from(value.array_int16),
+
+                array_int32: ::fidl_next::CompatFrom::compat_from(value.array_int32),
+
+                array_int64: ::fidl_next::CompatFrom::compat_from(value.array_int64),
+
+                array_float32: ::fidl_next::CompatFrom::compat_from(value.array_float32),
+
+                array_float64: ::fidl_next::CompatFrom::compat_from(value.array_float64),
+
+                array_string: ::fidl_next::CompatFrom::compat_from(value.array_string),
+
+                array_opt_string: ::fidl_next::CompatFrom::compat_from(value.array_opt_string),
+            }
         }
     }
 
-    impl ::core::convert::From<crate::Enum> for ::fidl_test_typesinprotocols::Enum {
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ArrayBasic> for crate::ArrayBasic {
         #[inline]
-        fn from(from: crate::Enum) -> Self {
-            match crate::Enum::from(from) {
+        fn compat_from(value: ::fidl_test_typesinprotocols::ArrayBasic) -> Self {
+            Self {
+                array_uint8: ::fidl_next::CompatFrom::compat_from(value.array_uint8),
+
+                array_uint16: ::fidl_next::CompatFrom::compat_from(value.array_uint16),
+
+                array_uint32: ::fidl_next::CompatFrom::compat_from(value.array_uint32),
+
+                array_uint64: ::fidl_next::CompatFrom::compat_from(value.array_uint64),
+
+                array_int8: ::fidl_next::CompatFrom::compat_from(value.array_int8),
+
+                array_int16: ::fidl_next::CompatFrom::compat_from(value.array_int16),
+
+                array_int32: ::fidl_next::CompatFrom::compat_from(value.array_int32),
+
+                array_int64: ::fidl_next::CompatFrom::compat_from(value.array_int64),
+
+                array_float32: ::fidl_next::CompatFrom::compat_from(value.array_float32),
+
+                array_float64: ::fidl_next::CompatFrom::compat_from(value.array_float64),
+
+                array_string: ::fidl_next::CompatFrom::compat_from(value.array_string),
+
+                array_opt_string: ::fidl_next::CompatFrom::compat_from(value.array_opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Bits> for ::fidl_test_typesinprotocols::Bits {
+        fn compat_from(value: crate::Bits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Bits> for crate::Bits {
+        fn compat_from(value: ::fidl_test_typesinprotocols::Bits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Enum> for ::fidl_test_typesinprotocols::Enum {
+        fn compat_from(value: crate::Enum) -> Self {
+            match value {
                 crate::Enum::Val => Self::Val,
 
-                crate::Enum::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::Enum::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Enum> for crate::Enum {
+        fn compat_from(value: ::fidl_test_typesinprotocols::Enum) -> Self {
+            match value {
+                ::fidl_test_typesinprotocols::Enum::Val => Self::Val,
+
+                ::fidl_test_typesinprotocols::Enum::__SourceBreaking { unknown_ordinal: value } => {
+                    Self::UnknownOrdinal_(value)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Struct> for ::fidl_test_typesinprotocols::Struct {
+        #[inline]
+        fn compat_from(value: crate::Struct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Struct> for crate::Struct {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::Struct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Table> for ::fidl_test_typesinprotocols::Table {
+        fn compat_from(value: crate::Table) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Table> for crate::Table {
+        fn compat_from(value: ::fidl_test_typesinprotocols::Table) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Union> for ::fidl_test_typesinprotocols::Union {
+        fn compat_from(value: crate::Union) -> Self {
+            match value {
+                crate::Union::B(value) => Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::Union::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Union> for crate::Union {
+        fn compat_from(value: ::fidl_test_typesinprotocols::Union) -> Self {
+            match value {
+                ::fidl_test_typesinprotocols::Union::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_typesinprotocols::Union::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ArrayCompound> for ::fidl_test_typesinprotocols::ArrayCompound {
+        #[inline]
+        fn compat_from(value: crate::ArrayCompound) -> Self {
+            Self {
+                array_bits: ::fidl_next::CompatFrom::compat_from(value.array_bits),
+
+                array_enum: ::fidl_next::CompatFrom::compat_from(value.array_enum),
+
+                array_struct: ::fidl_next::CompatFrom::compat_from(value.array_struct),
+
+                array_table: ::fidl_next::CompatFrom::compat_from(value.array_table),
+
+                array_union: ::fidl_next::CompatFrom::compat_from(value.array_union),
+
+                array_opt_struct: ::fidl_next::CompatFrom::compat_from(value.array_opt_struct),
+
+                array_opt_union: ::fidl_next::CompatFrom::compat_from(value.array_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ArrayCompound> for crate::ArrayCompound {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::ArrayCompound) -> Self {
+            Self {
+                array_bits: ::fidl_next::CompatFrom::compat_from(value.array_bits),
+
+                array_enum: ::fidl_next::CompatFrom::compat_from(value.array_enum),
+
+                array_struct: ::fidl_next::CompatFrom::compat_from(value.array_struct),
+
+                array_table: ::fidl_next::CompatFrom::compat_from(value.array_table),
+
+                array_union: ::fidl_next::CompatFrom::compat_from(value.array_union),
+
+                array_opt_struct: ::fidl_next::CompatFrom::compat_from(value.array_opt_struct),
+
+                array_opt_union: ::fidl_next::CompatFrom::compat_from(value.array_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ArrayVectorNested>
+        for ::fidl_test_typesinprotocols::ArrayVectorNested
+    {
+        #[inline]
+        fn compat_from(value: crate::ArrayVectorNested) -> Self {
+            Self {
+                array_array_uint8: ::fidl_next::CompatFrom::compat_from(value.array_array_uint8),
+
+                array_vector_uint8: ::fidl_next::CompatFrom::compat_from(value.array_vector_uint8),
+
+                vector_array_uint8: ::fidl_next::CompatFrom::compat_from(value.vector_array_uint8),
+
+                vector_vector_uint8: ::fidl_next::CompatFrom::compat_from(
+                    value.vector_vector_uint8,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ArrayVectorNested>
+        for crate::ArrayVectorNested
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::ArrayVectorNested) -> Self {
+            Self {
+                array_array_uint8: ::fidl_next::CompatFrom::compat_from(value.array_array_uint8),
+
+                array_vector_uint8: ::fidl_next::CompatFrom::compat_from(value.array_vector_uint8),
+
+                vector_array_uint8: ::fidl_next::CompatFrom::compat_from(value.vector_array_uint8),
+
+                vector_vector_uint8: ::fidl_next::CompatFrom::compat_from(
+                    value.vector_vector_uint8,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Basic> for ::fidl_test_typesinprotocols::Basic {
+        #[inline]
+        fn compat_from(value: crate::Basic) -> Self {
+            Self {
+                uint8: ::fidl_next::CompatFrom::compat_from(value.uint8),
+
+                uint16: ::fidl_next::CompatFrom::compat_from(value.uint16),
+
+                uint32: ::fidl_next::CompatFrom::compat_from(value.uint32),
+
+                uint64: ::fidl_next::CompatFrom::compat_from(value.uint64),
+
+                int8: ::fidl_next::CompatFrom::compat_from(value.int8),
+
+                int16: ::fidl_next::CompatFrom::compat_from(value.int16),
+
+                int32: ::fidl_next::CompatFrom::compat_from(value.int32),
+
+                int64: ::fidl_next::CompatFrom::compat_from(value.int64),
+
+                float32: ::fidl_next::CompatFrom::compat_from(value.float32),
+
+                float64: ::fidl_next::CompatFrom::compat_from(value.float64),
+
+                string: ::fidl_next::CompatFrom::compat_from(value.string),
+
+                opt_string: ::fidl_next::CompatFrom::compat_from(value.opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Basic> for crate::Basic {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::Basic) -> Self {
+            Self {
+                uint8: ::fidl_next::CompatFrom::compat_from(value.uint8),
+
+                uint16: ::fidl_next::CompatFrom::compat_from(value.uint16),
+
+                uint32: ::fidl_next::CompatFrom::compat_from(value.uint32),
+
+                uint64: ::fidl_next::CompatFrom::compat_from(value.uint64),
+
+                int8: ::fidl_next::CompatFrom::compat_from(value.int8),
+
+                int16: ::fidl_next::CompatFrom::compat_from(value.int16),
+
+                int32: ::fidl_next::CompatFrom::compat_from(value.int32),
+
+                int64: ::fidl_next::CompatFrom::compat_from(value.int64),
+
+                float32: ::fidl_next::CompatFrom::compat_from(value.float32),
+
+                float64: ::fidl_next::CompatFrom::compat_from(value.float64),
+
+                string: ::fidl_next::CompatFrom::compat_from(value.string),
+
+                opt_string: ::fidl_next::CompatFrom::compat_from(value.opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Compound> for ::fidl_test_typesinprotocols::Compound {
+        #[inline]
+        fn compat_from(value: crate::Compound) -> Self {
+            Self {
+                bits: ::fidl_next::CompatFrom::compat_from(value.bits),
+
+                enum_: ::fidl_next::CompatFrom::compat_from(value.enum_),
+
+                struct_: ::fidl_next::CompatFrom::compat_from(value.struct_),
+
+                table: ::fidl_next::CompatFrom::compat_from(value.table),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                opt_struct: ::fidl_next::CompatFrom::compat_from(value.opt_struct),
+
+                opt_union: ::fidl_next::CompatFrom::compat_from(value.opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Compound> for crate::Compound {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::Compound) -> Self {
+            Self {
+                bits: ::fidl_next::CompatFrom::compat_from(value.bits),
+
+                enum_: ::fidl_next::CompatFrom::compat_from(value.enum_),
+
+                struct_: ::fidl_next::CompatFrom::compat_from(value.struct_),
+
+                table: ::fidl_next::CompatFrom::compat_from(value.table),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                opt_struct: ::fidl_next::CompatFrom::compat_from(value.opt_struct),
+
+                opt_union: ::fidl_next::CompatFrom::compat_from(value.opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::VectorBasic> for ::fidl_test_typesinprotocols::VectorBasic {
+        #[inline]
+        fn compat_from(value: crate::VectorBasic) -> Self {
+            Self {
+                vector_uint8: ::fidl_next::CompatFrom::compat_from(value.vector_uint8),
+
+                vector_uint16: ::fidl_next::CompatFrom::compat_from(value.vector_uint16),
+
+                vector_uint32: ::fidl_next::CompatFrom::compat_from(value.vector_uint32),
+
+                vector_uint64: ::fidl_next::CompatFrom::compat_from(value.vector_uint64),
+
+                vector_int8: ::fidl_next::CompatFrom::compat_from(value.vector_int8),
+
+                vector_int16: ::fidl_next::CompatFrom::compat_from(value.vector_int16),
+
+                vector_int32: ::fidl_next::CompatFrom::compat_from(value.vector_int32),
+
+                vector_int64: ::fidl_next::CompatFrom::compat_from(value.vector_int64),
+
+                vector_float32: ::fidl_next::CompatFrom::compat_from(value.vector_float32),
+
+                vector_float64: ::fidl_next::CompatFrom::compat_from(value.vector_float64),
+
+                vector_string: ::fidl_next::CompatFrom::compat_from(value.vector_string),
+
+                vector_opt_string: ::fidl_next::CompatFrom::compat_from(value.vector_opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::VectorBasic> for crate::VectorBasic {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::VectorBasic) -> Self {
+            Self {
+                vector_uint8: ::fidl_next::CompatFrom::compat_from(value.vector_uint8),
+
+                vector_uint16: ::fidl_next::CompatFrom::compat_from(value.vector_uint16),
+
+                vector_uint32: ::fidl_next::CompatFrom::compat_from(value.vector_uint32),
+
+                vector_uint64: ::fidl_next::CompatFrom::compat_from(value.vector_uint64),
+
+                vector_int8: ::fidl_next::CompatFrom::compat_from(value.vector_int8),
+
+                vector_int16: ::fidl_next::CompatFrom::compat_from(value.vector_int16),
+
+                vector_int32: ::fidl_next::CompatFrom::compat_from(value.vector_int32),
+
+                vector_int64: ::fidl_next::CompatFrom::compat_from(value.vector_int64),
+
+                vector_float32: ::fidl_next::CompatFrom::compat_from(value.vector_float32),
+
+                vector_float64: ::fidl_next::CompatFrom::compat_from(value.vector_float64),
+
+                vector_string: ::fidl_next::CompatFrom::compat_from(value.vector_string),
+
+                vector_opt_string: ::fidl_next::CompatFrom::compat_from(value.vector_opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::VectorCompound>
+        for ::fidl_test_typesinprotocols::VectorCompound
+    {
+        #[inline]
+        fn compat_from(value: crate::VectorCompound) -> Self {
+            Self {
+                vector_bits: ::fidl_next::CompatFrom::compat_from(value.vector_bits),
+
+                vector_enum: ::fidl_next::CompatFrom::compat_from(value.vector_enum),
+
+                vector_struct: ::fidl_next::CompatFrom::compat_from(value.vector_struct),
+
+                vector_table: ::fidl_next::CompatFrom::compat_from(value.vector_table),
+
+                vector_union: ::fidl_next::CompatFrom::compat_from(value.vector_union),
+
+                vector_opt_struct: ::fidl_next::CompatFrom::compat_from(value.vector_opt_struct),
+
+                vector_opt_union: ::fidl_next::CompatFrom::compat_from(value.vector_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::VectorCompound>
+        for crate::VectorCompound
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::VectorCompound) -> Self {
+            Self {
+                vector_bits: ::fidl_next::CompatFrom::compat_from(value.vector_bits),
+
+                vector_enum: ::fidl_next::CompatFrom::compat_from(value.vector_enum),
+
+                vector_struct: ::fidl_next::CompatFrom::compat_from(value.vector_struct),
+
+                vector_table: ::fidl_next::CompatFrom::compat_from(value.vector_table),
+
+                vector_union: ::fidl_next::CompatFrom::compat_from(value.vector_union),
+
+                vector_opt_struct: ::fidl_next::CompatFrom::compat_from(value.vector_opt_struct),
+
+                vector_opt_union: ::fidl_next::CompatFrom::compat_from(value.vector_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::VectorOptional>
+        for ::fidl_test_typesinprotocols::VectorOptional
+    {
+        #[inline]
+        fn compat_from(value: crate::VectorOptional) -> Self {
+            Self {
+                opt_vector_uint8: ::fidl_next::CompatFrom::compat_from(value.opt_vector_uint8),
+
+                opt_vector_string: ::fidl_next::CompatFrom::compat_from(value.opt_vector_string),
+
+                opt_vector_struct: ::fidl_next::CompatFrom::compat_from(value.opt_vector_struct),
+
+                opt_vector_opt_struct: ::fidl_next::CompatFrom::compat_from(
+                    value.opt_vector_opt_struct,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::VectorOptional>
+        for crate::VectorOptional
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::VectorOptional) -> Self {
+            Self {
+                opt_vector_uint8: ::fidl_next::CompatFrom::compat_from(value.opt_vector_uint8),
+
+                opt_vector_string: ::fidl_next::CompatFrom::compat_from(value.opt_vector_string),
+
+                opt_vector_struct: ::fidl_next::CompatFrom::compat_from(value.opt_vector_struct),
+
+                opt_vector_opt_struct: ::fidl_next::CompatFrom::compat_from(
+                    value.opt_vector_opt_struct,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ResourceStruct>
+        for ::fidl_test_typesinprotocols::ResourceStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::ResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ResourceStruct>
+        for crate::ResourceStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::ResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ResourceTable> for ::fidl_test_typesinprotocols::ResourceTable {
+        fn compat_from(value: crate::ResourceTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ResourceTable> for crate::ResourceTable {
+        fn compat_from(value: ::fidl_test_typesinprotocols::ResourceTable) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ResourceUnion> for ::fidl_test_typesinprotocols::ResourceUnion {
+        fn compat_from(value: crate::ResourceUnion) -> Self {
+            match value {
+                crate::ResourceUnion::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::ResourceUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ResourceUnion> for crate::ResourceUnion {
+        fn compat_from(value: ::fidl_test_typesinprotocols::ResourceUnion) -> Self {
+            match value {
+                ::fidl_test_typesinprotocols::ResourceUnion::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_typesinprotocols::ResourceUnion::__SourceBreaking {
+                    unknown_ordinal,
+                } => Self::UnknownOrdinal_(unknown_ordinal),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Resource> for ::fidl_test_typesinprotocols::Resource {
+        #[inline]
+        fn compat_from(value: crate::Resource) -> Self {
+            Self {
+                handle: ::fidl_next::CompatFrom::compat_from(value.handle),
+
+                vmo: ::fidl_next::CompatFrom::compat_from(value.vmo),
+
+                client_end: ::fidl_next::CompatFrom::compat_from(value.client_end),
+
+                server_end: ::fidl_next::CompatFrom::compat_from(value.server_end),
+
+                struct_: ::fidl_next::CompatFrom::compat_from(value.struct_),
+
+                table: ::fidl_next::CompatFrom::compat_from(value.table),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                opt_handle: ::fidl_next::CompatFrom::compat_from(value.opt_handle),
+
+                opt_vmo: ::fidl_next::CompatFrom::compat_from(value.opt_vmo),
+
+                opt_client_end: ::fidl_next::CompatFrom::compat_from(value.opt_client_end),
+
+                opt_server_end: ::fidl_next::CompatFrom::compat_from(value.opt_server_end),
+
+                opt_struct: ::fidl_next::CompatFrom::compat_from(value.opt_struct),
+
+                opt_union: ::fidl_next::CompatFrom::compat_from(value.opt_union),
+
+                array_handle: ::fidl_next::CompatFrom::compat_from(value.array_handle),
+
+                array_vmo: ::fidl_next::CompatFrom::compat_from(value.array_vmo),
+
+                array_client_end: ::fidl_next::CompatFrom::compat_from(value.array_client_end),
+
+                array_server_end: ::fidl_next::CompatFrom::compat_from(value.array_server_end),
+
+                array_struct: ::fidl_next::CompatFrom::compat_from(value.array_struct),
+
+                array_table: ::fidl_next::CompatFrom::compat_from(value.array_table),
+
+                array_union: ::fidl_next::CompatFrom::compat_from(value.array_union),
+
+                vector_handle: ::fidl_next::CompatFrom::compat_from(value.vector_handle),
+
+                vector_vmo: ::fidl_next::CompatFrom::compat_from(value.vector_vmo),
+
+                vector_client_end: ::fidl_next::CompatFrom::compat_from(value.vector_client_end),
+
+                vector_server_end: ::fidl_next::CompatFrom::compat_from(value.vector_server_end),
+
+                vector_struct: ::fidl_next::CompatFrom::compat_from(value.vector_struct),
+
+                vector_table: ::fidl_next::CompatFrom::compat_from(value.vector_table),
+
+                vector_union: ::fidl_next::CompatFrom::compat_from(value.vector_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::Resource> for crate::Resource {
+        #[inline]
+        fn compat_from(value: ::fidl_test_typesinprotocols::Resource) -> Self {
+            Self {
+                handle: ::fidl_next::CompatFrom::compat_from(value.handle),
+
+                vmo: ::fidl_next::CompatFrom::compat_from(value.vmo),
+
+                client_end: ::fidl_next::CompatFrom::compat_from(value.client_end),
+
+                server_end: ::fidl_next::CompatFrom::compat_from(value.server_end),
+
+                struct_: ::fidl_next::CompatFrom::compat_from(value.struct_),
+
+                table: ::fidl_next::CompatFrom::compat_from(value.table),
+
+                union: ::fidl_next::CompatFrom::compat_from(value.union),
+
+                opt_handle: ::fidl_next::CompatFrom::compat_from(value.opt_handle),
+
+                opt_vmo: ::fidl_next::CompatFrom::compat_from(value.opt_vmo),
+
+                opt_client_end: ::fidl_next::CompatFrom::compat_from(value.opt_client_end),
+
+                opt_server_end: ::fidl_next::CompatFrom::compat_from(value.opt_server_end),
+
+                opt_struct: ::fidl_next::CompatFrom::compat_from(value.opt_struct),
+
+                opt_union: ::fidl_next::CompatFrom::compat_from(value.opt_union),
+
+                array_handle: ::fidl_next::CompatFrom::compat_from(value.array_handle),
+
+                array_vmo: ::fidl_next::CompatFrom::compat_from(value.array_vmo),
+
+                array_client_end: ::fidl_next::CompatFrom::compat_from(value.array_client_end),
+
+                array_server_end: ::fidl_next::CompatFrom::compat_from(value.array_server_end),
+
+                array_struct: ::fidl_next::CompatFrom::compat_from(value.array_struct),
+
+                array_table: ::fidl_next::CompatFrom::compat_from(value.array_table),
+
+                array_union: ::fidl_next::CompatFrom::compat_from(value.array_union),
+
+                vector_handle: ::fidl_next::CompatFrom::compat_from(value.vector_handle),
+
+                vector_vmo: ::fidl_next::CompatFrom::compat_from(value.vector_vmo),
+
+                vector_client_end: ::fidl_next::CompatFrom::compat_from(value.vector_client_end),
+
+                vector_server_end: ::fidl_next::CompatFrom::compat_from(value.vector_server_end),
+
+                vector_struct: ::fidl_next::CompatFrom::compat_from(value.vector_struct),
+
+                vector_table: ::fidl_next::CompatFrom::compat_from(value.vector_table),
+
+                vector_union: ::fidl_next::CompatFrom::compat_from(value.vector_union),
             }
         }
     }
@@ -12801,13 +13441,31 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
-    pub type ProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+    pub type ProtocolProxy = ::fidl_next::ClientSender<crate::Protocol>;
 
-    impl ::core::convert::From<crate::Protocol> for ::fidl_test_typesinprotocols::ProtocolMarker {
-        #[inline]
-        fn from(_: crate::Protocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Protocol> for ::fidl_test_typesinprotocols::ProtocolMarker {
+        fn compat_from(_: crate::Protocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_typesinprotocols::ProtocolMarker> for crate::Protocol {
+        fn compat_from(_: ::fidl_test_typesinprotocols::ProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_typesinprotocols::ProtocolProxy>
+        for crate::Protocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_typesinprotocols::ProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

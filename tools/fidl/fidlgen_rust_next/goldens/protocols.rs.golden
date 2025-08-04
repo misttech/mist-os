@@ -9011,54 +9011,262 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `AnotherDiscoverableProtocol`
     /// protocol.
-    pub type AnotherDiscoverableProtocolProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::AnotherDiscoverableProtocol,
-    >;
+    pub type AnotherDiscoverableProtocolProxy =
+        ::fidl_next::ClientSender<crate::AnotherDiscoverableProtocol>;
 
-    impl ::core::convert::From<crate::AnotherDiscoverableProtocol>
+    impl ::fidl_next::CompatFrom<crate::AnotherDiscoverableProtocol>
         for ::fidl_test_protocols::AnotherDiscoverableProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::AnotherDiscoverableProtocol) -> Self {
+        fn compat_from(_: crate::AnotherDiscoverableProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::AnotherDiscoverableProtocolMarker>
+        for crate::AnotherDiscoverableProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocols::AnotherDiscoverableProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::AnotherDiscoverableProtocolProxy>
+        for crate::AnotherDiscoverableProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::AnotherDiscoverableProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolMethodARequest>
+        for ::fidl_test_protocols::ChannelProtocolMethodARequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolMethodARequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMethodARequest>
+        for crate::ChannelProtocolMethodARequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolMethodARequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolEventARequest>
+        for ::fidl_test_protocols::ChannelProtocolEventARequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolEventARequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolEventARequest>
+        for crate::ChannelProtocolEventARequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolEventARequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolMethodBRequest>
+        for ::fidl_test_protocols::ChannelProtocolMethodBRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolMethodBRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMethodBRequest>
+        for crate::ChannelProtocolMethodBRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolMethodBRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolMethodBResponse>
+        for ::fidl_test_protocols::ChannelProtocolMethodBResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolMethodBResponse) -> Self {
+            Self { result: ::fidl_next::CompatFrom::compat_from(value.result) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMethodBResponse>
+        for crate::ChannelProtocolMethodBResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolMethodBResponse) -> Self {
+            Self { result: ::fidl_next::CompatFrom::compat_from(value.result) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolTakeHandleRequest>
+        for ::fidl_test_protocols::ChannelProtocolTakeHandleRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolTakeHandleRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolTakeHandleRequest>
+        for crate::ChannelProtocolTakeHandleRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolTakeHandleRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolMutateSocketRequest>
+        for ::fidl_test_protocols::ChannelProtocolMutateSocketRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolMutateSocketRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMutateSocketRequest>
+        for crate::ChannelProtocolMutateSocketRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolMutateSocketRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocolMutateSocketResponse>
+        for ::fidl_test_protocols::ChannelProtocolMutateSocketResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::ChannelProtocolMutateSocketResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMutateSocketResponse>
+        for crate::ChannelProtocolMutateSocketResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ChannelProtocolMutateSocketResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ChannelProtocol`
     /// protocol.
-    pub type ChannelProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ChannelProtocol>;
+    pub type ChannelProtocolProxy = ::fidl_next::ClientSender<crate::ChannelProtocol>;
 
-    impl ::core::convert::From<crate::ChannelProtocol>
+    impl ::fidl_next::CompatFrom<crate::ChannelProtocol>
         for ::fidl_test_protocols::ChannelProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::ChannelProtocol) -> Self {
+        fn compat_from(_: crate::ChannelProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ChannelProtocolMarker>
+        for crate::ChannelProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocols::ChannelProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::ChannelProtocolProxy>
+        for crate::ChannelProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::ChannelProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `DiscoverableProtocol`
     /// protocol.
-    pub type DiscoverableProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>;
+    pub type DiscoverableProtocolProxy = ::fidl_next::ClientSender<crate::DiscoverableProtocol>;
 
-    impl ::core::convert::From<crate::DiscoverableProtocol>
+    impl ::fidl_next::CompatFrom<crate::DiscoverableProtocol>
         for ::fidl_test_protocols::DiscoverableProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::DiscoverableProtocol) -> Self {
+        fn compat_from(_: crate::DiscoverableProtocol) -> Self {
             Self
         }
     }
 
-    impl ::core::convert::From<crate::ErrorEnum> for ::fidl_test_protocols::ErrorEnum {
-        #[inline]
-        fn from(from: crate::ErrorEnum) -> Self {
-            match crate::ErrorEnum::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::DiscoverableProtocolMarker>
+        for crate::DiscoverableProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocols::DiscoverableProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::DiscoverableProtocolProxy>
+        for crate::DiscoverableProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::DiscoverableProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ErrorEnum> for ::fidl_test_protocols::ErrorEnum {
+        fn compat_from(value: crate::ErrorEnum) -> Self {
+            match value {
                 crate::ErrorEnum::ErrFoo => Self::ErrFoo,
 
                 crate::ErrorEnum::ErrBar => Self::ErrBar,
@@ -9066,106 +9274,816 @@ pub mod compat {
         }
     }
 
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ErrorEnum> for crate::ErrorEnum {
+        fn compat_from(value: ::fidl_test_protocols::ErrorEnum) -> Self {
+            match value {
+                ::fidl_test_protocols::ErrorEnum::ErrFoo => Self::ErrFoo,
+
+                ::fidl_test_protocols::ErrorEnum::ErrBar => Self::ErrBar,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::HandleRightsProtocolNoResponseMethodRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolNoResponseMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::HandleRightsProtocolNoResponseMethodRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::HandleRightsProtocolNoResponseMethodRequest>
+        for crate::HandleRightsProtocolNoResponseMethodRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::HandleRightsProtocolNoResponseMethodRequest,
+        ) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::HandleRightsProtocolResponseMethodRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolResponseMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::HandleRightsProtocolResponseMethodRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::HandleRightsProtocolResponseMethodRequest>
+        for crate::HandleRightsProtocolResponseMethodRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::HandleRightsProtocolResponseMethodRequest,
+        ) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::HandleRightsProtocolResponseMethodResponse>
+        for ::fidl_test_protocols::HandleRightsProtocolResponseMethodResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::HandleRightsProtocolResponseMethodResponse) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::HandleRightsProtocolResponseMethodResponse>
+        for crate::HandleRightsProtocolResponseMethodResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::HandleRightsProtocolResponseMethodResponse,
+        ) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::HandleRightsProtocolAnEventRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolAnEventRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::HandleRightsProtocolAnEventRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::HandleRightsProtocolAnEventRequest>
+        for crate::HandleRightsProtocolAnEventRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::HandleRightsProtocolAnEventRequest) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `HandleRightsProtocol`
     /// protocol.
-    pub type HandleRightsProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::HandleRightsProtocol>;
+    pub type HandleRightsProtocolProxy = ::fidl_next::ClientSender<crate::HandleRightsProtocol>;
 
-    impl ::core::convert::From<crate::HandleRightsProtocol>
+    impl ::fidl_next::CompatFrom<crate::HandleRightsProtocol>
         for ::fidl_test_protocols::HandleRightsProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::HandleRightsProtocol) -> Self {
+        fn compat_from(_: crate::HandleRightsProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::HandleRightsProtocolMarker>
+        for crate::HandleRightsProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocols::HandleRightsProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::HandleRightsProtocolProxy>
+        for crate::HandleRightsProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::HandleRightsProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ManyParametersFifteenRequest>
+        for ::fidl_test_protocols::ManyParametersFifteenRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ManyParametersFifteenRequest) -> Self {
+            Self {
+                p1: ::fidl_next::CompatFrom::compat_from(value.p1),
+
+                p2: ::fidl_next::CompatFrom::compat_from(value.p2),
+
+                p3: ::fidl_next::CompatFrom::compat_from(value.p3),
+
+                p4: ::fidl_next::CompatFrom::compat_from(value.p4),
+
+                p5: ::fidl_next::CompatFrom::compat_from(value.p5),
+
+                p6: ::fidl_next::CompatFrom::compat_from(value.p6),
+
+                p7: ::fidl_next::CompatFrom::compat_from(value.p7),
+
+                p8: ::fidl_next::CompatFrom::compat_from(value.p8),
+
+                p9: ::fidl_next::CompatFrom::compat_from(value.p9),
+
+                p10: ::fidl_next::CompatFrom::compat_from(value.p10),
+
+                p11: ::fidl_next::CompatFrom::compat_from(value.p11),
+
+                p12: ::fidl_next::CompatFrom::compat_from(value.p12),
+
+                p13: ::fidl_next::CompatFrom::compat_from(value.p13),
+
+                p14: ::fidl_next::CompatFrom::compat_from(value.p14),
+
+                p15: ::fidl_next::CompatFrom::compat_from(value.p15),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ManyParametersFifteenRequest>
+        for crate::ManyParametersFifteenRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ManyParametersFifteenRequest) -> Self {
+            Self {
+                p1: ::fidl_next::CompatFrom::compat_from(value.p1),
+
+                p2: ::fidl_next::CompatFrom::compat_from(value.p2),
+
+                p3: ::fidl_next::CompatFrom::compat_from(value.p3),
+
+                p4: ::fidl_next::CompatFrom::compat_from(value.p4),
+
+                p5: ::fidl_next::CompatFrom::compat_from(value.p5),
+
+                p6: ::fidl_next::CompatFrom::compat_from(value.p6),
+
+                p7: ::fidl_next::CompatFrom::compat_from(value.p7),
+
+                p8: ::fidl_next::CompatFrom::compat_from(value.p8),
+
+                p9: ::fidl_next::CompatFrom::compat_from(value.p9),
+
+                p10: ::fidl_next::CompatFrom::compat_from(value.p10),
+
+                p11: ::fidl_next::CompatFrom::compat_from(value.p11),
+
+                p12: ::fidl_next::CompatFrom::compat_from(value.p12),
+
+                p13: ::fidl_next::CompatFrom::compat_from(value.p13),
+
+                p14: ::fidl_next::CompatFrom::compat_from(value.p14),
+
+                p15: ::fidl_next::CompatFrom::compat_from(value.p15),
+            }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ManyParameters`
     /// protocol.
-    pub type ManyParametersProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ManyParameters>;
+    pub type ManyParametersProxy = ::fidl_next::ClientSender<crate::ManyParameters>;
 
-    impl ::core::convert::From<crate::ManyParameters> for ::fidl_test_protocols::ManyParametersMarker {
-        #[inline]
-        fn from(_: crate::ManyParameters) -> Self {
+    impl ::fidl_next::CompatFrom<crate::ManyParameters>
+        for ::fidl_test_protocols::ManyParametersMarker
+    {
+        fn compat_from(_: crate::ManyParameters) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ManyParametersMarker>
+        for crate::ManyParameters
+    {
+        fn compat_from(_: ::fidl_test_protocols::ManyParametersMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::ManyParametersProxy>
+        for crate::ManyParameters
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::ManyParametersProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TheUnion> for ::fidl_test_protocols::TheUnion {
+        fn compat_from(value: crate::TheUnion) -> Self {
+            match value {
+                crate::TheUnion::V(value) => Self::V(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::TheUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::TheUnion> for crate::TheUnion {
+        fn compat_from(value: ::fidl_test_protocols::TheUnion) -> Self {
+            match value {
+                ::fidl_test_protocols::TheUnion::V(value) => {
+                    Self::V(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_protocols::TheUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MethodWithUnionUnionMethodRequest>
+        for ::fidl_test_protocols::MethodWithUnionUnionMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::MethodWithUnionUnionMethodRequest) -> Self {
+            Self { u: ::fidl_next::CompatFrom::compat_from(value.u) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::MethodWithUnionUnionMethodRequest>
+        for crate::MethodWithUnionUnionMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::MethodWithUnionUnionMethodRequest) -> Self {
+            Self { u: ::fidl_next::CompatFrom::compat_from(value.u) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MethodWithUnionUnionMethodResponse>
+        for ::fidl_test_protocols::MethodWithUnionUnionMethodResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::MethodWithUnionUnionMethodResponse) -> Self {
+            Self { u: ::fidl_next::CompatFrom::compat_from(value.u) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::MethodWithUnionUnionMethodResponse>
+        for crate::MethodWithUnionUnionMethodResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::MethodWithUnionUnionMethodResponse) -> Self {
+            Self { u: ::fidl_next::CompatFrom::compat_from(value.u) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MethodWithUnion`
     /// protocol.
-    pub type MethodWithUnionProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MethodWithUnion>;
+    pub type MethodWithUnionProxy = ::fidl_next::ClientSender<crate::MethodWithUnion>;
 
-    impl ::core::convert::From<crate::MethodWithUnion>
+    impl ::fidl_next::CompatFrom<crate::MethodWithUnion>
         for ::fidl_test_protocols::MethodWithUnionMarker
     {
-        #[inline]
-        fn from(_: crate::MethodWithUnion) -> Self {
+        fn compat_from(_: crate::MethodWithUnion) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::MethodWithUnionMarker>
+        for crate::MethodWithUnion
+    {
+        fn compat_from(_: ::fidl_test_protocols::MethodWithUnionMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::MethodWithUnionProxy>
+        for crate::MethodWithUnion
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::MethodWithUnionProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `PlatformServer`
     /// protocol.
-    pub type PlatformServerProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::PlatformServer>;
+    pub type PlatformServerProxy = ::fidl_next::ClientSender<crate::PlatformServer>;
 
-    impl ::core::convert::From<crate::PlatformServer> for ::fidl_test_protocols::PlatformServer_Marker {
-        #[inline]
-        fn from(_: crate::PlatformServer) -> Self {
+    impl ::fidl_next::CompatFrom<crate::PlatformServer>
+        for ::fidl_test_protocols::PlatformServer_Marker
+    {
+        fn compat_from(_: crate::PlatformServer) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::PlatformServer_Marker>
+        for crate::PlatformServer
+    {
+        fn compat_from(_: ::fidl_test_protocols::PlatformServer_Marker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::PlatformServer_Proxy>
+        for crate::PlatformServer
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::PlatformServer_Proxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ProtocolEnds> for ::fidl_test_protocols::ProtocolEnds {
+        #[inline]
+        fn compat_from(value: crate::ProtocolEnds) -> Self {
+            Self {
+                client: ::fidl_next::CompatFrom::compat_from(value.client),
+
+                server: ::fidl_next::CompatFrom::compat_from(value.server),
+
+                client_opt: ::fidl_next::CompatFrom::compat_from(value.client_opt),
+
+                server_opt: ::fidl_next::CompatFrom::compat_from(value.server_opt),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::ProtocolEnds> for crate::ProtocolEnds {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::ProtocolEnds) -> Self {
+            Self {
+                client: ::fidl_next::CompatFrom::compat_from(value.client),
+
+                server: ::fidl_next::CompatFrom::compat_from(value.server),
+
+                client_opt: ::fidl_next::CompatFrom::compat_from(value.client_opt),
+
+                server_opt: ::fidl_next::CompatFrom::compat_from(value.server_opt),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+        > for crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseWithRequestNoResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::WithAndWithoutRequestResponseWithRequestNoResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest,
+        > for crate::WithAndWithoutRequestResponseWithRequestNoResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+        > for crate::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseWithRequestWithResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+        > for crate::WithAndWithoutRequestResponseWithRequestWithResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseWithRequestWithResponseResponse>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: crate::WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        > for crate::WithAndWithoutRequestResponseWithRequestWithResponseResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponseOnWithResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::WithAndWithoutRequestResponseOnWithResponseRequest) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest,
+        > for crate::WithAndWithoutRequestResponseOnWithResponseRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest,
+        ) -> Self {
+            Self { ret: ::fidl_next::CompatFrom::compat_from(value.ret) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithAndWithoutRequestResponse`
     /// protocol.
-    pub type WithAndWithoutRequestResponseProxy = ::fidl_next::ClientSender<
-        ::fidl_next::fuchsia::zx::Channel,
-        crate::WithAndWithoutRequestResponse,
-    >;
+    pub type WithAndWithoutRequestResponseProxy =
+        ::fidl_next::ClientSender<crate::WithAndWithoutRequestResponse>;
 
-    impl ::core::convert::From<crate::WithAndWithoutRequestResponse>
+    impl ::fidl_next::CompatFrom<crate::WithAndWithoutRequestResponse>
         for ::fidl_test_protocols::WithAndWithoutRequestResponseMarker
     {
-        #[inline]
-        fn from(_: crate::WithAndWithoutRequestResponse) -> Self {
+        fn compat_from(_: crate::WithAndWithoutRequestResponse) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithAndWithoutRequestResponseMarker>
+        for crate::WithAndWithoutRequestResponse
+    {
+        fn compat_from(_: ::fidl_test_protocols::WithAndWithoutRequestResponseMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::WithAndWithoutRequestResponseProxy>
+        for crate::WithAndWithoutRequestResponse
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::WithAndWithoutRequestResponseProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithErrorSyntaxResponseAsStructResponse>
+        for ::fidl_test_protocols::WithErrorSyntaxResponseAsStructResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::WithErrorSyntaxResponseAsStructResponse) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithErrorSyntaxResponseAsStructResponse>
+        for crate::WithErrorSyntaxResponseAsStructResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithErrorSyntaxResponseAsStructResponse,
+        ) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithErrorSyntaxHandleInResultResponse>
+        for ::fidl_test_protocols::WithErrorSyntaxHandleInResultResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::WithErrorSyntaxHandleInResultResponse) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithErrorSyntaxHandleInResultResponse>
+        for crate::WithErrorSyntaxHandleInResultResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithErrorSyntaxHandleInResultResponse,
+        ) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithErrorSyntax`
     /// protocol.
-    pub type WithErrorSyntaxProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithErrorSyntax>;
+    pub type WithErrorSyntaxProxy = ::fidl_next::ClientSender<crate::WithErrorSyntax>;
 
-    impl ::core::convert::From<crate::WithErrorSyntax>
+    impl ::fidl_next::CompatFrom<crate::WithErrorSyntax>
         for ::fidl_test_protocols::WithErrorSyntaxMarker
     {
-        #[inline]
-        fn from(_: crate::WithErrorSyntax) -> Self {
+        fn compat_from(_: crate::WithErrorSyntax) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithErrorSyntaxMarker>
+        for crate::WithErrorSyntax
+    {
+        fn compat_from(_: ::fidl_test_protocols::WithErrorSyntaxMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::WithErrorSyntaxProxy>
+        for crate::WithErrorSyntax
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::WithErrorSyntaxProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsClientEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsClientEndsRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsClientEndsRequest) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsClientEndsRequest>
+        for crate::WithProtocolEndsClientEndsRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::WithProtocolEndsClientEndsRequest) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsClientEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsClientEndsResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsClientEndsResponse) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsClientEndsResponse>
+        for crate::WithProtocolEndsClientEndsResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::WithProtocolEndsClientEndsResponse) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsServerEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsServerEndsRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsServerEndsRequest) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsServerEndsRequest>
+        for crate::WithProtocolEndsServerEndsRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::WithProtocolEndsServerEndsRequest) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsServerEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsServerEndsResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsServerEndsResponse) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsServerEndsResponse>
+        for crate::WithProtocolEndsServerEndsResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_protocols::WithProtocolEndsServerEndsResponse) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsStructContainingEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsStructContainingEndsRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsStructContainingEndsRequest) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsStructContainingEndsRequest>
+        for crate::WithProtocolEndsStructContainingEndsRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithProtocolEndsStructContainingEndsRequest,
+        ) -> Self {
+            Self { in_: ::fidl_next::CompatFrom::compat_from(value.in_) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEndsStructContainingEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsStructContainingEndsResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::WithProtocolEndsStructContainingEndsResponse) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsStructContainingEndsResponse>
+        for crate::WithProtocolEndsStructContainingEndsResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_protocols::WithProtocolEndsStructContainingEndsResponse,
+        ) -> Self {
+            Self { out: ::fidl_next::CompatFrom::compat_from(value.out) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithProtocolEnds`
     /// protocol.
-    pub type WithProtocolEndsProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithProtocolEnds>;
+    pub type WithProtocolEndsProxy = ::fidl_next::ClientSender<crate::WithProtocolEnds>;
 
-    impl ::core::convert::From<crate::WithProtocolEnds>
+    impl ::fidl_next::CompatFrom<crate::WithProtocolEnds>
         for ::fidl_test_protocols::WithProtocolEndsMarker
     {
-        #[inline]
-        fn from(_: crate::WithProtocolEnds) -> Self {
+        fn compat_from(_: crate::WithProtocolEnds) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocols::WithProtocolEndsMarker>
+        for crate::WithProtocolEnds
+    {
+        fn compat_from(_: ::fidl_test_protocols::WithProtocolEndsMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocols::WithProtocolEndsProxy>
+        for crate::WithProtocolEnds
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocols::WithProtocolEndsProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

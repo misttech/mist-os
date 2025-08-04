@@ -1150,13 +1150,174 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::ObjType> for ::fidl_test_handlesintypes::ObjType {
+    impl ::fidl_next::CompatFrom<crate::EmptyResourceStruct>
+        for ::fidl_test_handlesintypes::EmptyResourceStruct
+    {
         #[inline]
-        fn from(from: crate::ObjType) -> Self {
-            match crate::ObjType::from(from) {
+        fn compat_from(value: crate::EmptyResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::EmptyResourceStruct>
+        for crate::EmptyResourceStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_handlesintypes::EmptyResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyResourceTable>
+        for ::fidl_test_handlesintypes::EmptyResourceTable
+    {
+        fn compat_from(value: crate::EmptyResourceTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::EmptyResourceTable>
+        for crate::EmptyResourceTable
+    {
+        fn compat_from(value: ::fidl_test_handlesintypes::EmptyResourceTable) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::EmptyResourceUnion>
+        for ::fidl_test_handlesintypes::EmptyResourceUnion
+    {
+        fn compat_from(value: crate::EmptyResourceUnion) -> Self {
+            match value {
+                crate::EmptyResourceUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::EmptyResourceUnion>
+        for crate::EmptyResourceUnion
+    {
+        fn compat_from(value: ::fidl_test_handlesintypes::EmptyResourceUnion) -> Self {
+            match value {
+                ::fidl_test_handlesintypes::EmptyResourceUnion::__SourceBreaking {
+                    unknown_ordinal,
+                } => Self::UnknownOrdinal_(unknown_ordinal),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ObjType> for ::fidl_test_handlesintypes::ObjType {
+        fn compat_from(value: crate::ObjType) -> Self {
+            match value {
                 crate::ObjType::None => Self::None,
 
                 crate::ObjType::Vmo => Self::Vmo,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::ObjType> for crate::ObjType {
+        fn compat_from(value: ::fidl_test_handlesintypes::ObjType) -> Self {
+            match value {
+                ::fidl_test_handlesintypes::ObjType::None => Self::None,
+
+                ::fidl_test_handlesintypes::ObjType::Vmo => Self::Vmo,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableWithHandle>
+        for ::fidl_test_handlesintypes::TableWithHandle
+    {
+        fn compat_from(value: crate::TableWithHandle) -> Self {
+            Self {
+                h: ::fidl_next::CompatFrom::compat_from(value.h),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::TableWithHandle>
+        for crate::TableWithHandle
+    {
+        fn compat_from(value: ::fidl_test_handlesintypes::TableWithHandle) -> Self {
+            Self { h: ::fidl_next::CompatFrom::compat_from(value.h) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionWithHandle>
+        for ::fidl_test_handlesintypes::UnionWithHandle
+    {
+        fn compat_from(value: crate::UnionWithHandle) -> Self {
+            match value {
+                crate::UnionWithHandle::H(value) => {
+                    Self::H(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnionWithHandle::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::UnionWithHandle>
+        for crate::UnionWithHandle
+    {
+        fn compat_from(value: ::fidl_test_handlesintypes::UnionWithHandle) -> Self {
+            match value {
+                ::fidl_test_handlesintypes::UnionWithHandle::H(value) => {
+                    Self::H(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_handlesintypes::UnionWithHandle::__SourceBreaking {
+                    unknown_ordinal,
+                } => Self::UnknownOrdinal_(unknown_ordinal),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::HandlesInTypes> for ::fidl_test_handlesintypes::HandlesInTypes {
+        #[inline]
+        fn compat_from(value: crate::HandlesInTypes) -> Self {
+            Self {
+                normal_handle: ::fidl_next::CompatFrom::compat_from(value.normal_handle),
+
+                handle_in_vec: ::fidl_next::CompatFrom::compat_from(value.handle_in_vec),
+
+                handle_in_array: ::fidl_next::CompatFrom::compat_from(value.handle_in_array),
+
+                handle_in_mixed_vec_array: ::fidl_next::CompatFrom::compat_from(
+                    value.handle_in_mixed_vec_array,
+                ),
+
+                table_with_handle: ::fidl_next::CompatFrom::compat_from(value.table_with_handle),
+
+                union_with_handle: ::fidl_next::CompatFrom::compat_from(value.union_with_handle),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_handlesintypes::HandlesInTypes> for crate::HandlesInTypes {
+        #[inline]
+        fn compat_from(value: ::fidl_test_handlesintypes::HandlesInTypes) -> Self {
+            Self {
+                normal_handle: ::fidl_next::CompatFrom::compat_from(value.normal_handle),
+
+                handle_in_vec: ::fidl_next::CompatFrom::compat_from(value.handle_in_vec),
+
+                handle_in_array: ::fidl_next::CompatFrom::compat_from(value.handle_in_array),
+
+                handle_in_mixed_vec_array: ::fidl_next::CompatFrom::compat_from(
+                    value.handle_in_mixed_vec_array,
+                ),
+
+                table_with_handle: ::fidl_next::CompatFrom::compat_from(value.table_with_handle),
+
+                union_with_handle: ::fidl_next::CompatFrom::compat_from(value.union_with_handle),
             }
         }
     }

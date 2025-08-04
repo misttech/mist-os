@@ -5760,4 +5760,417 @@ impl<'de> ::core::fmt::Debug for WireTableWithAttributes<'de> {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::EmptyTable> for ::fidl_test_table::EmptyTable {
+        fn compat_from(value: crate::EmptyTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::EmptyTable> for crate::EmptyTable {
+        fn compat_from(value: ::fidl_test_table::EmptyTable) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExtensionTable> for ::fidl_test_table::ExtensionTable {
+        fn compat_from(value: crate::ExtensionTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::ExtensionTable> for crate::ExtensionTable {
+        fn compat_from(value: ::fidl_test_table::ExtensionTable) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::NewerSimpleTable> for ::fidl_test_table::NewerSimpleTable {
+        fn compat_from(value: crate::NewerSimpleTable) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+
+                z: ::fidl_next::CompatFrom::compat_from(value.z),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::NewerSimpleTable> for crate::NewerSimpleTable {
+        fn compat_from(value: ::fidl_test_table::NewerSimpleTable) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+
+                z: ::fidl_next::CompatFrom::compat_from(value.z),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::OlderSimpleTable> for ::fidl_test_table::OlderSimpleTable {
+        fn compat_from(value: crate::OlderSimpleTable) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::OlderSimpleTable> for crate::OlderSimpleTable {
+        fn compat_from(value: ::fidl_test_table::OlderSimpleTable) -> Self {
+            Self { x: ::fidl_next::CompatFrom::compat_from(value.x) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ReverseOrdinalTable>
+        for ::fidl_test_table::ReverseOrdinalTable
+    {
+        fn compat_from(value: crate::ReverseOrdinalTable) -> Self {
+            Self {
+                z: ::fidl_next::CompatFrom::compat_from(value.z),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::ReverseOrdinalTable>
+        for crate::ReverseOrdinalTable
+    {
+        fn compat_from(value: ::fidl_test_table::ReverseOrdinalTable) -> Self {
+            Self {
+                z: ::fidl_next::CompatFrom::compat_from(value.z),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SimpleTable> for ::fidl_test_table::SimpleTable {
+        fn compat_from(value: crate::SimpleTable) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::SimpleTable> for crate::SimpleTable {
+        fn compat_from(value: ::fidl_test_table::SimpleTable) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                y: ::fidl_next::CompatFrom::compat_from(value.y),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SixtyFourOrdinalTable>
+        for ::fidl_test_table::SixtyFourOrdinalTable
+    {
+        fn compat_from(value: crate::SixtyFourOrdinalTable) -> Self {
+            Self {
+                v1: ::fidl_next::CompatFrom::compat_from(value.v1),
+
+                v2: ::fidl_next::CompatFrom::compat_from(value.v2),
+
+                v3: ::fidl_next::CompatFrom::compat_from(value.v3),
+
+                v4: ::fidl_next::CompatFrom::compat_from(value.v4),
+
+                v5: ::fidl_next::CompatFrom::compat_from(value.v5),
+
+                v6: ::fidl_next::CompatFrom::compat_from(value.v6),
+
+                v7: ::fidl_next::CompatFrom::compat_from(value.v7),
+
+                v8: ::fidl_next::CompatFrom::compat_from(value.v8),
+
+                v9: ::fidl_next::CompatFrom::compat_from(value.v9),
+
+                v10: ::fidl_next::CompatFrom::compat_from(value.v10),
+
+                v11: ::fidl_next::CompatFrom::compat_from(value.v11),
+
+                v12: ::fidl_next::CompatFrom::compat_from(value.v12),
+
+                v13: ::fidl_next::CompatFrom::compat_from(value.v13),
+
+                v14: ::fidl_next::CompatFrom::compat_from(value.v14),
+
+                v15: ::fidl_next::CompatFrom::compat_from(value.v15),
+
+                v16: ::fidl_next::CompatFrom::compat_from(value.v16),
+
+                v17: ::fidl_next::CompatFrom::compat_from(value.v17),
+
+                v18: ::fidl_next::CompatFrom::compat_from(value.v18),
+
+                v19: ::fidl_next::CompatFrom::compat_from(value.v19),
+
+                v20: ::fidl_next::CompatFrom::compat_from(value.v20),
+
+                v21: ::fidl_next::CompatFrom::compat_from(value.v21),
+
+                v22: ::fidl_next::CompatFrom::compat_from(value.v22),
+
+                v23: ::fidl_next::CompatFrom::compat_from(value.v23),
+
+                v24: ::fidl_next::CompatFrom::compat_from(value.v24),
+
+                v25: ::fidl_next::CompatFrom::compat_from(value.v25),
+
+                v26: ::fidl_next::CompatFrom::compat_from(value.v26),
+
+                v27: ::fidl_next::CompatFrom::compat_from(value.v27),
+
+                v28: ::fidl_next::CompatFrom::compat_from(value.v28),
+
+                v29: ::fidl_next::CompatFrom::compat_from(value.v29),
+
+                v30: ::fidl_next::CompatFrom::compat_from(value.v30),
+
+                v31: ::fidl_next::CompatFrom::compat_from(value.v31),
+
+                v32: ::fidl_next::CompatFrom::compat_from(value.v32),
+
+                v33: ::fidl_next::CompatFrom::compat_from(value.v33),
+
+                v34: ::fidl_next::CompatFrom::compat_from(value.v34),
+
+                v35: ::fidl_next::CompatFrom::compat_from(value.v35),
+
+                v36: ::fidl_next::CompatFrom::compat_from(value.v36),
+
+                v37: ::fidl_next::CompatFrom::compat_from(value.v37),
+
+                v38: ::fidl_next::CompatFrom::compat_from(value.v38),
+
+                v39: ::fidl_next::CompatFrom::compat_from(value.v39),
+
+                v40: ::fidl_next::CompatFrom::compat_from(value.v40),
+
+                v41: ::fidl_next::CompatFrom::compat_from(value.v41),
+
+                v42: ::fidl_next::CompatFrom::compat_from(value.v42),
+
+                v43: ::fidl_next::CompatFrom::compat_from(value.v43),
+
+                v44: ::fidl_next::CompatFrom::compat_from(value.v44),
+
+                v45: ::fidl_next::CompatFrom::compat_from(value.v45),
+
+                v46: ::fidl_next::CompatFrom::compat_from(value.v46),
+
+                v47: ::fidl_next::CompatFrom::compat_from(value.v47),
+
+                v48: ::fidl_next::CompatFrom::compat_from(value.v48),
+
+                v49: ::fidl_next::CompatFrom::compat_from(value.v49),
+
+                v50: ::fidl_next::CompatFrom::compat_from(value.v50),
+
+                v51: ::fidl_next::CompatFrom::compat_from(value.v51),
+
+                v52: ::fidl_next::CompatFrom::compat_from(value.v52),
+
+                v53: ::fidl_next::CompatFrom::compat_from(value.v53),
+
+                v54: ::fidl_next::CompatFrom::compat_from(value.v54),
+
+                v55: ::fidl_next::CompatFrom::compat_from(value.v55),
+
+                v56: ::fidl_next::CompatFrom::compat_from(value.v56),
+
+                v57: ::fidl_next::CompatFrom::compat_from(value.v57),
+
+                v58: ::fidl_next::CompatFrom::compat_from(value.v58),
+
+                v59: ::fidl_next::CompatFrom::compat_from(value.v59),
+
+                v60: ::fidl_next::CompatFrom::compat_from(value.v60),
+
+                v61: ::fidl_next::CompatFrom::compat_from(value.v61),
+
+                v62: ::fidl_next::CompatFrom::compat_from(value.v62),
+
+                v63: ::fidl_next::CompatFrom::compat_from(value.v63),
+
+                v64: ::fidl_next::CompatFrom::compat_from(value.v64),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::SixtyFourOrdinalTable>
+        for crate::SixtyFourOrdinalTable
+    {
+        fn compat_from(value: ::fidl_test_table::SixtyFourOrdinalTable) -> Self {
+            Self {
+                v1: ::fidl_next::CompatFrom::compat_from(value.v1),
+
+                v2: ::fidl_next::CompatFrom::compat_from(value.v2),
+
+                v3: ::fidl_next::CompatFrom::compat_from(value.v3),
+
+                v4: ::fidl_next::CompatFrom::compat_from(value.v4),
+
+                v5: ::fidl_next::CompatFrom::compat_from(value.v5),
+
+                v6: ::fidl_next::CompatFrom::compat_from(value.v6),
+
+                v7: ::fidl_next::CompatFrom::compat_from(value.v7),
+
+                v8: ::fidl_next::CompatFrom::compat_from(value.v8),
+
+                v9: ::fidl_next::CompatFrom::compat_from(value.v9),
+
+                v10: ::fidl_next::CompatFrom::compat_from(value.v10),
+
+                v11: ::fidl_next::CompatFrom::compat_from(value.v11),
+
+                v12: ::fidl_next::CompatFrom::compat_from(value.v12),
+
+                v13: ::fidl_next::CompatFrom::compat_from(value.v13),
+
+                v14: ::fidl_next::CompatFrom::compat_from(value.v14),
+
+                v15: ::fidl_next::CompatFrom::compat_from(value.v15),
+
+                v16: ::fidl_next::CompatFrom::compat_from(value.v16),
+
+                v17: ::fidl_next::CompatFrom::compat_from(value.v17),
+
+                v18: ::fidl_next::CompatFrom::compat_from(value.v18),
+
+                v19: ::fidl_next::CompatFrom::compat_from(value.v19),
+
+                v20: ::fidl_next::CompatFrom::compat_from(value.v20),
+
+                v21: ::fidl_next::CompatFrom::compat_from(value.v21),
+
+                v22: ::fidl_next::CompatFrom::compat_from(value.v22),
+
+                v23: ::fidl_next::CompatFrom::compat_from(value.v23),
+
+                v24: ::fidl_next::CompatFrom::compat_from(value.v24),
+
+                v25: ::fidl_next::CompatFrom::compat_from(value.v25),
+
+                v26: ::fidl_next::CompatFrom::compat_from(value.v26),
+
+                v27: ::fidl_next::CompatFrom::compat_from(value.v27),
+
+                v28: ::fidl_next::CompatFrom::compat_from(value.v28),
+
+                v29: ::fidl_next::CompatFrom::compat_from(value.v29),
+
+                v30: ::fidl_next::CompatFrom::compat_from(value.v30),
+
+                v31: ::fidl_next::CompatFrom::compat_from(value.v31),
+
+                v32: ::fidl_next::CompatFrom::compat_from(value.v32),
+
+                v33: ::fidl_next::CompatFrom::compat_from(value.v33),
+
+                v34: ::fidl_next::CompatFrom::compat_from(value.v34),
+
+                v35: ::fidl_next::CompatFrom::compat_from(value.v35),
+
+                v36: ::fidl_next::CompatFrom::compat_from(value.v36),
+
+                v37: ::fidl_next::CompatFrom::compat_from(value.v37),
+
+                v38: ::fidl_next::CompatFrom::compat_from(value.v38),
+
+                v39: ::fidl_next::CompatFrom::compat_from(value.v39),
+
+                v40: ::fidl_next::CompatFrom::compat_from(value.v40),
+
+                v41: ::fidl_next::CompatFrom::compat_from(value.v41),
+
+                v42: ::fidl_next::CompatFrom::compat_from(value.v42),
+
+                v43: ::fidl_next::CompatFrom::compat_from(value.v43),
+
+                v44: ::fidl_next::CompatFrom::compat_from(value.v44),
+
+                v45: ::fidl_next::CompatFrom::compat_from(value.v45),
+
+                v46: ::fidl_next::CompatFrom::compat_from(value.v46),
+
+                v47: ::fidl_next::CompatFrom::compat_from(value.v47),
+
+                v48: ::fidl_next::CompatFrom::compat_from(value.v48),
+
+                v49: ::fidl_next::CompatFrom::compat_from(value.v49),
+
+                v50: ::fidl_next::CompatFrom::compat_from(value.v50),
+
+                v51: ::fidl_next::CompatFrom::compat_from(value.v51),
+
+                v52: ::fidl_next::CompatFrom::compat_from(value.v52),
+
+                v53: ::fidl_next::CompatFrom::compat_from(value.v53),
+
+                v54: ::fidl_next::CompatFrom::compat_from(value.v54),
+
+                v55: ::fidl_next::CompatFrom::compat_from(value.v55),
+
+                v56: ::fidl_next::CompatFrom::compat_from(value.v56),
+
+                v57: ::fidl_next::CompatFrom::compat_from(value.v57),
+
+                v58: ::fidl_next::CompatFrom::compat_from(value.v58),
+
+                v59: ::fidl_next::CompatFrom::compat_from(value.v59),
+
+                v60: ::fidl_next::CompatFrom::compat_from(value.v60),
+
+                v61: ::fidl_next::CompatFrom::compat_from(value.v61),
+
+                v62: ::fidl_next::CompatFrom::compat_from(value.v62),
+
+                v63: ::fidl_next::CompatFrom::compat_from(value.v63),
+
+                v64: ::fidl_next::CompatFrom::compat_from(value.v64),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableWithAttributes>
+        for ::fidl_test_table::TableWithAttributes
+    {
+        fn compat_from(value: crate::TableWithAttributes) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_table::TableWithAttributes>
+        for crate::TableWithAttributes
+    {
+        fn compat_from(value: ::fidl_test_table::TableWithAttributes) -> Self {
+            Self { x: ::fidl_next::CompatFrom::compat_from(value.x) }
+        }
+    }
+}

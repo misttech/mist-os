@@ -1033,21 +1033,37 @@ impl ::core::fmt::Debug for WireOptionalUnion {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::Bits> for ::fidl_test_versions::Bits {
-        #[inline]
-        fn from(from: crate::Bits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::Bits> for ::fidl_test_versions::Bits {
+        fn compat_from(value: crate::Bits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::Enum> for ::fidl_test_versions::Enum {
-        #[inline]
-        fn from(from: crate::Enum) -> Self {
-            match crate::Enum::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::Bits> for crate::Bits {
+        fn compat_from(value: ::fidl_test_versions::Bits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Enum> for ::fidl_test_versions::Enum {
+        fn compat_from(value: crate::Enum) -> Self {
+            match value {
                 crate::Enum::A => Self::A,
 
-                crate::Enum::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::Enum::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::Enum> for crate::Enum {
+        fn compat_from(value: ::fidl_test_versions::Enum) -> Self {
+            match value {
+                ::fidl_test_versions::Enum::A => Self::A,
+
+                ::fidl_test_versions::Enum::__SourceBreaking { unknown_ordinal: value } => {
+                    Self::UnknownOrdinal_(value)
                 }
             }
         }
@@ -1056,26 +1072,116 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OtherProtocol`
     /// protocol.
-    pub type OtherProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OtherProtocol>;
+    pub type OtherProtocolProxy = ::fidl_next::ClientSender<crate::OtherProtocol>;
 
-    impl ::core::convert::From<crate::OtherProtocol> for ::fidl_test_versions::OtherProtocolMarker {
-        #[inline]
-        fn from(_: crate::OtherProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::OtherProtocol> for ::fidl_test_versions::OtherProtocolMarker {
+        fn compat_from(_: crate::OtherProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::OtherProtocolMarker> for crate::OtherProtocol {
+        fn compat_from(_: ::fidl_test_versions::OtherProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_versions::OtherProtocolProxy>
+        for crate::OtherProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_versions::OtherProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
-    pub type ProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+    pub type ProtocolProxy = ::fidl_next::ClientSender<crate::Protocol>;
 
-    impl ::core::convert::From<crate::Protocol> for ::fidl_test_versions::ProtocolMarker {
-        #[inline]
-        fn from(_: crate::Protocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Protocol> for ::fidl_test_versions::ProtocolMarker {
+        fn compat_from(_: crate::Protocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::ProtocolMarker> for crate::Protocol {
+        fn compat_from(_: ::fidl_test_versions::ProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_versions::ProtocolProxy> for crate::Protocol {
+        fn client_compat_from(
+            proxy: ::fidl_test_versions::ProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Struct> for ::fidl_test_versions::Struct {
+        #[inline]
+        fn compat_from(value: crate::Struct) -> Self {
+            Self { x: ::fidl_next::CompatFrom::compat_from(value.x) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::Struct> for crate::Struct {
+        #[inline]
+        fn compat_from(value: ::fidl_test_versions::Struct) -> Self {
+            Self { x: ::fidl_next::CompatFrom::compat_from(value.x) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Table> for ::fidl_test_versions::Table {
+        fn compat_from(value: crate::Table) -> Self {
+            Self {
+                x: ::fidl_next::CompatFrom::compat_from(value.x),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::Table> for crate::Table {
+        fn compat_from(value: ::fidl_test_versions::Table) -> Self {
+            Self { x: ::fidl_next::CompatFrom::compat_from(value.x) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Union> for ::fidl_test_versions::Union {
+        fn compat_from(value: crate::Union) -> Self {
+            match value {
+                crate::Union::X(value) => Self::X(::fidl_next::CompatFrom::compat_from(value)),
+
+                crate::Union::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_versions::Union> for crate::Union {
+        fn compat_from(value: ::fidl_test_versions::Union) -> Self {
+            match value {
+                ::fidl_test_versions::Union::X(value) => {
+                    Self::X(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_versions::Union::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
         }
     }
 }

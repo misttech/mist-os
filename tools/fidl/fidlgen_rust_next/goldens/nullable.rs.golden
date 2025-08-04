@@ -2163,16 +2163,246 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::Int32Wrapper> for ::fidl_test_nullable::Int32Wrapper {
+        #[inline]
+        fn compat_from(value: crate::Int32Wrapper) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::Int32Wrapper> for crate::Int32Wrapper {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::Int32Wrapper) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SimpleProtocolAddRequest>
+        for ::fidl_test_nullable::SimpleProtocolAddRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::SimpleProtocolAddRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::SimpleProtocolAddRequest>
+        for crate::SimpleProtocolAddRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::SimpleProtocolAddRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SimpleProtocolAddResponse>
+        for ::fidl_test_nullable::SimpleProtocolAddResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::SimpleProtocolAddResponse) -> Self {
+            Self { sum: ::fidl_next::CompatFrom::compat_from(value.sum) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::SimpleProtocolAddResponse>
+        for crate::SimpleProtocolAddResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::SimpleProtocolAddResponse) -> Self {
+            Self { sum: ::fidl_next::CompatFrom::compat_from(value.sum) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SimpleProtocol`
     /// protocol.
-    pub type SimpleProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SimpleProtocol>;
+    pub type SimpleProtocolProxy = ::fidl_next::ClientSender<crate::SimpleProtocol>;
 
-    impl ::core::convert::From<crate::SimpleProtocol> for ::fidl_test_nullable::SimpleProtocolMarker {
-        #[inline]
-        fn from(_: crate::SimpleProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::SimpleProtocol> for ::fidl_test_nullable::SimpleProtocolMarker {
+        fn compat_from(_: crate::SimpleProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::SimpleProtocolMarker> for crate::SimpleProtocol {
+        fn compat_from(_: ::fidl_test_nullable::SimpleProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_nullable::SimpleProtocolProxy>
+        for crate::SimpleProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_nullable::SimpleProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SimpleUnion> for ::fidl_test_nullable::SimpleUnion {
+        fn compat_from(value: crate::SimpleUnion) -> Self {
+            match value {
+                crate::SimpleUnion::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::SimpleUnion::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::SimpleUnion> for crate::SimpleUnion {
+        fn compat_from(value: ::fidl_test_nullable::SimpleUnion) -> Self {
+            match value {
+                ::fidl_test_nullable::SimpleUnion::A(value) => {
+                    Self::A(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_nullable::SimpleUnion::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableHandle>
+        for ::fidl_test_nullable::StructWithNullableHandle
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableHandle) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableHandle>
+        for crate::StructWithNullableHandle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableHandle) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableProtocol>
+        for ::fidl_test_nullable::StructWithNullableProtocol
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableProtocol) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableProtocol>
+        for crate::StructWithNullableProtocol
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableProtocol) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableRequest>
+        for ::fidl_test_nullable::StructWithNullableRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableRequest) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableRequest>
+        for crate::StructWithNullableRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableRequest) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableString>
+        for ::fidl_test_nullable::StructWithNullableString
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableString) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableString>
+        for crate::StructWithNullableString
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableString) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableStruct>
+        for ::fidl_test_nullable::StructWithNullableStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableStruct) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableStruct>
+        for crate::StructWithNullableStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableStruct) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableUnion>
+        for ::fidl_test_nullable::StructWithNullableUnion
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableUnion) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableUnion>
+        for crate::StructWithNullableUnion
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableUnion) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructWithNullableVector>
+        for ::fidl_test_nullable::StructWithNullableVector
+    {
+        #[inline]
+        fn compat_from(value: crate::StructWithNullableVector) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_nullable::StructWithNullableVector>
+        for crate::StructWithNullableVector
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_nullable::StructWithNullableVector) -> Self {
+            Self { val: ::fidl_next::CompatFrom::compat_from(value.val) }
         }
     }
 }

@@ -19,6 +19,7 @@ pub struct ProtocolCompatTemplate<'a> {
     name: String,
     proxy_name: String,
     compat_name: String,
+    compat_proxy_name: String,
     denylist: Denylist,
 }
 
@@ -32,8 +33,9 @@ impl<'a> ProtocolCompatTemplate<'a> {
     pub fn new(protocol: &'a Protocol, compat: &'a CompatTemplate<'a>) -> Self {
         let base_name = protocol.name.decl_name().camel();
         let proxy_name = format!("{base_name}Proxy");
-        let compat_name =
-            format!("{}Marker", escape_compat(base_name.clone(), protocol.name.decl_name()),);
+        let compat_base_name = escape_compat(base_name.clone(), protocol.name.decl_name());
+        let compat_name = format!("{compat_base_name}Marker");
+        let compat_proxy_name = format!("{compat_base_name}Proxy");
 
         Self {
             protocol,
@@ -42,6 +44,7 @@ impl<'a> ProtocolCompatTemplate<'a> {
             name: escape(base_name),
             proxy_name,
             compat_name,
+            compat_proxy_name,
             denylist: compat.rust_or_rust_next_denylist(&protocol.name),
         }
     }

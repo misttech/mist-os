@@ -172,4 +172,19 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::Baz> for ::fidl_test_transitivedependencies::Baz {
+        #[inline]
+        fn compat_from(value: crate::Baz) -> Self {
+            Self { g: ::fidl_next::CompatFrom::compat_from(value.g) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_transitivedependencies::Baz> for crate::Baz {
+        #[inline]
+        fn compat_from(value: ::fidl_test_transitivedependencies::Baz) -> Self {
+            Self { g: ::fidl_next::CompatFrom::compat_from(value.g) }
+        }
+    }
+}
