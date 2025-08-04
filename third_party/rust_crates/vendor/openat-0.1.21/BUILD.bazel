@@ -74,6 +74,6 @@ rust_library(
     }),
     version = "0.1.21",
     deps = [
-        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.174:libc",
     ],
 )

@@ -72,19 +72,19 @@ rust_library(
     version = "1.0.1",
     deps = select({
         "@rules_rust//rust/platform:aarch64-apple-darwin": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(windows))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(not(windows))
         ],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(windows))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(not(windows))
         ],
         "@rules_rust//rust/platform:x86_64-apple-darwin": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(windows))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(not(windows))
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(windows))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(not(windows))
         ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(windows))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(not(windows))
         ],
         "//conditions:default": [],
     }),
