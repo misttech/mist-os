@@ -65,7 +65,7 @@ rustc_library("ffx_assembly") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/assembly/api:assembly_api",
+    "//src/lib/assembly/api",
     "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/blob_size",
     "//src/lib/assembly/components",

@@ -7,7 +7,8 @@ import("//build/rust/rustc_library.gni")
 
 assert(is_host, "Assembly libraries are host-only")
 
-rustc_library("assembly_api") {
+rustc_library("api") {
+  name = "assembly_api"
   edition = "2021"
   version = "0.1.0"
   with_unit_tests = true
@@ -15,13 +16,12 @@ rustc_library("assembly_api") {
     "//src/lib/assembly/cli_args",
     "//src/lib/assembly/tool",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:tempfile",
   ]
   sources = [
     "src/api.rs",
     "src/lib.rs",
   ]
-  test_deps = [
-    "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:serde_json",
-  ]
+  test_deps = [ "//third_party/rust_crates:serde_json" ]
 }

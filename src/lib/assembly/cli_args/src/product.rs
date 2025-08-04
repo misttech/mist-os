@@ -151,7 +151,7 @@ pub struct ProductAssemblyOutputs {
 impl From<ProductArgs> for ProductAssemblyOutputs {
     fn from(args: ProductArgs) -> Self {
         let mut image_assembly_config = args.outdir.clone();
-        image_assembly_config.push("image_assembly_config.json");
+        image_assembly_config.push("image_assembly.json");
 
         ProductAssemblyOutputs {
             platform: args.input_bundles_dir,

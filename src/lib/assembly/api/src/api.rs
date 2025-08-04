@@ -7,6 +7,7 @@ use assembly_cli_args::{
     CreateSystemArgs, CreateSystemOutputs, ProductArgs, ProductAssemblyOutputs,
 };
 use assembly_tool::{PlatformToolProvider, ToolProvider};
+use camino::Utf8PathBuf;
 
 pub fn product_assembly(args: ProductArgs) -> Result<ProductAssemblyOutputs> {
     let tools = PlatformToolProvider::new(args.input_bundles_dir.clone());
@@ -27,8 +28,20 @@ pub fn create_system(args: CreateSystemArgs) -> Result<CreateSystemOutputs> {
 }
 
 pub fn assemble(args: ProductArgs) -> Result<CreateSystemOutputs> {
-    let product_outputs = product_assembly(args)?;
-    create_system(product_outputs.into())
+    // Create a temporary directory for the product assembly outputs.
+    // We cannot use the directories in `args`, because those are reserved for
+    // the system.
+    let product_tmp = tempfile::TempDir::new().unwrap();
+    let product_tmp = Utf8PathBuf::from_path_buf(product_tmp.path().to_path_buf()).unwrap();
+    let product_out = product_tmp.join("out");
+    let product_gen = product_tmp.join("gen");
+    let product_args = ProductArgs { outdir: product_out, gendir: product_gen, ..args };
+    let product_outputs = product_assembly(product_args)?;
+
+    // The system is written to the outdir/gendir passed in with `args`.
+    let create_system_args =
+        CreateSystemArgs { outdir: args.outdir, gendir: args.gendir, ..product_outputs.into() };
+    create_system(create_system_args)
 }
 
 #[cfg(test)]

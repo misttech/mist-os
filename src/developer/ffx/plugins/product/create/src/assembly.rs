@@ -5,17 +5,18 @@
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_artifact_cache::{Artifact, ArtifactCache};
+use assembly_cli_args::ProductArgs;
 use assembly_config_schema::{BoardConfig, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_platform_artifacts::PlatformArtifacts;
-use assembly_tool::PlatformToolProvider;
 use camino::Utf8PathBuf;
-use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 
 pub struct Assembly {
     pub platform_path: Utf8PathBuf,
     pub platform: PlatformArtifacts,
+    pub product_config_path: Utf8PathBuf,
     pub product_config: ProductConfig,
+    pub board_config_path: Utf8PathBuf,
     pub board_config: BoardConfig,
 }
 
@@ -53,7 +54,14 @@ impl Assembly {
         let platform =
             PlatformArtifacts::from_dir_with_path(&platform_path).context("Reading platform")?;
 
-        Ok(Self { platform_path, platform, product_config, board_config })
+        Ok(Self {
+            platform_path,
+            platform,
+            product_config_path,
+            product_config,
+            board_config_path,
+            board_config,
+        })
     }
 
     pub fn version_string(&self) -> String {
@@ -71,16 +79,23 @@ impl Assembly {
     pub async fn create_system(self, outdir: &Utf8PathBuf) -> Result<AssembledSystem> {
         let should_configure_example =
             ffx_config::get::<bool, _>("assembly_example_enabled").unwrap_or_default();
+        let gendir = tempfile::TempDir::new().unwrap();
+        let gendir = Utf8PathBuf::from_path_buf(gendir.path().to_path_buf()).unwrap();
 
-        let tools = PlatformToolProvider::new(self.platform_path.clone());
-        let mut product_assembly = ProductAssembly::new(
-            self.platform,
-            self.product_config,
-            self.board_config,
-            should_configure_example,
-        )?;
-        product_assembly.set_validation_mode(ValidationMode::Off);
-        let iac = product_assembly.build(&tools, outdir)?;
-        AssembledSystem::new(iac, false, outdir, &tools, None).await
+        let args = ProductArgs {
+            product: self.product_config_path,
+            board_config: self.board_config_path,
+            outdir: outdir.clone(),
+            gendir,
+            input_bundles_dir: self.platform_path,
+            package_validation: None,
+            custom_kernel_aib: None,
+            custom_boot_shim_aib: None,
+            suppress_overrides_warning: false,
+            developer_overrides: None,
+            include_example_aib_for_tests: Some(should_configure_example),
+        };
+        let create_system_outputs = assembly_api::assemble(args)?;
+        AssembledSystem::from_dir(create_system_outputs.outdir)
     }
 }

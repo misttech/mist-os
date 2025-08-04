@@ -190,7 +190,7 @@ async fn sanitized_product_bundle_create(
 
     writer.line(format!("Assembling into {} ...", &out))?;
     let tools = PlatformToolProvider::new(assembly.platform_path.clone());
-    let system = Box::pin(assembly.create_system(&tmp_path)).await?;
+    let system = Box::pin(assembly.create_system(&tmp_path.join("system"))).await?;
     let mut builder = ProductBundleBuilder::new(name, version)
         .system(system, Slot::A)
         .update_package(update_version_file, 1);
