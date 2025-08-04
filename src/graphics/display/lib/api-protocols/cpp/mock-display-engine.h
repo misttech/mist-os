@@ -52,10 +52,12 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index)>;
   using ReleaseImageChecker = fit::function<void(display::DriverImageId driver_image_id)>;
   using CheckConfigurationChecker = fit::function<display::ConfigCheckResult(
-      display::DisplayId display_id, display::ModeId display_mode_id,
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
       display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers)>;
   using ApplyConfigurationChecker = fit::function<void(
-      display::DisplayId display_id, display::ModeId display_mode_id,
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
       display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
       display::DriverConfigStamp config_stamp)>;
   using SetBufferCollectionConstraintsChecker =
@@ -111,10 +113,12 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
   void ReleaseImage(display::DriverImageId driver_image_id) override;
   display::ConfigCheckResult CheckConfiguration(
-      display::DisplayId display_id, display::ModeId display_mode_id,
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
       display::ColorConversion color_conversion,
       cpp20::span<const display::DriverLayer> layers) override;
-  void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
+  void ApplyConfiguration(display::DisplayId display_id,
+                          std::variant<display::ModeId, display::DisplayTiming> display_mode,
                           display::ColorConversion color_conversion,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override;

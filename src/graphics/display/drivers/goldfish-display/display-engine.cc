@@ -51,6 +51,11 @@ constexpr uint32_t FB_FPS = 5;
 constexpr uint32_t GL_RGBA = 0x1908;
 constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 
+// TODO(https://fxbug.dev/42072949): The `Mode` struct does not have an ID field.
+// The display coordinator requires each mode to have a unique ID. For now,
+// we use a placeholder ID 1.
+constexpr display::ModeId kModeId(1);
+
 }  // namespace
 
 DisplayEngine::DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
@@ -116,10 +121,6 @@ display::EngineInfo DisplayEngine::CompleteCoordinatorConnection() {
       .refresh_rate_millihertz = refresh_rate_hz * 1'000,
   }};
 
-  // TODO(https://fxbug.dev/42072949): The `Mode` struct does not have an ID field.
-  // The display coordinator requires each mode to have a unique ID. For now,
-  // we use a placeholder ID 1.
-  static constexpr display::ModeId kModeId(1);
   const display::ModeAndId preferred_mode = {{
       .id = kModeId,
       .mode = mode,
@@ -331,7 +332,8 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
 }
 
 display::ConfigCheckResult DisplayEngine::CheckConfiguration(
-    display::DisplayId display_id, display::ModeId display_mode_id,
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
     display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers) {
   // The display coordinator currently uses zero-display configs to blank a
   // display. We'll remove this eventually.
@@ -340,6 +342,14 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
   }
 
   ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
+
+  if (!std::holds_alternative<display::ModeId>(display_mode)) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
+  display::ModeId display_mode_id = std::get<display::ModeId>(display_mode);
+  if (display_mode_id != kModeId) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
 
   if (color_conversion != display::ColorConversion::kIdentity) {
     // Color Correction is not supported, but we will pretend we do.
@@ -490,11 +500,11 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
   return ZX_OK;
 }
 
-void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
-                                       display::ModeId display_mode_id,
-                                       display::ColorConversion color_conversion,
-                                       cpp20::span<const display::DriverLayer> layers,
-                                       display::DriverConfigStamp config_stamp) {
+void DisplayEngine::ApplyConfiguration(
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
+    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+    display::DriverConfigStamp config_stamp) {
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
   if (display_id == kPrimaryDisplayId) {
@@ -502,6 +512,9 @@ void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
       driver_image_id = layers[0].image_id();
     }
   }
+
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::ModeId>(display_mode));
+  ZX_DEBUG_ASSERT(std::get<display::ModeId>(display_mode) == kModeId);
 
   if (driver_image_id == display::kInvalidDriverImageId) {
     // The display doesn't have any active layers right now. For layers that

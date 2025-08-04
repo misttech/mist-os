@@ -202,7 +202,8 @@ void MockDisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 }
 
 display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
-    display::DisplayId display_id, display::ModeId display_mode_id,
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
     display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
@@ -211,15 +212,15 @@ display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
 
   ZX_ASSERT_MSG(call_expectation.check_configuration_checker != nullptr,
                 "Received call type does not match expected call type");
-  return call_expectation.check_configuration_checker(display_id, display_mode_id, color_conversion,
+  return call_expectation.check_configuration_checker(display_id, display_mode, color_conversion,
                                                       layers);
 }
 
-void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
-                                           display::ModeId display_mode_id,
-                                           display::ColorConversion color_conversion,
-                                           cpp20::span<const display::DriverLayer> layers,
-                                           display::DriverConfigStamp config_stamp) {
+void MockDisplayEngine::ApplyConfiguration(
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
+    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+    display::DriverConfigStamp config_stamp) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];
@@ -227,8 +228,8 @@ void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
 
   ZX_ASSERT_MSG(call_expectation.apply_configuration_checker != nullptr,
                 "Received call type does not match expected call type");
-  call_expectation.apply_configuration_checker(display_id, display_mode_id, color_conversion,
-                                               layers, config_stamp);
+  call_expectation.apply_configuration_checker(display_id, display_mode, color_conversion, layers,
+                                               config_stamp);
 }
 
 zx::result<> MockDisplayEngine::SetBufferCollectionConstraints(

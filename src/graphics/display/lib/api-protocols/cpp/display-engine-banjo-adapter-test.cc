@@ -264,15 +264,18 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSingleLayerSuccess) {
       .layers_count = kBanjoLayers.size(),
   };
 
-  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
-                                     display::ColorConversion color_conversion,
-                                     cpp20::span<const display::DriverLayer> layers) {
-    EXPECT_EQ(kDisplayId, display_id);
-    EXPECT_EQ(kModeId, display_mode_id);
-    EXPECT_EQ(kColorConversion, color_conversion);
-    EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
-    return display::ConfigCheckResult::kOk;
-  });
+  mock_.ExpectCheckConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion,
+          cpp20::span<const display::DriverLayer> layers) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ZX_ASSERT(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(kColorConversion, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        return display::ConfigCheckResult::kOk;
+      });
 
   EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
@@ -295,15 +298,18 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
       .layers_count = banjo_layers.size(),
   };
 
-  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
-                                     display::ColorConversion color_conversion,
-                                     cpp20::span<const display::DriverLayer> layers) {
-    EXPECT_EQ(kDisplayId, display_id);
-    EXPECT_EQ(kModeId, display_mode_id);
-    EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
-    EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
-    return display::ConfigCheckResult::kOk;
-  });
+  mock_.ExpectCheckConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion,
+          cpp20::span<const display::DriverLayer> layers) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ZX_ASSERT(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        return display::ConfigCheckResult::kOk;
+      });
 
   EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
@@ -349,24 +355,129 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationEngineError) {
       .layers_count = kBanjoLayers.size(),
   };
 
-  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
-                                     display::ColorConversion color_conversion,
-                                     cpp20::span<const display::DriverLayer> layers) {
-    return display::ConfigCheckResult::kUnsupportedDisplayModes;
-  });
+  mock_.ExpectCheckConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion,
+          cpp20::span<const display::DriverLayer> layers) {
+        return display::ConfigCheckResult::kUnsupportedDisplayModes;
+      });
 
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo(),
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
-TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorModeIdInvalid) {
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccessValidModeIdPreferredOverTiming) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr display::ModeId kModeId = display::kInvalidModeId;
+  static constexpr display::ModeId kModeId(24);
+  static constexpr display::DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
 
-  static constexpr std::array<layer_t, 1> kBanjoLayers = {CreateValidLayerWithSeed(0).ToBanjo()};
+  static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
   const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
       .mode_id = kModeId.ToBanjo(),
+      .timing = ToBanjoDisplayTiming(kDisplayTiming),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
+  };
+
+  mock_.ExpectCheckConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion,
+          cpp20::span<const display::DriverLayer> layers) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ZX_ASSERT(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        return display::ConfigCheckResult::kOk;
+      });
+
+  EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
+}
+
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccessValidTiming) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+
+  static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
+  const display_config_t kBanjoDisplayConfig = {
+      .display_id = kDisplayId.ToBanjo(),
+      .mode_id = kInvalidModeId.ToBanjo(),
+      .timing = ToBanjoDisplayTiming(kDisplayTiming),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
+  };
+
+  mock_.ExpectCheckConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion,
+          cpp20::span<const display::DriverLayer> layers) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ZX_ASSERT(std::holds_alternative<display::DisplayTiming>(display_mode));
+        EXPECT_EQ(kDisplayTiming, std::get<display::DisplayTiming>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        return display::ConfigCheckResult::kOk;
+      });
+
+  EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
+}
+
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorNeitherModeIdNorTimingIsValid) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display_timing_t kInvalidBanjoTiming = {
+      .h_addressable = 1'000'000'000,
+      .v_addressable = 1'000'000'000,
+  };
+  ASSERT_FALSE(display::IsBanjoDisplayTimingValid(kInvalidBanjoTiming));
+  static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
+  const display_config_t kBanjoDisplayConfig = {
+      .display_id = kDisplayId.ToBanjo(),
+      .mode_id = kInvalidModeId.ToBanjo(),
+      .timing = kInvalidBanjoTiming,
       .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
@@ -376,7 +487,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorModeIdInvali
   // invoking the engine driver. So, the mock driver should not receive any
   // calls.
 
-  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo(),
+  EXPECT_EQ(display::ConfigCheckResult::kInvalidConfig.ToBanjo(),
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
@@ -438,16 +549,19 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationSingleLayer) {
   };
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
-  mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
-                                     display::ColorConversion color_conversion,
-                                     cpp20::span<const display::DriverLayer> layers,
-                                     display::DriverConfigStamp config_stamp) {
-    EXPECT_EQ(kDisplayId, display_id);
-    EXPECT_EQ(kModeId, display_mode_id);
-    EXPECT_EQ(kColorConversion, color_conversion);
-    EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
-    EXPECT_EQ(kConfigStamp, config_stamp);
-  });
+  mock_.ExpectApplyConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+          display::DriverConfigStamp config_stamp) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ASSERT_TRUE(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(kColorConversion, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        EXPECT_EQ(kConfigStamp, config_stamp);
+      });
+
   engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
 }
 
@@ -470,16 +584,116 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
   };
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
-  mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
-                                     display::ColorConversion color_conversion,
-                                     cpp20::span<const display::DriverLayer> layers,
-                                     display::DriverConfigStamp config_stamp) {
-    EXPECT_EQ(kDisplayId, display_id);
-    EXPECT_EQ(kModeId, display_mode_id);
-    EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
-    EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
-    EXPECT_EQ(kConfigStamp, config_stamp);
-  });
+  mock_.ExpectApplyConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+          display::DriverConfigStamp config_stamp) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ASSERT_TRUE(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        EXPECT_EQ(kConfigStamp, config_stamp);
+      });
+
+  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
+}
+
+TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationPrefersValidModeIdOverTiming) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::ModeId kModeId(24);
+  static constexpr display::DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+  static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
+  static constexpr display::DriverConfigStamp kConfigStamp(4242);
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
+  const display_config_t kBanjoDisplayConfig = {
+      .display_id = kDisplayId.ToBanjo(),
+      .mode_id = kModeId.ToBanjo(),
+      .timing = ToBanjoDisplayTiming(kDisplayTiming),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
+  };
+  static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
+
+  mock_.ExpectApplyConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+          display::DriverConfigStamp config_stamp) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ASSERT_TRUE(std::holds_alternative<display::ModeId>(display_mode));
+        EXPECT_EQ(kModeId, std::get<display::ModeId>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        EXPECT_EQ(kConfigStamp, config_stamp);
+      });
+
+  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
+}
+
+TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationWithOnlyValidTiming) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+  static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
+  static constexpr display::DriverConfigStamp kConfigStamp(4242);
+
+  static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
+  const display_config_t kBanjoDisplayConfig = {
+      .display_id = kDisplayId.ToBanjo(),
+      .mode_id = kInvalidModeId.ToBanjo(),
+      .timing = ToBanjoDisplayTiming(kDisplayTiming),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
+  };
+  static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
+
+  mock_.ExpectApplyConfiguration(
+      [&](display::DisplayId display_id,
+          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+          display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+          display::DriverConfigStamp config_stamp) {
+        EXPECT_EQ(kDisplayId, display_id);
+        ASSERT_TRUE(std::holds_alternative<display::DisplayTiming>(display_mode));
+        EXPECT_EQ(kDisplayTiming, std::get<display::DisplayTiming>(display_mode));
+        EXPECT_EQ(display::ColorConversion::kIdentity, color_conversion);
+        EXPECT_THAT(layers, ::testing::ElementsAreArray(kLayers));
+        EXPECT_EQ(kConfigStamp, config_stamp);
+      });
+
   engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
 }
 

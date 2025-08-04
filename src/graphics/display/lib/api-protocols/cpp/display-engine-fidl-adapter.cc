@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <variant>
 
 #include <sdk/lib/driver/logging/cpp/logger.h>
 
@@ -27,6 +28,21 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace display {
+
+namespace {
+
+std::variant<display::ModeId, display::DisplayTiming> GetDisplayMode(
+    const fuchsia_hardware_display_engine::wire::DisplayConfig& display_config) {
+  display::ModeId mode_id(display_config.mode_id);
+  if (mode_id == display::kInvalidModeId) {
+    ZX_DEBUG_ASSERT_MSG(display::IsFidlDisplayTimingValid(display_config.timing),
+                        "Display coordinator applied rejected invalid timing");
+    return display::ToDisplayTiming(display_config.timing);
+  }
+  return mode_id;
+}
+
+}  // namespace
 
 DisplayEngineFidlAdapter::DisplayEngineFidlAdapter(DisplayEngineInterface* engine,
                                                    DisplayEngineEventsFidl* engine_events)
@@ -143,12 +159,20 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
 
   display::ColorConversion color_conversion(display_config.color_conversion);
 
+  std::variant<display::ModeId, display::DisplayTiming> display_mode;
   display::ModeId mode_id(display_config.mode_id);
   if (mode_id == display::kInvalidModeId) {
-    completer.buffer(arena).ReplyError(
-        display::ConfigCheckResult::kUnsupportedDisplayModes.ToFidl());
-    return;
+    // Fall back to timing.
+    if (!display::IsFidlDisplayTimingValid(display_config.timing)) {
+      completer.buffer(arena).ReplyError(display::ConfigCheckResult::kInvalidConfig.ToFidl());
+      return;
+    }
+    display_mode = display::ToDisplayTiming(display_config.timing);
+  } else {
+    display_mode = mode_id;
   }
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::ModeId>(display_mode) ||
+                  std::holds_alternative<display::DisplayTiming>(display_mode));
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -157,8 +181,9 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
     layers.emplace_back(fidl_layer);
   }
 
-  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::DisplayId(display_config.display_id), mode_id, color_conversion, layers);
+  display::ConfigCheckResult config_check_result =
+      engine_.CheckConfiguration(display::DisplayId(display_config.display_id),
+                                 std::move(display_mode), color_conversion, layers);
 
   if (config_check_result != display::ConfigCheckResult::kOk) {
     completer.buffer(arena).ReplyError(config_check_result.ToFidl());
@@ -188,9 +213,9 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
 
   display::ColorConversion color_conversion(display_config.color_conversion);
 
-  display::ModeId mode_id(display_config.mode_id);
-  ZX_DEBUG_ASSERT_MSG(mode_id != display::kInvalidModeId,
-                      "Display coordinator applied rejected invalid mode ID");
+  auto display_mode = GetDisplayMode(display_config);
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::ModeId>(display_mode) ||
+                  std::holds_alternative<display::DisplayTiming>(display_mode));
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -199,7 +224,7 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
     layers.emplace_back(fidl_layer);
   }
 
-  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), mode_id,
+  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), std::move(display_mode),
                              color_conversion, layers,
                              display::DriverConfigStamp(request->config_stamp));
   completer.buffer(arena).Reply();

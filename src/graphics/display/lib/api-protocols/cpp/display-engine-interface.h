@@ -10,10 +10,12 @@
 #include <lib/zx/result.h>
 
 #include <cstdint>
+#include <variant>
 
 #include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -68,7 +70,8 @@ class DisplayEngineInterface {
   // Out-of-tree drivers must not override this overload, because it will be
   // reworked.
   virtual display::ConfigCheckResult CheckConfiguration(
-      display::DisplayId display_id, display::ModeId display_mode_id,
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
       display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers);
 
   // Display engine drivers must override **exactly one** of the following
@@ -79,10 +82,11 @@ class DisplayEngineInterface {
                                   display::DriverConfigStamp driver_config_stamp);
   // Out-of-tree drivers must not override this overload, because it will be
   // reworked.
-  virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
-                                  display::ColorConversion color_conversion,
-                                  cpp20::span<const display::DriverLayer> layers,
-                                  display::DriverConfigStamp driver_config_stamp);
+  virtual void ApplyConfiguration(
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
+      display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+      display::DriverConfigStamp driver_config_stamp);
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,

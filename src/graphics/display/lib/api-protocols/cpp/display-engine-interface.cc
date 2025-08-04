@@ -36,11 +36,16 @@ display::ConfigCheckResult DisplayEngineInterface::CheckConfiguration(
 }
 
 display::ConfigCheckResult DisplayEngineInterface::CheckConfiguration(
-    display::DisplayId display_id, display::ModeId display_mode_id,
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
     display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers) {
   if (color_conversion != display::ColorConversion::kIdentity) {
     return display::ConfigCheckResult::kUnsupportedConfig;
   }
+  if (!std::holds_alternative<display::ModeId>(display_mode)) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
+  display::ModeId display_mode_id = std::get<display::ModeId>(display_mode);
   return CheckConfiguration(display_id, display_mode_id, layers);
 }
 
@@ -51,12 +56,16 @@ void DisplayEngineInterface::ApplyConfiguration(display::DisplayId display_id,
   ZX_PANIC("DisplayEngineInterface subclasses must override one ApplyConfiguration() overload.");
 }
 
-void DisplayEngineInterface::ApplyConfiguration(display::DisplayId display_id,
-                                                display::ModeId display_mode_id,
-                                                display::ColorConversion color_conversion,
-                                                cpp20::span<const display::DriverLayer> layers,
-                                                display::DriverConfigStamp driver_config_stamp) {
-  ZX_DEBUG_ASSERT(color_conversion == display::ColorConversion::kIdentity);
+void DisplayEngineInterface::ApplyConfiguration(
+    display::DisplayId display_id,
+    std::variant<display::ModeId, display::DisplayTiming> display_mode,
+    display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers,
+    display::DriverConfigStamp driver_config_stamp) {
+  ZX_DEBUG_ASSERT_MSG(color_conversion == display::ColorConversion::kIdentity,
+                      "Display coordinator applied rejected ColorConversion");
+  ZX_DEBUG_ASSERT_MSG(std::holds_alternative<display::ModeId>(display_mode),
+                      "Display coordinator applied rejected DisplayTiming");
+  display::ModeId display_mode_id = std::get<display::ModeId>(display_mode);
   ApplyConfiguration(display_id, display_mode_id, layers, driver_config_stamp);
 }
 
