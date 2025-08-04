@@ -882,7 +882,9 @@ TEST_F(BpfMapTest, NotificationsRingBufTest) {
   EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
 }
 
-TEST_F(BpfMapTest, LpmTrieNoFlag) {
+// LPM Trie tests are disabled until the implementation is enabled.
+// TODO(https://fxbug.dev/426630612) enable these tests.
+TEST_F(BpfMapTest, DISABLED_LpmTrieNoFlag) {
   // LPM trie creation without `BPF_F_NO_PREALLOC` should fail.
   union bpf_attr attr;
   memset(&attr, 0, sizeof(attr));
@@ -895,7 +897,7 @@ TEST_F(BpfMapTest, LpmTrieNoFlag) {
   EXPECT_EQ(errno, EINVAL);
 }
 
-TEST_F(BpfMapTest, LpmTrie) {
+TEST_F(BpfMapTest, DISABLED_LpmTrie) {
   struct LpmKey {
     uint32_t prefix_len;
     uint32_t data;

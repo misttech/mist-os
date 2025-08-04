@@ -338,7 +338,12 @@ fn create_map_impl(
         bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema, vmo)?),
-        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => Ok(Box::pin(lpm_trie::LpmTrie::new(schema, vmo)?)),
+        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => {
+            // LPM_TRIE maps are implemented, but it's disabled to workaround crashes.
+            // See b/435314748 .
+            track_stub!(TODO("https://fxbug.dev/426630612"), "BPF_MAP_TYPE_LPM_TRIE");
+            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
+        }
 
         // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
         // these

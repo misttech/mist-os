@@ -661,6 +661,7 @@ pub(super) use internal::LpmTrieEntryRef;
 use internal::{Layout, LpmTrieNode, LpmTrieState, LpmTrieStore};
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct LpmTrie {
     buffer: MapBuffer,
     layout: Layout,
@@ -763,6 +764,7 @@ fn trim_node(
 }
 
 impl LpmTrie {
+    #[allow(unused)]
     pub fn new(schema: &MapSchema, vmo: Option<zx::Vmo>) -> Result<Self, MapError> {
         if schema.key_size <= LPM_KEY_PREFIX_SIZE as u32 {
             return Err(MapError::InvalidParam);
