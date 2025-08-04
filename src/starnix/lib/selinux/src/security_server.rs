@@ -15,7 +15,7 @@ use crate::policy::{
     ClassPermissionId, FsUseLabelAndType, FsUseType, IoctlAccessDecision, Policy,
 };
 use crate::sid_table::SidTable;
-use crate::sync::Mutex;
+use crate::sync::RwLock;
 use crate::{
     ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
     FileSystemMountSids, FsNodeClass, InitialSid, KernelPermission, NullessByteStr, ObjectClass,
@@ -125,7 +125,7 @@ pub struct SecurityServer {
     avc_manager: AvcManager<SecurityServer>,
 
     /// The mutable state of the security server.
-    state: Mutex<SecurityServerState>,
+    state: RwLock<SecurityServerState>,
 
     /// Optional set of exceptions to apply to access checks, via `ExceptionsConfig`.
     exceptions: Vec<String>,
@@ -143,7 +143,7 @@ impl SecurityServer {
         assert_eq!(options, String::new());
 
         let avc_manager = AvcManager::new();
-        let state = Mutex::new(SecurityServerState {
+        let state = RwLock::new(SecurityServerState {
             active_policy: None,
             booleans: SeLinuxBooleans::default(),
             status_publisher: None,
@@ -173,7 +173,7 @@ impl SecurityServer {
         &self,
         security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
         let active_policy = locked_state
             .active_policy
             .as_mut()
@@ -190,7 +190,7 @@ impl SecurityServer {
     /// is the case for e.g. the `/proc/*/attr/` filesystem and `security.selinux` extended
     /// attribute values.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> Option<Vec<u8>> {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
         let active_policy = locked_state.active_policy.as_ref()?;
         let context = active_policy.sid_table.try_sid_to_security_context(sid)?;
         Some(active_policy.parsed.serialize_security_context(context))
@@ -238,12 +238,12 @@ impl SecurityServer {
 
     /// Returns the active policy in binary form, or `None` if no policy has yet been loaded.
     pub fn get_binary_policy(&self) -> Option<PolicyData> {
-        self.state.lock().active_policy.as_ref().map(|p| p.binary.clone())
+        self.state.read().active_policy.as_ref().map(|p| p.binary.clone())
     }
 
     /// Returns true if a policy has been loaded.
     pub fn has_policy(&self) -> bool {
-        self.state.lock().active_policy.is_some()
+        self.state.read().active_policy.is_some()
     }
 
     /// Set to enforcing mode if `enforce` is true, permissive mode otherwise.
@@ -252,35 +252,35 @@ impl SecurityServer {
     }
 
     pub fn is_enforcing(&self) -> bool {
-        self.state.lock().enforcing
+        self.state.read().enforcing
     }
 
     /// Returns true if the policy requires unknown class / permissions to be
     /// denied. Defaults to true until a policy is loaded.
     pub fn deny_unknown(&self) -> bool {
-        self.state.lock().deny_unknown()
+        self.state.read().deny_unknown()
     }
 
     /// Returns true if the policy requires unknown class / permissions to be
     /// rejected. Defaults to false until a policy is loaded.
     pub fn reject_unknown(&self) -> bool {
-        self.state.lock().reject_unknown()
+        self.state.read().reject_unknown()
     }
 
     /// Returns the list of names of boolean conditionals defined by the
     /// loaded policy.
     pub fn conditional_booleans(&self) -> Vec<String> {
-        self.state.lock().booleans.names()
+        self.state.read().booleans.names()
     }
 
     /// Returns the active and pending values of a policy boolean, if it exists.
     pub fn get_boolean(&self, name: &str) -> Result<(bool, bool), ()> {
-        self.state.lock().booleans.get(name)
+        self.state.read().booleans.get(name)
     }
 
     /// Sets the pending value of a boolean, if it is defined in the policy.
     pub fn set_pending_boolean(&self, name: &str, value: bool) -> Result<(), ()> {
-        self.state.lock().booleans.set_pending(name, value)
+        self.state.write().booleans.set_pending(name, value)
     }
 
     /// Commits all pending changes to conditional booleans.
@@ -299,7 +299,7 @@ impl SecurityServer {
 
     /// Returns the list of all class names.
     pub fn class_names(&self) -> Result<Vec<Vec<u8>>, ()> {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
         let names = locked_state
             .expect_active_policy()
             .parsed
@@ -312,7 +312,7 @@ impl SecurityServer {
 
     /// Returns the class identifier of a class, if it exists.
     pub fn class_id_by_name(&self, name: &str) -> Result<ClassId, ()> {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
         Ok(locked_state
             .expect_active_policy()
             .parsed
@@ -330,7 +330,7 @@ impl SecurityServer {
         &self,
         name: &str,
     ) -> Result<Vec<(ClassPermissionId, Vec<u8>)>, ()> {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
         locked_state.expect_active_policy().parsed.find_class_permissions_by_name(name)
     }
 
@@ -342,7 +342,7 @@ impl SecurityServer {
         fs_type: NullessByteStr<'_>,
         mount_options: &FileSystemMountOptions,
     ) -> FileSystemLabel {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
         let active_policy = locked_state.expect_active_policy_mut();
 
         let mount_sids = FileSystemMountSids {
@@ -404,7 +404,7 @@ impl SecurityServer {
         node_path: NullessByteStr<'_>,
         class_id: Option<ClassId>,
     ) -> Option<SecurityId> {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
         let active_policy = locked_state.expect_active_policy_mut();
         let security_context = active_policy.parsed.genfscon_label_for_fs_and_path(
             fs_type,
@@ -419,7 +419,7 @@ impl SecurityServer {
     /// that the policy entry for the `TypeId` of `bounded_sid` has the `TypeId` of `parent_sid`
     /// specified in its `bounds`.
     pub fn is_bounded_by(&self, bounded_sid: SecurityId, parent_sid: SecurityId) -> bool {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
         let active_policy = locked_state.expect_active_policy();
         let bounded_type = active_policy.sid_table.sid_to_security_context(bounded_sid).type_();
         let parent_type = active_policy.sid_table.sid_to_security_context(parent_sid).type_();
@@ -460,7 +460,7 @@ impl SecurityServer {
     /// Runs the supplied function with locked `self`, and then updates the SELinux status file
     /// associated with `self.state.status_publisher`, if any.
     fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
         f(locked_state.deref_mut());
         let new_value = SeLinuxStatus {
             is_enforcing: locked_state.enforcing,
@@ -482,7 +482,7 @@ impl SecurityServer {
         target_sid: SecurityId,
         target_class: impl Into<ObjectClass>,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
         let active_policy = locked_state.expect_active_policy_mut();
 
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
@@ -509,7 +509,7 @@ impl Query for SecurityServer {
         target_sid: SecurityId,
         target_class: ObjectClass,
     ) -> AccessDecision {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
 
         let active_policy = match &locked_state.active_policy {
             Some(active_policy) => active_policy,
@@ -551,7 +551,7 @@ impl Query for SecurityServer {
         fs_node_class: FsNodeClass,
         fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
-        let mut locked_state = self.state.lock();
+        let mut locked_state = self.state.write();
 
         // This interface will not be reached without a policy having been loaded.
         let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
@@ -576,7 +576,7 @@ impl Query for SecurityServer {
         target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
-        let locked_state = self.state.lock();
+        let locked_state = self.state.read();
 
         let active_policy = match &locked_state.active_policy {
             Some(active_policy) => active_policy,
@@ -603,7 +603,7 @@ impl AccessVectorComputer for SecurityServer {
         &self,
         permissions: &[P],
     ) -> Option<AccessVector> {
-        match &self.state.lock().active_policy {
+        match &self.state.read().active_policy {
             Some(policy) => policy.parsed.access_vector_from_permissions(permissions),
             None => Some(AccessVector::NONE),
         }

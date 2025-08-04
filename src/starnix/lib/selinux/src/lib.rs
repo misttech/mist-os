@@ -1541,7 +1541,7 @@ pub struct SeLinuxStatus {
 }
 
 /// Interface for security server to interact with selinuxfs status file.
-pub trait SeLinuxStatusPublisher: Send {
+pub trait SeLinuxStatusPublisher: Send + Sync {
     /// Sets the value part of the associated selinuxfs status file.
     fn set_status(&mut self, policy_status: SeLinuxStatus);
 }
