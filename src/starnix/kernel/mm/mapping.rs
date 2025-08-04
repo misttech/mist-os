@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::address_space::GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS;
 use crate::mm::memory::MemoryObject;
 use crate::mm::memory_manager::MemoryManagerState;
 use crate::mm::{
-    FaultRegisterMode, MappingOptions, MlockMapping, ProtectionFlags, UserFault, PAGE_SIZE,
+    FaultRegisterMode, MappingOptions, MlockMapping, ProtectionFlags, UserFault,
+    GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS, PAGE_SIZE,
 };
 use crate::vfs::aio::AioContext;
 use crate::vfs::{ActiveNamespaceNode, FileWriteGuardRef};
@@ -291,7 +291,7 @@ impl Mapping {
                 // Shrink the range of the named mapping to only the named area.
                 backing.memory_offset = prefix_len;
                 Mapping::new(
-                    mm_state.address_space.create_memory_backing(
+                    mm_state.create_memory_backing(
                         start,
                         backing.memory.clone(),
                         backing.memory_offset,
@@ -558,7 +558,7 @@ impl MappingSummary {
         if mapping.file_write_guard().0.is_some() {
             kind_summary.num_file_write_guards += 1;
         }
-        match mm_state.address_space.get_mapping_backing(mapping) {
+        match mm_state.get_mapping_backing(mapping) {
             MappingBacking::Memory(m) => {
                 kind_summary.num_memory_objects += 1;
                 if m.memory_offset != 0 {
