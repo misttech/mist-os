@@ -19,7 +19,7 @@
 #include <fbl/alloc_checker.h>
 
 void ClockDevice::Enable(EnableCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->Enable(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->Enable(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send Enable request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -42,7 +42,7 @@ void ClockDevice::Enable(EnableCompleter::Sync& completer) {
 }
 
 void ClockDevice::Disable(DisableCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->Disable(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->Disable(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send Disable request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -59,7 +59,7 @@ void ClockDevice::Disable(DisableCompleter::Sync& completer) {
 }
 
 void ClockDevice::IsEnabled(IsEnabledCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->IsEnabled(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->IsEnabled(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send IsEnabled request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -76,26 +76,32 @@ void ClockDevice::IsEnabled(IsEnabledCompleter::Sync& completer) {
 }
 
 void ClockDevice::SetRate(SetRateRequestView request, SetRateCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->SetRate(id_, request->hz);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to send SetRate request to clock %u: %s", id_, result.status_string());
-    completer.ReplyError(result.status());
-    return;
-  }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to set rate for clock %u: %s", id_,
-            zx_status_get_string(result->error_value()));
-    completer.ReplyError(result->error_value());
-    return;
-  }
+  clock_impl_.buffer(arena_)
+      ->SetRate(id_, request->hz)
+      .ThenExactlyOnce([this, completer = completer.ToAsync()](
+                           fdf::WireUnownedResult<fuchsia_hardware_clockimpl::ClockImpl::SetRate>&
+                               result) mutable {
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Failed to send SetRate request to clock %u: %s", id_,
+                  result.status_string());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "Failed to set rate for clock %u: %s", id_,
+                  zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
 
-  completer.ReplySuccess();
+        completer.ReplySuccess();
+      });
 }
 
 void ClockDevice::ClockDevice::QuerySupportedRate(QuerySupportedRateRequestView request,
                                                   QuerySupportedRateCompleter::Sync& completer) {
   fdf::WireUnownedResult result =
-      clock_impl_.buffer(arena_)->QuerySupportedRate(id_, request->hz_in);
+      clock_impl_.sync().buffer(arena_)->QuerySupportedRate(id_, request->hz_in);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send QuerySupportedRate request to clock %u: %s", id_,
             result.status_string());
@@ -117,7 +123,7 @@ void ClockDevice::ClockDevice::QuerySupportedRate(QuerySupportedRateRequestView 
 }
 
 void ClockDevice::GetRate(GetRateCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->GetRate(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->GetRate(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetRate request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -134,7 +140,7 @@ void ClockDevice::GetRate(GetRateCompleter::Sync& completer) {
 }
 
 void ClockDevice::SetInput(SetInputRequestView request, SetInputCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->SetInput(id_, request->idx);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->SetInput(id_, request->idx);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send SetInput request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -151,7 +157,7 @@ void ClockDevice::SetInput(SetInputRequestView request, SetInputCompleter::Sync&
 }
 
 void ClockDevice::GetNumInputs(GetNumInputsCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->GetNumInputs(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->GetNumInputs(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetNumInputs request to clock %u: %s", id_,
             result.status_string());
@@ -169,7 +175,7 @@ void ClockDevice::GetNumInputs(GetNumInputsCompleter::Sync& completer) {
 }
 
 void ClockDevice::GetInput(GetInputCompleter::Sync& completer) {
-  fdf::WireUnownedResult result = clock_impl_.buffer(arena_)->GetInput(id_);
+  fdf::WireUnownedResult result = clock_impl_.sync().buffer(arena_)->GetInput(id_);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetInput request to clock %u: %s", id_, result.status_string());
     completer.ReplyError(result.status());
@@ -202,7 +208,7 @@ zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
             clock_impl.status_string());
     return clock_impl.status_value();
   }
-  clock_impl_.Bind(std::move(clock_impl.value()));
+  clock_impl_.Bind(std::move(clock_impl.value()), fdf::Dispatcher::GetCurrent()->get());
 
   char child_node_name[20];
   if (!node_id.has_value()) {
