@@ -27,6 +27,7 @@
         "build/python/modules",
         "build/python/tests",
         "scripts/lib",
+        "src/developer/ffx/lib/fuchsia-controller/cpp",
         "src/developer/ffx/lib/fuchsia-controller/python",
         "src/lib/diagnostics/python",
         "src/performance/lib",
