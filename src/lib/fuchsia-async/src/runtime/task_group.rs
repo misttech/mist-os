@@ -67,7 +67,7 @@ impl TaskGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SendExecutor, Task};
+    use crate::{SendExecutorBuilder, Task};
     use futures::channel::mpsc;
     use futures::StreamExt;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,7 +113,7 @@ mod tests {
     fn test_task_group_join_waits_for_tasks() {
         let task_count = 20;
 
-        SendExecutor::new(task_count).run(async move {
+        SendExecutorBuilder::new().num_threads(task_count).build().run(async move {
             let mut task_group = TaskGroup::new();
             let value = Arc::new(AtomicU64::new(0));
 
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_task_group_empty_join_completes() {
-        SendExecutor::new(1).run(async move {
+        SendExecutorBuilder::new().num_threads(1).build().run(async move {
             TaskGroup::new().join().await;
         });
     }
@@ -141,7 +141,7 @@ mod tests {
         let wait_group = WaitGroup::new();
         let task_count = 10;
 
-        SendExecutor::new(task_count).run(async move {
+        SendExecutorBuilder::new().num_threads(task_count).build().run(async move {
             let mut task_group = TaskGroup::new();
             for _ in 0..task_count {
                 let done_signaler = wait_group.add_one();
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn test_task_group_spawn() {
         let task_count = 3;
-        SendExecutor::new(task_count).run(async move {
+        SendExecutorBuilder::new().num_threads(task_count).build().run(async move {
             let mut task_group = TaskGroup::new();
 
             // We can spawn tasks from any Future<()> implementation, including...

@@ -223,7 +223,7 @@ pub mod executor {
 
     impl SendExecutor {
         /// Create a new executor running with actual time.
-        pub fn new(num_threads: u8) -> Self {
+        pub(crate) fn new(num_threads: u8) -> Self {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(num_threads.into())
                 .enable_time()

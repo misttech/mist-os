@@ -269,7 +269,7 @@ pub async fn yield_now() {
 
 #[cfg(test)]
 mod tests {
-    use super::super::executor::{LocalExecutor, SendExecutor};
+    use super::super::executor::{LocalExecutor, SendExecutorBuilder};
     use super::*;
     use std::sync::{Arc, Mutex};
 
@@ -299,7 +299,7 @@ mod tests {
     #[should_panic]
     fn spawn_from_unblock_fails() {
         // no executor in the off-thread, so spawning fails
-        SendExecutor::new(2).run(async move {
+        SendExecutorBuilder::new().num_threads(2).build().run(async move {
             unblock(|| {
                 #[allow(clippy::let_underscore_future)]
                 let _ = Task::spawn(async {});

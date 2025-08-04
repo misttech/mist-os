@@ -42,26 +42,6 @@ impl fmt::Debug for SendExecutor {
 }
 
 impl SendExecutor {
-    /// Create a new multi-threaded executor.
-    #[allow(deprecated)]
-    pub fn new(num_threads: u8) -> Self {
-        Self::new_inner(num_threads, None)
-    }
-
-    /// Set a new worker initialization callback. Will be invoked once at the start of each worker
-    /// thread.
-    pub fn set_worker_init(&mut self, worker_init: impl Fn() + Send + Sync + 'static) {
-        self.worker_init = Some(Arc::new(worker_init) as Arc<dyn Fn() + Send + Sync + 'static>);
-    }
-
-    /// Apply the worker initialization callback to an owned executor, returning the executor.
-    ///
-    /// The initialization callback will be invoked once at the start of each worker thread.
-    pub fn with_worker_init(mut self, worker_init: fn()) -> Self {
-        self.set_worker_init(worker_init);
-        self
-    }
-
     fn new_inner(
         num_threads: u8,
         worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,

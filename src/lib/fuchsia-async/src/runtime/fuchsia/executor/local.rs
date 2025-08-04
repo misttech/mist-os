@@ -52,7 +52,7 @@ impl LocalExecutor {
     }
 
     /// Create a new single-threaded executor running with actual time, with a port.
-    pub fn new_with_port(port: zx::Port) -> Self {
+    pub(crate) fn new_with_port(port: zx::Port) -> Self {
         let inner = Arc::new(Executor::new_with_port(
             ExecutorTime::RealTime,
             /* is_local */ true,
@@ -190,7 +190,7 @@ impl TestExecutor {
     }
 
     /// Create a new executor for testing from a port.
-    pub fn new_with_port(port: zx::Port) -> Self {
+    pub(crate) fn new_with_port(port: zx::Port) -> Self {
         Self { local: LocalExecutor::new_with_port(port) }
     }
 

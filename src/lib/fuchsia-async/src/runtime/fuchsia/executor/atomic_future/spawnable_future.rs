@@ -75,7 +75,7 @@ impl<O> Future for &mut SpawnableFuture<'_, O> {
 #[cfg(test)]
 mod tests {
     use super::SpawnableFuture;
-    use crate::{Scope, SendExecutor};
+    use crate::{Scope, SendExecutorBuilder};
     use std::future::poll_fn;
     use std::sync::atomic::AtomicU64;
     use std::sync::atomic::Ordering::Relaxed;
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_spawnable_future() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let counter = Arc::new(AtomicU64::new(0));
             let counter2 = Arc::clone(&counter);
