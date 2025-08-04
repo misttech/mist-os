@@ -256,7 +256,9 @@ pub fn sys_msync(
     mm.ensure_mapped(addr, length)?;
 
     let addr_end = (addr + length).map_err(|_| Errno::new(ENOMEM))?;
-    if flags & MS_INVALIDATE != 0 && mm.state.read().num_locked_bytes(addr..addr_end) > 0 {
+    if flags & MS_INVALIDATE != 0
+        && mm.state.read().address_space.num_locked_bytes(addr..addr_end) > 0
+    {
         // gvisor mlock tests rely on returning EBUSY from msync on locked ranges.
         return error!(EBUSY);
     }

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::mapping::MappingBackingMemory;
+use crate::mm::address_space::AddressSpace;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
     FaultRegisterMode, FutexTable, InflightVmsplicedPayloads, Mapping, MappingBacking,
     MappingFlags, MappingName, MlockPinFlavor, MlockShadowProcess, PrivateFutexKey, UserFault,
-    UserFaultRegistration, VmsplicePayload, VmsplicePayloadSegment, VMEX_RESOURCE,
+    UserFaultRegistration, VmsplicePayload, VMEX_RESOURCE,
 };
 use crate::security;
 use crate::signals::{SignalDetail, SignalInfo};
@@ -65,7 +65,7 @@ use starnix_uapi::{
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut, Range, RangeBounds};
+use std::ops::{Deref, DerefMut, Range};
 use std::sync::{Arc, LazyLock};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
@@ -90,8 +90,6 @@ pub fn init_usercopy() {
     // This call lazily initializes the `Usercopy` instance.
     let _ = usercopy();
 }
-
-pub const GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS: usize = 256;
 
 #[cfg(target_arch = "x86_64")]
 const ASLR_RANDOM_BITS: usize = 27;
@@ -295,91 +293,13 @@ pub struct MemoryManagerState {
     user_vmar_info: zx::VmarInfo,
 
     /// The memory mappings currently used by this address space.
-    ///
-    /// The mappings record which object backs each address.
-    mappings: RangeMap<UserAddress, Mapping>,
-
-    /// Memory object backing private, anonymous memory allocations in this address space.
-    #[cfg(feature = "alternate_anon_allocs")]
-    private_anonymous: PrivateAnonymousMemoryManager,
+    pub address_space: AddressSpace,
 
     forkable_state: MemoryManagerForkableState,
 }
 
 // 64k under the 4GB
 const LOWER_4GB_LIMIT: UserAddress = UserAddress::const_from(0xffff_0000);
-
-#[cfg(feature = "alternate_anon_allocs")]
-struct PrivateAnonymousMemoryManager {
-    /// Memory object backing private, anonymous memory allocations in this address space.
-    backing: Arc<MemoryObject>,
-}
-
-#[cfg(feature = "alternate_anon_allocs")]
-impl PrivateAnonymousMemoryManager {
-    fn new(backing_size: u64) -> Self {
-        let backing = Arc::new(
-            MemoryObject::from(
-                zx::Vmo::create(backing_size)
-                    .unwrap()
-                    .replace_as_executable(&VMEX_RESOURCE)
-                    .unwrap(),
-            )
-            .with_zx_name(b"starnix:memory_manager"),
-        );
-        Self { backing }
-    }
-
-    fn read_memory<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.backing.read_uninit(bytes, addr.ptr() as u64).map_err(|_| errno!(EFAULT))
-    }
-
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<(), Errno> {
-        self.backing.write(bytes, addr.ptr() as u64).map_err(|_| errno!(EFAULT))
-    }
-
-    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.backing
-            .op_range(zx::VmoOp::ZERO, addr.ptr() as u64, length as u64)
-            .map_err(|_| errno!(EFAULT))?;
-        Ok(length)
-    }
-
-    fn move_pages(
-        &self,
-        source: &std::ops::Range<UserAddress>,
-        dest: UserAddress,
-    ) -> Result<(), Errno> {
-        let length = source.end - source.start;
-        let dest_memory_offset = dest.ptr() as u64;
-        let source_memory_offset = source.start.ptr() as u64;
-        self.backing
-            .memmove(
-                zx::TransferDataOptions::empty(),
-                dest_memory_offset,
-                source_memory_offset,
-                length.try_into().unwrap(),
-            )
-            .map_err(impossible_error)?;
-        Ok(())
-    }
-
-    fn snapshot(&self, backing_size: u64) -> Result<Self, Errno> {
-        Ok(Self {
-            backing: Arc::new(
-                self.backing
-                    .create_child(zx::VmoChildOptions::SNAPSHOT, 0, backing_size)
-                    .map_err(impossible_error)?
-                    .replace_as_executable(&VMEX_RESOURCE)
-                    .map_err(impossible_error)?,
-            ),
-        })
-    }
-}
 
 #[derive(Default, Clone)]
 pub struct MemoryManagerForkableState {
@@ -421,12 +341,12 @@ impl DerefMut for MemoryManagerState {
 }
 
 #[derive(Default)]
-struct ReleasedMappings {
+pub struct ReleasedMappings {
     doomed: Vec<Mapping>,
 }
 
 impl ReleasedMappings {
-    fn extend(&mut self, mappings: impl IntoIterator<Item = Mapping>) {
+    pub fn extend(&mut self, mappings: impl IntoIterator<Item = Mapping>) {
         self.doomed.extend(mappings);
     }
 
@@ -505,138 +425,10 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
-    /// Returns occupied address ranges that intersect with the given range.
-    ///
-    /// An address range is "occupied" if (a) there is already a mapping in that range or (b) there
-    /// is a GROWSDOWN mapping <= 256 pages above that range. The 256 pages below a GROWSDOWN
-    /// mapping is the "guard region." The memory manager avoids mapping memory in the guard region
-    /// in some circumstances to preserve space for the GROWSDOWN mapping to grow down.
-    fn get_occupied_address_ranges<'a>(
-        &'a self,
-        subrange: &'a Range<UserAddress>,
-    ) -> impl Iterator<Item = Range<UserAddress>> + 'a {
-        let query_range = subrange.start
-            ..(subrange
-                .end
-                .saturating_add(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS));
-        self.mappings.range(query_range).filter_map(|(range, mapping)| {
-            let occupied_range = mapping.inflate_to_include_guard_pages(range);
-            if occupied_range.start < subrange.end && subrange.start < occupied_range.end {
-                Some(occupied_range)
-            } else {
-                None
-            }
-        })
-    }
-
-    fn count_possible_placements(
-        &self,
-        length: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<usize> {
-        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
-        let mut possible_placements = 0;
-        // If the allocation is placed at the first available address, every page that is left
-        // before the next mapping or the end of subrange is +1 potential placement.
-        let mut first_fill_end = subrange.start.checked_add(length)?;
-        while first_fill_end <= subrange.end {
-            let Some(mapping) = occupied_ranges.next() else {
-                possible_placements += (subrange.end - first_fill_end) / (*PAGE_SIZE as usize) + 1;
-                break;
-            };
-            if mapping.start >= first_fill_end {
-                possible_placements += (mapping.start - first_fill_end) / (*PAGE_SIZE as usize) + 1;
-            }
-            first_fill_end = mapping.end.checked_add(length)?;
-        }
-        Some(possible_placements)
-    }
-
-    fn pick_placement(
-        &self,
-        length: usize,
-        mut chosen_placement_idx: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<UserAddress> {
-        let mut candidate =
-            Range { start: subrange.start, end: subrange.start.checked_add(length)? };
-        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
-        loop {
-            let Some(mapping) = occupied_ranges.next() else {
-                // No more mappings: treat the rest of the index as an offset.
-                let res =
-                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
-                debug_assert!(res.checked_add(length)? <= subrange.end);
-                return Some(res);
-            };
-            if mapping.start < candidate.end {
-                // doesn't fit, skip
-                candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
-                continue;
-            }
-            let unused_space =
-                (mapping.start.ptr() - candidate.end.ptr()) / (*PAGE_SIZE as usize) + 1;
-            if unused_space > chosen_placement_idx {
-                // Chosen placement is within the range; treat the rest of the index as an offset.
-                let res =
-                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
-                return Some(res);
-            }
-
-            // chosen address is further up, skip
-            chosen_placement_idx -= unused_space;
-            candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
-        }
-    }
-
-    fn find_random_unused_range(
-        &self,
-        length: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<UserAddress> {
-        let possible_placements = self.count_possible_placements(length, subrange)?;
-        if possible_placements == 0 {
-            return None;
-        }
-        let chosen_placement_idx = rand::random_range(0..possible_placements);
-        self.pick_placement(length, chosen_placement_idx, subrange)
-    }
-
     // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
     // from `mmap_top` downwards.
     pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
-        let gap_size = length as u64;
-        let mut upper_bound = self.mmap_top;
-
-        loop {
-            let gap_end = self.mappings.find_gap_end(gap_size, &upper_bound);
-            let candidate = gap_end.checked_sub(length)?;
-
-            // Is there a next mapping? If not, the candidate is already good.
-            let Some((occupied_range, mapping)) = self.mappings.get(gap_end) else {
-                return Some(candidate);
-            };
-            let occupied_range = mapping.inflate_to_include_guard_pages(occupied_range);
-            // If it doesn't overlap, the gap is big enough to fit.
-            if occupied_range.start >= gap_end {
-                return Some(candidate);
-            }
-            // If there was a mapping in the way, use the start of that range as the upper bound.
-            upper_bound = occupied_range.start;
-        }
-    }
-
-    // Accept the hint if the range is unused and within the range available for mapping.
-    fn is_hint_acceptable(&self, hint_addr: UserAddress, length: usize) -> bool {
-        let Some(hint_end) = hint_addr.checked_add(length) else {
-            return false;
-        };
-        if !RESTRICTED_ASPACE_RANGE.contains(&hint_addr.ptr())
-            || !RESTRICTED_ASPACE_RANGE.contains(&hint_end.ptr())
-        {
-            return false;
-        };
-        self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
+        self.address_space.find_next_unused_range_below(self.mmap_top, length)
     }
 
     fn select_address(
@@ -645,44 +437,10 @@ impl MemoryManagerState {
         length: usize,
         flags: MappingFlags,
     ) -> Result<SelectedAddress, Errno> {
-        let adjusted_length = round_up_to_system_page_size(length).or_else(|_| error!(ENOMEM))?;
-
-        let find_address = || -> Result<SelectedAddress, Errno> {
-            profile_duration!("FindAddressForMmap");
-            let new_addr = if flags.contains(MappingFlags::LOWER_32BIT) {
-                // MAP_32BIT specifies that the memory allocated will
-                // be within the first 2 GB of the process address space.
-                self.find_random_unused_range(
-                    adjusted_length,
-                    &(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-                        ..UserAddress::from_ptr(0x80000000)),
-                )
-                .ok_or_else(|| errno!(ENOMEM))?
-            } else {
-                self.find_next_unused_range(adjusted_length).ok_or_else(|| errno!(ENOMEM))?
-            };
-
-            Ok(SelectedAddress::Fixed(new_addr))
-        };
-
-        Ok(match addr {
-            DesiredAddress::Any => find_address()?,
-            DesiredAddress::Hint(hint_addr) => {
-                // Round down to page size
-                let hint_addr =
-                    UserAddress::from_ptr(hint_addr.ptr() - hint_addr.ptr() % *PAGE_SIZE as usize);
-                if self.is_hint_acceptable(hint_addr, adjusted_length) {
-                    SelectedAddress::Fixed(hint_addr)
-                } else {
-                    find_address()?
-                }
-            }
-            DesiredAddress::Fixed(addr) => SelectedAddress::Fixed(addr),
-            DesiredAddress::FixedOverwrite(addr) => SelectedAddress::FixedOverwrite(addr),
-        })
+        self.address_space.select_address_below(self.mmap_top, addr, length, flags)
     }
 
-    // Map the memory without updating `self.mappings`.
+    // Map the memory without updating `self.address_space.mappings`.
     fn map_in_user_vmar(
         &self,
         addr: SelectedAddress,
@@ -704,15 +462,6 @@ impl MemoryManagerState {
         )
     }
 
-    fn validate_addr(&self, addr: DesiredAddress, length: usize) -> Result<(), Errno> {
-        if let DesiredAddress::FixedOverwrite(addr) = addr {
-            if self.check_has_unauthorized_splits(addr, length) {
-                return error!(ENOMEM);
-            }
-        }
-        Ok(())
-    }
-
     fn map_memory(
         &mut self,
         mm: &Arc<MemoryManager>,
@@ -727,7 +476,7 @@ impl MemoryManagerState {
         file_write_guard: FileWriteGuardRef,
         released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
-        self.validate_addr(addr, length)?;
+        self.address_space.validate_addr(addr, length)?;
 
         let mapped_addr = self.map_in_user_vmar(
             self.select_address(addr, length, flags)?,
@@ -752,17 +501,17 @@ impl MemoryManagerState {
 
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
-            self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
+            self.address_space.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
         let mut mapping = Mapping::new(
-            self.create_memory_backing(mapped_addr, memory, memory_offset),
+            self.address_space.create_memory_backing(mapped_addr, memory, memory_offset),
             flags,
             max_access,
             file_write_guard,
         );
         mapping.set_name(name);
-        self.mappings.insert(mapped_addr..end, mapping);
+        self.address_space.mappings.insert(mapped_addr..end, mapping);
 
         Ok(mapped_addr)
     }
@@ -779,7 +528,7 @@ impl MemoryManagerState {
         name: MappingName,
         released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
-        self.validate_addr(addr, length)?;
+        self.address_space.validate_addr(addr, length)?;
 
         let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
         let selected_addr = self.select_address(addr, length, flags)?;
@@ -787,7 +536,7 @@ impl MemoryManagerState {
 
         let mapped_addr = self.map_in_user_vmar(
             selected_addr,
-            &self.private_anonymous.backing,
+            &self.address_space.private_anonymous.backing,
             backing_memory_offset as u64,
             length,
             flags,
@@ -797,11 +546,11 @@ impl MemoryManagerState {
         let end = (mapped_addr + length)?.round_up(*PAGE_SIZE)?;
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
-            self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
+            self.address_space.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
         let mapping = Mapping::new_private_anonymous(flags, name);
-        self.mappings.insert(mapped_addr..end, mapping);
+        self.address_space.mappings.insert(mapped_addr..end, mapping);
 
         Ok(mapped_addr)
     }
@@ -887,11 +636,11 @@ impl MemoryManagerState {
         let old_length = round_up_to_system_page_size(old_length)?;
         let new_length = round_up_to_system_page_size(new_length)?;
 
-        if self.check_has_unauthorized_splits(old_addr, old_length) {
+        if self.address_space.check_has_unauthorized_splits(old_addr, old_length) {
             return error!(EINVAL);
         }
 
-        if self.check_has_unauthorized_splits(new_addr, new_length) {
+        if self.address_space.check_has_unauthorized_splits(new_addr, new_length) {
             return error!(EINVAL);
         }
 
@@ -949,14 +698,15 @@ impl MemoryManagerState {
             return Ok(Some(old_addr));
         }
 
-        if self.mappings.range(old_range.end..new_range_in_place.end).next().is_some() {
+        if self.address_space.mappings.range(old_range.end..new_range_in_place.end).next().is_some()
+        {
             // There is some mapping in the growth range prevening an in-place growth.
             return Ok(None);
         }
 
         // There is space to grow in-place. The old range must be one contiguous mapping.
         let (original_range, mapping) =
-            self.mappings.get(old_addr).ok_or_else(|| errno!(EINVAL))?;
+            self.address_space.mappings.get(old_addr).ok_or_else(|| errno!(EINVAL))?;
 
         if old_range.end > original_range.end {
             return error!(EFAULT);
@@ -971,7 +721,7 @@ impl MemoryManagerState {
 
         // As a special case for private, anonymous mappings, allocate more space in the
         // memory object. FD-backed mappings have their backing memory handled by the file system.
-        match self.get_mapping_backing(&original_mapping) {
+        match self.address_space.get_mapping_backing(&original_mapping) {
             MappingBacking::Memory(backing) => {
                 if private_anonymous {
                     let new_memory_size = backing
@@ -1015,14 +765,16 @@ impl MemoryManagerState {
                 // Map new pages to back the growth.
                 self.map_in_user_vmar(
                     SelectedAddress::FixedOverwrite(growth_start),
-                    &self.private_anonymous.backing,
+                    &self.address_space.private_anonymous.backing,
                     growth_start.ptr() as u64,
                     growth_length,
                     original_mapping.flags(),
                     false,
                 )?;
                 // Overwrite the mapping entry with the new larger size.
-                self.mappings.insert(original_range.start..final_end, original_mapping.clone());
+                self.address_space
+                    .mappings
+                    .insert(original_range.start..final_end, original_mapping.clone());
                 Ok(Some(original_range.start))
             }
         }
@@ -1041,7 +793,7 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
         let (original_range, src_mapping) =
-            self.mappings.get(src_addr).ok_or_else(|| errno!(EINVAL))?;
+            self.address_space.mappings.get(src_addr).ok_or_else(|| errno!(EINVAL))?;
         let original_range = original_range.clone();
         let src_mapping = src_mapping.clone();
 
@@ -1090,7 +842,8 @@ impl MemoryManagerState {
 
         let offset_into_original_range = (src_addr - original_range.start) as u64;
         let private_anonymous = src_mapping.private_anonymous();
-        let (dst_memory_offset, memory) = match self.get_mapping_backing(&src_mapping) {
+        let (dst_memory_offset, memory) = match self.address_space.get_mapping_backing(&src_mapping)
+        {
             MappingBacking::Memory(backing) => {
                 if private_anonymous {
                     // This mapping is a private, anonymous mapping. Create a COW child memory object that covers
@@ -1136,12 +889,12 @@ impl MemoryManagerState {
                     let src_move_end = (src_range.start + length_to_move)?;
                     let range_to_move = src_range.start..src_move_end;
                     // Move the previously mapped pages into their new location.
-                    self.private_anonymous.move_pages(&range_to_move, dst_addr)?;
+                    self.address_space.private_anonymous.move_pages(&range_to_move, dst_addr)?;
                 }
 
                 self.map_in_user_vmar(
                     SelectedAddress::FixedOverwrite(dst_addr),
-                    &self.private_anonymous.backing,
+                    &self.address_space.private_anonymous.backing,
                     dst_addr.ptr() as u64,
                     dst_length,
                     src_mapping.flags(),
@@ -1164,7 +917,7 @@ impl MemoryManagerState {
                     )?;
                 }
 
-                self.mappings.insert(
+                self.address_space.mappings.insert(
                     dst_addr..dst_end,
                     Mapping::new_private_anonymous(src_mapping.flags(), src_mapping.name()),
                 );
@@ -1200,10 +953,10 @@ impl MemoryManagerState {
         if keep_source && private_anonymous {
             // For MREMAP_DONTUNMAP case, uncommit the old range
             // TODO(https://fxbug.dev/381098290): Handle the case of private file-backed memory.
-            let memory = match self.get_mapping_backing(&src_mapping) {
+            let memory = match self.address_space.get_mapping_backing(&src_mapping) {
                 MappingBacking::Memory(backing) => backing.memory(),
                 #[cfg(feature = "alternate_anon_allocs")]
-                MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
+                MappingBacking::PrivateAnonymous => &self.address_space.private_anonymous.backing,
             };
             let start = src_mapping.address_to_offset(src_addr);
             memory.op_range(zx::VmoOp::ZERO, start, src_length as u64).map_err(|s| match s {
@@ -1216,33 +969,6 @@ impl MemoryManagerState {
         }
 
         Ok(new_address)
-    }
-
-    // Checks if an operation may be performed over the target mapping that may
-    // result in a split mapping.
-    //
-    // An operation may be forbidden if the target mapping only partially covers
-    // an existing mapping with the `MappingOptions::DONT_SPLIT` flag set.
-    fn check_has_unauthorized_splits(&self, addr: UserAddress, length: usize) -> bool {
-        let query_range = addr..addr.saturating_add(length);
-        let mut intersection = self.mappings.range(query_range.clone());
-
-        // A mapping is not OK if it disallows splitting and the target range
-        // does not fully cover the mapping range.
-        let check_if_mapping_has_unauthorized_split =
-            |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
-                mapping.is_some_and(|(mapping_range, mapping)| {
-                    mapping.flags().contains(MappingFlags::DONT_SPLIT)
-                        && (mapping_range.start < query_range.start
-                            || query_range.end < mapping_range.end)
-                })
-            };
-
-        // We only check the first and last mappings in the range because naturally,
-        // the mappings in the middle are fully covered by the target mapping and
-        // won't be split.
-        check_if_mapping_has_unauthorized_split(intersection.next())
-            || check_if_mapping_has_unauthorized_split(intersection.next_back())
     }
 
     /// Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
@@ -1261,7 +987,7 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        if self.check_has_unauthorized_splits(addr, length) {
+        if self.address_space.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
         }
 
@@ -1276,141 +1002,9 @@ impl MemoryManagerState {
             }
         };
 
-        self.update_after_unmap(mm, addr, length, released_mappings)?;
+        self.address_space.update_after_unmap(mm, addr, length, released_mappings)?;
 
         Ok(())
-    }
-
-    // Updates `self.mappings` after the specified range was unmaped.
-    //
-    // The range to unmap can span multiple mappings, and can split mappings if
-    // the range start or end falls in the middle of a mapping.
-    //
-    // For example, with this set of mappings and unmap range `R`:
-    //
-    //   [  A  ][ B ] [    C    ]     <- mappings
-    //      |-------------|           <- unmap range R
-    //
-    // Assuming the mappings are all MAP_ANONYMOUS:
-    // - the pages of A, B, and C that fall in range R are unmapped; the memory object backing B is dropped.
-    // - the memory object backing A is shrunk.
-    // - a COW child memory object is created from C, which is mapped in the range of C that falls outside R.
-    //
-    // File-backed mappings don't need to have their memory object modified.
-    //
-    // Unmapped mappings are placed in `released_mappings`.
-    fn update_after_unmap(
-        &mut self,
-        mm: &Arc<MemoryManager>,
-        addr: UserAddress,
-        length: usize,
-        released_mappings: &mut ReleasedMappings,
-    ) -> Result<(), Errno> {
-        profile_duration!("UpdateAfterUnmap");
-        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-        let unmap_range = addr..end_addr;
-
-        #[cfg(feature = "alternate_anon_allocs")]
-        {
-            for (range, mapping) in self.mappings.range(unmap_range.clone()) {
-                // Deallocate any pages in the private, anonymous backing that are now unreachable.
-                if let MappingBacking::PrivateAnonymous = self.get_mapping_backing(mapping) {
-                    let unmapped_range = &unmap_range.intersect(range);
-
-                    mm.inflight_vmspliced_payloads
-                        .handle_unmapping(&self.private_anonymous.backing, unmapped_range)?;
-
-                    self.private_anonymous
-                        .zero(unmapped_range.start, unmapped_range.end - unmapped_range.start)?;
-                }
-            }
-            released_mappings.extend(self.mappings.remove(unmap_range));
-            return Ok(());
-        }
-
-        #[cfg(not(feature = "alternate_anon_allocs"))]
-        {
-            // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
-            let truncated_head = match self.mappings.get(addr) {
-                Some((range, mapping)) if range.start != addr && mapping.private_anonymous() => {
-                    Some((range.start..addr, mapping.clone()))
-                }
-                _ => None,
-            };
-
-            // Find the private, anonymous mapping that will get its head cut off by this unmap call.
-            // A mapping that starts exactly at `end_addr` is excluded since it is not affected by
-            // the unmapping.
-            let truncated_tail = match self.mappings.get(end_addr) {
-                Some((range, mapping))
-                    if range.start != end_addr && mapping.private_anonymous() =>
-                {
-                    Some((end_addr..range.end, mapping.clone()))
-                }
-                _ => None,
-            };
-
-            // Remove the original range of mappings from our map.
-            released_mappings.extend(self.mappings.remove(addr..end_addr));
-
-            if let Some((range, mut mapping)) = truncated_tail {
-                let MappingBacking::Memory(mut backing) = self.get_mapping_backing(mapping).clone();
-                mm.inflight_vmspliced_payloads
-                    .handle_unmapping(&backing.memory(), &unmap_range.intersect(&range))?;
-
-                // Create and map a child COW memory object mapping that represents the truncated tail.
-                let memory_info = backing.memory().basic_info();
-                let child_memory_offset = backing.address_to_offset(range.start);
-                let child_length = range.end - range.start;
-                let mut child_memory = backing
-                    .memory()
-                    .create_child(
-                        zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                        child_memory_offset,
-                        child_length as u64,
-                    )
-                    .map_err(MemoryManager::get_errno_for_map_err)?;
-                if memory_info.rights.contains(zx::Rights::EXECUTE) {
-                    child_memory = child_memory
-                        .replace_as_executable(&VMEX_RESOURCE)
-                        .map_err(impossible_error)?;
-                }
-
-                // Update the mapping.
-                backing.set_memory(Arc::new(child_memory));
-                backing.set_base(range.start);
-                backing.set_memory_offset(0);
-
-                self.map_in_user_vmar(
-                    SelectedAddress::FixedOverwrite(range.start),
-                    backing.memory(),
-                    0,
-                    child_length,
-                    mapping.flags(),
-                    false,
-                )?;
-
-                // Replace the mapping with a new one that contains updated memory object handle.
-                self.set_mapping_backing(&mut mapping, MappingBacking::Memory(backing));
-                self.mappings.insert(range, mapping);
-            }
-
-            if let Some((range, mapping)) = truncated_head {
-                let MappingBacking::Memory(backing) = self.get_mapping_backing(mapping);
-                mm.inflight_vmspliced_payloads
-                    .handle_unmapping(backing.memory(), &unmap_range.intersect(&range))?;
-
-                // Resize the memory object of the head mapping, whose tail was cut off.
-                let new_mapping_size = (range.end - range.start) as u64;
-                let new_memory_size = backing.memory_offset() + new_mapping_size;
-                backing
-                    .memory()
-                    .set_size(new_memory_size)
-                    .map_err(MemoryManager::get_errno_for_map_err)?;
-            }
-
-            Ok(())
-        }
     }
 
     fn protect_vmar_range(
@@ -1442,13 +1036,13 @@ impl MemoryManagerState {
         let page_size = *PAGE_SIZE;
         let end = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(page_size)?;
 
-        if self.check_has_unauthorized_splits(addr, length) {
+        if self.address_space.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
         }
 
         let prot_range = if prot_flags.contains(ProtectionFlags::GROWSDOWN) {
             let mut start = addr;
-            let Some((range, mapping)) = self.mappings.get(start) else {
+            let Some((range, mapping)) = self.address_space.mappings.get(start) else {
                 return error!(EINVAL);
             };
             // Ensure that the mapping has GROWSDOWN if PROT_GROWSDOWN was specified.
@@ -1465,7 +1059,7 @@ impl MemoryManagerState {
             //     set).
             start = range.start;
             while let Some((range, mapping)) =
-                self.mappings.get(start.saturating_sub(page_size as usize))
+                self.address_space.mappings.get(start.saturating_sub(page_size as usize))
             {
                 if !mapping.flags().contains(MappingFlags::GROWSDOWN)
                     || mapping.flags().access_flags() != access_flags
@@ -1489,7 +1083,7 @@ impl MemoryManagerState {
         // TODO(https://fxbug.dev/411617451): `mprotect` should apply the protection flags
         // until it encounters a mapping that doesn't allow it, rather than not apply the protection
         // flags at all if a single mapping doesn't allow it.
-        for (range, mapping) in self.mappings.range(prot_range.clone()) {
+        for (range, mapping) in self.address_space.mappings.range(prot_range.clone()) {
             security::file_mprotect(current_task, range, mapping, prot_flags)?;
         }
 
@@ -1510,7 +1104,7 @@ impl MemoryManagerState {
 
         // Update the flags on each mapping in the range.
         let mut updates = vec![];
-        for (range, mapping) in self.mappings.range(prot_range.clone()) {
+        for (range, mapping) in self.address_space.mappings.range(prot_range.clone()) {
             if mapping.userfault().is_some() {
                 track_stub!(
                     TODO("https://fxbug.dev/297375964"),
@@ -1525,7 +1119,7 @@ impl MemoryManagerState {
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
-            self.mappings.insert(range, mapping);
+            self.address_space.mappings.insert(range, mapping);
         }
         Ok(())
     }
@@ -1544,7 +1138,7 @@ impl MemoryManagerState {
 
         let end_addr =
             addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(*PAGE_SIZE)?;
-        if end_addr > self.max_address() {
+        if end_addr > self.address_space.max_address() {
             return error!(EFAULT);
         }
 
@@ -1555,7 +1149,7 @@ impl MemoryManagerState {
 
         let mut updates = vec![];
         let range_for_op = addr..end_addr;
-        for (range, mapping) in self.mappings.range(range_for_op.clone()) {
+        for (range, mapping) in self.address_space.mappings.range(range_for_op.clone()) {
             let range_to_zero = range.intersect(&range_for_op);
             if range_to_zero.is_empty() {
                 continue;
@@ -1603,9 +1197,9 @@ impl MemoryManagerState {
                     // the containing branch.
                     unknown_advice => unreachable!("unknown advice {unknown_advice}"),
                 };
-                let new_mapping = match self.get_mapping_backing(mapping) {
+                let new_mapping = match self.address_space.get_mapping_backing(mapping) {
                     MappingBacking::Memory(backing) => Mapping::with_name(
-                        self.create_memory_backing(
+                        self.address_space.create_memory_backing(
                             range_to_zero.start,
                             backing.memory().clone(),
                             backing.memory_offset() + start,
@@ -1714,10 +1308,12 @@ impl MemoryManagerState {
                     }
                 };
 
-                let memory = match self.get_mapping_backing(mapping) {
+                let memory = match self.address_space.get_mapping_backing(mapping) {
                     MappingBacking::Memory(backing) => backing.memory(),
                     #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
+                    MappingBacking::PrivateAnonymous => {
+                        &self.address_space.private_anonymous.backing
+                    }
                 };
                 memory.op_range(op, start, end - start).map_err(|s| match s {
                     zx::Status::OUT_OF_RANGE => errno!(EINVAL),
@@ -1730,7 +1326,7 @@ impl MemoryManagerState {
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
-            self.mappings.insert(range, mapping);
+            self.address_space.mappings.insert(range, mapping);
         }
         Ok(())
     }
@@ -1755,7 +1351,7 @@ impl MemoryManagerState {
         let mut bytes_mapped_in_range = 0;
         let mut num_new_locked_bytes = 0;
         let mut failed_to_lock = false;
-        for (range, mapping) in self.mappings.range(start_addr..end_addr) {
+        for (range, mapping) in self.address_space.mappings.range(start_addr..end_addr) {
             let mut range = range.clone();
             let mut mapping = mapping.clone();
 
@@ -1789,14 +1385,15 @@ impl MemoryManagerState {
                             .expando
                             .get_or_try_init(|| MlockShadowProcess::new())?;
 
-                        let (vmo, offset) = match self.get_mapping_backing(&mapping) {
+                        let (vmo, offset) = match self.address_space.get_mapping_backing(&mapping) {
                             MappingBacking::Memory(m) => (
                                 m.memory().as_vmo().ok_or_else(|| errno!(ENOMEM))?,
                                 m.memory_offset(),
                             ),
                             #[cfg(feature = "alternate_anon_allocs")]
                             MappingBacking::PrivateAnonymous => (
-                                self.private_anonymous
+                                self.address_space
+                                    .private_anonymous
                                     .backing
                                     .as_vmo()
                                     .ok_or_else(|| errno!(ENOMEM))?,
@@ -1819,7 +1416,7 @@ impl MemoryManagerState {
         }
 
         let memlock_rlimit = current_task.thread_group().get_rlimit(locked, Resource::MEMLOCK);
-        if self.total_locked_bytes() + num_new_locked_bytes > memlock_rlimit {
+        if self.address_space.total_locked_bytes() + num_new_locked_bytes > memlock_rlimit {
             if crate::security::check_task_capable(current_task, CAP_IPC_LOCK).is_err() {
                 let code = if memlock_rlimit > 0 { errno!(ENOMEM) } else { errno!(EPERM) };
                 return Err(code);
@@ -1856,7 +1453,7 @@ impl MemoryManagerState {
         }
 
         for (range, mapping) in updates {
-            self.mappings.insert(range, mapping);
+            self.address_space.mappings.insert(range, mapping);
         }
 
         if failed_to_lock {
@@ -1879,7 +1476,7 @@ impl MemoryManagerState {
 
         let mut updates = vec![];
         let mut bytes_mapped_in_range = 0;
-        for (range, mapping) in self.mappings.range(start_addr..end_addr) {
+        for (range, mapping) in self.address_space.mappings.range(start_addr..end_addr) {
             let mut range = range.clone();
             let mut mapping = mapping.clone();
 
@@ -1909,149 +1506,10 @@ impl MemoryManagerState {
         }
 
         for (range, mapping) in updates {
-            self.mappings.insert(range, mapping);
+            self.address_space.mappings.insert(range, mapping);
         }
 
         Ok(())
-    }
-
-    pub fn total_locked_bytes(&self) -> u64 {
-        self.num_locked_bytes(
-            UserAddress::from(self.user_vmar_info.base as u64)
-                ..UserAddress::from((self.user_vmar_info.base + self.user_vmar_info.len) as u64),
-        )
-    }
-
-    pub fn num_locked_bytes(&self, range: impl RangeBounds<UserAddress>) -> u64 {
-        self.mappings
-            .range(range)
-            .filter(|(_, mapping)| mapping.flags().contains(MappingFlags::LOCKED))
-            .map(|(range, _)| (range.end - range.start) as u64)
-            .sum()
-    }
-
-    fn max_address(&self) -> UserAddress {
-        UserAddress::from_ptr(self.user_vmar_info.base + self.user_vmar_info.len)
-    }
-
-    fn user_address_to_vmar_offset(&self, addr: UserAddress) -> Result<usize, ()> {
-        if !(self.user_vmar_info.base..self.user_vmar_info.base + self.user_vmar_info.len)
-            .contains(&addr.ptr())
-        {
-            return Err(());
-        }
-        (addr - self.user_vmar_info.base).map(|addr| addr.ptr()).map_err(|_| ())
-    }
-
-    fn get_mappings_for_vmsplice(
-        &self,
-        mm: &Arc<MemoryManager>,
-        buffers: &UserBuffers,
-    ) -> Result<Vec<Arc<VmsplicePayload>>, Errno> {
-        let mut vmsplice_mappings = Vec::new();
-
-        for UserBuffer { mut address, length } in buffers.iter().copied() {
-            let mappings = self.get_contiguous_mappings_at(address, length)?;
-            for (mapping, length) in mappings {
-                let vmsplice_payload = match self.get_mapping_backing(mapping) {
-                    MappingBacking::Memory(m) => VmsplicePayloadSegment {
-                        addr_offset: address,
-                        length,
-                        memory: m.memory().clone(),
-                        memory_offset: m.address_to_offset(address),
-                    },
-                    #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => VmsplicePayloadSegment {
-                        addr_offset: address,
-                        length,
-                        memory: self.private_anonymous.backing.clone(),
-                        memory_offset: address.ptr() as u64,
-                    },
-                };
-                vmsplice_mappings.push(VmsplicePayload::new(Arc::downgrade(mm), vmsplice_payload));
-
-                address = (address + length)?;
-            }
-        }
-
-        Ok(vmsplice_mappings)
-    }
-
-    /// Returns all the mappings starting at `addr`, and continuing until either `length` bytes have
-    /// been covered or an unmapped page is reached.
-    ///
-    /// Mappings are returned in ascending order along with the number of bytes that intersect the
-    /// requested range. The returned mappings are guaranteed to be contiguous and the total length
-    /// corresponds to the number of contiguous mapped bytes starting from `addr`, i.e.:
-    /// - 0 (empty iterator) if `addr` is not mapped.
-    /// - exactly `length` if the requested range is fully mapped.
-    /// - the offset of the first unmapped page (between 0 and `length`) if the requested range is
-    ///   only partially mapped.
-    ///
-    /// Returns EFAULT if the requested range overflows or extends past the end of the vmar.
-    fn get_contiguous_mappings_at(
-        &self,
-        addr: UserAddress,
-        length: usize,
-    ) -> Result<impl Iterator<Item = (&Mapping, usize)>, Errno> {
-        profile_duration!("GetContiguousMappings");
-        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EFAULT))?;
-        if end_addr > self.max_address() {
-            return error!(EFAULT);
-        }
-
-        // Iterate over all contiguous mappings intersecting the requested range.
-        let mut mappings = self.mappings.range(addr..end_addr);
-        let mut prev_range_end = None;
-        let mut offset = 0;
-        let result = std::iter::from_fn(move || {
-            profile_duration!("NextContiguousMapping");
-            if offset != length {
-                if let Some((range, mapping)) = mappings.next() {
-                    return match prev_range_end {
-                        // If this is the first mapping that we are considering, it may not actually
-                        // contain `addr` at all.
-                        None if range.start > addr => None,
-
-                        // Subsequent mappings may not be contiguous.
-                        Some(prev_range_end) if range.start != prev_range_end => None,
-
-                        // This mapping can be returned.
-                        _ => {
-                            let mapping_length = std::cmp::min(length, range.end - addr) - offset;
-                            offset += mapping_length;
-                            prev_range_end = Some(range.end);
-                            Some((mapping, mapping_length))
-                        }
-                    };
-                }
-            }
-
-            None
-        });
-
-        Ok(result)
-    }
-
-    /// Finds the next mapping at or above the given address if that mapping has the
-    /// MappingFlags::GROWSDOWN flag.
-    ///
-    /// If such a mapping exists, this function returns the address at which that mapping starts
-    /// and the mapping itself.
-    fn next_mapping_if_growsdown(&self, addr: UserAddress) -> Option<(UserAddress, &Mapping)> {
-        match self.mappings.find_at_or_after(addr) {
-            Some((range, mapping)) => {
-                if range.contains(&addr) {
-                    // |addr| is already contained within a mapping, nothing to grow.
-                    None
-                } else if !mapping.flags().contains(MappingFlags::GROWSDOWN) {
-                    None
-                } else {
-                    Some((range.start, mapping))
-                }
-            }
-            None => None,
-        }
     }
 
     /// Determines if an access at a given address could be covered by extending a growsdown mapping and
@@ -2062,7 +1520,9 @@ impl MemoryManagerState {
         is_write: bool,
     ) -> Result<bool, Error> {
         profile_duration!("ExtendGrowsDown");
-        let Some((mapping_low_addr, mapping_to_grow)) = self.next_mapping_if_growsdown(addr) else {
+        let Some((mapping_low_addr, mapping_to_grow)) =
+            self.address_space.next_mapping_if_growsdown(addr)
+        else {
             return Ok(false);
         };
         if is_write && !mapping_to_grow.can_write() {
@@ -2087,12 +1547,13 @@ impl MemoryManagerState {
         let vmar_flags =
             mapping_to_grow.flags().access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
         let mapping = Mapping::new(
-            self.create_memory_backing(low_addr, memory.clone(), 0),
+            self.address_space.create_memory_backing(low_addr, memory.clone(), 0),
             mapping_to_grow.flags(),
             mapping_to_grow.max_access(),
             FileWriteGuardRef(None),
         );
         let vmar_offset = self
+            .address_space
             .user_address_to_vmar_offset(low_addr)
             .map_err(|_| anyhow!("Address outside of user range"))?;
         let mapped_address = memory
@@ -2101,278 +1562,18 @@ impl MemoryManagerState {
         if mapped_address != low_addr.ptr() {
             return Err(anyhow!("Could not map extension of mapping to desired location."));
         }
-        self.mappings.insert(low_addr..high_addr, mapping);
+        self.address_space.mappings.insert(low_addr..high_addr, mapping);
         Ok(true)
-    }
-
-    /// Reads exactly `bytes.len()` bytes of memory.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to read into.
-    fn read_memory<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        let mut bytes_read = 0;
-        for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
-            let next_offset = bytes_read + len;
-            self.read_mapping_memory(
-                (addr + bytes_read)?,
-                mapping,
-                &mut bytes[bytes_read..next_offset],
-            )?;
-            bytes_read = next_offset;
-        }
-
-        if bytes_read != bytes.len() {
-            error!(EFAULT)
-        } else {
-            // SAFETY: The created slice is properly aligned/sized since it
-            // is a subset of the `bytes` slice. Note that `MaybeUninit<T>` has
-            // the same layout as `T`. Also note that `bytes_read` bytes have
-            // been properly initialized.
-            let bytes = unsafe {
-                std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, bytes_read)
-            };
-            Ok(bytes)
-        }
-    }
-
-    /// Reads exactly `bytes.len()` bytes of memory from `addr`.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to read into.
-    fn read_mapping_memory<'a>(
-        &self,
-        addr: UserAddress,
-        mapping: &Mapping,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        profile_duration!("MappingReadMemory");
-        if !mapping.can_read() {
-            return error!(EFAULT);
-        }
-        match self.get_mapping_backing(mapping) {
-            MappingBacking::Memory(backing) => backing.read_memory(addr, bytes),
-            #[cfg(feature = "alternate_anon_allocs")]
-            MappingBacking::PrivateAnonymous => self.private_anonymous.read_memory(addr, bytes),
-        }
-    }
-
-    /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
-    /// or no more bytes can be read.
-    ///
-    /// This is used, for example, to read null-terminated strings where the exact length is not
-    /// known, only the maximum length is.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to read into.
-    fn read_memory_partial<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        let mut bytes_read = 0;
-        for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
-            let next_offset = bytes_read + len;
-            if self
-                .read_mapping_memory(
-                    (addr + bytes_read)?,
-                    mapping,
-                    &mut bytes[bytes_read..next_offset],
-                )
-                .is_err()
-            {
-                break;
-            }
-            bytes_read = next_offset;
-        }
-
-        // If at least one byte was requested but we got none, it means that `addr` was invalid.
-        if !bytes.is_empty() && bytes_read == 0 {
-            error!(EFAULT)
-        } else {
-            // SAFETY: The created slice is properly aligned/sized since it
-            // is a subset of the `bytes` slice. Note that `MaybeUninit<T>` has
-            // the same layout as `T`. Also note that `bytes_read` bytes have
-            // been properly initialized.
-            let bytes = unsafe {
-                std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, bytes_read)
-            };
-            Ok(bytes)
-        }
-    }
-
-    /// Like `read_memory_partial` but only returns the bytes up to and including
-    /// a null (zero) byte.
-    fn read_memory_partial_until_null_byte<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        let read_bytes = self.read_memory_partial(addr, bytes)?;
-        let max_len = memchr::memchr(b'\0', read_bytes)
-            .map_or_else(|| read_bytes.len(), |null_index| null_index + 1);
-        Ok(&mut read_bytes[..max_len])
-    }
-
-    /// Writes the provided bytes.
-    ///
-    /// In case of success, the number of bytes written will always be `bytes.len()`.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to write to.
-    /// - `bytes`: The bytes to write.
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        profile_duration!("WriteMemory");
-        let mut bytes_written = 0;
-        for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
-            let next_offset = bytes_written + len;
-            self.write_mapping_memory(
-                (addr + bytes_written)?,
-                mapping,
-                &bytes[bytes_written..next_offset],
-            )?;
-            bytes_written = next_offset;
-        }
-
-        if bytes_written != bytes.len() {
-            error!(EFAULT)
-        } else {
-            Ok(bytes.len())
-        }
-    }
-
-    /// Writes the provided bytes to `addr`.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to write to.
-    /// - `bytes`: The bytes to write to the memory object.
-    fn write_mapping_memory(
-        &self,
-        addr: UserAddress,
-        mapping: &Mapping,
-        bytes: &[u8],
-    ) -> Result<(), Errno> {
-        profile_duration!("MappingWriteMemory");
-        if !mapping.can_write() {
-            return error!(EFAULT);
-        }
-        match self.get_mapping_backing(mapping) {
-            MappingBacking::Memory(backing) => backing.write_memory(addr, bytes),
-            #[cfg(feature = "alternate_anon_allocs")]
-            MappingBacking::PrivateAnonymous => self.private_anonymous.write_memory(addr, bytes),
-        }
-    }
-
-    /// Writes bytes starting at `addr`, continuing until either `bytes.len()` bytes have been
-    /// written or no more bytes can be written.
-    ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to write from.
-    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        profile_duration!("WriteMemoryPartial");
-        let mut bytes_written = 0;
-        for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
-            let next_offset = bytes_written + len;
-            if self
-                .write_mapping_memory(
-                    (addr + bytes_written)?,
-                    mapping,
-                    &bytes[bytes_written..next_offset],
-                )
-                .is_err()
-            {
-                break;
-            }
-            bytes_written = next_offset;
-        }
-
-        if !bytes.is_empty() && bytes_written == 0 {
-            error!(EFAULT)
-        } else {
-            Ok(bytes.len())
-        }
-    }
-
-    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        profile_duration!("Zero");
-        let mut bytes_written = 0;
-        for (mapping, len) in self.get_contiguous_mappings_at(addr, length)? {
-            let next_offset = bytes_written + len;
-            if self.zero_mapping((addr + bytes_written)?, mapping, len).is_err() {
-                break;
-            }
-            bytes_written = next_offset;
-        }
-
-        if length != bytes_written {
-            error!(EFAULT)
-        } else {
-            Ok(length)
-        }
-    }
-
-    fn zero_mapping(
-        &self,
-        addr: UserAddress,
-        mapping: &Mapping,
-        length: usize,
-    ) -> Result<usize, Errno> {
-        profile_duration!("MappingZeroMemory");
-        if !mapping.can_write() {
-            return error!(EFAULT);
-        }
-
-        match self.get_mapping_backing(mapping) {
-            MappingBacking::Memory(backing) => backing.zero(addr, length),
-            #[cfg(feature = "alternate_anon_allocs")]
-            MappingBacking::PrivateAnonymous => self.private_anonymous.zero(addr, length),
-        }
-    }
-
-    pub fn create_memory_backing(
-        &self,
-        base: UserAddress,
-        memory: Arc<MemoryObject>,
-        memory_offset: u64,
-    ) -> MappingBacking {
-        MappingBacking::Memory(Box::new(MappingBackingMemory::new(base, memory, memory_offset)))
-    }
-
-    pub fn get_mapping_backing<'a>(&self, mapping: &'a Mapping) -> &'a MappingBacking {
-        mapping.get_backing_internal()
-    }
-
-    #[cfg(not(feature = "alternate_anon_allocs"))]
-    fn set_mapping_backing(&mut self, mapping: &mut Mapping, backing: MappingBacking) {
-        mapping.set_backing_internal(backing);
-    }
-
-    fn get_aio_context(&self, addr: UserAddress) -> Option<(Range<UserAddress>, Arc<AioContext>)> {
-        let Some((range, mapping)) = self.mappings.get(addr) else {
-            return None;
-        };
-        let MappingName::AioContext(ref aio_context) = mapping.name() else {
-            return None;
-        };
-        if !mapping.can_read() {
-            return None;
-        }
-        Some((range.clone(), aio_context.clone()))
     }
 
     pub fn mrelease(&self) -> Result<(), Errno> {
         cfg_if! {
             if #[cfg(feature = "alternate_anon_allocs")] {
-                    self.private_anonymous
-                        .zero(UserAddress::from_ptr(self.user_vmar_info.base), self.user_vmar_info.len)?;
-                    return Ok(());
+                self.address_space.private_anonymous.zero(
+                    self.address_space.base,
+                    self.address_space.length,
+                )?;
+                return Ok(());
             } else {
                 return error!(ENOSYS);
             }
@@ -3071,7 +2272,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 impl MemoryManager {
     pub fn summarize(&self, summary: &mut crate::mm::MappingSummary) {
         let state = self.state.read();
-        for (_, mapping) in state.mappings.iter() {
+        for (_, mapping) in state.address_space.mappings.iter() {
             summary.add(&state, mapping);
         }
     }
@@ -3080,7 +2281,7 @@ impl MemoryManager {
         self: &Arc<MemoryManager>,
         buffers: &UserBuffers,
     ) -> Result<Vec<Arc<VmsplicePayload>>, Errno> {
-        self.state.read().get_mappings_for_vmsplice(self, buffers)
+        self.state.read().address_space.get_mappings_for_vmsplice(self, buffers)
     }
 
     pub fn has_same_address_space(&self, other: &Self) -> bool {
@@ -3113,7 +2314,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.state.read().read_memory(addr, bytes)
+        self.state.read().address_space.read_memory(addr, bytes)
     }
 
     pub fn unified_read_memory_partial_until_null_byte<'a>(
@@ -3142,7 +2343,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.state.read().read_memory_partial_until_null_byte(addr, bytes)
+        self.state.read().address_space.read_memory_partial_until_null_byte(addr, bytes)
     }
 
     pub fn unified_read_memory_partial<'a>(
@@ -3171,7 +2372,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.state.read().read_memory_partial(addr, bytes)
+        self.state.read().address_space.read_memory_partial(addr, bytes)
     }
 
     pub fn unified_write_memory(
@@ -3199,7 +2400,7 @@ impl MemoryManager {
     }
 
     pub fn syscall_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.state.read().write_memory(addr, bytes)
+        self.state.read().address_space.write_memory(addr, bytes)
     }
 
     pub fn unified_write_memory_partial(
@@ -3228,7 +2429,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &[u8],
     ) -> Result<usize, Errno> {
-        self.state.read().write_memory_partial(addr, bytes)
+        self.state.read().address_space.write_memory_partial(addr, bytes)
     }
 
     pub fn unified_zero(
@@ -3271,7 +2472,7 @@ impl MemoryManager {
     }
 
     pub fn syscall_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.state.read().zero(addr, length)
+        self.state.read().address_space.zero(addr, length)
     }
 
     /// Obtain a reference to this memory manager that can be used from another thread.
@@ -3329,13 +2530,6 @@ impl MemoryManager {
     }
 
     fn from_vmar(root_vmar: zx::Vmar, user_vmar: zx::Vmar, user_vmar_info: zx::VmarInfo) -> Self {
-        #[cfg(feature = "alternate_anon_allocs")]
-        // The private anonymous backing memory object extend from the user address 0 up to the
-        // highest mappable address. The pages below `user_vmar_info.base` are never mapped, but
-        // including them in the memory object makes the math for mapping address to memory object
-        // offsets simpler.
-        let backing_size = (user_vmar_info.base + user_vmar_info.len) as u64;
-
         MemoryManager {
             root_vmar,
             base_addr: UserAddress::from_ptr(user_vmar_info.base),
@@ -3343,9 +2537,10 @@ impl MemoryManager {
             state: RwLock::new(MemoryManagerState {
                 user_vmar,
                 user_vmar_info,
-                mappings: Default::default(),
-                #[cfg(feature = "alternate_anon_allocs")]
-                private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
+                address_space: AddressSpace::new(
+                    UserAddress::from_ptr(user_vmar_info.base),
+                    user_vmar_info.len,
+                ),
                 forkable_state: Default::default(),
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
@@ -3417,7 +2612,7 @@ impl MemoryManager {
                 let delta = new_end - old_end;
 
                 // Check for mappings over the program break region.
-                if state.mappings.range(range).next().is_some() {
+                if state.address_space.mappings.range(range).next().is_some() {
                     return Ok(brk.current);
                 }
 
@@ -3460,9 +2655,11 @@ impl MemoryManager {
             // extend that mapping, rather than making a new allocation.
             let existing = if old_end > brk_base {
                 match old_end - *PAGE_SIZE {
-                    Ok(addr) => {
-                        state.mappings.get(addr).filter(|(_, m)| m.name() == MappingName::Heap)
-                    }
+                    Ok(addr) => state
+                        .address_space
+                        .mappings
+                        .get(addr)
+                        .filter(|(_, m)| m.name() == MappingName::Heap),
                     Err(_) => None,
                 }
             } else {
@@ -3521,7 +2718,7 @@ impl MemoryManager {
         let mut updates = vec![];
 
         let mut state = self.state.write();
-        for (range, mapping) in state.mappings.range(range_for_op.clone()) {
+        for (range, mapping) in state.address_space.mappings.range(range_for_op.clone()) {
             if !mapping.private_anonymous() {
                 track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
                 return error!(EINVAL);
@@ -3545,7 +2742,7 @@ impl MemoryManager {
 
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
-            state.mappings.insert(range, mapping);
+            state.address_space.mappings.insert(range, mapping);
         }
 
         userfault.userfault_pages_insert(locked, range_for_op, false);
@@ -3568,7 +2765,7 @@ impl MemoryManager {
         let mut updates = vec![];
 
         let mut state = self.state.write();
-        for (range, mapping) in state.mappings.range(range_for_op.clone()) {
+        for (range, mapping) in state.address_space.mappings.range(range_for_op.clone()) {
             if !mapping.private_anonymous() {
                 track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
                 return error!(EINVAL);
@@ -3588,7 +2785,7 @@ impl MemoryManager {
             let length = range.end - range.start;
             let restored_flags = mapping.flags().access_flags();
 
-            state.mappings.insert(range.clone(), mapping);
+            state.address_space.mappings.insert(range.clone(), mapping);
 
             state
                 .protect_vmar_range(range.start, length, restored_flags)
@@ -3607,7 +2804,7 @@ impl MemoryManager {
         let mut updates = vec![];
 
         let mut state = self.state.write();
-        for (range, mapping) in state.mappings.iter() {
+        for (range, mapping) in state.address_space.mappings.iter() {
             if let Some(uf_registration) = mapping.userfault() {
                 if uf_registration.userfault.ptr_eq(&Arc::downgrade(userfault)) {
                     let mut mapping = mapping.clone();
@@ -3620,7 +2817,7 @@ impl MemoryManager {
         for (range, mapping) in updates {
             let length = range.end - range.start;
             let restored_flags = mapping.flags().access_flags();
-            state.mappings.insert(range.clone(), mapping);
+            state.address_space.mappings.insert(range.clone(), mapping);
             // We can't recover from an error here as this is run during the cleanup.
             state
                 .protect_vmar_range(range.start, length, restored_flags)
@@ -3656,7 +2853,7 @@ impl MemoryManager {
         // Check that the addr..length range is a contiguous range of mappings which are all
         // registered with an userfault object.
         let mut bytes_registered_with_uffd = 0;
-        for (mapping, len) in state.get_contiguous_mappings_at(addr, length)? {
+        for (mapping, len) in state.address_space.get_contiguous_mappings_at(addr, length)? {
             if let Some(uf_registration) = mapping.userfault() {
                 // Check that the mapping is registered with the same uffd. This is not required,
                 // but we don't support cross-uffd operations yet.
@@ -3697,7 +2894,7 @@ impl MemoryManager {
         // restoring the protections on the underlying Zircon mappings to the "real" protection bits
         // that were kept in the Starnix mappings. This will prevent new pagefaults from being
         // generated. Only do this on the pages that were populated by this operation.
-        for (range, mapping) in state.mappings.range(addr..trimmed_end) {
+        for (range, mapping) in state.address_space.mappings.range(addr..trimmed_end) {
             let range_to_protect = range.intersect(&(addr..trimmed_end));
             let restored_flags = mapping.flags().access_flags();
             let length = range_to_protect.end - range_to_protect.start;
@@ -3721,7 +2918,7 @@ impl MemoryManager {
         L: LockBefore<UserFaultInner>,
     {
         self.populate_from_uffd(locked, addr, length, userfault, |state, effective_length| {
-            state.zero(addr, effective_length)
+            state.address_space.zero(addr, effective_length)
         })
     }
 
@@ -3737,7 +2934,7 @@ impl MemoryManager {
         L: LockBefore<UserFaultInner>,
     {
         self.populate_from_uffd(locked, addr, length, userfault, |state, effective_length| {
-            state.write_memory(addr, &buf[..effective_length])
+            state.address_space.write_memory(addr, &buf[..effective_length])
         })
     }
 
@@ -3754,8 +2951,8 @@ impl MemoryManager {
     {
         self.populate_from_uffd(locked, dst_addr, length, userfault, |state, effective_length| {
             let mut buf = vec![std::mem::MaybeUninit::uninit(); effective_length];
-            let buf = state.read_memory(source_addr, &mut buf)?;
-            state.write_memory(dst_addr, &buf[..effective_length])
+            let buf = state.address_space.read_memory(source_addr, &mut buf)?;
+            state.address_space.write_memory(dst_addr, &buf[..effective_length])
         })
     }
 
@@ -3776,16 +2973,17 @@ impl MemoryManager {
         #[cfg(feature = "alternate_anon_allocs")]
         {
             let backing_size = (state.user_vmar_info.base + state.user_vmar_info.len) as u64;
-            target_state.private_anonymous = state.private_anonymous.snapshot(backing_size)?;
+            target_state.address_space.private_anonymous =
+                state.address_space.private_anonymous.snapshot(backing_size)?;
         }
 
-        for (range, mapping) in state.mappings.iter() {
+        for (range, mapping) in state.address_space.mappings.iter() {
             if mapping.flags().contains(MappingFlags::DONTFORK) {
                 continue;
             }
             // Locking is not inherited when forking.
             let target_mapping_flags = mapping.flags().difference(MappingFlags::LOCKED);
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     let memory_offset = backing.address_to_offset(range.start);
                     let length = range.end - range.start;
@@ -3828,6 +3026,7 @@ impl MemoryManager {
                     let length = range.end - range.start;
                     if mapping.flags().contains(MappingFlags::WIPEONFORK) {
                         target_state
+                            .address_space
                             .private_anonymous
                             .zero(range.start, length)
                             .map_err(|_| errno!(ENOMEM))?;
@@ -3836,13 +3035,13 @@ impl MemoryManager {
                     let target_memory_offset = range.start.ptr() as u64;
                     target_state.map_in_user_vmar(
                         SelectedAddress::FixedOverwrite(range.start),
-                        &target_state.private_anonymous.backing,
+                        &target_state.address_space.private_anonymous.backing,
                         target_memory_offset,
                         length,
                         target_mapping_flags,
                         false,
                     )?;
-                    target_state.mappings.insert(
+                    target_state.address_space.mappings.insert(
                         range.clone(),
                         Mapping::new_private_anonymous(
                             target_mapping_flags,
@@ -3882,10 +3081,11 @@ impl MemoryManager {
             // All private-anonymous memory is zeroed
             #[cfg(feature = "alternate_anon_allocs")]
             state
+                .address_space
                 .private_anonymous
-                .zero(UserAddress::from_ptr(state.user_vmar_info.base), state.user_vmar_info.len)?;
+                .zero(state.address_space.base, state.address_space.length)?;
 
-            std::mem::replace(&mut state.mappings, Default::default())
+            std::mem::replace(&mut state.address_space.mappings, Default::default())
         };
         self.initialize_mmap_layout(arch_width)?;
         Ok(())
@@ -4137,7 +3337,7 @@ impl MemoryManager {
         // On uffd-registered range, handle according to the uffd rules
         if error_code == zx::Status::ACCESS_DENIED {
             let state = self.state.write();
-            if let Some((_, mapping)) = state.mappings.get(addr) {
+            if let Some((_, mapping)) = state.address_space.mappings.get(addr) {
                 if let Some(userfault_reg) = &mapping.userfault() {
                     // TODO(https://fxbug.dev/391599171): Support other modes
                     assert_eq!(userfault_reg.mode, FaultRegisterMode::MISSING);
@@ -4226,6 +3426,7 @@ impl MemoryManager {
         let mut state = self.state.write();
 
         let mappings_in_range = state
+            .address_space
             .mappings
             .range(addr..end)
             .map(|(r, m)| (r.clone(), m.clone()))
@@ -4254,7 +3455,7 @@ impl MemoryManager {
                 let start_split_length = addr - range.start;
                 let start_split_mapping =
                     mapping.split_prefix_off(&state, range.start, start_split_length as u64);
-                state.mappings.insert(start_split_range, start_split_mapping);
+                state.address_space.mappings.insert(start_split_range, start_split_mapping);
 
                 range = addr..range.end;
             }
@@ -4269,7 +3470,8 @@ impl MemoryManager {
             // such as memory analysis tools.
             #[cfg(not(feature = "alternate_anon_allocs"))]
             {
-                let MappingBacking::Memory(backing) = state.get_mapping_backing(mapping);
+                let MappingBacking::Memory(backing) =
+                    state.address_space.get_mapping_backing(mapping);
                 match &name {
                     Some(memory_name) => {
                         backing.memory().set_zx_name(memory_name);
@@ -4284,9 +3486,9 @@ impl MemoryManager {
                 // last mapping to have an unnamed mapping after the named region.
                 let tail_range = end..range.end;
                 let tail_offset = range.end - end;
-                let tail_mapping = match state.get_mapping_backing(&mapping) {
+                let tail_mapping = match state.address_space.get_mapping_backing(&mapping) {
                     MappingBacking::Memory(backing) => Mapping::new(
-                        state.create_memory_backing(
+                        state.address_space.create_memory_backing(
                             end,
                             backing.memory().clone(),
                             backing.memory_offset() + tail_offset as u64,
@@ -4300,14 +3502,14 @@ impl MemoryManager {
                         Mapping::new_private_anonymous(mapping.flags(), mapping.name().clone())
                     }
                 };
-                state.mappings.insert(tail_range, tail_mapping);
+                state.address_space.mappings.insert(tail_range, tail_mapping);
                 range.end = end;
             }
             mapping.set_name(match &name {
                 Some(name) => MappingName::Vma(FlyByteStr::new(name.as_bytes())),
                 None => MappingName::None,
             });
-            state.mappings.insert(range, mapping);
+            state.address_space.mappings.insert(range, mapping);
         }
         if let Some(last_range_end) = last_range_end {
             if last_range_end < end {
@@ -4336,7 +3538,7 @@ impl MemoryManager {
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
         let state = self.state.read();
         let mut last_end = addr;
-        for (range, _) in state.mappings.range(addr..end_addr) {
+        for (range, _) in state.address_space.mappings.range(addr..end_addr) {
             if range.start > last_end {
                 // This mapping does not start immediately after the last.
                 return error!(ENOMEM);
@@ -4359,17 +3561,17 @@ impl MemoryManager {
         perms: ProtectionFlags,
     ) -> Result<(Arc<MemoryObject>, u64), Errno> {
         let state = self.state.read();
-        let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
+        let (_, mapping) = state.address_space.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if !mapping.flags().access_flags().contains(perms) {
             return error!(EACCES);
         }
-        match state.get_mapping_backing(mapping) {
+        match state.address_space.get_mapping_backing(mapping) {
             MappingBacking::Memory(backing) => {
                 Ok((Arc::clone(backing.memory()), mapping.address_to_offset(addr)))
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
-                Ok((Arc::clone(&state.private_anonymous.backing), addr.ptr() as u64))
+                Ok((Arc::clone(&state.address_space.private_anonymous.backing), addr.ptr() as u64))
             }
         }
     }
@@ -4398,7 +3600,7 @@ impl MemoryManager {
     pub fn check_plausible(&self, addr: UserAddress, buffer_size: usize) -> Result<(), Errno> {
         let state = self.state.read();
 
-        if let Some(range) = state.mappings.last_range() {
+        if let Some(range) = state.address_space.mappings.last_range() {
             if (range.end - buffer_size)? >= addr {
                 return Ok(());
             }
@@ -4408,7 +3610,7 @@ impl MemoryManager {
 
     pub fn get_aio_context(&self, addr: UserAddress) -> Option<Arc<AioContext>> {
         let state = self.state.read();
-        state.get_aio_context(addr).map(|(_, aio_context)| aio_context)
+        state.address_space.get_aio_context(addr).map(|(_, aio_context)| aio_context)
     }
 
     pub fn destroy_aio_context(
@@ -4424,7 +3626,7 @@ impl MemoryManager {
         // Validate that this address actually has an AioContext. We need to hold the state lock
         // until we actually remove the mappings to ensure that another thread does not manipulate
         // the mappings after we've validated that they contain an AioContext.
-        let Some((range, aio_context)) = state.get_aio_context(addr) else {
+        let Some((range, aio_context)) = state.address_space.get_aio_context(addr) else {
             return error!(EINVAL);
         };
 
@@ -4442,7 +3644,7 @@ impl MemoryManager {
         addr: UserAddress,
     ) -> Result<Option<flyweights::FlyByteStr>, Errno> {
         let state = self.state.read();
-        let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
+        let (_, mapping) = state.address_space.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if let MappingName::Vma(name) = mapping.name() {
             Ok(Some(name.clone()))
         } else {
@@ -4453,7 +3655,7 @@ impl MemoryManager {
     #[cfg(test)]
     pub fn get_mapping_count(&self) -> usize {
         let state = self.state.read();
-        state.mappings.iter().count()
+        state.address_space.mappings.iter().count()
     }
 
     pub fn extend_growsdown_mapping_to_address(
@@ -4485,14 +3687,16 @@ impl MemoryManager {
             let zx_details = zx_mapping.details();
             let Some(zx_details) = zx_details.as_mapping() else { continue };
             let (_, mm_mapping) = state
+                .address_space
                 .mappings
                 .get(UserAddress::from(zx_mapping.base as u64))
                 .expect("mapping bookkeeping must be consistent with zircon's");
             debug_assert_eq!(
-                match state.get_mapping_backing(mm_mapping) {
+                match state.address_space.get_mapping_backing(mm_mapping) {
                     MappingBacking::Memory(m) => m.memory().get_koid(),
                     #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => state.private_anonymous.backing.get_koid(),
+                    MappingBacking::PrivateAnonymous =>
+                        state.address_space.private_anonymous.backing.get_koid(),
                 },
                 zx_details.vmo_koid,
                 "MemoryManager and Zircon must agree on which VMO is mapped in this range",
@@ -4546,13 +3750,13 @@ impl MemoryManager {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
-            // SAFETY: `self.state.read().read_memory` only returns `Ok` if all
+            // SAFETY: `self.state.read().address_space.read_memory` only returns `Ok` if all
             // bytes were read to.
             let buf = unsafe {
                 read_to_array(|buf| {
-                    self.state.read().read_memory(futex_addr.into(), buf).map(|bytes_read| {
-                        debug_assert_eq!(bytes_read.len(), std::mem::size_of::<u32>())
-                    })
+                    self.state.read().address_space.read_memory(futex_addr.into(), buf).map(
+                        |bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<u32>()),
+                    )
                 })
             }?;
             Ok(u32::from_ne_bytes(buf))
@@ -4567,7 +3771,7 @@ impl MemoryManager {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_store_u32_relaxed(futex_addr.ptr(), value).map_err(|_| errno!(EFAULT))
         } else {
-            self.state.read().write_memory(futex_addr.into(), value.as_bytes())?;
+            self.state.read().address_space.write_memory(futex_addr.into(), value.as_bytes())?;
             Ok(())
         }
     }
@@ -4659,7 +3863,7 @@ pub enum DesiredAddress {
 
 /// The user-space address at which a mapping should be placed. Used by [`map_in_vmar`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SelectedAddress {
+pub(super) enum SelectedAddress {
     /// See DesiredAddress::Fixed.
     Fixed(UserAddress),
     /// See DesiredAddress::FixedOverwrite.
@@ -4691,7 +3895,7 @@ fn write_map(
         if map.can_write() { 'w' } else { '-' },
         if map.can_exec() { 'x' } else { '-' },
         if map.flags().contains(MappingFlags::SHARED) { 's' } else { 'p' },
-        match state.get_mapping_backing(map) {
+        match state.address_space.get_mapping_backing(map) {
             MappingBacking::Memory(backing) => backing.memory_offset(),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
@@ -4794,7 +3998,7 @@ impl SequenceFileSource for ProcMapsFile {
             return Ok(None);
         };
         let state = mm.state.read();
-        if let Some((range, map)) = state.mappings.find_at_or_after(cursor) {
+        if let Some((range, map)) = state.address_space.mappings.find_at_or_after(cursor) {
             write_map(&task, sink, &state, range, map)?;
             return Ok(Some(range.end));
         }
@@ -4837,7 +4041,7 @@ impl DynamicFileSource for ProcSmapsFile {
             );
         }
 
-        for (mm_range, mm_mapping) in state.mappings.iter() {
+        for (mm_range, mm_mapping) in state.address_space.mappings.iter() {
             let mut committed_bytes = 0;
 
             for (zx_range, zx_mapping_idx) in zx_memory_info.range(mm_range.clone()) {
@@ -4861,11 +4065,11 @@ impl DynamicFileSource for ProcSmapsFile {
                     zx_committed_bytes as u64
                 };
                 assert_eq!(
-                    match state.get_mapping_backing(mm_mapping) {
+                    match state.address_space.get_mapping_backing(mm_mapping) {
                         MappingBacking::Memory(m) => m.memory().get_koid(),
                         #[cfg(feature = "alternate_anon_allocs")]
                         MappingBacking::PrivateAnonymous =>
-                            state.private_anonymous.backing.get_koid(),
+                            state.address_space.private_anonymous.backing.get_koid(),
                     },
                     zx_details.vmo_koid,
                     "MemoryManager and Zircon must agree on which VMO is mapped in this range",
@@ -4876,7 +4080,7 @@ impl DynamicFileSource for ProcSmapsFile {
 
             let size_kb = (mm_range.end.ptr() - mm_range.start.ptr()) / 1024;
             writeln!(sink, "Size:           {size_kb:>8} kB",)?;
-            let share_count = match state.get_mapping_backing(mm_mapping) {
+            let share_count = match state.address_space.get_mapping_backing(mm_mapping) {
                 MappingBacking::Memory(backing) => {
                     let memory_info = backing.memory().info()?;
                     memory_info.share_count as u64
@@ -4970,7 +4174,6 @@ mod tests {
     use crate::testing::*;
     use crate::vfs::FdNumber;
     use assert_matches::assert_matches;
-    use itertools::assert_equal;
     use starnix_sync::{FileOpsCore, LockEqualOrBefore};
     use starnix_uapi::{
         MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
@@ -5001,7 +4204,11 @@ mod tests {
         // Look up the given addr in the mappings table.
         let get_range = |addr: UserAddress| {
             let state = mm.state.read();
-            state.mappings.get(addr).map(|(range, mapping)| (range.clone(), mapping.clone()))
+            state
+                .address_space
+                .mappings
+                .get(addr)
+                .map(|(range, mapping)| (range.clone(), mapping.clone()))
         };
 
         // Initialize the program break.
@@ -5073,7 +4280,7 @@ mod tests {
 
         let has = |addr: UserAddress| -> bool {
             let state = mm.state.read();
-            state.mappings.get(addr).is_some()
+            state.address_space.mappings.get(addr).is_some()
         };
 
         let brk_addr = mm
@@ -5102,193 +4309,6 @@ mod tests {
         assert_eq!(brk_addr, brk_addr2);
         let mapped_addr2 = map_memory(locked, &current_task, mapped_addr, *PAGE_SIZE);
         assert_eq!(mapped_addr, mapped_addr2);
-    }
-
-    #[::fuchsia::test]
-    async fn test_get_contiguous_mappings_at() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        // Create four one-page mappings with a hole between the third one and the fourth one.
-        let page_size = *PAGE_SIZE as usize;
-        let addr_a = (mm.base_addr + 10 * page_size).unwrap();
-        let addr_b = (mm.base_addr + 11 * page_size).unwrap();
-        let addr_c = (mm.base_addr + 12 * page_size).unwrap();
-        let addr_d = (mm.base_addr + 14 * page_size).unwrap();
-        assert_eq!(map_memory(locked, &current_task, addr_a, *PAGE_SIZE), addr_a);
-        assert_eq!(map_memory(locked, &current_task, addr_b, *PAGE_SIZE), addr_b);
-        assert_eq!(map_memory(locked, &current_task, addr_c, *PAGE_SIZE), addr_c);
-        assert_eq!(map_memory(locked, &current_task, addr_d, *PAGE_SIZE), addr_d);
-
-        {
-            let mm_state = mm.state.read();
-            // Verify that requesting an unmapped address returns an empty iterator.
-            assert_equal(
-                mm_state.get_contiguous_mappings_at((addr_a - 100u64).unwrap(), 50).unwrap(),
-                vec![],
-            );
-            assert_equal(
-                mm_state.get_contiguous_mappings_at((addr_a - 100u64).unwrap(), 200).unwrap(),
-                vec![],
-            );
-
-            // Verify that requesting zero bytes returns an empty iterator.
-            assert_equal(mm_state.get_contiguous_mappings_at(addr_a, 0).unwrap(), vec![]);
-
-            // Verify errors.
-            assert_eq!(
-                mm_state
-                    .get_contiguous_mappings_at(UserAddress::from(100), usize::MAX)
-                    .err()
-                    .unwrap(),
-                errno!(EFAULT)
-            );
-            assert_eq!(
-                mm_state
-                    .get_contiguous_mappings_at((mm_state.max_address() + 1u64).unwrap(), 0)
-                    .err()
-                    .unwrap(),
-                errno!(EFAULT)
-            );
-        }
-
-        // Test strategy-specific properties.
-        #[cfg(feature = "alternate_anon_allocs")]
-        {
-            assert_eq!(mm.get_mapping_count(), 2);
-            let mm_state = mm.state.read();
-            let (map_a, map_b) = {
-                let mut it = mm_state.mappings.iter();
-                (it.next().unwrap().1, it.next().unwrap().1)
-            };
-
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size).unwrap(),
-                vec![(map_a, page_size)],
-            );
-
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size / 2).unwrap(),
-                vec![(map_a, page_size / 2)],
-            );
-
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size * 3).unwrap(),
-                vec![(map_a, page_size * 3)],
-            );
-
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_b, page_size).unwrap(),
-                vec![(map_a, page_size)],
-            );
-
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_d, page_size).unwrap(),
-                vec![(map_b, page_size)],
-            );
-
-            // Verify that results stop if there is a hole.
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 10)
-                    .unwrap(),
-                vec![(map_a, page_size * 2 + page_size / 2)],
-            );
-
-            // Verify that results stop at the last mapped page.
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_d, page_size * 10).unwrap(),
-                vec![(map_b, page_size)],
-            );
-        }
-        #[cfg(not(feature = "alternate_anon_allocs"))]
-        {
-            assert_eq!(mm.get_mapping_count(), 4);
-
-            let mm_state = mm.state.read();
-            // Obtain references to the mappings.
-            let (map_a, map_b, map_c, map_d) = {
-                let mut it = mm_state.mappings.iter();
-                (
-                    it.next().unwrap().1,
-                    it.next().unwrap().1,
-                    it.next().unwrap().1,
-                    it.next().unwrap().1,
-                )
-            };
-
-            // Verify result when requesting a whole mapping or portions of it.
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size).unwrap(),
-                vec![(map_a, page_size)],
-            );
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size / 2).unwrap(),
-                vec![(map_a, page_size / 2)],
-            );
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size / 2)
-                    .unwrap(),
-                vec![(map_a, page_size / 2)],
-            );
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 4).unwrap(), page_size / 8)
-                    .unwrap(),
-                vec![(map_a, page_size / 8)],
-            );
-
-            // Verify result when requesting a range spanning more than one mapping.
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size)
-                    .unwrap(),
-                vec![(map_a, page_size / 2), (map_b, page_size / 2)],
-            );
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at(
-                        (addr_a + page_size / 2).unwrap(),
-                        page_size * 3 / 2,
-                    )
-                    .unwrap(),
-                vec![(map_a, page_size / 2), (map_b, page_size)],
-            );
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a, page_size * 3 / 2).unwrap(),
-                vec![(map_a, page_size), (map_b, page_size / 2)],
-            );
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 2)
-                    .unwrap(),
-                vec![(map_a, page_size / 2), (map_b, page_size), (map_c, page_size / 2)],
-            );
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at(
-                        (addr_b + page_size / 2).unwrap(),
-                        page_size * 3 / 2,
-                    )
-                    .unwrap(),
-                vec![(map_b, page_size / 2), (map_c, page_size)],
-            );
-
-            // Verify that results stop if there is a hole.
-            assert_equal(
-                mm_state
-                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 10)
-                    .unwrap(),
-                vec![(map_a, page_size / 2), (map_b, page_size), (map_c, page_size)],
-            );
-
-            // Verify that results stop at the last mapped page.
-            assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_d, page_size * 10).unwrap(),
-                vec![(map_d, page_size)],
-            );
-        }
     }
 
     #[::fuchsia::test]
@@ -5559,167 +4579,6 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_find_next_unused_range() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        let mmap_top = mm.state.read().find_next_unused_range(0).unwrap().ptr();
-        let page_size = *PAGE_SIZE as usize;
-        assert!(mmap_top <= RESTRICTED_ASPACE_HIGHEST_ADDRESS);
-
-        // No mappings - top address minus requested size is available
-        assert_eq!(
-            mm.state.read().find_next_unused_range(page_size).unwrap(),
-            UserAddress::from_ptr(mmap_top - page_size)
-        );
-
-        // Fill it.
-        let addr = UserAddress::from_ptr(mmap_top - page_size);
-        assert_eq!(map_memory(locked, &current_task, addr, *PAGE_SIZE), addr);
-
-        // The next available range is right before the new mapping.
-        assert_eq!(
-            mm.state.read().find_next_unused_range(page_size).unwrap(),
-            UserAddress::from_ptr(addr.ptr() - page_size)
-        );
-
-        // Allocate an extra page before a one-page gap.
-        let addr2 = UserAddress::from_ptr(addr.ptr() - 2 * page_size);
-        assert_eq!(map_memory(locked, &current_task, addr2, *PAGE_SIZE), addr2);
-
-        // Searching for one-page range still gives the same result
-        assert_eq!(
-            mm.state.read().find_next_unused_range(page_size).unwrap(),
-            UserAddress::from_ptr(addr.ptr() - page_size)
-        );
-
-        // Searching for a bigger range results in the area before the second mapping
-        assert_eq!(
-            mm.state.read().find_next_unused_range(2 * page_size).unwrap(),
-            UserAddress::from_ptr(addr2.ptr() - 2 * page_size)
-        );
-
-        // Searching for more memory than available should fail.
-        assert_eq!(mm.state.read().find_next_unused_range(mmap_top), None);
-    }
-
-    #[::fuchsia::test]
-    async fn test_count_placements() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        // ten-page range
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        assert_eq!(
-            mm.state.read().count_possible_placements(11 * page_size, &subrange_ten),
-            Some(0)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
-            Some(1)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(9 * page_size, &subrange_ten),
-            Some(2)
-        );
-        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(10));
-
-        // map 6th page
-        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
-        assert_eq!(map_memory(locked, &current_task, addr, *PAGE_SIZE), addr);
-
-        assert_eq!(
-            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
-            Some(0)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(5 * page_size, &subrange_ten),
-            Some(1)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
-            Some(3)
-        );
-        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(9));
-    }
-
-    #[::fuchsia::test]
-    async fn test_pick_placement() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
-        assert_eq!(map_memory(locked, &current_task, addr, *PAGE_SIZE), addr);
-        assert_eq!(
-            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
-            Some(3)
-        );
-
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 0, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE))
-        );
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 1, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + page_size))
-        );
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 2, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 6 * page_size))
-        );
-    }
-
-    #[::fuchsia::test]
-    async fn test_find_random_unused_range() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        // ten-page range
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        for _ in 0..10 {
-            let addr = mm.state.read().find_random_unused_range(page_size, &subrange_ten);
-            assert!(addr.is_some());
-            assert_eq!(map_memory(locked, &current_task, addr.unwrap(), *PAGE_SIZE), addr.unwrap());
-        }
-        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
-    }
-
-    #[::fuchsia::test]
-    async fn test_grows_down_near_aspace_base() {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm().unwrap();
-
-        let page_count = 10;
-
-        let page_size = *PAGE_SIZE as usize;
-        let addr =
-            (UserAddress::from_ptr(RESTRICTED_ASPACE_BASE) + page_count * page_size).unwrap();
-        assert_eq!(
-            map_memory_with_flags(
-                locked,
-                &current_task,
-                addr,
-                page_size as u64,
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_GROWSDOWN
-            ),
-            addr
-        );
-
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)..addr;
-        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
-    }
-
-    #[::fuchsia::test]
     async fn test_unmap_returned_mappings() {
         let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm().unwrap();
@@ -5762,14 +4621,14 @@ mod tests {
         let addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(addr).expect("mapping");
+        let (range, mapping) = state.address_space.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, (addr + (*PAGE_SIZE * 2)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
         let original_memory = {
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5786,17 +4645,20 @@ mod tests {
             let state = mm.state.read();
 
             // The first page should be unmapped.
-            assert!(state.mappings.get(addr).is_none());
+            assert!(state.address_space.mappings.get(addr).is_none());
 
             // The second page should be a new child COW memory object.
-            let (range, mapping) =
-                state.mappings.get((addr + *PAGE_SIZE).unwrap()).expect("second page");
+            let (range, mapping) = state
+                .address_space
+                .mappings
+                .get((addr + *PAGE_SIZE).unwrap())
+                .expect("second page");
             assert_eq!(range.start, (addr + *PAGE_SIZE).unwrap());
             assert_eq!(range.end, (addr + *PAGE_SIZE * 2).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), (addr + *PAGE_SIZE).unwrap());
                     assert_eq!(backing.memory_offset(), 0);
@@ -5817,14 +4679,14 @@ mod tests {
         let addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(addr).expect("mapping");
+        let (range, mapping) = state.address_space.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, (addr + (*PAGE_SIZE * 2)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
         let original_memory = {
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5841,16 +4703,16 @@ mod tests {
             let state = mm.state.read();
 
             // The second page should be unmapped.
-            assert!(state.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
+            assert!(state.address_space.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
 
             // The first page's memory object should be the same as the original, only shrunk.
-            let (range, mapping) = state.mappings.get(addr).expect("first page");
+            let (range, mapping) = state.address_space.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, (addr + *PAGE_SIZE).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5890,17 +4752,17 @@ mod tests {
             MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
         );
         let state = mm.state.read();
-        let (range1, _) = state.mappings.get(addr1).expect("mapping");
+        let (range1, _) = state.address_space.mappings.get(addr1).expect("mapping");
         assert_eq!(range1.start, addr1);
         assert_eq!(range1.end, (addr1 + *PAGE_SIZE).unwrap());
-        let (range2, mapping2) = state.mappings.get(addr2).expect("mapping");
+        let (range2, mapping2) = state.address_space.mappings.get(addr2).expect("mapping");
         assert_eq!(range2.start, addr2);
         assert_eq!(range2.end, (addr2 + *PAGE_SIZE).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping2;
         #[cfg(not(feature = "alternate_anon_allocs"))]
         let original_memory2 = {
-            match state.get_mapping_backing(mapping2) {
+            match state.address_space.get_mapping_backing(mapping2) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr2);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5916,16 +4778,16 @@ mod tests {
         let state = mm.state.read();
 
         // The first page should be unmapped.
-        assert!(state.mappings.get(addr1).is_none());
+        assert!(state.address_space.mappings.get(addr1).is_none());
 
         // The second page should remain unchanged.
-        let (range2, mapping2) = state.mappings.get(addr2).expect("second page");
+        let (range2, mapping2) = state.address_space.mappings.get(addr2).expect("second page");
         assert_eq!(range2.start, addr2);
         assert_eq!(range2.end, (addr2 + *PAGE_SIZE).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping2;
         #[cfg(not(feature = "alternate_anon_allocs"))]
-        match state.get_mapping_backing(mapping2) {
+        match state.address_space.get_mapping_backing(mapping2) {
             MappingBacking::Memory(backing) => {
                 assert_eq!(backing.base(), addr2);
                 assert_eq!(backing.memory_offset(), 0);
@@ -5946,14 +4808,14 @@ mod tests {
         let addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(addr).expect("mapping");
+        let (range, mapping) = state.address_space.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, (addr + (*PAGE_SIZE * 3)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
         let original_memory = {
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5970,16 +4832,16 @@ mod tests {
             let state = mm.state.read();
 
             // The middle page should be unmapped.
-            assert!(state.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
+            assert!(state.address_space.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
 
-            let (range, mapping) = state.mappings.get(addr).expect("first page");
+            let (range, mapping) = state.address_space.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, (addr + *PAGE_SIZE).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             // The first page's memory object should be the same as the original, only shrunk.
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), addr);
                     assert_eq!(backing.memory_offset(), 0);
@@ -5988,15 +4850,18 @@ mod tests {
                 }
             }
 
-            let (range, mapping) =
-                state.mappings.get((addr + *PAGE_SIZE * 2).unwrap()).expect("last page");
+            let (range, mapping) = state
+                .address_space
+                .mappings
+                .get((addr + *PAGE_SIZE * 2).unwrap())
+                .expect("last page");
             assert_eq!(range.start, (addr + *PAGE_SIZE * 2).unwrap());
             assert_eq!(range.end, (addr + *PAGE_SIZE * 3).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             // The last page should be a new child COW memory object.
-            match state.get_mapping_backing(mapping) {
+            match state.address_space.get_mapping_backing(mapping) {
                 MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base(), (addr + *PAGE_SIZE * 2).unwrap());
                     assert_eq!(backing.memory_offset(), 0);
@@ -6377,10 +5242,10 @@ mod tests {
             let state = current_task.mm().unwrap().state.read();
 
             // The name should apply to both mappings.
-            let (_, mapping) = state.mappings.get(first_mapping_addr).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(first_mapping_addr).unwrap();
             assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
 
-            let (_, mapping) = state.mappings.get(second_mapping_addr).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(second_mapping_addr).unwrap();
             assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }
@@ -6418,7 +5283,7 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }
@@ -6457,7 +5322,7 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(second_page).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(second_page).unwrap();
             assert_eq!(mapping.name(), MappingName::None);
         }
     }
@@ -6491,14 +5356,18 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name(), MappingName::None);
 
-            let (_, mapping) = state.mappings.get((mapping_addr + *PAGE_SIZE).unwrap()).unwrap();
+            let (_, mapping) =
+                state.address_space.mappings.get((mapping_addr + *PAGE_SIZE).unwrap()).unwrap();
             assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
 
-            let (_, mapping) =
-                state.mappings.get((mapping_addr + (2 * *PAGE_SIZE)).unwrap()).unwrap();
+            let (_, mapping) = state
+                .address_space
+                .mappings
+                .get((mapping_addr + (2 * *PAGE_SIZE)).unwrap())
+                .unwrap();
             assert_eq!(mapping.name(), MappingName::None);
         }
     }
@@ -6537,7 +5406,7 @@ mod tests {
         {
             let state = target.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
+            let (_, mapping) = state.address_space.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }

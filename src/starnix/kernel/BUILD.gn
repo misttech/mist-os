@@ -158,6 +158,7 @@ rustc_library("starnix_core") {
     "fs/sysfs/power_directory.rs",
     "fs/tmpfs.rs",
     "lib.rs",
+    "mm/address_space.rs",
     "mm/debugger.rs",
     "mm/futex_table.rs",
     "mm/mapping.rs",
