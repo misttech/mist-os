@@ -143,6 +143,13 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
 
   display::ColorConversion color_conversion(display_config.color_conversion);
 
+  display::ModeId mode_id(display_config.mode_id);
+  if (mode_id == display::kInvalidModeId) {
+    completer.buffer(arena).ReplyError(
+        display::ConfigCheckResult::kUnsupportedDisplayModes.ToFidl());
+    return;
+  }
+
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
   for (const auto& fidl_layer : display_config.layers) {
@@ -151,7 +158,7 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
   }
 
   display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::DisplayId(display_config.display_id), display::ModeId(1), color_conversion, layers);
+      display::DisplayId(display_config.display_id), mode_id, color_conversion, layers);
 
   if (config_check_result != display::ConfigCheckResult::kOk) {
     completer.buffer(arena).ReplyError(config_check_result.ToFidl());
@@ -181,6 +188,10 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
 
   display::ColorConversion color_conversion(display_config.color_conversion);
 
+  display::ModeId mode_id(display_config.mode_id);
+  ZX_DEBUG_ASSERT_MSG(mode_id != display::kInvalidModeId,
+                      "Display coordinator applied rejected invalid mode ID");
+
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
   for (const auto& fidl_layer : display_config.layers) {
@@ -188,7 +199,7 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
     layers.emplace_back(fidl_layer);
   }
 
-  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), display::ModeId(1),
+  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), mode_id,
                              color_conversion, layers,
                              display::DriverConfigStamp(request->config_stamp));
   completer.buffer(arena).Reply();

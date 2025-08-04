@@ -137,6 +137,11 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
 
   display::ColorConversion color_conversion(banjo_display_config->color_conversion);
 
+  display::ModeId mode_id(banjo_display_config->mode_id);
+  if (mode_id == display::kInvalidModeId) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo();
+  }
+
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
   for (const auto& banjo_layer : banjo_layers) {
@@ -144,9 +149,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     layers.emplace_back(banjo_layer);
   }
 
-  display::ConfigCheckResult config_check_result =
-      engine_.CheckConfiguration(display::DisplayId(banjo_display_config->display_id),
-                                 display::ModeId(1), color_conversion, layers);
+  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
+      display::DisplayId(banjo_display_config->display_id), mode_id, color_conversion, layers);
   return config_check_result.ToBanjo();
 }
 
@@ -170,6 +174,10 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
 
   display::ColorConversion color_conversion(banjo_display_config->color_conversion);
 
+  display::ModeId mode_id(banjo_display_config->mode_id);
+  ZX_DEBUG_ASSERT_MSG(mode_id != display::kInvalidModeId,
+                      "Display coordinator applied rejected invalid mode ID");
+
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
   for (const auto& banjo_layer : banjo_layers) {
@@ -177,8 +185,8 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
     layers.emplace_back(banjo_layer);
   }
 
-  engine_.ApplyConfiguration(display::DisplayId(banjo_display_config->display_id),
-                             display::ModeId(1), color_conversion, layers,
+  engine_.ApplyConfiguration(display::DisplayId(banjo_display_config->display_id), mode_id,
+                             color_conversion, layers,
                              display::DriverConfigStamp(*banjo_config_stamp));
 }
 
