@@ -4237,17 +4237,11 @@ impl MemoryManager {
                 // It's invalid to assign a name to a file-backed mapping.
                 return error!(EBADF);
             }
-            if range.start < addr {
-                // This mapping starts before the named region. Split the mapping so we can apply the name only to
-                // the specified region.
-                let start_split_range = range.start..addr;
-                let start_split_length = addr - range.start;
-                let start_split_mapping =
-                    mapping.split_prefix_off(&state, range.start, start_split_length as u64);
-                state.mappings.insert(start_split_range, start_split_mapping);
+            // Handle mappings that start before the region to be named.
+            range.start = std::cmp::max(range.start, addr);
+            // Handle mappings that extend past the region to be named.
+            range.end = std::cmp::min(range.end, end);
 
-                range = addr..range.end;
-            }
             if let Some(last_range_end) = last_range_end {
                 if last_range_end != range.start {
                     // The name must apply to a contiguous range of mapped pages.
@@ -4268,30 +4262,6 @@ impl MemoryManager {
                         backing.memory().set_zx_name(b"");
                     }
                 }
-            }
-            if range.end > end {
-                // The named region ends before the last mapping ends. Split the tail off of the
-                // last mapping to have an unnamed mapping after the named region.
-                let tail_range = end..range.end;
-                let tail_offset = range.end - end;
-                let tail_mapping = match state.get_mapping_backing(&mapping) {
-                    MappingBacking::Memory(backing) => Mapping::new(
-                        state.create_memory_backing(
-                            end,
-                            backing.memory().clone(),
-                            backing.memory_offset() + tail_offset as u64,
-                        ),
-                        mapping.flags(),
-                        mapping.max_access(),
-                        mapping.file_write_guard().clone(),
-                    ),
-                    #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => {
-                        Mapping::new_private_anonymous(mapping.flags(), mapping.name().clone())
-                    }
-                };
-                state.mappings.insert(tail_range, tail_mapping);
-                range.end = end;
             }
             mapping.set_name(match &name {
                 Some(name) => MappingName::Vma(FlyByteStr::new(name.as_bytes())),

@@ -279,34 +279,6 @@ impl Mapping {
         // ui   -   userfaultfd minor fault pages tracking (since Linux 5.13)
         string
     }
-
-    pub fn split_prefix_off(
-        &mut self,
-        mm_state: &MemoryManagerState,
-        start: UserAddress,
-        prefix_len: u64,
-    ) -> Self {
-        match &mut self.backing {
-            MappingBacking::Memory(backing) => {
-                // Shrink the range of the named mapping to only the named area.
-                backing.memory_offset = prefix_len;
-                Mapping::new(
-                    mm_state.create_memory_backing(
-                        start,
-                        backing.memory.clone(),
-                        backing.memory_offset,
-                    ),
-                    self.flags,
-                    self.max_access,
-                    self.file_write_guard.clone(),
-                )
-            }
-            #[cfg(feature = "alternate_anon_allocs")]
-            MappingBacking::PrivateAnonymous => {
-                Mapping::new_private_anonymous(self.flags, self.name())
-            }
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
