@@ -20,7 +20,7 @@ if (is_linux) {
   resource("print_helper_resource") {
     testonly = true
     sources = [ "$root_out_dir/print_helper" ]
-    outputs = [ "data/tests/print_helper" ]
+    outputs = [ "data/tests/deps/print_helper" ]
     deps = [ ":print_helper" ]
   }
 
@@ -39,7 +39,7 @@ if (is_linux) {
   resource("clone_exec_helper_resource") {
     testonly = true
     sources = [ "$root_out_dir/clone_exec_helper" ]
-    outputs = [ "data/tests/clone_exec_helper" ]
+    outputs = [ "data/tests/deps/clone_exec_helper" ]
     deps = [ ":clone_exec_helper" ]
   }
 }

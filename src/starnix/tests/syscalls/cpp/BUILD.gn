@@ -255,7 +255,7 @@ if (current_cpu == "x64" || current_cpu == "arm64") {
     if (current_cpu == "arm64") {
       sources += [ "//prebuilt/starnix/fuse-overlayfs-arm64/fuse-overlayfs" ]
     }
-    outputs = [ "data/fuse-overlayfs" ]
+    outputs = [ "data/tests/deps/fuse-overlayfs" ]
   }
 } else {
   group("fuse_overlayfs") {
@@ -267,7 +267,7 @@ resource("simple_ext4_image") {
     "data/hello_world.txt",
     "data/simple_ext4.img",
   ]
-  outputs = [ "data/{{source_file_part}}" ]
+  outputs = [ "data/tests/deps/{{source_file_part}}" ]
 }
 
 config("march") {
@@ -511,7 +511,7 @@ if (is_linux) {
   resource("ptrace_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/ptrace_test_exec_child" ]
-    outputs = [ "data/tests/ptrace_test_exec_child" ]
+    outputs = [ "data/tests/deps/ptrace_test_exec_child" ]
     deps = [ ":ptrace_test_exec_child" ]
   }
 
@@ -531,7 +531,7 @@ if (is_linux) {
   resource("signal_handling_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/signal_handling_test_exec_child" ]
-    outputs = [ "data/tests/signal_handling_test_exec_child" ]
+    outputs = [ "data/tests/deps/signal_handling_test_exec_child" ]
     deps = [ ":signal_handling_test_exec_child" ]
   }
 
@@ -551,7 +551,7 @@ if (is_linux) {
   resource("syscall_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/syscall_test_exec_child" ]
-    outputs = [ "data/tests/syscall_test_exec_child" ]
+    outputs = [ "data/tests/deps/syscall_test_exec_child" ]
     deps = [ ":syscall_test_exec_child" ]
   }
 
@@ -571,7 +571,7 @@ if (is_linux) {
   resource("suid_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/suid_test_exec_child" ]
-    outputs = [ "data/tests/suid_test_exec_child" ]
+    outputs = [ "data/tests/deps/suid_test_exec_child" ]
     deps = [ ":suid_test_exec_child" ]
   }
 }
@@ -582,7 +582,7 @@ resource("extended_pstate_initial_state_child_resource") {
   exe_label = ":${binary_name}"
   out_dir = get_label_info(exe_label, "root_out_dir")
   sources = [ "${out_dir}/${binary_name}" ]
-  outputs = [ "data/tests/${binary_name}" ]
+  outputs = [ "data/tests/deps/${binary_name}" ]
   deps = [ exe_label ]
 }
 
