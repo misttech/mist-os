@@ -74,7 +74,7 @@ rust_library(
     }),
     version = "1.10.0",
     deps = [
-        "//third_party/rust_crates/vendor/either-1.14.0:either",
+        "//third_party/rust_crates/vendor/either-1.15.0:either",
         "//third_party/rust_crates/vendor/rayon-core-1.12.1:rayon_core",
     ],
 )

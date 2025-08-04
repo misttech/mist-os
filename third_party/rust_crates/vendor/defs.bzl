@@ -349,7 +349,7 @@ _NORMAL_DEPENDENCIES = {
             "dyn-clone": Label("//third_party/rust_crates/vendor/dyn-clone-1.0.19:dyn_clone"),
             "ecb": Label("//third_party/rust_crates/vendor/ecb-0.1.2:ecb"),
             "ecdsa": Label("//third_party/rust_crates/vendor/ecdsa-0.14.8:ecdsa"),
-            "either": Label("//third_party/rust_crates/vendor/either-1.14.0:either"),
+            "either": Label("//third_party/rust_crates/vendor/either-1.15.0:either"),
             "elliptic-curve": Label("//third_party/rust_crates/vendor/elliptic-curve-0.12.3:elliptic_curve"),
             "eui48": Label("//third_party/rust_crates/vendor/eui48-1.1.0:eui48"),
             "event-listener": Label("//third_party/rust_crates/vendor/event-listener-5.3.1:event_listener"),

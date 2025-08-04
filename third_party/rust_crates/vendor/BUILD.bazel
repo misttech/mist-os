@@ -799,14 +799,14 @@ alias(
 )
 
 alias(
-    name = "either-1.14.0",
-    actual = "//third_party/rust_crates/vendor/either-1.14.0:either",
+    name = "either-1.15.0",
+    actual = "//third_party/rust_crates/vendor/either-1.15.0:either",
     tags = ["manual"],
 )
 
 alias(
     name = "either",
-    actual = "//third_party/rust_crates/vendor/either-1.14.0:either",
+    actual = "//third_party/rust_crates/vendor/either-1.15.0:either",
     tags = ["manual"],
 )
 
