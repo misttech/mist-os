@@ -18,7 +18,7 @@ if (current_toolchain == default_toolchain) {
     outputs = [ gn_desc_json_file ]
     depfile = "$target_out_dir/$gn_desc_json.d"
     hermetic_deps = false
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
 
     args = [
       "--fuchsia_dir",

@@ -764,7 +764,7 @@ template("bazel_product_bundle") {
     filter_bazel_info_logs = false
 
     # Required by targets.bazel_product_bundle sub-target
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
 
     forward_variables_from(invoker,
                            [

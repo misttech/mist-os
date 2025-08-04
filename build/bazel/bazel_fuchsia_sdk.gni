@@ -307,7 +307,7 @@ template("run_fuchsia_bazel_sdk_tests") {
       hermetic_deps = false
 
       # The build events log contains absolute paths written by Bazel!
-      no_output_dir_leaks = false
+      check_for_output_dir_leaks = false
     }
   }
 

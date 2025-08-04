@@ -1002,11 +1002,11 @@ foreach(_target_type,
 #      to generate the file is smaller than the ones from the parent
 #      action.
 #
-#   no_output_dir_leaks:
+#   check_for_output_dir_leaks:
 #     Type: boolean
 #     Required: no
 #     Default: true
-#     Description: If 'no_output_dir_leaks' is true, then the action
+#     Description: If 'check_for_output_dir_leaks' is true, then the action
 #       will be checked for output dir leaks.
 #       Otherwise, the check will be skipped.
 #       This check is composable with all others in this section.
@@ -1173,7 +1173,7 @@ foreach(_target_type,
                                "hermetic_inputs_file",
                                "hermetic_inputs_script",
                                "hermetic_inputs_target",
-                               "no_output_dir_leaks",
+                               "check_for_output_dir_leaks",
                                "repeatable",
                                "response_file_contents",
                                "script",
@@ -1469,27 +1469,28 @@ foreach(_target_type,
                 ] + _args
       }
 
-      # To suppress checking for output dir leaks, in the invoker:
-      #   no_output_dir_leaks = false
-      no_output_dir_leaks = true
-      if (defined(invoker.no_output_dir_leaks)) {
-        no_output_dir_leaks = invoker.no_output_dir_leaks
+      # To suppress checking for output dir leaks, set
+      #   'check_for_output_dir_leaks = false'
+      #  in the invoker.
+      check_for_output_dir_leaks = true
+      if (defined(invoker.check_for_output_dir_leaks)) {
+        check_for_output_dir_leaks = invoker.check_for_output_dir_leaks
       } else if (string_replace("##${current_toolchain}",
                                 "##//third_party/",
                                 "") != "##${current_toolchain}") {
         # Disable build-time leak checks when running actions that belong to
         # toolchain() instances defined by //third_party/ build files.
-        no_output_dir_leaks = false
+        check_for_output_dir_leaks = false
       }
 
-      if (!no_output_dir_leaks) {
+      if (!check_for_output_dir_leaks) {
         deps += [ "//build:output_dir_leaking_allowlist" ]
       }
 
       # Prevent the build output dir path from leaking into the
       # command or its outputs, for cache-ability and consistency
       # across different build environments.
-      if (no_output_dir_leaks && check_output_dir_leaks &&
+      if (check_for_output_dir_leaks && check_output_dir_leaks &&
           invoker.script != "//build/scripts/no_op.sh") {
         _args = []
         _args =

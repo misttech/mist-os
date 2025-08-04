@@ -1436,7 +1436,7 @@ action("python_ide_integration") {
   # The final file is symlinked to the root of the checkout directory, and the paths
   # contained the file must be relative to that directory. For that reason, we need to pass
   # the real build directory path so that each file path is relative to the final symlink location.
-  no_output_dir_leaks = false
+  check_for_output_dir_leaks = false
 
   deps = [ ":fidl_python_dirs" ]
 

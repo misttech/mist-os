@@ -468,7 +468,7 @@ template("package_tool_archive_create") {
                              "public_deps",
                              "testonly",
                              "visibility",
-                             "no_output_dir_leaks",
+                             "check_for_output_dir_leaks",
                            ])
 
     deps = [ invoker.package ]
@@ -514,7 +514,7 @@ template("package_tool_package_manifest_list_create") {
                              "deps",
                              "testonly",
                              "visibility",
-                             "no_output_dir_leaks",
+                             "check_for_output_dir_leaks",
                            ])
 
     # The contents of these folders is dynamic, and managed entirely by this action.

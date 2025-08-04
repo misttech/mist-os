@@ -36,7 +36,7 @@ if (use_bringup_assembly) {
     script = "//scripts/mkinstaller/mkinstaller.py"
     outputs = [ "$target_out_dir/$target_name.img" ]
     dest_image = rebase_path("$target_out_dir/$target_name.img", root_build_dir)
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
     args = [
       "--create",
       "--force",

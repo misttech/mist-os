@@ -152,7 +152,7 @@ template("product_bundle") {
   }
 
   ffx_action(targets.product_bundle) {
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
     forward_variables_from(invoker,
                            [
                              "testonly",

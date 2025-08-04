@@ -70,6 +70,6 @@ template("project_json") {
     }
 
     # "project.json" names the output dir
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 }

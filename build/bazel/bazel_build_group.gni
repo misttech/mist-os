@@ -275,7 +275,7 @@ template("bazel_build_group") {
 
       # Disable leak scanner since this action can copy very large product bundle directories
       # (over 6 GiB) with takes dozens of seconds to verify for no practical benefit.
-      no_output_dir_leaks = false
+      check_for_output_dir_leaks = false
 
       forward_variables_from(subtarget, [ "metadata" ])
     }

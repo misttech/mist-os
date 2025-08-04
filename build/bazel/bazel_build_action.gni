@@ -165,7 +165,7 @@ import("//build/bazel/bazel_action.gni")
 #     Default: false
 #
 #   metadata:
-#   no_output_dir_leaks:
+#   check_for_output_dir_leaks:
 #   testonly:
 #   visibility:
 #     Usual GN meaning.
