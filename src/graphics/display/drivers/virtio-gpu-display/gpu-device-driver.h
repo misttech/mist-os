@@ -57,7 +57,7 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
   // Must outlive `display_engine_` and `engine_fidl_adapter_`.
   std::unique_ptr<display::DisplayEngineEventsFidl> engine_events_;
 
-  // Must outlive `engine_banjo_adapter_`.
+  // Must outlive `engine_fidl_adapter_`.
   std::unique_ptr<DisplayEngine> display_engine_;
 
   std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
