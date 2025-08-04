@@ -59,6 +59,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -1054,7 +1055,18 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
       continue;
     }
 
-    return CheckConfigForDisplay(display_config);
+    // Required to get display preferred modes.
+    fbl::AutoLock lock(controller_.mtx());
+    zx::result<std::span<const display::ModeAndId>> preferred_modes_result =
+        controller_.GetDisplayPreferredModes(display_config.id());
+    if (preferred_modes_result.is_error()) {
+      fdf::error("Failed to get display preferred modes for display ID {}: {}",
+                 display_config.id().value(), preferred_modes_result);
+      return display::ConfigCheckResult::kUnsupportedConfig;
+    }
+
+    std::span<const display::ModeAndId> preferred_modes = preferred_modes_result.value();
+    return CheckConfigForDisplay(display_config, preferred_modes);
   }
 
   // The client needs to process display changes and prepare a configuration
@@ -1062,7 +1074,8 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
   return display::ConfigCheckResult::kEmptyConfig;
 }
 
-display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& display_config) {
+display::ConfigCheckResult Client::CheckConfigForDisplay(
+    const DisplayConfig& display_config, std::span<const display::ModeAndId> preferred_modes) {
   ZX_DEBUG_ASSERT(!display_config.draft_layers_.is_empty());
 
   // The cast will not result in UB because the maximum layer count is
@@ -1081,14 +1094,34 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
 
   // Frame used for checking that each layer's `display_destination` lies
   // entirely within the display output.
-  // TODO(https://fxbug.dev/435313315): Replace `timing` with Mode information
-  // of the given display.
-  const rect_u_t display_area = {
-      .x = 0,
-      .y = 0,
-      .width = display_config.draft_.timing.h_addressable,
-      .height = display_config.draft_.timing.v_addressable,
-  };
+
+  const display::ModeId draft_mode_id(display_config.draft_.mode_id);
+  display::Rectangle display_area({});
+  if (draft_mode_id != display::kInvalidModeId) {
+    auto mode_it = std::ranges::find_if(
+        preferred_modes,
+        [&](const display::ModeAndId& mode_and_id) { return mode_and_id.id() == draft_mode_id; });
+    if (mode_it == preferred_modes.end()) {
+      fdf::error("SetDisplayMode called with unknown mode ID: {}", draft_mode_id.value());
+      return display::ConfigCheckResult::kUnsupportedDisplayModes;
+    }
+    display_area = {{
+        .x = 0,
+        .y = 0,
+        .width = mode_it->mode().active_area().width(),
+        .height = mode_it->mode().active_area().height(),
+    }};
+  } else {
+    // If no mode is set, use the display's current timing information.
+    display_area = {{
+        .x = 0,
+        .y = 0,
+        // The cast will not result in UB because the maximum value of
+        // `h_addressable` and `v_addressable` is `2^16 - 1`.
+        .width = static_cast<int32_t>(display_config.draft_.timing.h_addressable),
+        .height = static_cast<int32_t>(display_config.draft_.timing.v_addressable),
+    }};
+  }
 
   // Normalize the display configuration, and perform Coordinator-level
   // checks. The engine drivers API contract does not allow passing
@@ -1120,7 +1153,7 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
       // and display engine drivers when being imported, so they are always
       // accepted by the display coordinator.
     }
-    if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
+    if (!OriginRectangleContains(display_area.ToBanjo(), banjo_layer.display_destination)) {
       return display::ConfigCheckResult::kInvalidConfig;
     }
   }
