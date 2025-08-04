@@ -134,7 +134,7 @@
     "atom_label": "//sdk/lib/stdcompat:stdcompat_sdk",
     "atom_meta": {
       "dest": "pkg/stdcompat/meta.json",
-      "schema": "cc_source_library",
+      "type": "cc_source_library",
       "stable": true
     },
     "is_stable": true,
@@ -249,7 +249,7 @@
     "atom_label": "//sdk/lib/fit:fit_sdk",
     "atom_meta": {
       "dest": "pkg/fit/meta.json",
-      "schema": "cc_source_library",
+      "type": "cc_source_library",
       "stable": true
     },
     "is_stable": true,
@@ -437,7 +437,7 @@
     "atom_label": "//sdk/lib/fdio:fdio_sdk_manifest",
     "atom_meta": {
       "dest": "pkg/fdio/meta.json",
-      "schema": "cc_prebuilt_library"
+      "type": "cc_prebuilt_library"
     },
     "is_stable": true,
     "atom_type": "cc_prebuilt_library",
@@ -602,7 +602,7 @@
     "atom_label": "//zircon/vdso/zx:zx_sdk",
     "atom_meta": {
       "dest": "fidl/zx/meta.json",
-      "schema": "fidl_library",
+      "type": "fidl_library",
       "stable": true
     },
     "is_stable": true,
@@ -628,7 +628,7 @@
     "atom_label": "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_sdk",
     "atom_meta": {
       "dest": "fidl/fuchsia.unknown/meta.json",
-      "schema": "fidl_library",
+      "type": "fidl_library",
       "stable": true
     },
     "is_stable": true,
@@ -682,7 +682,7 @@
     "atom_label": "//sdk/fidl/fuchsia.io:fuchsia.io_sdk",
     "atom_meta": {
       "dest": "fidl/fuchsia.io/meta.json",
-      "schema": "fidl_library",
+      "type": "fidl_library",
       "stable": true
     },
     "is_stable": true,
@@ -735,7 +735,7 @@
     "atom_label": "//zircon/tools/zbi:zbi_sdk",
     "atom_meta": {
       "dest": "tools/x64/zbi-meta.json",
-      "schema": "host_tool",
+      "type": "host_tool",
       "value": {
         "files": [
           "tools/x64/zbi"
@@ -763,11 +763,8 @@
     "atom_id": "sdk://tools/x64/ffx_tools/ffx-emu",
     "atom_label": "//src/developer/ffx/plugins/emulator:sdk",
     "atom_meta": {
-      "additional_schema_files": [
-        "//build/sdk/meta/host_tool.json"
-      ],
       "dest": "tools/x64/ffx_tools/ffx-emu-meta.json",
-      "schema": "ffx_tool",
+      "type": "ffx_tool",
       "value": {
         "files": {
 
@@ -795,7 +792,7 @@
     "atom_label": "//src/developer/ffx/plugins/emulator:aemu_internal",
     "atom_meta": {
       "dest": "tools/x64/aemu_internal-meta.json",
-      "schema": "companion_host_tool"
+      "type": "companion_host_tool"
     },
     "is_stable": true,
     "atom_type": "companion_host_tool",
@@ -819,7 +816,7 @@
     "atom_label": "//src/devices/bind/fuchsia.serial:fuchsia.serial_sdk",
     "atom_meta": {
       "dest": "bind/fuchsia.serial/meta.json",
-      "schema": "bind_library"
+      "type": "bind_library"
     },
     "is_stable": true,
     "atom_type": "bind_library",
@@ -851,7 +848,7 @@
     "atom_label": "//sdk/lib/syslog/shards:syslog_sdk",
     "atom_meta": {
       "dest": "pkg/syslog/syslog_sdk.json",
-      "schema": "data",
+      "type": "data",
       "value": {
         "data": [
           "pkg/syslog/client.shard.cml",
@@ -874,7 +871,6 @@
     "atom_label": "//sdk:version_history_sdk",
     "atom_meta": {
       "dest": "version_history.json",
-      "schema": "version_history",
       "type": "version_history"
     },
     "is_stable": true,
@@ -1073,7 +1069,7 @@
     "atom_label": "//sdk/testing/sl4f/client:client_sdk",
     "atom_meta": {
       "dest": "dart/sl4f/meta.json",
-      "schema": "dart_library"
+      "type": "dart_library"
     },
     "is_stable": true,
     "atom_type": "dart_library",
@@ -1157,7 +1153,7 @@
     "atom_label": "//sdk:sdk_notice",
     "atom_meta": {
       "dest": "docs/sdk_notice.json",
-      "schema": "documentation",
+      "type": "documentation",
       "value": {
         "docs": [
           "NOTICE.fuchsia"
@@ -1178,7 +1174,7 @@
     "atom_label": "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk",
     "atom_meta": {
       "dest": "python/rtc_conformance_test/meta.json",
-      "schema": "experimental_python_e2e_test"
+      "type": "experimental_python_e2e_test"
     },
     "is_stable": true,
     "atom_type": "experimental_python_e2e_test",
@@ -2069,7 +2065,7 @@
     "atom_label": "//zircon/public/sysroot_sdk:sysroot_sdk",
     "atom_meta": {
       "dest": "pkg/sysroot/meta.json",
-      "schema": "sysroot",
+      "type": "sysroot",
       "value": {
         "ifs_files": [
           "libc.ifs",
@@ -2337,7 +2333,7 @@
     "atom_label": "//src/lib/vulkan:vulkan_layers",
     "atom_meta": {
       "dest": "pkg/vulkan_layers/meta.json",
-      "schema": "loadable_module",
+      "type": "loadable_module",
       "value": {
         "binaries": {
           "x64": [
