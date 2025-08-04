@@ -126,7 +126,7 @@ group("non_hermetic_deps") {
   visibility += [ "//build/rust:*" ]
 
   # rustdoc-link merges an arbitrary tree of rustdoc `--out-dir`s
-  visibility += [ "//build/rust/tests:rustdoc-link" ]
+  visibility += [ "//build/rust/tests/rustdoc-link/*" ]
 
   # See: https://fxbug.dev/42148579
   visibility += [ "//sdk:cts_generate" ]
