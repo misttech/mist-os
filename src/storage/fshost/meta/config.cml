@@ -203,5 +203,11 @@
             availability: "optional",
             default: "never_evict",
         },
+        {
+            /// If true, provision Fxfs partition if it does not exist.
+            config: "fuchsia.fshost.ProvisionFxfs",
+            key: "provision_fxfs",
+            type: "bool",
+        },
     ],
 }

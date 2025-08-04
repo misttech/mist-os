@@ -18,8 +18,9 @@ use std::pin::pin;
 use std::time::Duration;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_test as fdt,
-    fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_hardware_block_volume as fvolume,
-    fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_fshost_fxfsprovisioner as ffxfsprovisioner,
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_hardware_ramdisk as framdisk,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 pub mod disk_builder;
@@ -130,6 +131,7 @@ impl TestFixtureBuilder {
                 Route::new()
                     .capability(Capability::protocol::<ffeedback::CrashReporterMarker>())
                     .capability(Capability::directory("boot").rights(fio::R_STAR_DIR).path("/boot"))
+                    .capability(Capability::protocol::<ffxfsprovisioner::FxfsProvisionerMarker>())
                     .from(&mocks)
                     .to(&fshost),
             )

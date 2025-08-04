@@ -54,6 +54,7 @@ template("fshost_cml") {
           sources += [
             "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
             "//src/storage/fshost/meta/fxblob_fshost_test.cml",
+            "//src/storage/fshost/meta/provision_fxfs_fshost.shard.cml",
           ]
         } else {
           sources += [

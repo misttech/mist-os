@@ -127,6 +127,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       Config{.name = "fuchsia.fshost.FxfsCryptUrl"},
       Config{.name = "fuchsia.fshost.StarnixVolumeName"},
       Config{.name = "fuchsia.fshost.InlineCrypto"},
+      Config{.name = "fuchsia.fshost.ProvisionFxfs"},
   };
 
   if (!args->fshost_config.empty()) {

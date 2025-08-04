@@ -34,5 +34,6 @@ pub fn default_test_config() -> fshost_config::Config {
         disable_automount: false,
         blobfs_write_compression_algorithm: "".to_string(),
         blobfs_cache_eviction_policy: "".to_string(),
+        provision_fxfs: false,
     }
 }

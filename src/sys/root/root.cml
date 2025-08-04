@@ -66,6 +66,7 @@
                 "fuchsia.fshost.Mbr",
                 "fuchsia.fshost.Nand",
                 "fuchsia.fshost.NoZxcrypt",
+                "fuchsia.fshost.ProvisionFxfs",
                 "fuchsia.fshost.RamdiskImage",
                 "fuchsia.fshost.StarnixVolumeName",
                 "fuchsia.fshost.StorageHost",

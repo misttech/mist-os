@@ -81,6 +81,7 @@ template("generated_fshost_config") {
       inline_crypto = false
       blobfs_write_compression_algorithm = ""
       blobfs_cache_eviction_policy = ""
+      provision_fxfs = false
 
       if (defined(invoker.options)) {
         forward_variables_from(invoker.options, "*")

@@ -290,6 +290,8 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
             ("fuchsia.fshost.InlineCrypto", inline_crypto),
             ("fuchsia.blobfs.WriteCompressionAlgorithm", algorithm),
             ("fuchsia.blobfs.CacheEvictionPolicy", policy),
+            // TODO(https://fxbug.dev/411312604): determine the value here.
+            ("fuchsia.fshost.ProvisionFxfs", Config::new_bool(false)),
         ];
         for config in configs {
             builder.set_config_capability(config.0, config.1)?;

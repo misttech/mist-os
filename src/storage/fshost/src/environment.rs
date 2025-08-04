@@ -25,7 +25,7 @@ use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use crypt_policy::{get_policy, Policy};
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
+use fidl::endpoints::{create_proxy, Proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker, VolumeProxy};
@@ -35,7 +35,9 @@ use fs_management::filesystem::{
 use fs_management::format::DiskFormat;
 use fs_management::partition::fvm_allocate_partition;
 use fs_management::{Blobfs, ComponentType, F2fs, FSConfig, Fvm, Fxfs, Minfs};
-use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use fuchsia_component::client::{
+    connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_at_path,
+};
 use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -159,6 +161,16 @@ pub trait Environment: Send + Sync {
         device: &dyn Device,
         name: &str,
     ) -> Result<(), Error>;
+
+    /// When called, attempt to provision an Fxfs partition if a partition with "fxfs" label does
+    /// not exist in `partitions`. Fshost needs to be updated of the new partition layout.
+    async fn try_provision_fxfs(
+        &mut self,
+        _device: &mut dyn Device,
+        _partitions: Vec<PartitionInfo>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 pub enum Filesystem {
@@ -1123,6 +1135,57 @@ impl Environment for FshostEnvironment {
         name: &str,
     ) -> Result<(), Error> {
         self.device_publisher.publish_to_debug_block_dir(device, name)
+    }
+
+    async fn try_provision_fxfs(
+        &mut self,
+        device: &mut dyn Device,
+        partitions: Vec<PartitionInfo>,
+    ) -> Result<(), Error> {
+        if !self.config.provision_fxfs {
+            return Ok(());
+        }
+
+        if partitions.into_iter().map(|p| p.label).any(|x| x == "fxfs") {
+            log::info!("try_provision_fxfs skipped as fxfs partition exists");
+            return Ok(());
+        }
+        log::info!("try_provision_fxfs attempting to provision fxfs partition");
+
+        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(fs_management::Gpt::dynamic_child()),
+        );
+        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
+        let exposed_dir_proxy = serving.exposed_dir();
+
+        let partitions_admin_proxy = connect_to_protocol_at_dir_root::<
+            fpartitions::PartitionsAdminMarker,
+        >(&exposed_dir_proxy)
+        .context("failed to connect to PartitionsAdmin admin")?;
+        let partitions_admin = partitions_admin_proxy
+            .into_client_end()
+            .map_err(|_| anyhow!("failed to convert PartitionsAdmin proxy into client end"))?;
+
+        let partitions_dir = fuchsia_fs::directory::open_directory(
+            &exposed_dir_proxy,
+            fpartitions::PartitionServiceMarker::SERVICE_NAME,
+            fuchsia_fs::PERM_READABLE,
+        )
+        .await
+        .context("Failed to open partitions dir")?
+        .into_client_end()
+        .map_err(|_| anyhow!("failed to convert dir proxy into client end"))?;
+
+        let fxfs_provisioner =
+            connect_to_protocol::<fidl_fuchsia_fshost_fxfsprovisioner::FxfsProvisionerMarker>()
+                .context("failed to connect to fxfs provisioner protocol")?;
+        let _ = fxfs_provisioner
+            .provision(partitions_admin, partitions_dir)
+            .await
+            .context("provisioner failed")?;
+
+        Ok(())
     }
 }
 
