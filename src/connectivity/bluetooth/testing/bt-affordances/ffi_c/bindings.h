@@ -105,6 +105,14 @@ zx_status_t stop_le_scan();
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t connect_le(uint64_t peer_id);
 
+/// Start advertising as an LE peripheral, accept the first connection, and return the PeerId of
+/// its initiator.
+///
+/// `address_type` is 1 for Public or 2 for Random. All other values are interpreted as unset, in
+/// which case the address type will be Public or Random depending on if privacy is enabled in the
+/// system. See fuchsia.bluetooth.le/AdvertisingParameters for details.
+uint64_t advertise_peripheral(bool connectable, uint8_t address_type);
+
 }  // extern "C"
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_BT_AFFORDANCES_FFI_C_BINDINGS_H_

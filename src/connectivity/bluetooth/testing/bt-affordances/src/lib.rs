@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth::PeerId;
+use fidl_fuchsia_bluetooth::{AddressType, PeerId};
 use fidl_fuchsia_bluetooth_sys::{PairingOptions, PairingSecurityLevel};
 use fuchsia_async::LocalExecutor;
 use fuchsia_bt_test_affordances::WorkThread;
@@ -327,4 +327,23 @@ pub extern "C" fn connect_le(peer_id: u64) -> zx_status_t {
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
+}
+
+/// Start advertising as an LE peripheral, accept the first connection, and return the PeerId of
+/// its initiator.
+///
+/// `address_type` is 1 for Public or 2 for Random. All other values are interpreted as unset, in
+/// which case the address type will be Public or Random depending on if privacy is enabled in the
+/// system. See fuchsia.bluetooth.le/AdvertisingParameters for details.
+#[no_mangle]
+pub extern "C" fn advertise_peripheral(connectable: bool, address_type: u8) -> u64 {
+    match block_on(
+        STATE.worker.advertise_peripheral(connectable, AddressType::from_primitive(address_type)),
+    ) {
+        Ok(peer_id) => peer_id.value,
+        Err(err) => {
+            eprintln!("start_advertising_peripheral encountered error: {err}");
+            0
+        }
+    }
 }

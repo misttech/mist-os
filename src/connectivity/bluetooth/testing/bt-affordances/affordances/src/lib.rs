@@ -4,13 +4,16 @@
 
 use anyhow::anyhow;
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl_fuchsia_bluetooth::PeerId;
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_bluetooth::{AddressType, PeerId};
 use fidl_fuchsia_bluetooth_bredr::{
     ConnectParameters, L2capParameters, ProfileMarker, ProfileProxy,
 };
 use fidl_fuchsia_bluetooth_le::{
-    CentralMarker, CentralProxy, ConnectionMarker, ConnectionOptions, ConnectionProxy, Filter,
-    ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
+    AdvertisedPeripheralMarker, AdvertisedPeripheralRequest, AdvertisingParameters, CentralMarker,
+    CentralProxy, ConnectionMarker, ConnectionOptions, ConnectionProxy, Filter,
+    PrivilegedPeripheralMarker, PrivilegedPeripheralProxy, ScanOptions, ScanResultWatcherMarker,
+    ScanResultWatcherProxy,
 };
 use fidl_fuchsia_bluetooth_sys::{
     AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, PairingOptions, Peer,
@@ -21,7 +24,7 @@ use fuchsia_bluetooth::types::Channel;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::{StreamExt, TryFutureExt};
+use futures::{select, StreamExt, TryFutureExt};
 use std::ffi::{CStr, CString};
 use std::thread;
 
@@ -44,6 +47,7 @@ enum Request {
     ),
     StopLeScan(oneshot::Sender<bool>),
     ConnectLe(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
+    AdvertisePeripheral(bool, Option<AddressType>, oneshot::Sender<Result<PeerId, anyhow::Error>>),
     Stop,
 }
 
@@ -71,7 +75,8 @@ impl WorkThread {
         let mut host_cache: Vec<HostInfo> = Vec::new();
         let mut peer_cache: Vec<Peer> = Vec::new();
         let mut _l2cap_channel: Channel;
-        let mut _le_connection: ConnectionProxy;
+        let mut _central_connection: ConnectionProxy;
+        let mut _peripheral_connection: ClientEnd<ConnectionMarker>;
 
         while let Some(request) = receiver.next().await {
             match request {
@@ -151,8 +156,19 @@ impl WorkThread {
                 Request::ConnectLe(peer_id, result_sender) => {
                     match proxies.connect_le(&peer_id).await {
                         Ok(connection) => {
-                            _le_connection = connection;
+                            _central_connection = connection;
                             result_sender.send(Ok(())).unwrap();
+                        }
+                        Err(err) => {
+                            result_sender.send(Err(err)).unwrap();
+                        }
+                    }
+                }
+                Request::AdvertisePeripheral(connectable, address_type, result_sender) => {
+                    match proxies.advertise_peripheral(connectable, address_type).await {
+                        Ok((peer_id, connection)) => {
+                            _peripheral_connection = connection;
+                            result_sender.send(Ok(peer_id)).unwrap();
                         }
                         Err(err) => {
                             result_sender.send(Err(err)).unwrap();
@@ -285,12 +301,29 @@ impl WorkThread {
         self.sender.clone().unbounded_send(Request::ConnectLe(peer_id, sender))?;
         receiver.await?
     }
+
+    // Start advertising as an LE peripheral, accept the first connection, and return the PeerId of
+    // its initiator.
+    // TODO(b/407618718): Accept additional AdvertisingParameters.
+    pub async fn advertise_peripheral(
+        &self,
+        connectable: bool,
+        address_type: Option<AddressType>,
+    ) -> Result<PeerId, anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<PeerId, anyhow::Error>>();
+        self.sender
+            .clone()
+            .unbounded_send(Request::AdvertisePeripheral(connectable, address_type, sender))
+            .unwrap();
+        receiver.await?
+    }
 }
 
 struct Proxies {
     access_proxy: AccessProxy,
     profile_proxy: ProfileProxy,
     central_proxy: CentralProxy,
+    peripheral_proxy: PrivilegedPeripheralProxy,
     host_watcher_stream: HangingGetStream<HostWatcherProxy, Vec<HostInfo>>,
     peer_watcher_stream: HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
     discovery_session: Mutex<Option<ProcedureTokenProxy>>,
@@ -303,6 +336,7 @@ impl Proxies {
         let access_proxy = connect_to_protocol::<AccessMarker>()?;
         let profile_proxy = connect_to_protocol::<ProfileMarker>()?;
         let central_proxy = connect_to_protocol::<CentralMarker>()?;
+        let peripheral_proxy = connect_to_protocol::<PrivilegedPeripheralMarker>()?;
         let host_watcher_stream = HangingGetStream::new_with_fn_ptr(
             connect_to_protocol::<HostWatcherMarker>()?,
             HostWatcherProxy::watch,
@@ -317,6 +351,7 @@ impl Proxies {
             access_proxy,
             profile_proxy,
             central_proxy,
+            peripheral_proxy,
             host_watcher_stream,
             peer_watcher_stream,
             discovery_session,
@@ -568,5 +603,49 @@ impl Proxies {
         let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>();
         self.central_proxy.connect(peer_id, &ConnectionOptions::default(), le_server)?;
         Ok(le_client)
+    }
+
+    async fn advertise_peripheral(
+        &self,
+        connectable: bool,
+        address_type: Option<AddressType>,
+    ) -> Result<(PeerId, ClientEnd<ConnectionMarker>), anyhow::Error> {
+        // TODO(https://fxbug.dev/396500079): Support non-connectable advertising.
+        if !connectable {
+            return Err(anyhow!("Non-connectable peripheral advertising not yet supported."));
+        }
+
+        let (client, mut request_stream) =
+            fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>();
+
+        let mut params = AdvertisingParameters::default();
+        params.connectable = Some(connectable);
+        params.address_type = address_type;
+
+        let mut advertise_fut = self.peripheral_proxy.advertise(&params, client);
+
+        select! {
+            result = advertise_fut => {
+                return Err(anyhow!("LE advertisement finished with result: {result:?}"));
+            }
+            request = request_stream.next() => {
+                match request {
+                    Some(Ok(AdvertisedPeripheralRequest::OnConnected {
+                        peer,
+                        connection,
+                        responder,
+                    })) => {
+                        let _ = responder.send();
+                        return Ok((peer.id.unwrap(), connection));
+                    }
+                    Some(Err(e)) => {
+                        return Err(anyhow!("Error in AdvertisedPeripheral stream: {e:?}"));
+                    }
+                    None => {
+                        return Err(anyhow!("AdvertisedPeripheral stream terminated."));
+                    }
+                }
+            }
+        }
     }
 }

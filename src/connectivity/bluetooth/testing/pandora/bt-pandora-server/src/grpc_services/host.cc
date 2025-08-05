@@ -96,7 +96,19 @@ Status HostService::WaitDisconnection(::grpc::ServerContext* context,
 Status HostService::Advertise(::grpc::ServerContext* context,
                               const ::pandora::AdvertiseRequest* request,
                               ::grpc::ServerWriter<::pandora::AdvertiseResponse>* writer) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  uint8_t address_type =
+      request->own_address_type() == pandora::OwnAddressType::PUBLIC ||
+              request->own_address_type() == pandora::OwnAddressType::RESOLVABLE_OR_PUBLIC
+          ? 1
+          : 2;
+  uint64_t peer_id = advertise_peripheral(request->connectable(), address_type);
+  if (!peer_id) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
+  }
+  pandora::AdvertiseResponse response;
+  response.mutable_connection()->mutable_cookie()->set_value(std::to_string(peer_id));
+  writer->Write(response);
+  return {/*OK*/};
 }
 
 Status HostService::Scan(::grpc::ServerContext* context, const ::pandora::ScanRequest* request,
