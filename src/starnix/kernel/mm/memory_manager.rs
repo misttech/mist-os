@@ -975,7 +975,7 @@ impl MemoryManagerState {
             MappingBacking::Memory(backing) => {
                 if private_anonymous {
                     let new_memory_size = backing
-                        .memory_offset()
+                        .address_to_offset(original_range.start)
                         .checked_add(final_length as u64)
                         .ok_or_else(|| errno!(EINVAL))?;
                     backing
@@ -985,11 +985,7 @@ impl MemoryManagerState {
                     // Zero-out the pages that were added when growing. This is not necessary, but ensures
                     // correctness of our COW implementation. Ignore any errors.
                     let original_length = original_range.end - original_range.start;
-                    let _ = backing.memory().op_range(
-                        zx::VmoOp::ZERO,
-                        backing.memory_offset() + original_length as u64,
-                        (final_length - original_length) as u64,
-                    );
+                    let _ = backing.zero(original_range.end, final_length - original_length);
                 }
 
                 // Re-map the original range, which may include pages before the requested range.
@@ -997,7 +993,7 @@ impl MemoryManagerState {
                     mm,
                     DesiredAddress::FixedOverwrite(original_range.start),
                     backing.memory().clone(),
-                    backing.memory_offset(),
+                    backing.address_to_offset(original_range.start),
                     final_length,
                     original_mapping.flags(),
                     original_mapping.max_access(),
@@ -1088,7 +1084,6 @@ impl MemoryManagerState {
             return error!(EFAULT);
         }
 
-        let offset_into_original_range = (src_addr - original_range.start) as u64;
         let private_anonymous = src_mapping.private_anonymous();
         let (dst_memory_offset, memory) = match self.get_mapping_backing(&src_mapping) {
             MappingBacking::Memory(backing) => {
@@ -1099,7 +1094,7 @@ impl MemoryManagerState {
                         .memory()
                         .create_child(
                             zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                            backing.memory_offset() + offset_into_original_range,
+                            backing.address_to_offset(src_addr),
                             dst_length as u64,
                         )
                         .map_err(MemoryManager::get_errno_for_map_err)?;
@@ -1120,7 +1115,7 @@ impl MemoryManagerState {
                 } else {
                     // This mapping is backed by an FD, just map the range of the memory object covering the moved
                     // pages. If the memory object already had COW semantics, this preserves them.
-                    (backing.memory_offset() + offset_into_original_range, backing.memory().clone())
+                    (backing.address_to_offset(src_addr), backing.memory().clone())
                 }
             }
             #[cfg(feature = "alternate_anon_allocs")]
