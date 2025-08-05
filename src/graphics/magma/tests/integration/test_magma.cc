@@ -1040,9 +1040,9 @@ class TestConnection {
     zx::channel local_endpoint, server_endpoint;
     EXPECT_EQ(ZX_OK, zx::channel::create(0u, &local_endpoint, &server_endpoint));
     EXPECT_EQ(ZX_OK,
-              fdio_service_connect("/svc/fuchsia.sysmem.Allocator", server_endpoint.release()));
+              fdio_service_connect("/svc/fuchsia.sysmem2.Allocator", server_endpoint.release()));
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_sysmem_connection_import(local_endpoint.release(), &connection));
+              magma_sysmem2_connection_import(local_endpoint.release(), &connection));
 
     magma_buffer_collection_t collection;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_sysmem_connection_import_buffer_collection(
