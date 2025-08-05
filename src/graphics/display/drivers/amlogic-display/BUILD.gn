@@ -112,6 +112,7 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/ddk:ddk_metadata_only",
     "//src/lib/fxl",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",

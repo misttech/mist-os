@@ -15,6 +15,9 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         allowed_scheduler_roles: [ "fuchsia.graphics.display.drivers.amlogic-display.vsync" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.display.engine.Service" },
+    ],
     use: [
         { protocol: "fuchsia.scheduler.RoleManager" },
         { protocol: "fuchsia.sysmem2.Allocator" },
@@ -28,6 +31,12 @@
             type: "uint8",
             availability: "optional",
             default: 0,
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.display.engine.Service",
+            from: "self",
         },
     ],
 }

@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
@@ -28,8 +27,8 @@
 #include "fidl/fuchsia.driver.framework/cpp/natural_types.h"
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 #include "src/graphics/display/drivers/amlogic-display/structured_config.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace amlogic_display {
 
@@ -64,9 +63,9 @@ zx::result<> DisplayDeviceDriver::Start() {
   auto config = take_config<structured_config::Config>();
 
   fbl::AllocChecker alloc_checker;
-  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
+  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsFidl>(&alloc_checker);
   if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineEventsBanjo");
+    fdf::error("Failed to allocate memory for DisplayEngineEventsFidl");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -78,10 +77,10 @@ zx::result<> DisplayDeviceDriver::Start() {
   }
   display_engine_ = std::move(create_display_engine_result).value();
 
-  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+  engine_fidl_adapter_ = fbl::make_unique_checked<display::DisplayEngineFidlAdapter>(
       &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineBanjoAdapter");
+    fdf::error("Failed to allocate memory for DisplayEngineFidlAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -90,18 +89,21 @@ zx::result<> DisplayDeviceDriver::Start() {
   inspect::Node config_node = display_engine_->inspector().GetRoot().CreateChild("config");
   config.RecordInspect(&config_node);
 
-  zx::result<> compat_server_init_result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                /*banjo_config=*/engine_banjo_adapter_->CreateBanjoConfig());
-  if (compat_server_init_result.is_error()) {
-    return compat_server_init_result.take_error();
+  fuchsia_hardware_display_engine::Service::InstanceHandler service_handler(
+      {.engine = engine_fidl_adapter_->CreateHandler(*(driver_dispatcher()->get()))});
+  zx::result<> add_service_result =
+      outgoing()->AddService<fuchsia_hardware_display_engine::Service>(std::move(service_handler));
+  if (add_service_result.is_error()) {
+    fdf::error("Failed to add service: {}", add_service_result);
+    return add_service_result.take_error();
   }
 
   const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
-  const std::vector<fuchsia_driver_framework::Offer> node_offers = compat_server_.CreateOffers2();
+  const std::vector<fuchsia_driver_framework::Offer> node_offers = {
+      fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>(),
+  };
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
       AddChild(name(), node_properties, node_offers);
   if (controller_client_result.is_error()) {

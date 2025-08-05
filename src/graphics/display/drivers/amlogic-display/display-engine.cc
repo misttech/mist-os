@@ -11,7 +11,6 @@
 #include <fidl/fuchsia.math/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>

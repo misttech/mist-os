@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
