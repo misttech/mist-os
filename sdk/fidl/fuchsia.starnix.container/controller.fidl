@@ -64,6 +64,22 @@ open protocol Controller {
     flexible GetJobHandle() -> (resource table {
         1: job zx.Handle:JOB;
     });
+
+    /// Sends the provided signal to the process with the given pid.
+    @available(added=HEAD)
+    flexible SendSignal(table {
+        1: pid int32;
+        2: signal uint64;
+    }) -> () error SignalError;
+};
+
+@available(added=HEAD)
+type SignalError = flexible enum {
+    /// Invalid target process.
+    INVALID_TARGET = 1;
+
+    /// Invalid signal.
+    INVALID_SIGNAL = 2;
 };
 
 type SpawnConsoleError = flexible enum {

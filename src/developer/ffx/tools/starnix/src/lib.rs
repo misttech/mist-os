@@ -17,6 +17,7 @@ use common::connect_to_rcs;
 
 mod adb;
 mod console;
+mod kill;
 mod vmo;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -26,6 +27,7 @@ pub enum StarnixSubCommand {
     #[cfg(feature = "enable_console_tool")]
     Console(console::StarnixConsoleCommand),
     Vmo(vmo::StarnixVmoCommand),
+    Kill(kill::StarnixKillCommand),
 }
 
 #[derive(Debug, JsonSchema, Serialize)]
@@ -35,6 +37,7 @@ pub enum StarnixToolOutput {
     #[cfg(feature = "enable_console_tool")]
     Console(console::ConsoleCommandOutput),
     Vmo(vmo::VmoCommandOutput),
+    Kill(kill::KillCommandOutput),
 }
 
 impl std::fmt::Display for StarnixToolOutput {
@@ -44,6 +47,7 @@ impl std::fmt::Display for StarnixToolOutput {
             #[cfg(feature = "enable_console_tool")]
             Self::Console(o) => write!(f, "{o}"),
             Self::Vmo(o) => write!(f, "{o}"),
+            Self::Kill(o) => write!(f, "{o}"),
         }
     }
 }
@@ -82,6 +86,10 @@ impl FfxMain for StarnixTool {
             StarnixSubCommand::Vmo(command) => {
                 let rcs = connect_to_rcs(&self.rcs_connector).await?;
                 vmo::starnix_vmo(command, &rcs).await.map(StarnixToolOutput::Vmo)
+            }
+            StarnixSubCommand::Kill(command) => {
+                let rcs = connect_to_rcs(&self.rcs_connector).await?;
+                kill::starnix_kill(command, &rcs).await.map(StarnixToolOutput::Kill)
             }
         }?;
         writer.machine_or_else(&output, || output.to_string()).bug_context("writing output")?;

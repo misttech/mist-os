@@ -1597,6 +1597,29 @@ impl ThreadGroup {
         Ok(())
     }
 
+    /// Sends a signal to this thread_group without performing any access checks.
+    ///
+    /// # Safety
+    /// This is unsafe, because it should only be called by tools and tests.
+    pub unsafe fn send_signal_unchecked_debug(
+        &self,
+        current_task: &CurrentTask,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<(), Errno> {
+        let signal = Signal::try_from(unchecked_signal)?;
+        let signal_info = SignalInfo {
+            code: SI_USER as i32,
+            detail: SignalDetail::Kill {
+                pid: current_task.thread_group().leader,
+                uid: current_task.current_creds().uid,
+            },
+            ..SignalInfo::default(signal)
+        };
+
+        self.write().send_signal(signal_info);
+        Ok(())
+    }
+
     /// Attempts to send an unchecked signal to this thread group, with info read from
     /// `siginfo_ref`.
     ///

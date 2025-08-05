@@ -61,6 +61,7 @@ rustc_library("lib") {
     "src/adb.rs",
     "src/common.rs",
     "src/console.rs",
+    "src/kill.rs",
     "src/lib.rs",
     "src/vmo.rs",
   ]
