@@ -90,15 +90,22 @@ SecurityService::SecurityService(async_dispatcher_t* dispatcher) {
 ::grpc::Status SecurityService::Secure(::grpc::ServerContext* context,
                                        const ::pandora::SecureRequest* request,
                                        ::pandora::SecureResponse* response) {
-  uint32_t pairing_level;
   if (request->level_case() == ::pandora::SecureRequest::LevelCase::kClassic) {
     return Status(StatusCode::UNIMPLEMENTED, "Only implemented LE pairing security so far");
   }
+
+  uint32_t pairing_level;
+  bool bondable = true;
   switch (request->le()) {
     case pandora::LE_LEVEL1: {
       return Status(StatusCode::INVALID_ARGUMENT, "LE pairing with no security is not supported");
     }
     case pandora::LE_LEVEL2: {
+      // TODO(https://fxbug.dev/396500079): This security level is only used in one MMI, in which
+      // case the pairing is to be completed in non-bondable mode. Ideally we should not rely on
+      // this assumption here.
+      bondable = false;
+
       // Encrypted unauthenticated
       pairing_level = 1;
       break;
@@ -118,7 +125,7 @@ SecurityService::SecurityService(async_dispatcher_t* dispatcher) {
   }
 
   pair(std::strtoul(request->connection().cookie().value().c_str(), nullptr, /*base=*/10),
-       pairing_level);
+       pairing_level, bondable);
 
   return {/*OK*/};
 }

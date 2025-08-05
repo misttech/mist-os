@@ -63,7 +63,7 @@ zx_status_t disconnect_peer(uint64_t peer_id);
 /// fuchsia.bluetooth.sys/PairingOptions for details.
 ///
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
-zx_status_t pair(uint64_t peer_id, uint32_t le_security_level);
+zx_status_t pair(uint64_t peer_id, uint32_t le_security_level, bool bondable);
 
 /// Remove all bonding information and disconnect peer with given identifier, if found.
 ///

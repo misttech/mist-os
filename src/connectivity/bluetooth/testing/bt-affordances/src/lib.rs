@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth::{AddressType, PeerId};
-use fidl_fuchsia_bluetooth_sys::{PairingOptions, PairingSecurityLevel};
+use fidl_fuchsia_bluetooth_sys::{BondableMode, PairingOptions, PairingSecurityLevel};
 use fuchsia_async::LocalExecutor;
 use fuchsia_bt_test_affordances::WorkThread;
 use fuchsia_sync::Mutex;
@@ -198,11 +198,13 @@ pub extern "C" fn disconnect_peer(peer_id: u64) -> zx_status_t {
 ///
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 #[no_mangle]
-pub extern "C" fn pair(peer_id: u64, le_security_level: u32) -> zx_status_t {
+pub extern "C" fn pair(peer_id: u64, le_security_level: u32, bondable: bool) -> zx_status_t {
     let peer_id = PeerId { value: peer_id };
 
     let mut options = PairingOptions::default();
     options.le_security_level = PairingSecurityLevel::from_primitive(le_security_level);
+    options.bondable_mode =
+        bondable.then_some(BondableMode::Bondable).or(Some(BondableMode::NonBondable));
 
     if let Err(err) = block_on(STATE.worker.pair(peer_id, options)) {
         eprintln!("pair encountered error: {err}");
