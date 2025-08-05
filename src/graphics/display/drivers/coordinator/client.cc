@@ -74,16 +74,17 @@ constexpr uint32_t kFallbackVerticalSizeMm = 90;
 //
 // `outer` must be positioned at the coordinate system's origin. Both `inner` and `outer` must be
 // non-empty.
-constexpr bool OriginRectangleContains(const rect_u_t& outer, const rect_u_t& inner) {
-  ZX_DEBUG_ASSERT(outer.x == 0);
-  ZX_DEBUG_ASSERT(outer.y == 0);
-  ZX_DEBUG_ASSERT(outer.width > 0);
-  ZX_DEBUG_ASSERT(outer.height > 0);
-  ZX_DEBUG_ASSERT(inner.width > 0);
-  ZX_DEBUG_ASSERT(inner.height > 0);
+constexpr bool OriginRectangleContains(const display::Rectangle& outer,
+                                       const display::Rectangle& inner) {
+  ZX_DEBUG_ASSERT(outer.x() == 0);
+  ZX_DEBUG_ASSERT(outer.y() == 0);
+  ZX_DEBUG_ASSERT(outer.width() > 0);
+  ZX_DEBUG_ASSERT(outer.height() > 0);
+  ZX_DEBUG_ASSERT(inner.width() > 0);
+  ZX_DEBUG_ASSERT(inner.height() > 0);
 
-  return inner.x < outer.width && inner.y < outer.height && inner.x + inner.width <= outer.width &&
-         inner.y + inner.height <= outer.height;
+  return inner.x() < outer.width() && inner.y() < outer.height() &&
+         inner.x() + inner.width() <= outer.width() && inner.y() + inner.height() <= outer.height();
 }
 
 // We allocate some variable sized stack allocations based on the number of
@@ -611,7 +612,13 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
   }
   Layer& layer = *layers_it;
 
-  layer.SetPrimaryConfig(request->image_metadata);
+  if (!display::ImageMetadata::IsValid(request->image_metadata)) {
+    fdf::error("SetLayerPrimaryConfig called with invalid image metadata");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::ImageMetadata image_metadata(request->image_metadata);
+  layer.SetPrimaryConfig(image_metadata);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -634,15 +641,29 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   }
   Layer& layer = *layers_it;
 
-  if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
-    fdf::error("Invalid transform %" PRIu8,
-               static_cast<uint8_t>(request->image_source_transformation));
+  if (!display::CoordinateTransformation::IsValid(request->image_source_transformation)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid image_source_transformation");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
+  display::CoordinateTransformation image_source_transformation(
+      request->image_source_transformation);
 
-  layer.SetPrimaryPosition(request->image_source_transformation, request->image_source,
-                           request->display_destination);
+  if (!display::Rectangle::IsValid(request->image_source)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid image_source");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle image_source = display::Rectangle::From(request->image_source);
+
+  if (!display::Rectangle::IsValid(request->display_destination)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid display_destination");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle display_destination = display::Rectangle::From(request->display_destination);
+
+  layer.SetPrimaryPosition(image_source_transformation, image_source, display_destination);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -665,13 +686,19 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   }
   Layer& layer = *layers_it;
 
-  if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
-      (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
-    fdf::error("Invalid args {} {}", static_cast<uint8_t>(request->mode), request->val);
+  if (!display::AlphaMode::IsValid(request->mode)) {
+    fdf::error("Invalid alpha mode {}", static_cast<uint8_t>(request->mode));
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
-  layer.SetPrimaryAlpha(request->mode, request->val);
+  display::AlphaMode alpha_mode(request->mode);
+
+  if ((!isnan(request->val) && (request->val < 0 || request->val > 1))) {
+    fdf::error("Invalid alpha value {}", request->val);
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  layer.SetPrimaryAlpha(alpha_mode, /*alpha_coefficient=*/request->val);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -693,16 +720,21 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   }
   Layer& layer = *layers_it;
 
-  uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(
-      request->color.format,
-      /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
-  if (request->color.bytes.size() < bytes_per_pixel) {
+  if (!display::Color::IsValid(request->color)) {
     fdf::error("SetLayerColorConfig with invalid pixel format");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
+  display::Color color = display::Color::From(request->color);
 
-  layer.SetColorConfig(request->color, request->display_destination);
+  if (!display::Rectangle::IsValid(request->display_destination)) {
+    fdf::error("SetLayerColorConfig called with invalid display_destination");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle display_destination = display::Rectangle::From(request->display_destination);
+
+  layer.SetColorConfig(color, display_destination);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -1131,21 +1163,17 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(
       return display::ConfigCheckResult::kUnsupportedConfig;
     }
 
-    layer_t& banjo_layer = banjo_layers[banjo_layers_index];
-    ++banjo_layers_index;
-
-    banjo_layer = draft_layer_node.layer->draft_layer_config_;
-
-    if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
+    const display::DriverLayer& driver_layer = draft_layer_node.layer->draft_layer_config_;
+    if (driver_layer.image_source().width() != 0 && driver_layer.image_source().height() != 0) {
       // Frame for checking that the layer's `image_source` lies entirely within
       // the source image.
-      const rect_u_t image_area = {
+      const display::Rectangle image_area({
           .x = 0,
           .y = 0,
-          .width = banjo_layer.image_metadata.dimensions.width,
-          .height = banjo_layer.image_metadata.dimensions.height,
-      };
-      if (!OriginRectangleContains(image_area, banjo_layer.image_source)) {
+          .width = driver_layer.image_metadata().dimensions().width(),
+          .height = driver_layer.image_metadata().dimensions().height(),
+      });
+      if (!OriginRectangleContains(image_area, driver_layer.image_source())) {
         return display::ConfigCheckResult::kInvalidConfig;
       }
 
@@ -1153,9 +1181,13 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(
       // and display engine drivers when being imported, so they are always
       // accepted by the display coordinator.
     }
-    if (!OriginRectangleContains(display_area.ToBanjo(), banjo_layer.display_destination)) {
+    if (!OriginRectangleContains(display_area, driver_layer.display_destination())) {
       return display::ConfigCheckResult::kInvalidConfig;
     }
+
+    layer_t& banjo_layer = banjo_layers[banjo_layers_index];
+    ++banjo_layers_index;
+    banjo_layer = driver_layer.ToBanjo();
   }
 
   ZX_DEBUG_ASSERT_MSG(display_config.draft_.layers_count == banjo_layers_index,
@@ -1236,11 +1268,11 @@ void Client::ApplyConfigImpl() {
       }
 
       display_config.applied_.layers_count++;
-      layers[layers_index] = applied_layer->applied_layer_config_;
+      layers[layers_index] = applied_layer->applied_layer_config_.ToBanjo();
       ++layers_index;
 
-      bool is_solid_color_fill = applied_layer->applied_layer_config_.image_source.width == 0 ||
-                                 applied_layer->applied_layer_config_.image_source.height == 0;
+      bool is_solid_color_fill = applied_layer->applied_layer_config_.image_source().width() == 0 ||
+                                 applied_layer->applied_layer_config_.image_source().height() == 0;
       if (!is_solid_color_fill) {
         if (applied_layer->applied_image() == nullptr) {
           config_missing_image = true;
