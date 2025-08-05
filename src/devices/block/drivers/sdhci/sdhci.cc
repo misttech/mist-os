@@ -22,8 +22,6 @@
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
 
-#include <format>
-
 #include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -686,56 +684,6 @@ zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_respon
       }
     }
   }
-
-  // TODO(427293779): Remove this after the eMMC issue has been fixed.
-  if (next_request_log_entry_ >= request_log_.size()) {
-    request_log_.emplace_back();
-  }
-  RequestLogEntry& log_entry = request_log_[next_request_log_entry_++];
-  next_request_log_entry_ = next_request_log_entry_ % kMaxRequestLogEntries;
-
-  log_entry.cmd_idx = request.cmd_idx;
-  log_entry.cmd_flags = request.cmd_flags;
-  log_entry.arg = request.arg;
-  log_entry.response = out_response[0];
-  log_entry.count = request_count_++;
-
-  log_entry.buffers.clear();
-  for (size_t i = 0; i < request.buffers_count; i++) {
-    BufferInfo buffer_info{
-        .offset = request.buffers_list[i].offset,
-        .size = request.buffers_list[i].size,
-    };
-    if (request.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
-      buffer_info.id = request.buffers_list[i].buffer.vmo_id;
-    } else if (request.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_HANDLE) {
-      buffer_info.id = request.buffers_list[i].buffer.vmo;
-    } else {
-      buffer_info.id = 0;
-    }
-    log_entry.buffers.push_back(buffer_info);
-  }
-
-  UpdateRequestLog();
-
-  log_entry.first_block.clear();
-
-  // If we just received SET_BLOCK_COUNT with packed commands enabled and this command is
-  // WRITE_MULTIPLE_BLOCK (cmd25), then the first block must contain the packed command header.
-  if (request.cmd_idx == 25 && command_packing_cmd23_ && request.buffers_count > 0 &&
-      request.buffers_list[0].size == 512 &&
-      request.buffers_list[0].type == SDMMC_BUFFER_TYPE_VMO_HANDLE) {
-    log_entry.first_block.resize(512);
-    if (zx_vmo_read(request.buffers_list[0].buffer.vmo, log_entry.first_block.data(),
-                    request.buffers_list[0].offset, 512) != ZX_OK) {
-      // Push a known value so that we can tell from inspect that the read failed.
-      log_entry.first_block.clear();
-      log_entry.first_block.push_back(0xff);
-    }
-  }
-
-  // SET_BLOCK_COUNT (cmd23) with bit 30 set indicates that next command will be packed.
-  command_packing_cmd23_ = request.cmd_idx == 23 && request.arg & (1 << 30);
 
   const InterruptStatus interrupt_status = pending_request.status;
 
@@ -1478,41 +1426,7 @@ zx::result<> Sdhci::Start() {
   }
   node_controller_.Bind(std::move(result.value()));
 
-  request_log_root_ = inspector().root().CreateChild("Request log (oldest first)");
-
   return zx::ok();
-}
-
-void Sdhci::UpdateRequestLog() {
-  ZX_DEBUG_ASSERT(next_request_log_entry_ < kMaxRequestLogEntries);
-  uint32_t entry = next_request_log_entry_ >= request_log_.size() ? 0 : next_request_log_entry_;
-  for (uint32_t i = 0; i < request_log_.size(); i++, entry = (entry + 1) % request_log_.size()) {
-    if (i >= request_log_nodes_.size()) {
-      auto& entry_node = request_log_nodes_.emplace_back();
-      entry_node.node = request_log_root_.CreateChild(std::format("{}", i));
-      entry_node.cmd_idx = entry_node.node.CreateUint("cmd_idx", 0);
-      entry_node.cmd_flags = entry_node.node.CreateString("cmd_flags", "");
-      entry_node.arg = entry_node.node.CreateString("arg", "");
-      entry_node.response = entry_node.node.CreateString("response", "");
-      entry_node.count = entry_node.node.CreateUint("count", 0);
-      entry_node.first_block = entry_node.node.CreateByteVector("first block", {});
-    }
-
-    auto& entry_node = request_log_nodes_[i];
-    entry_node.cmd_idx.Set(request_log_[entry].cmd_idx);
-    entry_node.cmd_flags.Set(std::format("{:08x}", request_log_[entry].cmd_flags));
-    entry_node.arg.Set(std::format("{:08x}", request_log_[entry].arg));
-    entry_node.response.Set(std::format("{:08x}", request_log_[entry].response));
-    entry_node.count.Set(request_log_[entry].count);
-    entry_node.first_block.Set(request_log_[entry].first_block);
-
-    const std::vector<BufferInfo>& buffers = request_log_[entry].buffers;
-    entry_node.buffers = entry_node.node.CreateStringArray("buffers", buffers.size());
-    for (size_t i = 0; i < buffers.size(); i++) {
-      entry_node.buffers.Set(
-          i, std::format("VMO {}: {:x}@{:x}", buffers[i].id, buffers[i].size, buffers[i].offset));
-    }
-  }
 }
 
 }  // namespace sdhci
