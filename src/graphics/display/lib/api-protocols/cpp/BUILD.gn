@@ -9,10 +9,6 @@ library_sources = [
   "backlight-fidl-adapter.cc",
   "backlight-fidl-adapter.h",
   "backlight-interface.h",
-  "display-engine-banjo-adapter.cc",
-  "display-engine-banjo-adapter.h",
-  "display-engine-events-banjo.cc",
-  "display-engine-events-banjo.h",
   "display-engine-events-fidl.cc",
   "display-engine-events-fidl.h",
   "display-engine-events-interface.cc",
@@ -32,7 +28,6 @@ library_deps = [
 ]
 
 library_public_deps = [
-  "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
   "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
   "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
@@ -63,8 +58,6 @@ source_set("cpp-cxx17") {
 test_sources = [
   "backlight-fidl-adapter-test.cc",
   "backlight-interface-test.cc",
-  "display-engine-banjo-adapter-test.cc",
-  "display-engine-events-banjo-test.cc",
   "display-engine-events-fidl-test.cc",
   "display-engine-events-interface-test.cc",
   "display-engine-fidl-adapter-test.cc",
@@ -72,8 +65,6 @@ test_sources = [
   "inplace-vector-test.cc",
   "mock-backlight.cc",
   "mock-backlight.h",
-  "mock-banjo-display-engine-listener.cc",
-  "mock-banjo-display-engine-listener.h",
   "mock-display-engine.cc",
   "mock-display-engine.h",
   "mock-fidl-display-engine-listener.cc",

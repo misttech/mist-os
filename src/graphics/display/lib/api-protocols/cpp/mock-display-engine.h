@@ -34,8 +34,8 @@ namespace display::testing {
 // Strict mock for DisplayEngineInterface implementations.
 //
 // This is a very rare case where strict mocking is warranted. The code under
-// test is an adapter that maps Banjo or FIDL calls 1:1 to C++ calls. So, the
-// API contract being tested is expressed in terms of individual function calls.
+// test is an adapter that maps FIDL calls 1:1 to C++ calls. So, the API
+// contract being tested is expressed in terms of individual function calls.
 class MockDisplayEngine : public display::DisplayEngineInterface {
  public:
   // Expectation containers for display::DisplayEngineInterface:

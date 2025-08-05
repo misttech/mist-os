@@ -21,10 +21,6 @@ namespace display {
 //
 // This abstract base class only represents the events in the FIDL interface.
 // The methods are represented by `DisplayEngineInterface`.
-//
-// This abstract base class also represents the
-// [`fuchsia.hardware.display.controller/DisplayEngineListener`] Banjo
-// interface.
 class DisplayEngineEventsInterface {
  public:
   DisplayEngineEventsInterface() = default;
