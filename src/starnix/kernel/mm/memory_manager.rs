@@ -1553,8 +1553,8 @@ impl MemoryManagerState {
             if range_to_zero.is_empty() {
                 continue;
             }
-            let start = mapping.address_to_offset(range_to_zero.start);
-            let end = mapping.address_to_offset(range_to_zero.end);
+            let start_offset = mapping.address_to_offset(range_to_zero.start);
+            let end_offset = mapping.address_to_offset(range_to_zero.end);
             if advice == MADV_DONTFORK
                 || advice == MADV_DOFORK
                 || advice == MADV_WIPEONFORK
@@ -1596,23 +1596,8 @@ impl MemoryManagerState {
                     // the containing branch.
                     unknown_advice => unreachable!("unknown advice {unknown_advice}"),
                 };
-                let new_mapping = match self.get_mapping_backing(mapping) {
-                    MappingBacking::Memory(backing) => Mapping::with_name(
-                        self.create_memory_backing(
-                            range_to_zero.start,
-                            backing.memory().clone(),
-                            backing.memory_offset() + start,
-                        ),
-                        new_flags,
-                        mapping.max_access(),
-                        mapping.name().clone(),
-                        mapping.file_write_guard().clone(),
-                    ),
-                    #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => {
-                        Mapping::new_private_anonymous(new_flags, mapping.name().clone())
-                    }
-                };
+                let mut new_mapping = mapping.clone();
+                new_mapping.set_flags(new_flags);
                 updates.push((range_to_zero, new_mapping));
             } else {
                 if mapping.flags().contains(MappingFlags::SHARED) {
@@ -1712,13 +1697,15 @@ impl MemoryManagerState {
                     #[cfg(feature = "alternate_anon_allocs")]
                     MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
                 };
-                memory.op_range(op, start, end - start).map_err(|s| match s {
-                    zx::Status::OUT_OF_RANGE => errno!(EINVAL),
-                    zx::Status::NO_MEMORY => errno!(ENOMEM),
-                    zx::Status::INVALID_ARGS => errno!(EINVAL),
-                    zx::Status::ACCESS_DENIED => errno!(EACCES),
-                    _ => impossible_error(s),
-                })?;
+                memory.op_range(op, start_offset, end_offset - start_offset).map_err(
+                    |s| match s {
+                        zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+                        zx::Status::NO_MEMORY => errno!(ENOMEM),
+                        zx::Status::INVALID_ARGS => errno!(EINVAL),
+                        zx::Status::ACCESS_DENIED => errno!(EACCES),
+                        _ => impossible_error(s),
+                    },
+                )?;
             }
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
