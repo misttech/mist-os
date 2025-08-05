@@ -98,7 +98,7 @@ trait LpmKey {
                 result += 32;
             } else {
                 result += num_matching_bits(a, b);
-                break;
+                return result;
             }
         }
         let suffix = len % 32;
@@ -111,7 +111,7 @@ trait LpmKey {
                 result += std::cmp::min(suffix, num_matching_bits(a, b));
             }
         }
-        return result;
+        result
     }
 
     // Returns true if `self` is a prefix of they `key`.
@@ -124,9 +124,9 @@ impl LpmKey for &[u8] {
     fn read_u32(&self, index: usize) -> u32 {
         let pos = index * std::mem::size_of::<u32>();
         assert!(pos < self.len());
-        let end = std::mem::size_of::<u32>();
+        let end = pos + std::mem::size_of::<u32>();
         if end <= self.len() {
-            u32::read_from_bytes(&self[pos..(pos + std::mem::size_of::<u32>())]).unwrap()
+            u32::read_from_bytes(&self[pos..end]).unwrap()
         } else {
             // `self` may not contain a whole number of `u32` values. The last
             // value is padded with 0s.
@@ -447,14 +447,15 @@ mod internal {
 
         // Updates child node from `prev` to `new`.
         pub fn update_child(&self, new: Option<&LpmTrieNode<'a>>, prev: Option<&LpmTrieNode<'a>>) {
+            let next_bit_pos = self.key.key_len();
             let next_bit = match (new, prev) {
                 (Some(new), Some(prev)) => {
-                    let bit = new.key.get_bit(self.key.key_len()).unwrap();
-                    assert!(bit == prev.key.get_bit(self.key.key_len()).unwrap());
+                    let bit = new.key.get_bit(next_bit_pos).unwrap();
+                    assert!(bit == prev.key.get_bit(next_bit_pos).unwrap());
                     bit
                 }
-                (Some(new), None) => new.key.get_bit(self.key.key_len()).unwrap(),
-                (None, Some(prev)) => prev.key.get_bit(self.key.key_len()).unwrap(),
+                (Some(new), None) => new.key.get_bit(next_bit_pos).unwrap(),
+                (None, Some(prev)) => prev.key.get_bit(next_bit_pos).unwrap(),
                 (None, None) => unreachable!(),
             };
             let branch = match next_bit {
@@ -1008,12 +1009,13 @@ impl MapImpl for LpmTrie {
 mod test {
     use super::*;
     use rand::seq::SliceRandom;
-    use zerocopy::{Immutable, IntoBytes};
+    use test_case::test_case;
+    use zerocopy::{FromBytes, Immutable, IntoBytes};
 
     const TEST_KEY_MAX_BYTES: usize = 20;
 
     #[repr(C)]
-    #[derive(IntoBytes, Immutable)]
+    #[derive(IntoBytes, Immutable, FromBytes)]
     struct Key {
         len: u32,
         data: [u8; TEST_KEY_MAX_BYTES],
@@ -1056,6 +1058,15 @@ mod test {
         let key2 = serialize_key(8, &[0b01010001]);
         assert!(!key1.as_slice().is_prefix_of(key2.as_slice()));
         assert!(key2.as_slice().is_prefix_of(key1.as_slice()));
+
+        // Try `num_matching_bits() with a key longer than 32 bits
+        let long_key1 = serialize_key(80, &[0, 0, 0, 0, 0b10000000]);
+        let long_key2 = serialize_key(88, &[0, 0, 0, 0, 0b10000100]);
+        assert_eq!(long_key1.as_slice().num_matching_bits(long_key2.as_slice()), 37);
+
+        let long_key1 = serialize_key(160, &[0, 1]);
+        let long_key2 = serialize_key(160, &[0, 0]);
+        assert_eq!(long_key1.as_slice().num_matching_bits(long_key2.as_slice()), 15);
     }
 
     #[fuchsia::test]
@@ -1139,8 +1150,62 @@ mod test {
             .expect("Failed to insert map entry");
     }
 
+    fn get_short_key(id: usize) -> Vec<u8> {
+        let mut res = 0u16;
+        for bit in 0..8 {
+            let v = if id & (1 << bit) != 0 { 0b10 } else { 0b01 };
+            res |= v << (bit * 2);
+        }
+
+        serialize_key(16, res.as_bytes())
+    }
+
+    fn get_long_key(id: usize) -> Vec<u8> {
+        let mut bytes = [0; 20];
+        for bit in 0..8 {
+            bytes[bit] = if id & (1 << bit) != 0 { 0b00011000 } else { 0b00000110 };
+        }
+
+        serialize_key(64, &bytes)
+    }
+
+    fn get_variable_len_tail_key(id: usize) -> Vec<u8> {
+        let mut bytes = [0; 20];
+        let len = 2 + id / 2;
+        let last_byte = (len - 1) / 8;
+        let last_byte_bits = (len - 1) % 8 + 1;
+
+        // All bytes of the key are the same except for the last byte, i.e.
+        // all entropy is in the last byte.
+        for i in 0..(last_byte as u8) {
+            bytes[i as usize] = (i * 3).reverse_bits();
+        }
+
+        bytes[last_byte] =
+            ((id as u8 ^ 0b01010101) & ((1u16 << last_byte_bits) - 1) as u8).reverse_bits();
+
+        serialize_key(len as u32, &bytes)
+    }
+
+    fn get_variable_len_head_key(id: usize) -> Vec<u8> {
+        let mut bytes = [0; 20];
+        let len = 2 + id / 2;
+
+        // All bytes of the key are the same except for the first byte.
+        bytes[0] = (id as u8 ^ 0b01010101).reverse_bits();
+        for i in 1u8..20 {
+            bytes[i as usize] = (i * 3).reverse_bits();
+        }
+
+        serialize_key(len as u32, &bytes)
+    }
+
+    #[test_case(get_short_key; "short keys")]
+    #[test_case(get_long_key; "long keys")]
+    #[test_case(get_variable_len_tail_key; "variable len, tail entropy")]
+    #[test_case(get_variable_len_head_key; "variable len, head entropy")]
     #[fuchsia::test]
-    fn test_random_insert_order() {
+    fn test_random_insert_order(get_key: impl Fn(usize) -> Vec<u8>) {
         const NUM_ENTRIES: u8 = 200;
 
         let trie = LpmTrie::new(
@@ -1157,28 +1222,28 @@ mod test {
         let mut ids: Vec<u8> = (0..NUM_ENTRIES).collect();
         ids.shuffle(&mut rand::rng());
 
-        let get_key = |id: u8| {
-            let mut res = 0u16;
-            for bit in 0..8 {
-                let v = if id & (1 << bit) != 0 { 0b10 } else { 0b01 };
-                res |= v << (bit * 2);
-            }
-
-            serialize_key(16, res.as_bytes())
-        };
-
         for id in ids.iter() {
             let id = *id;
-            let key = get_key(id);
+            let key = get_key(id as usize);
             trie.update(MapKey::from_slice(&key), &[id, 1, 2, 3], 0)
                 .expect("Failed to update map entry");
         }
 
         // Try looking up all entries.
         for id in 0..NUM_ENTRIES {
-            let key = get_key(id);
+            let key = get_key(id as usize);
             let value = trie.lookup(&key).unwrap().ptr().load()[..4].to_owned();
             assert_eq!(value, vec![id, 1, 2, 3]);
+
+            // Try looking up the same key with an extra bit at the end. This
+            // should yield the same result or another key that's longer than the current one.
+            let mut key2 = Key::read_from_bytes(&key).unwrap();
+            key2.len += 1;
+            let value = trie.lookup(&key2.as_bytes()).unwrap().ptr().load()[..4].to_owned();
+            if value != vec![id, 1, 2, 3] {
+                let found_id = value[0] as usize;
+                assert!(get_key(found_id).as_slice().key_len() > key.as_slice().key_len());
+            }
         }
 
         // Iterate all entries with `get_next_key()`.
@@ -1200,7 +1265,7 @@ mod test {
         ids.shuffle(&mut rand::rng());
         for id in ids.iter() {
             let id = *id;
-            let key = get_key(id);
+            let key = get_key(id as usize);
             trie.delete(key.as_slice()).unwrap();
         }
 
@@ -1208,23 +1273,23 @@ mod test {
         ids.shuffle(&mut rand::rng());
         for id in ids.iter() {
             let id = *id;
-            let key = get_key(id);
+            let key = get_key(id as usize);
             trie.update(MapKey::from_slice(&key), &[id, 1, 2, 3], 0)
                 .expect("Failed to update map entry");
         }
 
         // Try looking up all entries.
         for id in 0..NUM_ENTRIES {
-            let key = get_key(id);
+            let key = get_key(id as usize);
             let value = trie.lookup(&key).unwrap().ptr().load()[..4].to_owned();
-            assert_eq!(value, vec![id, 1, 2, 3]);
+            assert_eq!(value, vec![id as u8, 1, 2, 3]);
         }
 
         // Remove all entries in random order.
         ids.shuffle(&mut rand::rng());
         for id in ids.iter() {
             let id = *id;
-            let key = get_key(id);
+            let key = get_key(id as usize);
             trie.delete(key.as_slice()).unwrap();
         }
 

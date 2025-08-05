@@ -45,7 +45,10 @@ rustc_library("ebpf_api") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   with_unit_tests = true
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:test-case",
+  ]
 }
 
 fuchsia_unittest_package("starnix_ebpf_api_tests") {
