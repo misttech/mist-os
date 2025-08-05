@@ -87,7 +87,7 @@ rust_library(
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
         "//third_party/rust_crates/vendor/http-0.2.4:http",
         "//third_party/rust_crates/vendor/hyper-0.14.19:hyper",
-        "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+        "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
         "//third_party/rust_crates/vendor/log-0.4.22:log",
         "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",

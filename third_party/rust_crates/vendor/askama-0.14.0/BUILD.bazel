@@ -85,7 +85,7 @@ rust_library(
     }),
     version = "0.14.0",
     deps = [
-        "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+        "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
         "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
     ],
 )
