@@ -10,7 +10,6 @@ use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use fuchsia_async::{Task, Timer};
 use futures::FutureExt;
 use mdns::protocol as dns;
-use mdns::protocol::Type;
 use netext::{get_mcast_interfaces, IsLocalAddr};
 use packet::{InnerPacketBuilder, ParseBuffer};
 use std::cell::RefCell;
@@ -873,7 +872,7 @@ fn contains_source_address<B: zerocopy::SplitByteSlice + Copy>(
     msg: &dns::Message<B>,
 ) -> bool {
     for answer in msg.answers.iter().chain(msg.additional.iter()) {
-        if answer.rtype != Type::A && answer.rtype != Type::Aaaa {
+        if answer.rtype != dns::Type::A && answer.rtype != dns::Type::Aaaa {
             continue;
         }
 
@@ -1005,7 +1004,7 @@ mod tests {
 
     use super::*;
     use ::mdns::protocol::{
-        Class, DomainBuilder, EmbeddedPacketBuilder, Message, MessageBuilder, RecordBuilder, Type,
+        Class, DomainBuilder, EmbeddedPacketBuilder, Message, MessageBuilder, RecordBuilder,
     };
     use fidl_fuchsia_developer_ffx::TargetIpPort;
     use fidl_fuchsia_net::IpAddress::Ipv4;
@@ -1015,7 +1014,8 @@ mod tests {
     #[test]
     fn test_make_target() {
         let nodename = DomainBuilder::from_str("foo._fuchsia._udp.local").unwrap();
-        let record = RecordBuilder::new(nodename, Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
+        let record =
+            RecordBuilder::new(nodename, dns::Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
         let mut message = MessageBuilder::new(0, true);
         message.add_additional(record);
         let mut msg_bytes = message
@@ -1045,10 +1045,16 @@ mod tests {
             txt_data.write_all(&[d.len() as u8])?;
             txt_data.write_all(d.as_bytes())?;
         }
-        let record =
-            RecordBuilder::new(nodename.clone(), Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
+        let record = RecordBuilder::new(
+            nodename.clone(),
+            dns::Type::A,
+            Class::Any,
+            true,
+            4500,
+            &[8, 8, 8, 8],
+        );
         let text_record =
-            RecordBuilder::new(nodename, Type::Txt, Class::Any, true, 4500, &txt_data);
+            RecordBuilder::new(nodename, dns::Type::Txt, Class::Any, true, 4500, &txt_data);
         let mut message = MessageBuilder::new(0, true);
         message.add_additional(record);
         message.add_additional(text_record);
@@ -1081,10 +1087,16 @@ mod tests {
             emu_data.write_all(&[d.len() as u8])?;
             emu_data.write_all(d.as_bytes())?;
         }
-        let record =
-            RecordBuilder::new(nodename.clone(), Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
+        let record = RecordBuilder::new(
+            nodename.clone(),
+            dns::Type::A,
+            Class::Any,
+            true,
+            4500,
+            &[8, 8, 8, 8],
+        );
         let text_record =
-            RecordBuilder::new(nodename, Type::Txt, Class::Any, true, 4500, &emu_data);
+            RecordBuilder::new(nodename, dns::Type::Txt, Class::Any, true, 4500, &emu_data);
         let mut message = MessageBuilder::new(0, true);
         message.add_additional(record);
         message.add_additional(text_record);
@@ -1120,7 +1132,7 @@ mod tests {
         let nodename = DomainBuilder::from_str("foo._fuchsia._udp.local").unwrap();
         let record = RecordBuilder::new(
             nodename,
-            Type::Ptr,
+            dns::Type::Ptr,
             Class::Any,
             true,
             4500,
@@ -1141,7 +1153,7 @@ mod tests {
     fn create_mdns_advert(nodename: &str, address: IpAddr) -> Vec<u8> {
         let domain = DomainBuilder::from_str(&format!("{}._fuchsia._udp.local", nodename)).unwrap();
         let rdata = DomainBuilder::from_str("_fuchsia._udp.local").unwrap().bytes();
-        let record = RecordBuilder::new(domain, Type::Ptr, Class::Any, true, 1, &rdata);
+        let record = RecordBuilder::new(domain, dns::Type::Ptr, Class::Any, true, 1, &rdata);
         let mut message = MessageBuilder::new(0, true);
         message.add_additional(record);
 
@@ -1153,8 +1165,8 @@ mod tests {
         let record = RecordBuilder::new(
             domain,
             match address {
-                IpAddr::V4(_) => Type::A,
-                IpAddr::V6(_) => Type::Aaaa,
+                IpAddr::V4(_) => dns::Type::A,
+                IpAddr::V6(_) => dns::Type::Aaaa,
             },
             Class::Any,
             true,
