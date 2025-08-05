@@ -8,11 +8,15 @@ use fidl_fuchsia_bluetooth::PeerId;
 use fidl_fuchsia_bluetooth_bredr::{
     ConnectParameters, L2capParameters, ProfileMarker, ProfileProxy,
 };
+use fidl_fuchsia_bluetooth_le::{
+    CentralMarker, CentralProxy, Filter, ScanOptions, ScanResultWatcherMarker,
+    ScanResultWatcherProxy,
+};
 use fidl_fuchsia_bluetooth_sys::{
     AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, Peer,
     ProcedureTokenProxy,
 };
-use fuchsia_async::{LocalExecutor, TimeoutExt, Timer};
+use fuchsia_async::{LocalExecutor, Task, TimeoutExt, Timer};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
@@ -31,6 +35,12 @@ enum Request {
     ConnectL2cap(PeerId, u16, oneshot::Sender<Result<(), anyhow::Error>>),
     SetDiscovery(bool, oneshot::Sender<Result<(), anyhow::Error>>),
     SetDiscoverability(bool, oneshot::Sender<Result<(), anyhow::Error>>),
+    StartLeScan(
+        oneshot::Sender<
+            Result<mpsc::UnboundedReceiver<Vec<fidl_fuchsia_bluetooth_le::Peer>>, anyhow::Error>,
+        >,
+    ),
+    StopLeScan(oneshot::Sender<bool>),
     Stop,
 }
 
@@ -121,6 +131,12 @@ impl WorkThread {
                 Request::SetDiscoverability(discoverable, sender) => {
                     sender.send(proxies.set_discoverability(discoverable).await).unwrap();
                 }
+                Request::StartLeScan(result_sender) => {
+                    result_sender.send(proxies.start_le_scan().await).unwrap();
+                }
+                Request::StopLeScan(result_sender) => {
+                    result_sender.send(proxies.stop_le_scan()).unwrap();
+                }
                 Request::Stop => break,
             }
         }
@@ -198,21 +214,47 @@ impl WorkThread {
         self.sender.clone().unbounded_send(Request::SetDiscoverability(discoverable, sender))?;
         receiver.await?
     }
+
+    // Scan for all nearby LE peripherals and broadcasters. Returns the receiving end of an
+    // mpsc::channel through which LE peer updates are written. Dropping the receiver closes the
+    // channel, which stops the scan when the next update is received.
+    //
+    // Calling this while a scan is ongoing drops and overwrites the existing scan.
+    pub async fn start_le_scan(
+        &self,
+    ) -> Result<mpsc::UnboundedReceiver<Vec<fidl_fuchsia_bluetooth_le::Peer>>, anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<
+            Result<mpsc::UnboundedReceiver<Vec<fidl_fuchsia_bluetooth_le::Peer>>, anyhow::Error>,
+        >();
+        self.sender.clone().unbounded_send(Request::StartLeScan(sender))?;
+        receiver.await?
+    }
+
+    // Stop an ongoing LE scan. Returns false if no scan is ongoing. If an ongoing scan is stopped,
+    // the mpsc::channel exposed to the client closes (i.e. `receiver.next()` returns None).
+    pub async fn stop_le_scan(&self) -> bool {
+        let (sender, receiver) = oneshot::channel::<bool>();
+        self.sender.clone().unbounded_send(Request::StopLeScan(sender)).unwrap();
+        receiver.await.unwrap()
+    }
 }
 
 struct Proxies {
     access_proxy: AccessProxy,
     profile_proxy: ProfileProxy,
+    central_proxy: CentralProxy,
     host_watcher_stream: HangingGetStream<HostWatcherProxy, Vec<HostInfo>>,
     peer_watcher_stream: HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
     discovery_session: Mutex<Option<ProcedureTokenProxy>>,
     discoverability_session: Mutex<Option<ProcedureTokenProxy>>,
+    le_scan_task: Mutex<Option<Task<()>>>,
 }
 
 impl Proxies {
     fn connect() -> Result<Self, anyhow::Error> {
         let access_proxy = connect_to_protocol::<AccessMarker>()?;
         let profile_proxy = connect_to_protocol::<ProfileMarker>()?;
+        let central_proxy = connect_to_protocol::<CentralMarker>()?;
         let host_watcher_stream = HangingGetStream::new_with_fn_ptr(
             connect_to_protocol::<HostWatcherMarker>()?,
             HostWatcherProxy::watch,
@@ -221,14 +263,17 @@ impl Proxies {
             HangingGetStream::new_with_fn_ptr(access_proxy.clone(), AccessProxy::watch_peers);
         let discovery_session: Mutex<Option<ProcedureTokenProxy>> = Mutex::new(None);
         let discoverability_session: Mutex<Option<ProcedureTokenProxy>> = Mutex::new(None);
+        let le_scan_task: Mutex<Option<Task<()>>> = Mutex::new(None);
 
         Ok(Proxies {
             access_proxy,
             profile_proxy,
+            central_proxy,
             host_watcher_stream,
             peer_watcher_stream,
             discovery_session,
             discoverability_session,
+            le_scan_task,
         })
     }
 
@@ -402,5 +447,46 @@ impl Proxies {
         }
         *discoverability_session = Some(token);
         Ok(())
+    }
+
+    async fn start_le_scan(
+        &mut self,
+    ) -> Result<mpsc::UnboundedReceiver<Vec<fidl_fuchsia_bluetooth_le::Peer>>, anyhow::Error> {
+        let (sender, receiver) = mpsc::unbounded::<Vec<fidl_fuchsia_bluetooth_le::Peer>>();
+
+        let (scan_client, scan_server) = fidl::endpoints::create_proxy::<ScanResultWatcherMarker>();
+        let options = ScanOptions {
+            // Empty filter matches all LE peripherals and broadcasters.
+            filters: Some(vec![Filter { ..Default::default() }]),
+            ..Default::default()
+        };
+        let _scan_fut = self.central_proxy.scan(&options, scan_server).check()?;
+        let mut scan_result_stream =
+            HangingGetStream::new(scan_client, ScanResultWatcherProxy::watch);
+
+        *self.le_scan_task.lock() = Some(Task::spawn(async move {
+            while let Some(result) = scan_result_stream.next().await {
+                match result {
+                    Ok(updated) => {
+                        if let Err(err) = sender.unbounded_send(updated) {
+                            println!("LE scan stream closed with status: {err}");
+                            sender.close_channel();
+                            return;
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("LE scan encountered error: {err}");
+                        sender.close_channel();
+                        return;
+                    }
+                }
+            }
+        }));
+
+        Ok(receiver)
+    }
+
+    fn stop_le_scan(&self) -> bool {
+        self.le_scan_task.lock().take().is_some()
     }
 }

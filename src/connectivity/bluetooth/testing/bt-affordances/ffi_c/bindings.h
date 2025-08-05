@@ -11,6 +11,15 @@
 #include <new>
 #include <ostream>
 
+struct LePeer {
+  uint64_t id;
+  bool connectable;
+  char name[248];
+};
+
+/// `peer` is only valid for the duration of this callback.
+using LeScanCallback = void (*)(void *context, const LePeer *peer);
+
 extern "C" {
 
 /// Stop serving Rust affordances.
@@ -45,11 +54,6 @@ zx_status_t connect_peer(uint64_t peer_id);
 /// Remove all bonding information and disconnect peer with given identifier, if found.
 ///
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
-///
-/// # Safety
-///
-/// The caller must ensure that `address` points to a valid C string encoding a BD_ADDR as a string
-/// of bytes in little-endian order.
 zx_status_t forget_peer(uint64_t peer_id);
 
 /// Connect an L2CAP channel on a specific PSM to an already-connected peer. Calling this again will
@@ -62,6 +66,25 @@ zx_status_t connect_l2cap_channel(uint64_t peer_id, uint16_t psm);
 ///
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t set_discoverability(bool discoverable);
+
+/// Scan for all nearby LE peripherals and broadcasters.
+///
+/// The callback `cb` is invoked on every LE peer found or updated. The `context` provided to this
+/// function is included in each invocation of `cb`.
+///
+/// Calling this while a scan is ongoing drops and overwrites the existing scan.
+///
+/// Returns ZX_STATUS_INTERNAL if scan was unable to start because of an error (check logs).
+///
+/// # Safety
+///
+/// The caller must ensure `context` and `cb` point to valid memory & a valid callback.
+zx_status_t start_le_scan(void *context, LeScanCallback cb);
+
+/// Stop an ongoing LE scan.
+///
+/// Returns ZX_STATUS_BAD_STATE if no scan was ongoing.
+zx_status_t stop_le_scan();
 
 }  // extern "C"
 

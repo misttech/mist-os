@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_staticlib.gni")
+import("//tools/protobuf/rust_proto_library.gni")
 
 rustc_staticlib("affordances-c") {
   name = "affordances_c"
@@ -13,8 +14,12 @@ rustc_staticlib("affordances-c") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
+    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_rust",
     "//sdk/rust/zx",
     "//src/connectivity/bluetooth/testing/bt-affordances/affordances",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-sync",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
 

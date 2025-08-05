@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.bluetooth.bredr.Profile",
+                "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.HostWatcher",
                 "fuchsia.bluetooth.sys.Pairing",

@@ -4,13 +4,13 @@
 
 #include "host.h"
 
-#include <lib/syslog/cpp/macros.h>
-
 #include <algorithm>
+
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/message.h>
 
 #include "fidl/fuchsia.bluetooth.sys/cpp/common_types.h"
 #include "lib/component/incoming/cpp/protocol.h"
-#include "src/connectivity/bluetooth/testing/bt-affordances/ffi_c/bindings.h"
 
 using grpc::Status;
 using grpc::StatusCode;
@@ -145,7 +145,33 @@ Status HostService::Advertise(::grpc::ServerContext* context,
 
 Status HostService::Scan(::grpc::ServerContext* context, const ::pandora::ScanRequest* request,
                          ::grpc::ServerWriter<::pandora::ScanningResponse>* writer) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  {
+    std::lock_guard lock(m_scan_scp_writer_);
+    scan_rsp_writer = writer;
+  }
+
+  if (start_le_scan(/*context=*/this, LeScanCb) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Failure to start_le_scan (check logs)");
+  }
+
+  // TODO(https://fxbug.dev/396500079): Potentially migrate to gRPC async callback API and remove
+  // this timeout. Since we are using the sync API, `writer` is invalidated when this handler exits,
+  // so we keep it alive for an arbitrary sleep period allowing the scan to proceed, after which we
+  // cancel the scan. In practice, the mmi2gRPC client cancels the scan earlier (when the test peer
+  // is found).
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  std::lock_guard lock(m_scan_scp_writer_);
+  scan_rsp_writer = nullptr;
+  zx_status_t status = stop_le_scan();
+  if (status == ZX_OK) {
+    FX_LOGS(WARNING) << "LE scan stopped after timeout.";
+  } else if (status == ZX_ERR_BAD_STATE) {
+    FX_LOGS(INFO) << "LE scan was already stopped after timeout.";
+  } else {
+    return Status(StatusCode::INTERNAL, "Unexpected error in stop_le_scan");
+  }
+  return {/*OK*/};
 }
 
 Status HostService::Inquiry(::grpc::ServerContext* context,
