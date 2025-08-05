@@ -348,24 +348,12 @@ impl MappingBackingMemory {
         self.base
     }
 
-    pub fn set_base(&mut self, base: UserAddress) {
-        self.base = base;
-    }
-
     pub fn memory(&self) -> &Arc<MemoryObject> {
         &self.memory
     }
 
-    pub fn set_memory(&mut self, memory: Arc<MemoryObject>) {
-        self.memory = memory;
-    }
-
     pub fn memory_offset(&self) -> u64 {
         self.memory_offset
-    }
-
-    pub fn set_memory_offset(&mut self, memory_offset: u64) {
-        self.memory_offset = memory_offset;
     }
 
     /// Reads exactly `bytes.len()` bytes of memory from `addr`.

@@ -1377,9 +1377,7 @@ impl MemoryManagerState {
                 }
 
                 // Update the mapping.
-                backing.set_memory(Arc::new(child_memory));
-                backing.set_base(range.start);
-                backing.set_memory_offset(0);
+                backing = self.create_memory_backing(range.start, Arc::new(child_memory), 0);
 
                 self.map_in_user_vmar(
                     SelectedAddress::FixedOverwrite(range.start),
