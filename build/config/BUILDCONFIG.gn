@@ -1486,23 +1486,35 @@ foreach(_target_type,
       # Prevent the build output dir path from leaking into the
       # command or its outputs, for cache-ability and consistency
       # across different build environments.
-      if (check_for_output_dir_leaks && check_output_dir_leaks &&
-          invoker.script != "//build/scripts/no_op.sh") {
-        _args = []
-        _args =
-            [
-              "-S",
-              rebase_path("//build/rbe/output_leak_scanner.py", root_build_dir),
-              "--label",
-              get_label_info(":$target_name", "label_with_toolchain"),
-            ] + rebase_path(outputs, root_build_dir) +
-            [
-              "--",
-              rebase_path(script, root_build_dir),
-            ] + args
-        args = []
-        args = _args
-        script = python_exe_src
+      if (check_for_output_dir_leaks && check_output_dir_leaks) {
+        scripts_safe_to_not_check = [
+          # Any no-op action won't have any outputs
+          "//build/scripts/no_op.sh",
+
+          # run_and_stamp writes an empty stamp file
+          "//build/scripts/run_and_stamp.sh",
+        ]
+
+        script_safe_to_not_check =
+            scripts_safe_to_not_check !=
+            scripts_safe_to_not_check + [ invoker.script ] - [ invoker.script ]
+        if (!script_safe_to_not_check) {
+          _args = []
+          _args = [
+                    "-S",
+                    rebase_path("//build/rbe/output_leak_scanner.py",
+                                root_build_dir),
+                    "--label",
+                    get_label_info(":$target_name", "label_with_toolchain"),
+                  ] + rebase_path(outputs, root_build_dir) +
+                  [
+                    "--",
+                    rebase_path(script, root_build_dir),
+                  ] + args
+          args = []
+          args = _args
+          script = python_exe_src
+        }
       }
 
       metadata = {
