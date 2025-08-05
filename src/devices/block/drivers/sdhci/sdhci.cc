@@ -335,16 +335,7 @@ void Sdhci::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_st
   irq_.ack();
 }
 
-void Sdhci::HandleTransferInterrupt(InterruptStatus status) {
-  if (status.data_timeout_error() && status.transfer_complete()) {
-    // Per the spec, transfer complete interrupts take priority over data timeout error interrupts.
-    status.set_data_timeout_error(0);
-    if (!status.SpecificErrorTypes()) {
-      // Also clear the error bit if data timeout is the only error.
-      status.set_error(0);
-    }
-  }
-
+void Sdhci::HandleTransferInterrupt(const InterruptStatus status) {
   if (status.ErrorInterrupt()) {
     pending_request_->status = status;
     pending_request_->status.set_error(1);
