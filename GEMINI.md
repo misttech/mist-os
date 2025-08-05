@@ -11,6 +11,12 @@ option to make the output smaller. The Fuchsia platform uses the GN and Bazel
 build systems. You must not generate Cargo.toml, CMakeLists.txt, or Makefile
 build files.
 
+By default, `fx build` triggers an incremental build. In most cases, `fx build`
+is sufficient for building. While `fx clean && fx build` or `fx clean-build` will
+trigger a full Fuchsia build, it is slow and you should avoid using it.  Always
+ask the user before running `fx clean` or `fx clean-build` and avoid running it
+as much as possible.
+
 To run a test, run `fx --invoker=gemini test <name of test>`. You can list
 available tests with `fx test --dry`. You can get JSON output by adding the
 arguments `--logpath -`. Run `fx test --help` for more information.
