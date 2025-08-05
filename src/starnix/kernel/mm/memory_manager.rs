@@ -4616,7 +4616,7 @@ fn write_map(
         if map.can_exec() { 'x' } else { '-' },
         if map.flags().contains(MappingFlags::SHARED) { 's' } else { 'p' },
         match state.get_mapping_backing(map) {
-            MappingBacking::Memory(backing) => backing.memory_offset(),
+            MappingBacking::Memory(backing) => backing.address_to_offset(range.start),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
         },
