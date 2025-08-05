@@ -25,6 +25,7 @@ rustc_library("selinux") {
     "src/policy/parser.rs",
     "src/policy/security_context.rs",
     "src/policy/symbols.rs",
+    "src/policy/view.rs",
     "src/security_server.rs",
     "src/sid_table.rs",
     "src/sync.rs",

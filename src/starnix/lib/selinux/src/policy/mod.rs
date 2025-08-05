@@ -8,6 +8,7 @@ pub mod index;
 pub mod metadata;
 pub mod parsed_policy;
 pub mod parser;
+pub mod view;
 
 mod constraints;
 mod extensible_bitmap;

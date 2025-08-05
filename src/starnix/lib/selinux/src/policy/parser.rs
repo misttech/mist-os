@@ -21,6 +21,10 @@ impl PolicyCursor {
         Self { data, offset: 0 }
     }
 
+    pub fn new_at(data: PolicyData, offset: PolicyOffset) -> Self {
+        Self { data, offset }
+    }
+
     /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
     pub fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         mut self,
@@ -43,6 +47,10 @@ impl PolicyCursor {
         Some((slice, self))
     }
 
+    pub fn offset(&self) -> PolicyOffset {
+        self.offset
+    }
+
     pub fn len(&self) -> usize {
         self.data.len() - self.offset as usize
     }
@@ -55,7 +63,7 @@ impl PolicyCursor {
     }
 
     /// Seeks forward by `num_bytes`, returning a `std::io::Error` if seeking fails.
-    fn seek_forward(&mut self, num_bytes: usize) -> Result<(), std::io::Error> {
+    pub fn seek_forward(&mut self, num_bytes: usize) -> Result<(), std::io::Error> {
         if num_bytes > self.len() {
             return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
         }

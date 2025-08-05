@@ -5,11 +5,11 @@
 use crate::NullessByteStr;
 
 use super::arrays::{
-    AccessVectorRules, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+    AccessVectorRule, ConditionalNodes, Context, DeprecatedFilenameTransitions,
     FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
     InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
     RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
-    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY, XPERMS_TYPE_IOCTL_PREFIXES,
+    SimpleArrayView, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY, XPERMS_TYPE_IOCTL_PREFIXES,
     XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES,
 };
 use super::error::{ParseError, ValidateError};
@@ -31,6 +31,7 @@ use anyhow::Context as _;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::iter::Iterator;
 use zerocopy::little_endian as le;
 
 /// A parsed binary policy.
@@ -69,7 +70,7 @@ pub struct ParsedPolicy {
     /// The set of categories referenced by this policy.
     categories: SymbolList<Category>,
     /// The set of access vector rules referenced by this policy.
-    access_vector_rules: SimpleArray<AccessVectorRules>,
+    access_vector_rules: SimpleArrayView<AccessVectorRule>,
     conditional_lists: SimpleArray<ConditionalNodes>,
     /// The set of role transitions to apply when instantiating new objects.
     role_transitions: RoleTransitions,
@@ -148,7 +149,7 @@ impl ParsedPolicy {
         let mut computed_audit_allow = AccessVector::NONE;
         let mut computed_audit_deny = AccessVector::ALL;
 
-        for access_vector_rule in self.access_vector_rules.data.iter() {
+        for access_vector_rule in self.access_vector_rules() {
             // Ignore `access_vector_rule` entries not relayed to "allow" or
             // audit statements.
             //
@@ -261,7 +262,7 @@ impl ParsedPolicy {
         let mut auditallow = XpermsBitmap::NONE;
         let mut auditdeny = XpermsBitmap::ALL;
 
-        for access_vector_rule in self.access_vector_rules.data.iter() {
+        for access_vector_rule in self.access_vector_rules() {
             if !access_vector_rule.is_allowxperm()
                 && !access_vector_rule.is_auditallowxperm()
                 && !access_vector_rule.is_dontauditxperm()
@@ -417,8 +418,8 @@ impl ParsedPolicy {
         &self.range_transitions.data
     }
 
-    pub(super) fn access_vector_rules(&self) -> &AccessVectorRules {
-        &self.access_vector_rules.data
+    pub(super) fn access_vector_rules(&self) -> impl Iterator<Item = AccessVectorRule> {
+        self.access_vector_rules.data().iter(&self.data)
     }
 
     pub(super) fn compute_filename_transition(
@@ -565,7 +566,7 @@ fn parse_policy_internal(
         .map_err(Into::<anyhow::Error>::into)
         .context("parsing categories")?;
 
-    let (access_vector_rules, tail) = SimpleArray::<AccessVectorRules>::parse(tail)
+    let (access_vector_rules, tail) = SimpleArrayView::<AccessVectorRule>::parse(tail)
         .map_err(Into::<anyhow::Error>::into)
         .context("parsing access vector rules")?;
 
@@ -898,7 +899,7 @@ impl ParsedPolicy {
         }
 
         // Validate that types output by access vector rules are defined.
-        for access_vector_rule in &self.access_vector_rules.data {
+        for access_vector_rule in self.access_vector_rules() {
             if let Some(type_id) = access_vector_rule.new_type() {
                 validate_id(&type_ids, type_id, "new_type")?;
             }
