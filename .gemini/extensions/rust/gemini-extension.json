@@ -4,7 +4,7 @@
   "description": "A Gemini extension that uses rust-analyzer to provide code intelligence for Rust.",
   "mcpServers": {
     "rust-analyzer": {
-      "command": "./prebuilt/third_party/mcp-language-server/linux-amd64/mcp-language-server",
+      "command": "./prebuilt/third_party/mcp-language-server/linux-x64/mcp-language-server",
       "args": [
         "-workspace",
         "./",
