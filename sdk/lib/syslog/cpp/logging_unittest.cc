@@ -362,8 +362,6 @@ class TestLogSink : public fidl::Server<fuchsia_logger::LogSink> {
   }
 
  private:
-  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override { FAIL(); }
-
   void ConnectStructured(ConnectStructuredRequest& request,
                          ConnectStructuredCompleter::Sync& completer) override {
     std::unique_lock lock(mutex_);

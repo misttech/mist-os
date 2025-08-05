@@ -379,9 +379,6 @@ mod tests {
                 let message_logged_copy = Arc::clone(&message_logged);
                 async move {
                     match r.next().await.expect("stream error").expect("fidl error") {
-                        LogSinkRequest::Connect { .. } => {
-                            panic!("Unexpected call to `Connect`");
-                        }
                         LogSinkRequest::ConnectStructured { socket, .. } => {
                             *message_logged_copy.lock().unwrap() =
                                 get_message_logged_to_socket(socket);

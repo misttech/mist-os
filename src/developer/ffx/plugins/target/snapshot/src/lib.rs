@@ -418,7 +418,6 @@ mod test {
                 let _ignore = params;
                 responder.send(&annotations).unwrap();
             }
-            _ => assert!(false),
         })
     }
 

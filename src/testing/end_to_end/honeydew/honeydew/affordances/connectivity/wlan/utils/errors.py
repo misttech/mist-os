@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """Contains errors raised by WLAN affordances."""
 
-import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_policy as f_wlan_policy
 
 from honeydew import errors
 
@@ -20,7 +20,7 @@ class HoneydewWlanRequestRejectedError(HoneydewWlanError):
     """
 
     def __init__(
-        self, method: str, reason: f_wlan_common.RequestStatus
+        self, method: str, reason: f_wlan_policy.RequestStatus
     ) -> None:
         """Initialize a HoneydewWlanRequestRejectedError.
 

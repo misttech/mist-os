@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from typing import TypeVar
 from unittest import mock
 
-import fidl_fuchsia_wlan_common as f_wlan_common
 import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 
@@ -220,7 +219,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
         self.access_point_controller_obj.start_access_point.side_effect = [
             _async_response(
                 f_wlan_policy.AccessPointControllerStartAccessPointResponse(
-                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                    status=f_wlan_policy.RequestStatus.ACKNOWLEDGED
                 )
             )
         ]
@@ -253,7 +252,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
         self.access_point_controller_obj.stop_access_point.side_effect = [
             _async_response(
                 f_wlan_policy.AccessPointControllerStartAccessPointResponse(
-                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                    status=f_wlan_policy.RequestStatus.ACKNOWLEDGED
                 )
             )
         ]

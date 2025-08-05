@@ -107,13 +107,6 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(26) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
-    fprintf(stderr, "Unexpected Connect\n");
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
-
   void ConnectStructured(ConnectStructuredRequestView request,
                          ConnectStructuredCompleter::Sync& _completer) override {
     loop_.Quit();

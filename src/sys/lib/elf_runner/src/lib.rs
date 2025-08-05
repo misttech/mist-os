@@ -1407,9 +1407,6 @@ mod tests {
                     async move {
                         while let Some(Ok(req)) = r.next().await {
                             match req {
-                                LogSinkRequest::Connect { .. } => {
-                                    panic!("Unexpected call to `Connect`");
-                                }
                                 LogSinkRequest::ConnectStructured { .. } => {
                                     let mut count = req_count.lock().await;
                                     *count += 1;

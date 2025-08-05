@@ -122,11 +122,6 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
 
   void LoadDefaults(LoadDefaultsCompleter::Sync&) override { FX_NOTIMPLEMENTED(); }
 
-  void EnableDeviceSettings(EnableDeviceSettingsRequest&,
-                            EnableDeviceSettingsCompleter::Sync&) override {
-    FX_NOTIMPLEMENTED();
-  }
-
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioCore> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FX_LOGS(ERROR) << "FakeAudioCore: AudioCore::handle_unknown_method(ordinal "

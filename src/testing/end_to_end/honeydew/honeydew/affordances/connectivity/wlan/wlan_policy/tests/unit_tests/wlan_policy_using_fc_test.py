@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from typing import TypeVar
 from unittest import mock
 
-import fidl_fuchsia_wlan_common as f_wlan_common
 import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 
@@ -242,46 +241,46 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "acknowledged",
                     _async_response(
                         f_wlan_policy.ClientControllerConnectResponse(
-                            status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                            status=f_wlan_policy.RequestStatus.ACKNOWLEDGED
                         )
                     ),
-                    f_wlan_common.RequestStatus.ACKNOWLEDGED,
+                    f_wlan_policy.RequestStatus.ACKNOWLEDGED,
                 ),
                 (
                     "not supported",
                     _async_response(
                         f_wlan_policy.ClientControllerConnectResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                            status=f_wlan_policy.RequestStatus.REJECTED_NOT_SUPPORTED
                         )
                     ),
-                    f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED,
+                    f_wlan_policy.RequestStatus.REJECTED_NOT_SUPPORTED,
                 ),
                 (
                     "incompatible mode",
                     _async_response(
                         f_wlan_policy.ClientControllerConnectResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                            status=f_wlan_policy.RequestStatus.REJECTED_INCOMPATIBLE_MODE
                         )
                     ),
-                    f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE,
+                    f_wlan_policy.RequestStatus.REJECTED_INCOMPATIBLE_MODE,
                 ),
                 (
                     "already in use",
                     _async_response(
                         f_wlan_policy.ClientControllerConnectResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                            status=f_wlan_policy.RequestStatus.REJECTED_ALREADY_IN_USE
                         )
                     ),
-                    f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE,
+                    f_wlan_policy.RequestStatus.REJECTED_ALREADY_IN_USE,
                 ),
                 (
                     "duplicate request",
                     _async_response(
                         f_wlan_policy.ClientControllerConnectResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                            status=f_wlan_policy.RequestStatus.REJECTED_DUPLICATE_REQUEST
                         )
                     ),
-                    f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST,
+                    f_wlan_policy.RequestStatus.REJECTED_DUPLICATE_REQUEST,
                 ),
                 (
                     "internal error",
@@ -691,7 +690,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.create_client_controller()
             client_controller.start_client_connections.return_value = _async_response(
                 f_wlan_policy.ClientControllerStartClientConnectionsResponse(
-                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                    status=f_wlan_policy.RequestStatus.ACKNOWLEDGED
                 )
             )
             self.wlan_policy_obj.start_client_connections()
@@ -707,7 +706,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "not supported",
                     _async_response(
                         f_wlan_policy.ClientControllerStartClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                            status=f_wlan_policy.RequestStatus.REJECTED_NOT_SUPPORTED
                         )
                     ),
                 ),
@@ -715,7 +714,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "incompatible mode",
                     _async_response(
                         f_wlan_policy.ClientControllerStartClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                            status=f_wlan_policy.RequestStatus.REJECTED_INCOMPATIBLE_MODE
                         )
                     ),
                 ),
@@ -723,7 +722,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "already in use",
                     _async_response(
                         f_wlan_policy.ClientControllerStartClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                            status=f_wlan_policy.RequestStatus.REJECTED_ALREADY_IN_USE
                         )
                     ),
                 ),
@@ -731,7 +730,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "duplicate request",
                     _async_response(
                         f_wlan_policy.ClientControllerStartClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                            status=f_wlan_policy.RequestStatus.REJECTED_DUPLICATE_REQUEST
                         )
                     ),
                 ),
@@ -763,7 +762,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             client_controller.stop_client_connections.return_value = (
                 _async_response(
                     f_wlan_policy.ClientControllerStopClientConnectionsResponse(
-                        status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                        status=f_wlan_policy.RequestStatus.ACKNOWLEDGED
                     )
                 )
             )
@@ -780,7 +779,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "not supported",
                     _async_response(
                         f_wlan_policy.ClientControllerStopClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                            status=f_wlan_policy.RequestStatus.REJECTED_NOT_SUPPORTED
                         )
                     ),
                 ),
@@ -788,7 +787,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "incompatible mode",
                     _async_response(
                         f_wlan_policy.ClientControllerStopClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                            status=f_wlan_policy.RequestStatus.REJECTED_INCOMPATIBLE_MODE
                         )
                     ),
                 ),
@@ -796,7 +795,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "already in use",
                     _async_response(
                         f_wlan_policy.ClientControllerStopClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                            status=f_wlan_policy.RequestStatus.REJECTED_ALREADY_IN_USE
                         )
                     ),
                 ),
@@ -804,7 +803,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                     "duplicate request",
                     _async_response(
                         f_wlan_policy.ClientControllerStopClientConnectionsResponse(
-                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                            status=f_wlan_policy.RequestStatus.REJECTED_DUPLICATE_REQUEST
                         )
                     ),
                 ),

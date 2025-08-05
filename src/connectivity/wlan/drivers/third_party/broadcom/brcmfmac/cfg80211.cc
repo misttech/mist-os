@@ -4645,13 +4645,13 @@ static void brcmf_get_bwcap(struct brcmf_if* ifp, uint32_t bw_cap[]) {
   uint32_t val = WLC_BAND_2G;
   zx_status_t status = brcmf_fil_iovar_int_get(ifp, "bw_cap", &val, nullptr);
   if (status == ZX_OK) {
-    bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] = val;
+    bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kTwoGhz)] = val;
 
     // 5 GHz
     val = WLC_BAND_5G;
     status = brcmf_fil_iovar_int_get(ifp, "bw_cap", &val, nullptr);
     if (status == ZX_OK) {
-      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] = val;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kFiveGhz)] = val;
       return;
     }
     BRCMF_WARN(
@@ -4671,15 +4671,17 @@ static void brcmf_get_bwcap(struct brcmf_if* ifp, uint32_t bw_cap[]) {
 
   switch (mimo_bwcap) {
     case WLC_N_BW_40ALL:
-      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] |= WLC_BW_40MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kTwoGhz)] |=
+          WLC_BW_40MHZ_BIT;
       __FALLTHROUGH;
     case WLC_N_BW_20IN2G_40IN5G:
-      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] |=
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kFiveGhz)] |=
           WLC_BW_40MHZ_BIT;
       __FALLTHROUGH;
     case WLC_N_BW_20ALL:
-      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] |= WLC_BW_20MHZ_BIT;
-      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] |=
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kTwoGhz)] |=
+          WLC_BW_20MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211_wire::WlanBand::kFiveGhz)] |=
           WLC_BW_20MHZ_BIT;
       break;
     default:
@@ -5077,8 +5079,8 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQuery
     brcmf_get_bwcap(ifp, bw_cap);
   }
   BRCMF_DBG(QUERY, "nmode=%d, vhtmode=%d, bw_cap=(%d, %d)", nmode, vhtmode,
-            bw_cap[static_cast<uint8_t>(fuchsia_wlan_common::wire::WlanBand::kTwoGhz)],
-            bw_cap[static_cast<uint8_t>(fuchsia_wlan_common::wire::WlanBand::kFiveGhz)]);
+            bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211::wire::WlanBand::kTwoGhz)],
+            bw_cap[static_cast<uint8_t>(fuchsia_wlan_ieee80211::wire::WlanBand::kFiveGhz)]);
 
   // LDPC support, applies to both HT and VHT
   ldpc_cap = 0;

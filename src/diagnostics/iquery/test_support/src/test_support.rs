@@ -321,25 +321,6 @@ impl MockRealmQuery {
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     responder.send(Ok(&res.to_instance())).unwrap();
                 }
-                fsys2_f::RealmQueryRequest::Open {
-                    moniker,
-                    dir_type,
-                    object,
-                    responder,
-                    path,
-                    ..
-                } => {
-                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
-                    if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
-                        if dir_type == fsys2_f::OpenDirType::ExposedDir {
-                            // Serve the out dir, everything else doesn't get served.
-                            res.serve_exposed_dir_f(object.into_channel().into(), &path);
-                        }
-                        responder.send(Ok(())).unwrap();
-                    } else {
-                        responder.send(Err(fsys2_f::OpenError::InstanceNotFound)).unwrap();
-                    }
-                }
                 fsys2_f::RealmQueryRequest::OpenDirectory {
                     moniker,
                     dir_type,

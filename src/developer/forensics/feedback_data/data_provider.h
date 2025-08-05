@@ -74,8 +74,6 @@ class DataProvider : public fuchsia::feedback::DataProvider, public DataProvider
                    GetSnapshotCallback callback) override;
   void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
                            GetSnapshotInternalCallback callback) override;
-  void GetScreenshot(fuchsia::feedback::ImageEncoding encoding,
-                     GetScreenshotCallback callback) override;
 
   size_t NumCurrentServedArchives() { return served_archives_.size(); }
 

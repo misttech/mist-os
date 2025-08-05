@@ -34,7 +34,6 @@ namespace forensics {
 namespace feedback_data {
 namespace {
 
-using fuchsia::feedback::ImageEncoding;
 using fuchsia::feedback::Snapshot;
 
 // Timeout for a single asynchronous piece of data, e.g., syslog collection, if the client didn't
@@ -118,12 +117,8 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
 
         // Add the annotations to the FIDL object and as file in the snapshot itself.
         if (auto fidl = feedback::Encode<fuchsia::feedback::Annotations>(annotations);
-            fidl.has_annotations()) {
-          // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
-          snapshot.set_annotations(fidl.annotations());
-          if (fidl.has_annotations2()) {
-            snapshot.set_annotations2(fidl.annotations2());
-          }
+            fidl.has_annotations2()) {
+          snapshot.set_annotations2(fidl.annotations2());
         }
 
         if (archive.vmo().is_valid()) {
@@ -235,11 +230,6 @@ bool ServedArchive::Serve(fidl::ServerEnd<fuchsia_io::File> file_server,
   }
 
   return true;
-}
-
-void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback callback) {
-  FX_LOGS(ERROR) << "fuchsia.feedback/DataProvider.GetScreenshot is removed. "
-                 << "Use fuchsia.ui.composition/Screenshot instead.";
 }
 
 }  // namespace feedback_data
