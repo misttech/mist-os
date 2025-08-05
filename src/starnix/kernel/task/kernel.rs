@@ -50,8 +50,8 @@ use starnix_sync::{
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{from_status_like_fdio, VMADDR_CID_HOST};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
@@ -380,7 +380,9 @@ impl Kernel {
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
-        let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
+        let vsock_address_maker = Box::new(|x: u32| -> SocketAddress {
+            SocketAddress::Vsock { port: x, cid: VMADDR_CID_HOST }
+        });
 
         let crash_reporter = CrashReporter::new(
             &inspect_node,

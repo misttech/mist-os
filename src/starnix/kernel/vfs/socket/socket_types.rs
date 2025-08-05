@@ -196,8 +196,8 @@ pub enum SocketAddress {
     /// A `Unix` socket address contains the filesystem path that was used to bind the socket.
     Unix(FsString),
 
-    /// An AF_VSOCK socket is just referred to by its listening port on the client
-    Vsock(u32),
+    /// An AF_VSOCK socket is referred to by its listening port and cid.
+    Vsock { port: u32, cid: u32 },
 
     /// AF_INET socket addresses are passed through as a sockaddr* to zxio.
     Inet(Vec<u8>),
@@ -219,7 +219,7 @@ impl SocketAddress {
     pub fn default_for_domain(domain: SocketDomain) -> SocketAddress {
         match domain {
             SocketDomain::Unix => SocketAddress::Unix(FsString::default()),
-            SocketDomain::Vsock => SocketAddress::Vsock(0xffff),
+            SocketDomain::Vsock => SocketAddress::Vsock { port: 0xffff, cid: 0 },
             SocketDomain::Inet => {
                 SocketAddress::Inet(uapi::sockaddr_in::default().as_bytes().to_vec())
             }
@@ -268,7 +268,7 @@ impl SocketAddress {
             AF_VSOCK => {
                 let vsock_address = sockaddr_vm::read_from_bytes(&*address);
                 if let Ok(address) = vsock_address {
-                    SocketAddress::Vsock(address.svm_port)
+                    SocketAddress::Vsock { port: address.svm_port, cid: address.svm_cid }
                 } else {
                     SocketAddress::Unspecified
                 }
@@ -303,7 +303,7 @@ impl SocketAddress {
         match self {
             SocketAddress::Unspecified => false,
             SocketAddress::Unix(_) => domain == SocketDomain::Unix,
-            SocketAddress::Vsock(_) => domain == SocketDomain::Vsock,
+            SocketAddress::Vsock { .. } => domain == SocketDomain::Vsock,
             SocketAddress::Inet(_) => domain == SocketDomain::Inet,
             SocketAddress::Inet6(_) => domain == SocketDomain::Inet6,
             SocketAddress::Netlink(_) => domain == SocketDomain::Netlink,
@@ -343,10 +343,14 @@ impl SocketAddress {
                     [&AF_UNIX.to_ne_bytes(), &name[..path_length], &[b'\0']].concat()
                 }
             },
-            SocketAddress::Vsock(port) => {
+            SocketAddress::Vsock { port, cid } => {
                 let mut bytes = vec![0u8; std::mem::size_of::<sockaddr_vm>()];
-                let vm_addr =
-                    sockaddr_vm { svm_family: AF_VSOCK, svm_port: *port, ..sockaddr_vm::default() };
+                let vm_addr = sockaddr_vm {
+                    svm_family: AF_VSOCK,
+                    svm_port: *port,
+                    svm_cid: *cid,
+                    ..sockaddr_vm::default()
+                };
                 let _ = vm_addr.write_to(&mut bytes[..]);
                 bytes
             }
