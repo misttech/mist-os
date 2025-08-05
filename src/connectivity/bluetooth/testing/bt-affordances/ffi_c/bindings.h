@@ -86,6 +86,11 @@ zx_status_t start_le_scan(void *context, LeScanCallback cb);
 /// Returns ZX_STATUS_BAD_STATE if no scan was ongoing.
 zx_status_t stop_le_scan();
 
+/// Connect to an LE peer with the given identifier.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+zx_status_t connect_le(uint64_t peer_id);
+
 }  // extern "C"
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_BT_AFFORDANCES_FFI_C_BINDINGS_H_

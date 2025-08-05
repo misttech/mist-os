@@ -278,3 +278,17 @@ pub extern "C" fn stop_le_scan() -> zx_status_t {
 
     zx::Status::OK.into_raw()
 }
+
+/// Connect to an LE peer with the given identifier.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+#[no_mangle]
+pub extern "C" fn connect_le(peer_id: u64) -> zx_status_t {
+    let peer_id = PeerId { value: peer_id };
+
+    if let Err(err) = block_on(STATE.worker.connect_le(peer_id)) {
+        eprintln!("connect_le encountered error: {err:?}");
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
+}

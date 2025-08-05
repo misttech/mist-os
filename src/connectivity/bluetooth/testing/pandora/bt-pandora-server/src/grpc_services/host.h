@@ -35,6 +35,8 @@ class HostService : public pandora::Host::Service {
                                 const ::pandora::WaitConnectionRequest* request,
                                 ::pandora::WaitConnectionResponse* response) override;
 
+  // The public address field in `request` should hold an std::to_string encoding of the PeerId to
+  // connect.
   ::grpc::Status ConnectLE(::grpc::ServerContext* context,
                            const ::pandora::ConnectLERequest* request,
                            ::pandora::ConnectLEResponse* response) override;

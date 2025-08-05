@@ -95,7 +95,23 @@ Status HostService::WaitConnection(grpc::ServerContext* context,
 Status HostService::ConnectLE(::grpc::ServerContext* context,
                               const ::pandora::ConnectLERequest* request,
                               ::pandora::ConnectLEResponse* response) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  if (!request->has_public_()) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Expected PeerId encoded in public address field");
+  }
+  if (request->public_().size() != sizeof(uint64_t)) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Public address field invalid size for PeerId");
+  }
+
+  uint64_t peer_id;
+  // Assuming PeerId was encoded to the native byte order (as it is in Rust affordance FFI methods)
+  // and this copy is executed on the same machine, it is safe.
+  std::memcpy(&peer_id, request->public_().data(), sizeof(uint64_t));
+
+  if (connect_le(peer_id) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
+  }
+  response->mutable_connection()->mutable_cookie()->set_value(std::to_string(peer_id));
+  return {/*OK*/};
 }
 
 Status HostService::Disconnect(::grpc::ServerContext* context,

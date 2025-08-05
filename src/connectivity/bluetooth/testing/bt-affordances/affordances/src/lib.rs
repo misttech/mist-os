@@ -9,8 +9,8 @@ use fidl_fuchsia_bluetooth_bredr::{
     ConnectParameters, L2capParameters, ProfileMarker, ProfileProxy,
 };
 use fidl_fuchsia_bluetooth_le::{
-    CentralMarker, CentralProxy, Filter, ScanOptions, ScanResultWatcherMarker,
-    ScanResultWatcherProxy,
+    CentralMarker, CentralProxy, ConnectionMarker, ConnectionOptions, ConnectionProxy, Filter,
+    ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
 };
 use fidl_fuchsia_bluetooth_sys::{
     AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, Peer,
@@ -41,6 +41,7 @@ enum Request {
         >,
     ),
     StopLeScan(oneshot::Sender<bool>),
+    ConnectLe(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     Stop,
 }
 
@@ -67,8 +68,8 @@ impl WorkThread {
         let mut proxies = Proxies::connect()?;
         let mut host_cache: Vec<HostInfo> = Vec::new();
         let mut peer_cache: Vec<Peer> = Vec::new();
-        #[allow(clippy::collection_is_never_read)]
         let mut _l2cap_channel: Channel;
+        let mut _le_connection: ConnectionProxy;
 
         while let Some(request) = receiver.next().await {
             match request {
@@ -136,6 +137,17 @@ impl WorkThread {
                 }
                 Request::StopLeScan(result_sender) => {
                     result_sender.send(proxies.stop_le_scan()).unwrap();
+                }
+                Request::ConnectLe(peer_id, result_sender) => {
+                    match proxies.connect_le(&peer_id).await {
+                        Ok(connection) => {
+                            _le_connection = connection;
+                            result_sender.send(Ok(())).unwrap();
+                        }
+                        Err(err) => {
+                            result_sender.send(Err(err)).unwrap();
+                        }
+                    }
                 }
                 Request::Stop => break,
             }
@@ -236,6 +248,13 @@ impl WorkThread {
         let (sender, receiver) = oneshot::channel::<bool>();
         self.sender.clone().unbounded_send(Request::StopLeScan(sender)).unwrap();
         receiver.await.unwrap()
+    }
+
+    // Connect an LE peer and store the connection.
+    pub async fn connect_le(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
+        self.sender.clone().unbounded_send(Request::ConnectLe(peer_id, sender))?;
+        receiver.await?
     }
 }
 
@@ -488,5 +507,11 @@ impl Proxies {
 
     fn stop_le_scan(&self) -> bool {
         self.le_scan_task.lock().take().is_some()
+    }
+
+    async fn connect_le(&mut self, peer_id: &PeerId) -> Result<ConnectionProxy, anyhow::Error> {
+        let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>();
+        self.central_proxy.connect(peer_id, &ConnectionOptions::default(), le_server)?;
+        Ok(le_client)
     }
 }
