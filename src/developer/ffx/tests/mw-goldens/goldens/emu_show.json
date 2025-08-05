@@ -285,12 +285,35 @@
     },
     "NetworkingMode": {
       "description": "Selector for the mode of networking to enable between the guest and host systems.",
-      "type": "string",
-      "enum": [
-        "auto",
-        "tap",
-        "user",
-        "none"
+      "oneOf": [
+        {
+          "description": "Allow the system to determine the best available networking option. Typically this means \"Tap\", falling back to \"User\" if Tap is unavailable.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
+          "description": "Networking will be set up in bridged mode, using an interface such as tun/tap.",
+          "type": "string",
+          "enum": [
+            "tap"
+          ]
+        },
+        {
+          "description": "Networking will be over explicitly mapped ports, using an interface such as SLiRP.",
+          "type": "string",
+          "enum": [
+            "user"
+          ]
+        },
+        {
+          "description": "Guest networking will be disabled.",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        }
       ]
     },
     "PortMapping": {

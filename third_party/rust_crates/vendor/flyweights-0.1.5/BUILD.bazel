@@ -80,7 +80,7 @@ rust_library(
         "//third_party/rust_crates/ask2patch/byteorder",
         "//third_party/rust_crates/vendor/ahash-0.8.11:ahash",
         "//third_party/rust_crates/vendor/bstr-1.5.0:bstr",
-        "//third_party/rust_crates/vendor/schemars-0.8.10:schemars",
+        "//third_party/rust_crates/vendor/schemars-0.8.22:schemars",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/static_assertions-1.1.0:static_assertions",
     ],

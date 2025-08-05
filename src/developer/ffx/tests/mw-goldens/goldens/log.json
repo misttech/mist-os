@@ -257,14 +257,49 @@
     },
     "Severity": {
       "description": "Severities a log message can have, often called the log's \"level\".",
-      "type": "string",
-      "enum": [
-        "TRACE",
-        "DEBUG",
-        "INFO",
-        "WARN",
-        "ERROR",
-        "FATAL"
+      "oneOf": [
+        {
+          "description": "Trace severity level",
+          "type": "string",
+          "enum": [
+            "TRACE"
+          ]
+        },
+        {
+          "description": "Debug severity level",
+          "type": "string",
+          "enum": [
+            "DEBUG"
+          ]
+        },
+        {
+          "description": "Info severity level",
+          "type": "string",
+          "enum": [
+            "INFO"
+          ]
+        },
+        {
+          "description": "Warn severity level",
+          "type": "string",
+          "enum": [
+            "WARN"
+          ]
+        },
+        {
+          "description": "Error severity level",
+          "type": "string",
+          "enum": [
+            "ERROR"
+          ]
+        },
+        {
+          "description": "Fatal severity level",
+          "type": "string",
+          "enum": [
+            "FATAL"
+          ]
+        }
       ]
     },
     "DiagnosticsHierarchy": {

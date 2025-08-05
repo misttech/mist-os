@@ -103,13 +103,42 @@
       }
     },
     "CompatibilityState": {
-      "type": "string",
-      "enum": [
-        "error",
-        "absent",
-        "unknown",
-        "unsupported",
-        "supported"
+      "oneOf": [
+        {
+          "description": "An error was encountered determining the compatibility status.",
+          "type": "string",
+          "enum": [
+            "error"
+          ]
+        },
+        {
+          "description": "The compatibility information is not present.",
+          "type": "string",
+          "enum": [
+            "absent"
+          ]
+        },
+        {
+          "description": "ABI revision was not recognized.",
+          "type": "string",
+          "enum": [
+            "unknown"
+          ]
+        },
+        {
+          "description": "ABI revision it presented is not supported.",
+          "type": "string",
+          "enum": [
+            "unsupported"
+          ]
+        },
+        {
+          "description": "ABI revision is supported",
+          "type": "string",
+          "enum": [
+            "supported"
+          ]
+        }
       ]
     },
     "BoardData": {

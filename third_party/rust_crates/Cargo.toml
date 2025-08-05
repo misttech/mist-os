@@ -207,7 +207,7 @@ rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
-schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
+schemars = { version = "0.8.22", features = ["chrono", "preserve_order"] }
 scopeguard = "1.2.0"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_derive = "1.0.147"
@@ -982,7 +982,7 @@ rustflags = []
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
 
-[gn.package.schemars."0.8.10"]
+[gn.package.schemars."0.8.22"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 
 # scoped-tls has not gone through a thorough safety review yet, and needs to be

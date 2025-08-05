@@ -2395,14 +2395,14 @@ alias(
 )
 
 alias(
-    name = "schemars-0.8.10",
-    actual = "//third_party/rust_crates/vendor/schemars-0.8.10:schemars",
+    name = "schemars-0.8.22",
+    actual = "//third_party/rust_crates/vendor/schemars-0.8.22:schemars",
     tags = ["manual"],
 )
 
 alias(
     name = "schemars",
-    actual = "//third_party/rust_crates/vendor/schemars-0.8.10:schemars",
+    actual = "//third_party/rust_crates/vendor/schemars-0.8.22:schemars",
     tags = ["manual"],
 )
 

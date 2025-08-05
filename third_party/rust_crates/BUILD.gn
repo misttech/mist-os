@@ -899,7 +899,7 @@ group("rutabaga_gfx") {
 }
 
 group("schemars") {
-  public_deps = [ ":schemars-v0_8_10" ]
+  public_deps = [ ":schemars-v0_8_22" ]
 }
 
 group("scopeguard") {
@@ -6488,7 +6488,7 @@ rustc_library("flyweights-v0_1_5") {
   deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":ahash-v0_8_11" ]
   deps += [ ":bstr-v1_5_0" ]
-  deps += [ ":schemars-v0_8_10" ]
+  deps += [ ":schemars-v0_8_22" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":static_assertions-v1_1_0" ]
 
@@ -15512,16 +15512,16 @@ rustc_library("schannel-v0_1_19") {
   applicable_licenses = [ ":schannel-v0_1_19.license" ]
 }
 
-license("schemars-v0_8_10.license") {
+license("schemars-v0_8_22.license") {
   public_package_name = "schemars"
-  license_files = [ "//third_party/rust_crates/vendor/schemars-0.8.10/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/schemars-0.8.22/LICENSE" ]
 }
 
-rustc_library("schemars-v0_8_10") {
+rustc_library("schemars-v0_8_22") {
   crate_name = "schemars"
-  source_root = "//third_party/rust_crates/vendor/schemars-0.8.10/src/lib.rs"
-  output_name = "schemars-418da217f5a1778c"
-  edition = "2018"
+  source_root = "//third_party/rust_crates/vendor/schemars-0.8.22/src/lib.rs"
+  output_name = "schemars-e7ab5fc47f05a053"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -15530,7 +15530,7 @@ rustc_library("schemars-v0_8_10") {
   deps += [ ":chrono-v0_4_41" ]
   deps += [ ":dyn-clone-v1_0_19" ]
   deps += [ ":indexmap-v1_9_2" ]
-  deps += [ ":schemars_derive-v0_8_10($host_toolchain)" ]
+  deps += [ ":schemars_derive-v0_8_22($host_toolchain)" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
 
@@ -15538,8 +15538,8 @@ rustc_library("schemars-v0_8_10") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=418da217f5a1778c",
-    "-Cextra-filename=-418da217f5a1778c",
+    "-Cmetadata=e7ab5fc47f05a053",
+    "-Cextra-filename=-e7ab5fc47f05a053",
     "--cfg=feature=\"chrono\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -15552,21 +15552,21 @@ rustc_library("schemars-v0_8_10") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":schemars-v0_8_10.license" ]
+  applicable_licenses = [ ":schemars-v0_8_22.license" ]
 }
 
-license("schemars_derive-v0_8_10.license") {
+license("schemars_derive-v0_8_22.license") {
   public_package_name = "schemars_derive"
   license_files =
-      [ "//third_party/rust_crates/vendor/schemars_derive-0.8.10/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/schemars_derive-0.8.22/LICENSE" ]
 }
 
-rustc_macro("schemars_derive-v0_8_10") {
+rustc_macro("schemars_derive-v0_8_22") {
   crate_name = "schemars_derive"
   source_root =
-      "//third_party/rust_crates/vendor/schemars_derive-0.8.10/src/lib.rs"
-  output_name = "schemars_derive-5b2df8822511f6d5"
-  edition = "2018"
+      "//third_party/rust_crates/vendor/schemars_derive-0.8.22/src/lib.rs"
+  output_name = "schemars_derive-24b805c8831d9d31"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -15574,20 +15574,20 @@ rustc_macro("schemars_derive-v0_8_10") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":serde_derive_internals-v0_26_0" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":serde_derive_internals-v0_29_1" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=5b2df8822511f6d5",
-    "-Cextra-filename=-5b2df8822511f6d5",
+    "-Cmetadata=24b805c8831d9d31",
+    "-Cextra-filename=-24b805c8831d9d31",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":schemars_derive-v0_8_10.license" ]
+  applicable_licenses = [ ":schemars_derive-v0_8_22.license" ]
 }
 
 license("scoped-tls-v1_0_1.license") {
@@ -15977,19 +15977,19 @@ rustc_macro("serde_derive-v1_0_204") {
   applicable_licenses = [ ":serde_derive-v1_0_204.license" ]
 }
 
-license("serde_derive_internals-v0_26_0.license") {
+license("serde_derive_internals-v0_29_1.license") {
   public_package_name = "serde_derive_internals"
   license_files = [
-    "//third_party/rust_crates/vendor/serde_derive_internals-0.26.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/serde_derive_internals-0.26.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/serde_derive_internals-0.29.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/serde_derive_internals-0.29.1/LICENSE-MIT",
   ]
 }
 
-rustc_library("serde_derive_internals-v0_26_0") {
+rustc_library("serde_derive_internals-v0_29_1") {
   crate_name = "serde_derive_internals"
   source_root =
-      "//third_party/rust_crates/vendor/serde_derive_internals-0.26.0/lib.rs"
-  output_name = "serde_derive_internals-2c76cdeea6fc3318"
+      "//third_party/rust_crates/vendor/serde_derive_internals-0.29.1/lib.rs"
+  output_name = "serde_derive_internals-17fe011d9debc286"
   edition = "2015"
   disable_clippy = true
   enforce_source_listing = false
@@ -15998,19 +15998,19 @@ rustc_library("serde_derive_internals-v0_26_0") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=2c76cdeea6fc3318",
-    "-Cextra-filename=-2c76cdeea6fc3318",
+    "-Cmetadata=17fe011d9debc286",
+    "-Cextra-filename=-17fe011d9debc286",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":serde_derive_internals-v0_26_0.license" ]
+  applicable_licenses = [ ":serde_derive_internals-v0_29_1.license" ]
 }
 
 license("serde_json-v1_0_128.license") {

@@ -169,9 +169,12 @@ impl DataType {
         }
         // An enum with variants of different types.
         // TODO(b/332348955): Support this properly.
+        // TODO(b/436293725): Support comments on enum variants.
         else if let Some(_) = schema.subschemas {
-            let error_message =
-                format!("Failed to generate docs for complex {} enum: b/332348955", &rust_type);
+            let error_message = format!(
+                "Failed to generate docs for complex {} enum: b/332348955 or b/436293725",
+                &rust_type
+            );
             description = format!("{}\n\n{}", &error_message, description);
             // println!("{}", error_message);
             DataTypeInner::Enum(EnumDataType { variants: BTreeSet::new() })
@@ -295,7 +298,6 @@ mod tests {
     #[allow(dead_code)]
     #[derive(Serialize, JsonSchema)]
     enum MyEnum {
-        /// Comments on variants do not work :(
         Variant1,
         #[serde(rename = "variant_2")]
         Variant2,

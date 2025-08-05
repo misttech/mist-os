@@ -445,7 +445,7 @@ _NORMAL_DEPENDENCIES = {
             "rustls-webpki": Label("//third_party/rust_crates/vendor/rustls-webpki-0.101.7:webpki"),
             "rustyline": Label("//third_party/rust_crates/vendor/rustyline-2.1.0:rustyline"),
             "rutabaga_gfx": Label("//third_party/rust_crates/vendor/rutabaga_gfx-0.1.3:rutabaga_gfx"),
-            "schemars": Label("//third_party/rust_crates/vendor/schemars-0.8.10:schemars"),
+            "schemars": Label("//third_party/rust_crates/vendor/schemars-0.8.22:schemars"),
             "scopeguard": Label("//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard"),
             "serde": Label("//third_party/rust_crates/vendor/serde-1.0.204:serde"),
             "serde_json": Label("//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json"),
