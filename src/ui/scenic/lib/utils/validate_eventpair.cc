@@ -10,13 +10,11 @@ namespace utils {
 
 bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
                         const zx::eventpair& b_object, zx_rights_t b_rights) {
-  if (a_object.get_info(ZX_INFO_HANDLE_VALID, nullptr,
-                        /*buffer size*/ 0, nullptr, nullptr) != ZX_OK) {
+  if (zx_handle_check_valid(a_object.get()) != ZX_OK) {
     return false;  // bad handle
   }
 
-  if (b_object.get_info(ZX_INFO_HANDLE_VALID, nullptr,
-                        /*buffer size*/ 0, nullptr, nullptr) != ZX_OK) {
+  if (zx_handle_check_valid(b_object.get()) != ZX_OK) {
     return false;  // bad handle
   }
 

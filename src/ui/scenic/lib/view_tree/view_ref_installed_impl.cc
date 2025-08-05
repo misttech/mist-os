@@ -18,8 +18,7 @@ namespace {
 
 // Check if a ViewRef is valid and has the correct rights.
 bool IsValidViewRef(fuchsia::ui::views::ViewRef& view_ref) {
-  if (view_ref.reference.get_info(ZX_INFO_HANDLE_VALID, nullptr, /*buffer size*/ 0, nullptr,
-                                  nullptr) != ZX_OK) {
+  if (zx_handle_check_valid(view_ref.reference.get()) != ZX_OK) {
     FX_LOGS(INFO) << "Bad handle";
     return false;  // bad handle
   }
