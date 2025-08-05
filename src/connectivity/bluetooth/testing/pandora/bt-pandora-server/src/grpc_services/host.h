@@ -15,8 +15,6 @@
 
 class HostService : public pandora::Host::Service {
  public:
-  explicit HostService(async_dispatcher_t* dispatcher);
-
   ::grpc::Status FactoryReset(::grpc::ServerContext* context,
                               const ::google::protobuf::Empty* request,
                               ::google::protobuf::Empty* response) override;
@@ -68,15 +66,6 @@ class HostService : public pandora::Host::Service {
                                        ::google::protobuf::Empty* response) override;
 
  private:
-  class PairingDelegateImpl : public fidl::Server<fuchsia_bluetooth_sys::PairingDelegate> {
-    void OnPairingRequest(OnPairingRequestRequest& request,
-                          OnPairingRequestCompleter::Sync& completer) override;
-    void OnPairingComplete(OnPairingCompleteRequest& request,
-                           OnPairingCompleteCompleter::Sync& completer) override;
-    void OnRemoteKeypress(OnRemoteKeypressRequest& request,
-                          OnRemoteKeypressCompleter::Sync& completer) override {}
-  };
-
   static void LeScanCb(void* context, const LePeer* peer) {
     HostService* svc = static_cast<HostService*>(context);
     std::lock_guard lock(svc->m_scan_scp_writer_);
@@ -110,8 +99,6 @@ class HostService : public pandora::Host::Service {
   std::mutex m_access_;
   std::vector<fuchsia_bluetooth_sys::Peer> peers_;
   bool peer_watching_{false};
-
-  fidl::SyncClient<fuchsia_bluetooth_sys::Pairing> pairing_client_;
 };
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_HOST_H_

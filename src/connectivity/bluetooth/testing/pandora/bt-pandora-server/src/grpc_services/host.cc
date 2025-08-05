@@ -9,42 +9,10 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/message.h>
 
-#include "fidl/fuchsia.bluetooth.sys/cpp/common_types.h"
-#include "lib/component/incoming/cpp/protocol.h"
-
 using grpc::Status;
 using grpc::StatusCode;
 
 using namespace std::chrono_literals;
-
-HostService::HostService(async_dispatcher_t* dispatcher) {
-  // Connect to fuchsia.bluetooth.sys.Pairing
-  zx::result pairing_client_end = component::Connect<fuchsia_bluetooth_sys::Pairing>();
-  if (!pairing_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to Pairing service: " << pairing_client_end.error_value();
-    return;
-  }
-  pairing_client_.Bind(std::move(*pairing_client_end));
-
-  // Connect to fuchsia.bluetooth.sys.PairingDelegate and set PairingDelegate
-  // TODO(b/423700622): Move PairingDelegate to bt-affordances.
-  zx::result<fidl::Endpoints<fuchsia_bluetooth_sys::PairingDelegate>> endpoints =
-      fidl::CreateEndpoints<fuchsia_bluetooth_sys::PairingDelegate>();
-  if (!endpoints.is_ok()) {
-    FX_LOGS(ERROR) << "Error creating PairingDelegate endpoints: " << endpoints.status_string();
-    return;
-  }
-  auto [pairing_delegate_client_end, pairing_delegate_server_end] = *std::move(endpoints);
-  auto result = pairing_client_->SetPairingDelegate(
-      {fuchsia_bluetooth_sys::InputCapability::kConfirmation,
-       fuchsia_bluetooth_sys::OutputCapability::kDisplay, std::move(pairing_delegate_client_end)});
-  if (result.is_error()) {
-    FX_LOGS(ERROR) << "Error setting PairingDelegate: " << result.error_value();
-    return;
-  }
-  fidl::BindServer(dispatcher, std::move(pairing_delegate_server_end),
-                   std::make_unique<PairingDelegateImpl>());
-}
 
 // TODO(https://fxbug.dev/316721276): Implement gRPCs necessary to enable GAP/A2DP testing.
 
@@ -204,21 +172,6 @@ Status HostService::SetConnectabilityMode(::grpc::ServerContext* context,
                                           const ::pandora::SetConnectabilityModeRequest* request,
                                           ::google::protobuf::Empty* response) {
   return Status(StatusCode::UNIMPLEMENTED, "");
-}
-
-void HostService::PairingDelegateImpl::OnPairingRequest(
-    OnPairingRequestRequest& request, OnPairingRequestCompleter::Sync& completer) {
-  FX_LOGS(INFO) << "PairingDelegate received pairing request; accepting";
-  completer.Reply({true, {}});
-}
-
-void HostService::PairingDelegateImpl::OnPairingComplete(
-    OnPairingCompleteRequest& request, OnPairingCompleteCompleter::Sync& completer) {
-  if (request.success()) {
-    FX_LOGS(INFO) << "Succesfully paired to peer id: " << request.id().value();
-    return;
-  }
-  FX_LOGS(ERROR) << "Error pairing to peer id: " << request.id().value();
 }
 
 std::vector<fuchsia_bluetooth_sys::Peer>::const_iterator HostService::WaitForPeer(

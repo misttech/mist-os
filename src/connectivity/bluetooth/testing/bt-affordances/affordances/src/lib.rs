@@ -200,8 +200,7 @@ impl WorkThread {
     }
 
     // Initiate pairing with peer with given identifier.
-    // TODO(b/423700622): Add PairingDelegate server to bt-affordances & delete it from Pandora Host
-    // gRPC service.
+    // TODO(b/423700622): Add PairingDelegate server to bt-affordances.
     pub async fn pair(
         &self,
         peer_id: PeerId,
