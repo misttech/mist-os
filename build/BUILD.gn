@@ -540,11 +540,6 @@ group("deprecated_zx_wrapper_allowlist") {
   ]
 }
 
-# TODO(https://fxbug.dev/42176904): to be populated.
-group("output_dir_leaking_allowlist") {
-  visibility = [ "*" ]
-}
-
 group("config_data_template_allowlist") {
   visibility = [
     "//build/images/*",

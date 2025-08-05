@@ -1483,10 +1483,6 @@ foreach(_target_type,
         check_for_output_dir_leaks = false
       }
 
-      if (!check_for_output_dir_leaks) {
-        deps += [ "//build:output_dir_leaking_allowlist" ]
-      }
-
       # Prevent the build output dir path from leaking into the
       # command or its outputs, for cache-ability and consistency
       # across different build environments.
