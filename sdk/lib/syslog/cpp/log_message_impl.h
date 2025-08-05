@@ -134,10 +134,11 @@ void WriteStructuredLog(fuchsia_logging::LogSeverity severity, const char* file,
     builder.WithFile(file, line);
   }
   if (msg != nullptr) {
-    builder.WithMsg(msg);
+    std::string_view message(msg);
+    builder.WithMsg(message);
   }
   auto buffer = builder.Build();
-  (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
+  (buffer.Encode(args), ...);
   buffer.Flush();
 }
 

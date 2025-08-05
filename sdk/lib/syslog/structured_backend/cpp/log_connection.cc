@@ -22,8 +22,10 @@ zx::result<LogConnection> LogConnection::Create(
   return zx::ok(LogConnection(std::move(local), {}));
 }
 
-zx::result<> LogConnection::FlushBuffer(fuchsia_syslog::LogBuffer& buffer) const {
-  cpp20::span<const uint8_t> data = buffer.EndRecord();
+zx::result<> LogConnection::FlushSpan(cpp20::span<const uint8_t> data) const {
+  if (data.empty()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
   zx_status_t status;
   while (true) {
     status = socket_.write(0, data.data(), data.size_bytes(), nullptr);

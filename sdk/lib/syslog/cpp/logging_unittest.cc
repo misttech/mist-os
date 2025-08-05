@@ -465,6 +465,21 @@ TEST(LogConnection, BlockIfFull) {
   thread.join();
 }
 
+TEST(LogConnection, EncodingError) {
+  zx::socket client, server;
+  ASSERT_EQ(zx::socket::create(0, &client, &server), ZX_OK);
+
+  LogConnection connection(std::move(client), {});
+  LogBuffer buffer;
+  std::string message;
+  message.resize(sizeof internal::LogBufferData::data, 'a');
+
+  // This should result in an invalid message because it's too big.
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, 0, message, 0, 1, 2);
+
+  EXPECT_EQ(connection.FlushBuffer(buffer).status_value(), ZX_ERR_INVALID_ARGS);
+}
+
 #endif
 
 }  // namespace

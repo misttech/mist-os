@@ -31,9 +31,13 @@ class LogConnection {
   bool is_valid() const { return socket_.is_valid(); }
 
   // Flushes the LogBuffer to the connection.
-  zx::result<> FlushBuffer(fuchsia_syslog::LogBuffer& buffer) const;
+  zx::result<> FlushBuffer(fuchsia_syslog::LogBuffer& buffer) const {
+    return FlushSpan(buffer.EndRecord());
+  }
 
  private:
+  zx::result<> FlushSpan(cpp20::span<const uint8_t> data) const;
+
   zx::socket socket_;
   bool block_if_full_ = false;
 };
