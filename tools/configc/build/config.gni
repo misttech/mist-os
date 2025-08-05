@@ -398,6 +398,10 @@ template("validate_packaged_config") {
     ]
     outputs = [ _stamp ]
 
+    # As this action only writes a stamp file, there's no need to run
+    # the check for any output dir leaks in the file.
+    check_for_output_dir_leaks = false
+
     if (!defined(deps)) {
       deps = []
     }
