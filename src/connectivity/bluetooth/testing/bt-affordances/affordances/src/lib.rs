@@ -13,7 +13,7 @@ use fidl_fuchsia_bluetooth_le::{
     ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
 };
 use fidl_fuchsia_bluetooth_sys::{
-    AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, Peer,
+    AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, PairingOptions, Peer,
     ProcedureTokenProxy,
 };
 use fuchsia_async::{LocalExecutor, Task, TimeoutExt, Timer};
@@ -31,6 +31,7 @@ enum Request {
     GetKnownPeers(oneshot::Sender<Result<Vec<Peer>, anyhow::Error>>),
     GetPeerId(CString, oneshot::Sender<Result<PeerId, anyhow::Error>>),
     Connect(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
+    Pair(PeerId, PairingOptions, oneshot::Sender<Result<(), anyhow::Error>>),
     Forget(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     ConnectL2cap(PeerId, u16, oneshot::Sender<Result<(), anyhow::Error>>),
     SetDiscovery(bool, oneshot::Sender<Result<(), anyhow::Error>>),
@@ -115,6 +116,9 @@ impl WorkThread {
                 Request::Connect(peer_id, result_sender) => {
                     result_sender.send(proxies.connect_peer(&peer_id).await).unwrap();
                 }
+                Request::Pair(peer_id, options, result_sender) => {
+                    result_sender.send(proxies.pair(&peer_id, &options).await).unwrap()
+                }
                 Request::ConnectL2cap(peer_id, psm, result_sender) => {
                     match proxies.connect_l2cap(&peer_id, psm).await {
                         Ok(channel) => {
@@ -192,6 +196,19 @@ impl WorkThread {
     pub async fn connect_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
         self.sender.clone().unbounded_send(Request::Connect(peer_id, sender))?;
+        receiver.await?
+    }
+
+    // Initiate pairing with peer with given identifier.
+    // TODO(b/423700622): Add PairingDelegate server to bt-affordances & delete it from Pandora Host
+    // gRPC service.
+    pub async fn pair(
+        &self,
+        peer_id: PeerId,
+        options: PairingOptions,
+    ) -> Result<(), anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
+        self.sender.clone().unbounded_send(Request::Pair(peer_id, options, sender))?;
         receiver.await?
     }
 
@@ -306,6 +323,18 @@ impl Proxies {
             .and_then(|connect_result| {
                 connect_result.map_err(|sapphire_err| {
                     anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {sapphire_err:?}")
+                })
+            })
+    }
+
+    async fn pair(&self, peer_id: &PeerId, options: &PairingOptions) -> Result<(), anyhow::Error> {
+        self.access_proxy
+            .pair(peer_id, options)
+            .await
+            .map_err(|fidl_error| anyhow!("fuchsia.bluetooth.sys.Access/Pair error: {fidl_error}"))
+            .and_then(|pair_result| {
+                pair_result.map_err(|sapphire_err| {
+                    anyhow!("fuchsia.bluetooth.sys.Access/Pair error: {sapphire_err:?}")
                 })
             })
     }

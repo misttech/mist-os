@@ -51,6 +51,15 @@ uint64_t get_peer_id(const char *address);
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t connect_peer(uint64_t peer_id);
 
+/// Initiate pairing with peer with given identifier.
+///
+/// `le_security_level` is only relevant for LE pairing. Specify 1 for Encrypted or 2 for
+/// Authenticated. All other values are interpreted as unset, defaulting to Authenticated. See
+/// fuchsia.bluetooth.sys/PairingOptions for details.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+zx_status_t pair(uint64_t peer_id, uint32_t le_security_level);
+
 /// Remove all bonding information and disconnect peer with given identifier, if found.
 ///
 /// Returns ZX_STATUS_INTERNAL on error (check logs).

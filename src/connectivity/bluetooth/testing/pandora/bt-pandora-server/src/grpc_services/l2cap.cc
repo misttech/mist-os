@@ -17,7 +17,7 @@ grpc::Status L2capService::Connect(::grpc::ServerContext* context,
                                    const ::pandora::l2cap::ConnectRequest* request,
                                    ::pandora::l2cap::ConnectResponse* response) {
   if (connect_l2cap_channel(
-          std::strtoul(request->connection().cookie().value().c_str(), nullptr, 10),
+          std::strtoul(request->connection().cookie().value().c_str(), nullptr, /*base=*/10),
           static_cast<uint16_t>(request->basic().psm())) != ZX_OK) {
     return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }

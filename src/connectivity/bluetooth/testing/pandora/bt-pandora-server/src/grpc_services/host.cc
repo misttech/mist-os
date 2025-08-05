@@ -27,6 +27,7 @@ HostService::HostService(async_dispatcher_t* dispatcher) {
   pairing_client_.Bind(std::move(*pairing_client_end));
 
   // Connect to fuchsia.bluetooth.sys.PairingDelegate and set PairingDelegate
+  // TODO(b/423700622): Move PairingDelegate to bt-affordances.
   zx::result<fidl::Endpoints<fuchsia_bluetooth_sys::PairingDelegate>> endpoints =
       fidl::CreateEndpoints<fuchsia_bluetooth_sys::PairingDelegate>();
   if (!endpoints.is_ok()) {
@@ -34,9 +35,9 @@ HostService::HostService(async_dispatcher_t* dispatcher) {
     return;
   }
   auto [pairing_delegate_client_end, pairing_delegate_server_end] = *std::move(endpoints);
-  auto result = pairing_client_->SetPairingDelegate({fuchsia_bluetooth_sys::InputCapability::kNone,
-                                                     fuchsia_bluetooth_sys::OutputCapability::kNone,
-                                                     std::move(pairing_delegate_client_end)});
+  auto result = pairing_client_->SetPairingDelegate(
+      {fuchsia_bluetooth_sys::InputCapability::kConfirmation,
+       fuchsia_bluetooth_sys::OutputCapability::kDisplay, std::move(pairing_delegate_client_end)});
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Error setting PairingDelegate: " << result.error_value();
     return;
@@ -98,15 +99,8 @@ Status HostService::ConnectLE(::grpc::ServerContext* context,
   if (!request->has_public_()) {
     return Status(StatusCode::INVALID_ARGUMENT, "Expected PeerId encoded in public address field");
   }
-  if (request->public_().size() != sizeof(uint64_t)) {
-    return Status(StatusCode::INVALID_ARGUMENT, "Public address field invalid size for PeerId");
-  }
 
-  uint64_t peer_id;
-  // Assuming PeerId was encoded to the native byte order (as it is in Rust affordance FFI methods)
-  // and this copy is executed on the same machine, it is safe.
-  std::memcpy(&peer_id, request->public_().data(), sizeof(uint64_t));
-
+  uint64_t peer_id = std::strtoul(request->public_().c_str(), nullptr, /*base=*/10);
   if (connect_le(peer_id) != ZX_OK) {
     return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }

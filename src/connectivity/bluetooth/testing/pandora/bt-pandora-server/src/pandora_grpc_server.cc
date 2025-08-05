@@ -31,6 +31,7 @@ zx_status_t PandoraGrpcServer::Run(uint16_t port, bool verbose) {
   builder.RegisterService(&a2dp_service_);
   builder.RegisterService(&host_service_);
   builder.RegisterService(&l2cap_service_);
+  builder.RegisterService(&security_service_);
   builder.RegisterService(&security_storage_service_);
 
   FX_LOGS(INFO) << "Server listening on " << address;

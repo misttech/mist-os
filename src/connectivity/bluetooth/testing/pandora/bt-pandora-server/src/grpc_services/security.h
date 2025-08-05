@@ -10,9 +10,24 @@
 class SecurityStorageService : public pandora::SecurityStorage::Service {
   ::grpc::Status IsBonded(::grpc::ServerContext* context, const ::pandora::IsBondedRequest* request,
                           ::google::protobuf::BoolValue* response) override;
+
   ::grpc::Status DeleteBond(::grpc::ServerContext* context,
                             const ::pandora::DeleteBondRequest* request,
                             ::google::protobuf::Empty* response) override;
+};
+
+class SecurityService : public pandora::Security::Service {
+  ::grpc::Status OnPairing(
+      ::grpc::ServerContext* context,
+      ::grpc::ServerReaderWriter<::pandora::PairingEvent, ::pandora::PairingEventAnswer>* stream)
+      override;
+
+  ::grpc::Status Secure(::grpc::ServerContext* context, const ::pandora::SecureRequest* request,
+                        ::pandora::SecureResponse* response) override;
+
+  ::grpc::Status WaitSecurity(::grpc::ServerContext* context,
+                              const ::pandora::WaitSecurityRequest* request,
+                              ::pandora::WaitSecurityResponse* response) override;
 };
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_SECURITY_H_

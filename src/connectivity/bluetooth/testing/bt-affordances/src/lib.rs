@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth::PeerId;
+use fidl_fuchsia_bluetooth_sys::{PairingOptions, PairingSecurityLevel};
 use fuchsia_async::LocalExecutor;
 use fuchsia_bt_test_affordances::WorkThread;
 use fuchsia_sync::Mutex;
@@ -170,6 +171,27 @@ pub extern "C" fn connect_peer(peer_id: u64) -> zx_status_t {
 
     if let Err(err) = block_on(STATE.worker.connect_peer(peer_id)) {
         eprintln!("connect_peer encountered error: {err}");
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
+}
+
+/// Initiate pairing with peer with given identifier.
+///
+/// `le_security_level` is only relevant for LE pairing. Specify 1 for Encrypted or 2 for
+/// Authenticated. All other values are interpreted as unset, defaulting to Authenticated. See
+/// fuchsia.bluetooth.sys/PairingOptions for details.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+#[no_mangle]
+pub extern "C" fn pair(peer_id: u64, le_security_level: u32) -> zx_status_t {
+    let peer_id = PeerId { value: peer_id };
+
+    let mut options = PairingOptions::default();
+    options.le_security_level = PairingSecurityLevel::from_primitive(le_security_level);
+
+    if let Err(err) = block_on(STATE.worker.pair(peer_id, options)) {
+        eprintln!("pair encountered error: {err}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()

@@ -37,3 +37,51 @@ Status SecurityStorageService::DeleteBond(::grpc::ServerContext* context,
 
   return {/*OK*/};
 }
+
+::grpc::Status SecurityService::OnPairing(
+    ::grpc::ServerContext* context,
+    ::grpc::ServerReaderWriter<::pandora::PairingEvent, ::pandora::PairingEventAnswer>* stream) {
+  return Status(StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SecurityService::Secure(::grpc::ServerContext* context,
+                                       const ::pandora::SecureRequest* request,
+                                       ::pandora::SecureResponse* response) {
+  uint32_t pairing_level;
+  if (request->level_case() == ::pandora::SecureRequest::LevelCase::kClassic) {
+    return Status(StatusCode::UNIMPLEMENTED, "Only implemented LE pairing security so far");
+  }
+  switch (request->le()) {
+    case pandora::LE_LEVEL1: {
+      return Status(StatusCode::INVALID_ARGUMENT, "LE pairing with no security is not supported");
+    }
+    case pandora::LE_LEVEL2: {
+      // Encrypted unauthenticated
+      pairing_level = 1;
+      break;
+    }
+    case pandora::LE_LEVEL3: {
+      // Encrypted authenticated
+      pairing_level = 2;
+      break;
+    }
+    case pandora::LE_LEVEL4: {
+      return Status(StatusCode::UNIMPLEMENTED,
+                    "Have not yet handled LE Secure Connections pairing");
+    }
+    default: {
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid LESecurityLevel");
+    }
+  }
+
+  pair(std::strtoul(request->connection().cookie().value().c_str(), nullptr, /*base=*/10),
+       pairing_level);
+
+  return {/*OK*/};
+}
+
+::grpc::Status SecurityService::WaitSecurity(::grpc::ServerContext* context,
+                                             const ::pandora::WaitSecurityRequest* request,
+                                             ::pandora::WaitSecurityResponse* response) {
+  return Status(StatusCode::UNIMPLEMENTED, "");
+}
