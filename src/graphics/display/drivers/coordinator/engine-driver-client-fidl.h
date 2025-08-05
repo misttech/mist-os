@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -44,7 +43,6 @@ class EngineDriverClientFidl : public EngineDriverClient {
   void ApplyConfiguration(const display_config_t* display_config,
                           display::DriverConfigStamp config_stamp) override;
   display::EngineInfo CompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t& banjo_listener_protocol,
       fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client)
       override;
   void UnsetListener() override;

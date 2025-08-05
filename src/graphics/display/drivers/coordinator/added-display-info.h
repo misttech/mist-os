@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ADDED_DISPLAY_INFO_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -28,18 +27,7 @@ namespace display_coordinator {
 struct AddedDisplayInfo {
   // Returns a valid instance.
   //
-  // Fails with ZX_ERR_INVALID_ARGS if `banjo_display_info` cannot be used to
-  // produce a valid instance. Fails with ZX_ERR_NO_MEMORY on OOM. All failures
-  // result in logging.
-  //
-  // Instances are always created on the heap so they can be conveniently passed
-  // between dispatchers.
-  static zx::result<std::unique_ptr<AddedDisplayInfo>> Create(
-      const raw_display_info_t& banjo_display_info);
-
-  // Returns a valid instance.
-  //
-  // Fails with ZX_ERR_INVALID_ARGS if `banjo_display_info` cannot be used to
+  // Fails with ZX_ERR_INVALID_ARGS if `fidl_display_info` cannot be used to
   // produce a valid instance. Fails with ZX_ERR_NO_MEMORY on OOM. All failures
   // result in logging.
   //

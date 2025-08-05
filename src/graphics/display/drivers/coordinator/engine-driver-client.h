@@ -50,13 +50,8 @@ class EngineDriverClient {
   virtual display::ConfigCheckResult CheckConfiguration(const display_config_t* display_config) = 0;
   virtual void ApplyConfiguration(const display_config_t* display_config,
                                   display::DriverConfigStamp config_stamp) = 0;
-
-  // The arguments are not packaged in a ListenerChannelBundle struct
-  // because we know we'll never have more than two transports (Banjo and FIDL).
   virtual display::EngineInfo CompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t& banjo_listener_protocol,
       fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client) = 0;
-
   virtual void UnsetListener() = 0;
   virtual zx::result<display::DriverImageId> ImportImage(
       const display::ImageMetadata& image_metadata, display::DriverBufferCollectionId collection_id,

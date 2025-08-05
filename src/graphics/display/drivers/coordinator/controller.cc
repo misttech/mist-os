@@ -856,8 +856,8 @@ zx::result<> Controller::Initialize() {
   }
   engine_listener_fidl_binding_completion.Wait();
 
-  engine_info_ = engine_driver_client_->CompleteCoordinatorConnection(
-      engine_listener_banjo_adapter_.GetProtocol(), std::move(fidl_listener_client));
+  engine_info_ =
+      engine_driver_client_->CompleteCoordinatorConnection(std::move(fidl_listener_client));
   fdf::info("Engine capabilities - max layers: {}, max displays: {}, display capture: {}",
             engine_info_->max_layer_count(), engine_info_->max_connected_display_count(),
             engine_info_->is_capture_supported() ? "yes" : "no");
@@ -903,7 +903,6 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
     : root_(inspector_.GetRoot().CreateChild("display")),
       driver_dispatcher_(std::move(driver_dispatcher)),
       engine_listener_dispatcher_(std::move(engine_listener_dispatcher)),
-      engine_listener_banjo_adapter_(this, engine_listener_dispatcher_->borrow()),
       engine_listener_fidl_adapter_(this, engine_listener_dispatcher_->borrow()),
       vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {

@@ -90,7 +90,6 @@ void EngineDriverClientFidl::ApplyConfiguration(const display_config_t* display_
 }
 
 display::EngineInfo EngineDriverClientFidl::CompleteCoordinatorConnection(
-    const display_engine_listener_protocol_t& banjo_listener_protocol,
     fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client) {
   fdf::Arena arena(kArenaTag);
   fdf::WireUnownedResult<fuchsia_hardware_display_engine::Engine::CompleteCoordinatorConnection>

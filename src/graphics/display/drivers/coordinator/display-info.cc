@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/result.h>
 #include <lib/zx/result.h>

@@ -58,9 +58,8 @@ TEST_F(EngineDriverClientFidlTest, CompleteCoordinatorConnection) {
 
   auto [listener_client, listener_server] =
       fdf::Endpoints<fuchsia_hardware_display_engine::EngineListener>::Create();
-  display_engine_listener_protocol_t listener_proto = {};
   display::EngineInfo result =
-      fidl_client_.CompleteCoordinatorConnection(listener_proto, std::move(listener_client));
+      fidl_client_.CompleteCoordinatorConnection(std::move(listener_client));
   EXPECT_EQ(result.max_layer_count(), kEngineInfo.max_layer_count());
   EXPECT_EQ(result.max_connected_display_count(), kEngineInfo.max_connected_display_count());
   EXPECT_EQ(result.is_capture_supported(), kEngineInfo.is_capture_supported());
