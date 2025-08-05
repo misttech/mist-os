@@ -325,23 +325,17 @@ pub enum MappingName {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct MappingBackingMemory {
-    /// The base address of this mapping.
-    ///
-    /// Keep in mind that the mapping might be trimmed in the RangeMap if the
-    /// part of the mapping is unmapped, which means the base might extend
-    /// before the currently valid portion of the mapping.
-    base: UserAddress,
-
     /// The memory object that contains the memory used in this mapping.
     memory: Arc<MemoryObject>,
 
-    /// The offset in the memory object that corresponds to the base address.
-    memory_offset: u64,
+    /// The delta to convert from a user address to an offset in the memory object.
+    address_to_offset_delta: u64,
 }
 
 impl MappingBackingMemory {
     pub fn new(base: UserAddress, memory: Arc<MemoryObject>, memory_offset: u64) -> Self {
-        Self { base, memory, memory_offset }
+        let address_to_offset_delta = memory_offset.wrapping_sub(base.ptr() as u64);
+        Self { memory, address_to_offset_delta }
     }
 
     pub fn memory(&self) -> &Arc<MemoryObject> {
@@ -380,7 +374,7 @@ impl MappingBackingMemory {
 
     /// Converts a `UserAddress` to an offset in this mapping's memory object.
     pub fn address_to_offset(&self, addr: UserAddress) -> u64 {
-        (addr.ptr() - self.base.ptr()) as u64 + self.memory_offset
+        (addr.ptr() as u64).wrapping_add(self.address_to_offset_delta)
     }
 }
 
@@ -511,11 +505,8 @@ impl MappingSummary {
             kind_summary.num_file_write_guards += 1;
         }
         match mm_state.get_mapping_backing(mapping) {
-            MappingBacking::Memory(m) => {
+            MappingBacking::Memory(_) => {
                 kind_summary.num_memory_objects += 1;
-                if m.memory_offset != 0 {
-                    kind_summary.num_non_zero_memory_offset += 1;
-                }
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => kind_summary.num_private_anon += 1,
@@ -549,7 +540,6 @@ struct MappingKindSummary {
     count: u64,
     num_private: u64,
     num_shared: u64,
-    num_non_zero_memory_offset: u64,
     num_file_write_guards: u64,
     num_memory_objects: u64,
     #[cfg(feature = "alternate_anon_allocs")]
@@ -561,7 +551,6 @@ impl MappingKindSummary {
         node.record_uint("count", self.count);
         node.record_uint("num_private", self.num_private);
         node.record_uint("num_shared", self.num_shared);
-        node.record_uint("num_non_zero_memory_offset", self.num_non_zero_memory_offset);
         node.record_uint("num_file_write_guards", self.num_file_write_guards);
         node.record_uint("num_memory_objects", self.num_memory_objects);
         #[cfg(feature = "alternate_anon_allocs")]
