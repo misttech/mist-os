@@ -187,6 +187,15 @@ where
     }
 }
 
+impl From<TargetInfoQuery> for Option<String> {
+    fn from(t: TargetInfoQuery) -> Self {
+        match t {
+            TargetInfoQuery::First => None,
+            e @ _ => Some(e.into()),
+        }
+    }
+}
+
 impl From<&str> for TargetInfoQuery {
     fn from(s: &str) -> Self {
         String::from(s).into()
@@ -237,6 +246,12 @@ impl From<String> for TargetInfoQuery {
 
 impl From<TargetInfoQuery> for String {
     fn from(t: TargetInfoQuery) -> Self {
+        String::from(&t)
+    }
+}
+
+impl From<&TargetInfoQuery> for String {
+    fn from(t: &TargetInfoQuery) -> Self {
         match t {
             TargetInfoQuery::First => {
                 format!("")
@@ -287,6 +302,7 @@ mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::{TargetIp, TargetVSockCtx};
     use fidl_fuchsia_net as net;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use test_case::test_case;
 
     #[test]
@@ -454,5 +470,40 @@ mod test {
         let tiq = TargetInfoQuery::from(str_input);
         let tiq_string = String::from(tiq);
         assert_eq!(tiq_string, str_input);
+    }
+
+    #[test_case(
+        TargetInfoQuery::First,
+        None;
+        "Test First"
+    )]
+    #[test_case(
+        TargetInfoQuery::NodenameOrSerial("tressoftheemeraldsea".to_string()),
+        Some("tressoftheemeraldsea".to_string());
+        "Test Nodename or serial"
+    )]
+    #[test_case(
+        TargetInfoQuery::VSock(16),
+        Some("vsock:cid:16".to_string());
+        "Test Vsock Cid"
+    )]
+    #[test_case(
+        TargetInfoQuery::Usb(12),
+        Some("usb:cid:12".to_string());
+        "Test Usb Cid"
+    )]
+    #[test_case(
+        TargetInfoQuery::Serial("totallynothoid".to_string()),
+        Some("serial:totallynothoid".to_string());
+        "Test Serial"
+    )]
+    #[test_case(
+        TargetInfoQuery::Addr(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),8082)),
+        Some("192.168.1.1:8082".to_string());
+        "Test Addr"
+    )]
+    fn test_into_option(query: TargetInfoQuery, want: Option<String>) {
+        let got: Option<String> = query.into();
+        assert_eq!(got, want);
     }
 }
