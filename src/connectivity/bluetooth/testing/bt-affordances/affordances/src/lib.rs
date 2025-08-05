@@ -75,8 +75,8 @@ impl WorkThread {
 
         while let Some(request) = receiver.next().await {
             match request {
-                Request::ReadLocalAddress(sender) => {
-                    sender
+                Request::ReadLocalAddress(result_sender) => {
+                    result_sender
                         .send(
                             proxies
                                 .get_active_host(&mut host_cache)
@@ -92,14 +92,16 @@ impl WorkThread {
                         )
                         .unwrap();
                 }
-                Request::GetKnownPeers(sender) => {
+                Request::GetKnownPeers(result_sender) => {
                     if let Err(err) =
                         proxies.refresh_peer_cache(std::time::Duration::ZERO, &mut peer_cache).await
                     {
-                        sender.send(Err(anyhow!("refresh_peer_cache() error: {err}"))).unwrap();
+                        result_sender
+                            .send(Err(anyhow!("refresh_peer_cache() error: {err}")))
+                            .unwrap();
                         continue;
                     }
-                    sender.send(Ok(peer_cache.clone())).unwrap();
+                    result_sender.send(Ok(peer_cache.clone())).unwrap();
                 }
                 Request::GetPeerId(address, result_sender) => {
                     if let Some(peer) = proxies
@@ -111,8 +113,8 @@ impl WorkThread {
                     }
                     result_sender.send(Err(anyhow!("Peer not found"))).unwrap();
                 }
-                Request::Forget(peer_id, sender) => {
-                    sender.send(proxies.forget(&peer_id).await).unwrap();
+                Request::Forget(peer_id, result_sender) => {
+                    result_sender.send(proxies.forget(&peer_id).await).unwrap();
                 }
                 Request::Connect(peer_id, result_sender) => {
                     result_sender.send(proxies.connect_peer(&peer_id).await).unwrap();
@@ -134,11 +136,11 @@ impl WorkThread {
                         }
                     }
                 }
-                Request::SetDiscovery(discovery, sender) => {
-                    sender.send(proxies.set_discovery(discovery).await).unwrap();
+                Request::SetDiscovery(discovery, result_sender) => {
+                    result_sender.send(proxies.set_discovery(discovery).await).unwrap();
                 }
-                Request::SetDiscoverability(discoverable, sender) => {
-                    sender.send(proxies.set_discoverability(discoverable).await).unwrap();
+                Request::SetDiscoverability(discoverable, result_sender) => {
+                    result_sender.send(proxies.set_discoverability(discoverable).await).unwrap();
                 }
                 Request::StartLeScan(result_sender) => {
                     result_sender.send(proxies.start_le_scan().await).unwrap();
