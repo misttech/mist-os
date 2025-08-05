@@ -9,9 +9,16 @@ using fuchsia.kernel;
 
 @discoverable
 open protocol MemoryMonitor {
+    // Returns a memory snapshot of the device. Computing this snapshot may be expensive.
     GetSnapshot(resource struct {
         // `snapshot` will have a single `Snapshot` written into it, before being closed.
         snapshot zx.Handle:SOCKET;
+    });
+
+    // Returns system-level memory statistics for the device. Computing these statistics is less
+    // expensive than computing a memory snapshot.
+    GetSystemStatistics() -> (struct {
+        statistics MemoryStatistics;
     });
 };
 
@@ -184,4 +191,22 @@ type BucketDefinition = table {
     /// Regex saying which VMOs to match. Will be interpreted as a regex.
     /// Missing or empty string means ".*".
     3: vmo string:MAX;
+};
+
+/// Holds the time of the different system clocks of the device.
+type Time = table {
+    1: boot_time zx.InstantBoot;
+    2: monotonic_time zx.InstantMono;
+};
+
+/// System-level memory statistics of a device, as seen by the server. This table does not contain
+/// any process, component or principal-level information, and is faster to compute than a memory
+/// snapshot.
+type MemoryStatistics = table {
+    /// Time of the device when this data was collected.
+    1: time Time;
+    /// System-wide memory statistics from the kernel.
+    2: kernel_statistics KernelStatistics;
+    /// Details of performance impact of memory usage (e.g. thrashing, stalling, etc)
+    3: performance_metrics PerformanceImpactMetrics;
 };

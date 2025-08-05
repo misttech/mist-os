@@ -31,4 +31,10 @@ pub struct ComponentsCommand {
 
     #[argh(switch, description = "outputs a detailed output, machine only.")]
     pub detailed: bool,
+
+    #[argh(
+        option,
+        description = "outputs system-wide statistics at regular intervals (in seconds)"
+    )]
+    pub stats_only: Option<u64>,
 }

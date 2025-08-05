@@ -112,6 +112,7 @@ impl FfxMain for MemoryTool {
                         csv: self.cmd.csv,
                         buckets: self.cmd.buckets,
                         detailed: false,
+                        stats_only: None,
                     },
                     monitor_proxy: mm2,
                 };
