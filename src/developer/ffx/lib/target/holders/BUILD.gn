@@ -24,6 +24,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -64,6 +65,7 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/remote_control_proxy.rs",
     "src/target_info.rs",
+    "src/target_info_query.rs",
     "src/target_proxy.rs",
     "src/with_moniker.rs",
   ]
