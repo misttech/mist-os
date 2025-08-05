@@ -4,6 +4,7 @@
 
 """Common utilities needed by Bazel SDK rules."""
 
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load(":providers.bzl", "FuchsiaProvidersInfo")
 
 # A dictionary to be expanded inside a ctx.actions.run() or

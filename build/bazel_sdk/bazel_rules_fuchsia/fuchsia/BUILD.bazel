@@ -40,6 +40,8 @@ filegroup(
 
         # External libraries that get loaded by our rules
         "@bazel_skylib//:distribution",
+        "@rules_cc//cc:bzl_srcs",
+        "@rules_cc//cc/toolchains:toolchain_rules",
         "@rules_license//rules_gathering:standard_package",
         "@rules_license//rules:standard_package",
         "@platforms//:srcs",

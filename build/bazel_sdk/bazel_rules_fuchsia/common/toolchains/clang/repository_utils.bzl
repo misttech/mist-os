@@ -301,6 +301,7 @@ def setup_clang_repository(constants):
 def _empty_host_cpp_toolchain_repository_impl(repo_ctx):
     _BUILD_BAZEL_CONTENT = """
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("//common:toolchains/clang/toolchain_utils.bzl", "empty_cc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
