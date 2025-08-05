@@ -6,8 +6,10 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import search_tests
 
@@ -31,7 +33,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
         del os.environ["FUCHSIA_DIR"]
 
         with self.assertRaises(Exception) as ex:
-            search_tests.create_search_locations()
+            search_tests.create_search_locations(False)
 
         self.assertEqual(
             str(ex.exception), "Environment variable FUCHSIA_DIR must be set"
@@ -45,7 +47,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             os.environ["FUCHSIA_DIR"] = str(path)
 
             with self.assertRaises(Exception) as ex:
-                search_tests.create_search_locations()
+                search_tests.create_search_locations(False)
 
             self.assertEqual(
                 str(ex.exception), f"Path {path} should be a directory"
@@ -61,7 +63,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             os.environ["FUCHSIA_DIR"] = str(dir)
 
             with self.assertRaises(Exception) as ex:
-                search_tests.create_search_locations()
+                search_tests.create_search_locations(False)
 
             expected = os.path.join(dir, "out", "other", "tests.json")
 
@@ -82,13 +84,35 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
 
             os.environ["FUCHSIA_DIR"] = str(dir)
 
-            locations = search_tests.create_search_locations()
+            locations = search_tests.create_search_locations(False)
             self.assertEqual(locations.fuchsia_directory, dir)
             self.assertEqual(
                 locations.tests_json_file,
                 os.path.join(dir, "out", "other", "tests.json"),
             )
             self.assertNotEqual("", str(locations))
+
+    @mock.patch("search_tests.subprocess")
+    def test_success_with_remote(self, mock_subprocess: mock.MagicMock) -> None:
+        mock_subprocess.check_output.return_value = "fake-build-id-123\n"
+        mock_subprocess.run.side_effect = (
+            lambda *args, **kwargs: mock.MagicMock(
+                spec=subprocess.CompletedProcess, returncode=0
+            )
+        )
+        with tempfile.TemporaryDirectory() as dir:
+            with open(os.path.join(dir, ".fx-build-dir"), "w") as f:
+                f.write("out/other")
+            os.makedirs(os.path.join(dir, "out", "other"))
+            with open(
+                os.path.join(dir, "out", "other", "tests.json"), "w"
+            ) as f:
+                pass
+
+            os.environ["FUCHSIA_DIR"] = str(dir)
+
+            locations = search_tests.create_search_locations(True)
+            self.assertEqual(4, len(locations.remote_tests_jsons))
 
 
 class TestTestsFileMatcher(unittest.TestCase):
@@ -109,7 +133,7 @@ class TestTestsFileMatcher(unittest.TestCase):
     def test_empty_file(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(dir, [])
-            tests_matcher = search_tests.TestsFileMatcher(path)
+            tests_matcher = search_tests.TestsFileMatcher(path, False)
             matcher = search_tests.Matcher(threshold=0.75)
             self.assertEqual(tests_matcher.find_matches("foo", matcher), [])
 
@@ -122,7 +146,7 @@ class TestTestsFileMatcher(unittest.TestCase):
                     "host_test/my-host-test",
                 ],
             )
-            tests_matcher = search_tests.TestsFileMatcher(path)
+            tests_matcher = search_tests.TestsFileMatcher(path, False)
             matcher = search_tests.Matcher(threshold=1)
             self.assertEqual(
                 [
@@ -161,7 +185,7 @@ class TestTestsFileMatcher(unittest.TestCase):
                     ),
                 ],
             )
-            tests_matcher = search_tests.TestsFileMatcher(path)
+            tests_matcher = search_tests.TestsFileMatcher(path, False)
             matcher = search_tests.Matcher(threshold=0.7)
             self.assertEqual(
                 [
@@ -564,6 +588,7 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
             f.write(TEST_PACKAGE("integration-tests"))
 
         os.environ["FUCHSIA_DIR"] = str(self.dir.name)
+        os.environ["FUCHSIA_TEST_FETCH_REMOTE"] = "FALSE"
 
     def tearDown(self) -> None:
         self.dir.cleanup()

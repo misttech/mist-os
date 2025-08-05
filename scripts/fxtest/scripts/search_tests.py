@@ -8,7 +8,9 @@ import dataclasses
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import time
 import typing
 from collections import defaultdict
@@ -31,6 +33,15 @@ HOST_TEST_TEMPLATE_NAMES = [
 # These tests may be build with target toolchain.
 DEVELOPER_TEST_TEMPLATE_NAMES = [
     "python_perf_test",
+]
+
+# Default builders we fetch remote tests.json files. These builders
+# are expected to cover most of the platform tests.
+DEFAULT_BUILDERS = [
+    "turquoise/global.ci/core.x64-balanced",
+    "turquoise/global.ci/bringup.x64-balanced",
+    "turquoise/global.ci/core.arm64-balanced",
+    "turquoise/global.ci/bringup.arm64-balanced",
 ]
 
 
@@ -56,11 +67,17 @@ def command(args: argparse.Namespace) -> None:
         raise Exception("--threshold must be between 0 and 1")
 
     with TimingTracker("Create search locations"):
-        search_locations: SearchLocations = create_search_locations()
+        search_locations: SearchLocations = create_search_locations(args.remote)
     with TimingTracker("Create test file matcher"):
         tests_file_matcher: TestsFileMatcher = TestsFileMatcher(
-            search_locations.tests_json_file
+            search_locations.tests_json_file, False
         )
+    remote_tests_json_matchers = []
+    with TimingTracker("Create remote test file matcher"):
+        for remote_tests_json in search_locations.remote_tests_jsons:
+            remote_tests_json_matchers.append(
+                TestsFileMatcher(remote_tests_json, True)
+            )
     with TimingTracker("Create build file matcher"):
         build_file_matcher: BuildFileMatcher = BuildFileMatcher(
             search_locations.fuchsia_directory
@@ -76,6 +93,12 @@ def command(args: argparse.Namespace) -> None:
         build_matches = build_file_matcher.find_matches(
             args.match_string, matcher
         )
+    remote_tests_matches = []
+    with TimingTracker("Find matches in remote tests file"):
+        for remote_tests_json_matcher in remote_tests_json_matchers:
+            remote_tests_matches += remote_tests_json_matcher.find_matches(
+                args.match_string, matcher
+            )
 
     test_match_names = set(
         [suggestion.matched_name for suggestion in tests_matches]
@@ -90,11 +113,12 @@ def command(args: argparse.Namespace) -> None:
     # listing them as BUILD.gn results, since fx test presumably already
     # included them as its own suggestions.
     all_matches = list(tests_matches) if not args.omit_test_file else []
-    all_matches += [
-        match
-        for match in build_matches
-        if match.matched_name not in test_match_names
-    ]
+    for match in build_matches + remote_tests_matches:
+        if match.matched_name in test_match_names:
+            continue
+        all_matches.append(match)
+        test_match_names.add(match.matched_name)
+
     all_matches.sort(key=lambda x: x.similarity, reverse=True)
 
     if not all_matches:
@@ -276,10 +300,12 @@ class SearchLocations:
     Attributes:
         fuchsia_directory: The root of the Fuchsia source tree.
         tests_json_file: Path to tests.json, listing tests for this build.
+        remote_tests_jsons: Paths to fetched tests.json files.
     """
 
     fuchsia_directory: str
     tests_json_file: str
+    remote_tests_jsons: list[str]
 
     def __repr__(self) -> str:
         return str(self.__dict__)
@@ -587,7 +613,8 @@ class BuildFileMatcher:
 class TestsFileMatcher:
     """Given a tests.json file path, supports searching for matching tests."""
 
-    def __init__(self, tests_json_file: str) -> None:
+    def __init__(self, tests_json_file: str, is_remote: bool) -> None:
+        self.is_remote = is_remote
         with open(tests_json_file, "r") as f:
             contents = json.load(f)
             self.names: dict[str, list[str]] = dict()
@@ -597,7 +624,12 @@ class TestsFileMatcher:
             for entry in contents:
                 labels: list[str] = []
                 test: dict[str, typing.Any] = entry["test"]
-                for label_name in ["label", "component_label", "package_label"]:
+                for label_name in [
+                    "label",
+                    "component_label",
+                    "package_label",
+                    "os",
+                ]:
                     if label_name in test:
                         # Filter out the toolchain suffix on paths
                         # so they appear cleaner and match more easily.
@@ -660,17 +692,18 @@ class TestsFileMatcher:
                 if (y := (matcher.match(x, target), x))[0] is not None
             ]
             (max_score, max_option) = max(scores) if scores else (None, None)
+            if self.is_remote:
+                command = "add-host-test" if "linux" in labels else "add-test"
+                message = f"fx {command} {labels[0]}"
+            else:
+                message = f"Build includes: {options[0]}"
             if max_score is not None and max_option is not None:
-                matches.append(
-                    Suggestion(
-                        max_option, max_score, f"Build includes: {options[0]}"
-                    )
-                )
+                matches.append(Suggestion(max_option, max_score, message))
 
         return matches
 
 
-def create_search_locations() -> SearchLocations:
+def create_search_locations(enable_remote: bool) -> SearchLocations:
     """Parses environment variables to produce SearchLocations"""
 
     fuchsia_directory = os.getenv("FUCHSIA_DIR")
@@ -689,7 +722,66 @@ def create_search_locations() -> SearchLocations:
             f"Expected to find a test list file at {tests_json_file}"
         )
 
-    return SearchLocations(fuchsia_directory, tests_json_file)
+    # We only fetch remote tests.json in non-tests scenarios
+    fetch_remote = os.getenv("FUCHSIA_TEST_FETCH_REMOTE") in ["1", "TRUE"]
+    if enable_remote:
+        fetch_remote = enable_remote
+
+    remote_tests_jsons = (
+        collect_remote_tests_jsons(fuchsia_directory) if fetch_remote else []
+    )
+
+    return SearchLocations(
+        fuchsia_directory, tests_json_file, remote_tests_jsons
+    )
+
+
+def collect_remote_tests_jsons(fuchsia_directory: str) -> list[str]:
+    remote_tests_jsons = []
+    lkg_tool = os.path.join(
+        fuchsia_directory, "prebuilt", "tools", "lkg", "lkg"
+    )
+    gsutil_tool = os.path.join(
+        fuchsia_directory, "prebuilt", "tools", "gsutil", "gsutil"
+    )
+
+    try:
+        subprocess.run(
+            [gsutil_tool, "auth-info"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+    except:
+        print(
+            f"Warning: Could not verify gsutil authentication. Please run '{gsutil_tool} auth-login' to grant access if you want to fetch remote tests."
+        )
+        return []
+
+    for builder in DEFAULT_BUILDERS:
+        # Run lkg build and get the build ID
+        # This assumes lkg output will only contain the build ID and nothing else.
+        build_id = subprocess.check_output(
+            [lkg_tool, "build", "-builder", builder],
+            text=True,
+        ).strip()
+
+        # Fetch tests.json using gsutil and the obtained build ID
+        gsutil_command = [
+            gsutil_tool,
+            "cat",
+            f"gs://fuchsia-artifacts-internal/builds/{build_id}/build_api/tests.json",
+        ]
+
+        clean_builder_name = builder.replace("/", "_")
+        output_filename = os.path.join(
+            tempfile.gettempdir(), f"{clean_builder_name}_tests.json"
+        )
+
+        with open(output_filename, "w") as f:
+            subprocess.run(gsutil_command, check=True, stdout=f)
+        remote_tests_jsons.append(output_filename)
+
+    return remote_tests_jsons
 
 
 def main(args_list: list[str] | None = None) -> int:
@@ -705,6 +797,12 @@ def main(args_list: list[str] | None = None) -> int:
         type=float,
         help="Threshold for matching, must be between 0.0 and 1.0",
         default=DEFAULT_THRESHOLD,
+    )
+    parser.add_argument(
+        "--remote",
+        action="store_true",
+        default=False,
+        help="Whether to use remote tests.json files for tests suggestions",
     )
     parser.add_argument(
         "--max-results",
