@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
 use analytics::add_custom_event;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -15,8 +14,6 @@ use fho::{deferred, Deferred, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
-use netext::IsLocalAddr;
-use std::cmp::Ordering;
 use std::time::Duration;
 use target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use target_holders::daemon_protocol;
@@ -186,68 +183,26 @@ async fn get_target_info(
     Ok((ffx::RemoteControlState::Down, None, None))
 }
 
+// Convert the handle to a TargetInfo, filling in the information from the target if we are
+// asked to make a connection to RCS.
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
     connect_to_target: bool,
 ) -> Result<ffx::TargetInfo> {
-    let mut serial_number = None;
-    let (target_state, addresses) = match handle.state {
-        discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product { addrs: target_addrs, serial } => {
-            serial_number = serial;
-            (ffx::TargetState::Product, Some(target_addrs))
-        }
-        discovery::TargetState::Fastboot(fts) => {
-            let addresses = match fts.connection_state {
-                discovery::FastbootConnectionState::Usb => Some(vec![]),
-                discovery::FastbootConnectionState::Tcp(addresses)
-                | discovery::FastbootConnectionState::Udp(addresses) => {
-                    Some(addresses.into_iter().map(Into::into).collect())
-                }
-            };
-            (ffx::TargetState::Fastboot, addresses)
-        }
-        discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
-    };
-    let (rcs_state, product_config, board_config) = if connect_to_target {
-        if let Some(ref target_addrs) = addresses {
-            get_target_info(context, target_addrs).await?
+    let (rcs_state, product_config, board_config) =
+        if let discovery::TargetState::Product { ref addrs, .. } = handle.state {
+            // A let-chain would be cleaner, but they are only available in Rust 2024
+            if connect_to_target {
+                get_target_info(context, addrs).await?
+            } else {
+                (ffx::RemoteControlState::Unknown, None, None)
+            }
         } else {
             (ffx::RemoteControlState::Unknown, None, None)
-        }
-    } else {
-        (ffx::RemoteControlState::Unknown, None, None)
-    };
-    let addresses = addresses.map(|mut addrs| {
-        addrs.sort_by(|a, b| prefer_local(a, b));
-        addrs
-    });
-    let addresses =
-        addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
-    Ok(ffx::TargetInfo {
-        nodename: handle.node_name,
-        addresses,
-        serial_number,
-        rcs_state: Some(rcs_state),
-        target_state: Some(target_state),
-        board_config,
-        product_config,
-        is_manual: Some(handle.manual),
-        ..Default::default()
-    })
-}
-
-// For ipv6 addresses, prefer link-local to non-local
-fn prefer_local(a: &TargetAddr, b: &TargetAddr) -> Ordering {
-    match (
-        a.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
-        b.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
-    ) {
-        (true, true) | (false, false) => a.cmp(b),
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-    }
+        };
+    let info: ffx::TargetInfo = handle.into();
+    Ok(ffx::TargetInfo { rcs_state: Some(rcs_state), board_config, product_config, ..info })
 }
 
 async fn local_list_targets(
