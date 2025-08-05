@@ -251,6 +251,7 @@ type InterruptMode = flexible enum : uint8 {
     /// Legacy interrupt mode.
     LEGACY = 1;
     /// Legacy interrupt mode (without ACKing, see |AckInterrupt|).
+    @available(removed=HEAD)
     LEGACY_NOACK = 2;
     /// MSI (messaage-signaled interrupt) mode.
     MSI = 3;
