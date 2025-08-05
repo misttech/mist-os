@@ -68,7 +68,13 @@ Status HostService::ConnectLE(::grpc::ServerContext* context,
     return Status(StatusCode::INVALID_ARGUMENT, "Expected PeerId encoded in public address field");
   }
 
-  uint64_t peer_id = std::strtoul(request->public_().c_str(), nullptr, /*base=*/10);
+  uint64_t peer_id;
+  if (request->public_().size() == 6) {
+    peer_id = get_peer_id(request->public_().c_str());
+  } else {
+    peer_id = std::strtoul(request->public_().c_str(), nullptr, /*base=*/10);
+  }
+
   if (connect_le(peer_id) != ZX_OK) {
     return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }
