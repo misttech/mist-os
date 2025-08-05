@@ -111,6 +111,7 @@ test_names = [
   "mprotect",
   "pipe",
   "procattr",
+  "ptrace",
   "selinuxfs",
   "socket",
   "syslog",
@@ -129,6 +130,8 @@ test_subprogram_names = [
   "is_duplicated_fd",
   "is_itimer_real_reset",
   "is_selinux_null_inode",
+  "ptrace_traceme",
+  "stop",
   "true",
 
   # keep-sorted end
@@ -146,6 +149,7 @@ resource("policies") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/mprotect.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/pipe_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ptrace_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/syslog.pp",
