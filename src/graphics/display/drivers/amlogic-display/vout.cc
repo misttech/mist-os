@@ -58,7 +58,10 @@ Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
           .dsi_host = std::move(dsi_host),
           .clock = std::move(dsi_clock),
           .panel_config = *panel_config,
-          .banjo_mode = ToDisplayMode(panel_config->display_timing).ToBanjo(),
+          .mode_and_id = display::ModeAndId({
+              .id = display::ModeId(1),
+              .mode = ToDisplayMode(panel_config->display_timing),
+          }),
       } {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   node_.RecordInt("vout_type", static_cast<int>(type()));
@@ -159,32 +162,29 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
   return zx::ok(std::move(vout));
 }
 
-raw_display_info_t Vout::CreateRawDisplayInfo(
-    display::DisplayId display_id,
-    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
+AddedDisplayInfo Vout::CreateAddedDisplayInfo(display::DisplayId display_id) {
   switch (type_) {
     case VoutType::kDsi: {
-      return raw_display_info_t{
-          .display_id = display_id.ToBanjo(),
-          .preferred_modes_list = &dsi_.banjo_mode,
-          .preferred_modes_count = 1,
-          .edid_bytes_list = nullptr,
-          .edid_bytes_count = 0,
-          .pixel_formats_list = pixel_formats.data(),
-          .pixel_formats_count = pixel_formats.size(),
+      ZX_DEBUG_ASSERT(dsi_.mode_and_id.has_value());
+      return {
+          .display_id = display_id,
+          .preferred_modes = {dsi_.mode_and_id.value()},
+          .edid = {},
       };
     }
-    case VoutType::kHdmi:
+    case VoutType::kHdmi: {
       ZX_DEBUG_ASSERT(!hdmi_.current_display_edid.is_empty());
-      return raw_display_info_t{
-          .display_id = display_id.ToBanjo(),
-          .preferred_modes_list = nullptr,
-          .preferred_modes_count = 0,
-          .edid_bytes_list = hdmi_.current_display_edid.data(),
-          .edid_bytes_count = hdmi_.current_display_edid.size(),
-          .pixel_formats_list = pixel_formats.data(),
-          .pixel_formats_count = pixel_formats.size(),
+      fbl::Vector<uint8_t> out_edid;
+      fbl::AllocChecker alloc_checker;
+      out_edid.resize(hdmi_.current_display_edid.size(), &alloc_checker);
+      ZX_ASSERT(alloc_checker.check());
+      std::ranges::copy(hdmi_.current_display_edid, out_edid.begin());
+      return {
+          .display_id = display_id,
+          .preferred_modes = {},
+          .edid = std::move(out_edid),
       };
+    }
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }

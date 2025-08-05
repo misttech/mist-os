@@ -8,10 +8,10 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <variant>
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
@@ -32,27 +33,43 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace amlogic_display {
 
-class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
+class DisplayEngine final : public display::DisplayEngineInterface {
  public:
   // Factory method for production use.
   //
   // `incoming` must be non-null.
-  // `visual_debug_level` used to enable colorful blackscreen.
+  // `engine_events` must not be null and must outlive `DisplayEngine`.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      std::shared_ptr<fdf::Namespace> incoming, structured_config::Config structured_config);
+      std::shared_ptr<fdf::Namespace> incoming,
+      display::DisplayEngineEventsInterface* engine_events,
+      structured_config::Config structured_config);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
   // `incoming` must be non-null.
-  // `visual_debug_level` used to enable colorful blackscreen.
+  // `engine_events` must not be null and must outlive `DisplayEngine`.
   //
   // Production code should use `DisplayEngine::Create()` instead.
   DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
+                display::DisplayEngineEventsInterface* engine_events,
                 structured_config::Config structured_config);
 
   DisplayEngine(const DisplayEngine&) = delete;
@@ -80,41 +97,42 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // destructor.
   void Deinitialize();
 
-  // ddk::DisplayEngineProtocol
-  void DisplayEngineCompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t* display_engine_listener,
-      engine_info_t* out_banjo_engine_info);
-  void DisplayEngineUnsetListener();
-  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
-                                                  zx::channel collection_token);
-  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-                                       uint64_t* out_image_handle);
-  void DisplayEngineReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayEngineCheckConfiguration(const display_config_t* display_config_ptr);
-  void DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
-                                       const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayEngineSetBufferCollectionConstraints(
-      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
-
-  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t index, uint64_t* out_capture_handle);
-  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
-  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
-
-  const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
-    return &display_engine_protocol_ops_;
-  }
-
-  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
+  // `display::DisplayEngineInterface`:
+  display::EngineInfo CompleteCoordinatorConnection() override;
+  zx::result<> ImportBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
+  zx::result<> ReleaseBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id) override;
+  zx::result<display::DriverImageId> ImportImage(
+      const display::ImageMetadata& image_metadata,
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  void ReleaseImage(display::DriverImageId image_id) override;
+  display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
+      display::ColorConversion color_conversion,
+      cpp20::span<const display::DriverLayer> layers) override;
+  void ApplyConfiguration(display::DisplayId display_id,
+                          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+                          display::ColorConversion color_conversion,
+                          cpp20::span<const display::DriverLayer> layers,
+                          display::DriverConfigStamp config_stamp) override;
+  zx::result<> SetBufferCollectionConstraints(
+      const display::ImageBufferUsage& image_buffer_usage,
+      display::DriverBufferCollectionId buffer_collection_id) override;
+  zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
+  zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
+  zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
+  zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
 
   const inspect::Inspector& inspector() const { return inspector_; }
 
   void Dump() { vout_->Dump(); }
 
-  void SetFormatSupportCheck(fit::function<bool(fuchsia_images2::wire::PixelFormat)> fn) {
+  void SetFormatSupportCheck(fit::function<bool(display::PixelFormat)> fn) {
     format_support_check_ = std::move(fn);
   }
 
@@ -226,8 +244,8 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // Relaxed is safe because full_init_done_ only ever moves from false to true.
   std::atomic<bool> full_init_done_ = false;
 
-  // Display controller related data
-  ddk::DisplayEngineListenerProtocolClient engine_listener_ __TA_GUARDED(display_mutex_);
+  // Emits engine events over the EngineListener interface.
+  display::DisplayEngineEventsInterface& engine_events_ __TA_GUARDED(display_mutex_);
 
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
@@ -266,7 +284,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   std::unique_ptr<Capture> capture_;
   std::unique_ptr<VsyncReceiver> vsync_receiver_;
 
-  fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
+  fit::function<bool(display::PixelFormat format)> format_support_check_ = nullptr;
 
   structured_config::Config structured_config_;
 };
