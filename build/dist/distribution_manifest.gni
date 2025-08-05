@@ -95,6 +95,7 @@ template("distribution_manifest") {
                            ])
 
     script = "//build/dist/expand_and_find_conflicting_dist_entries.py"
+    check_for_output_dir_leaks = false
 
     sources = [ intermediate_file ]
     outputs = [ manifest_file ]

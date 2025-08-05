@@ -82,6 +82,7 @@ template("fini_manifest") {
                            ])
 
     script = "//build/dist/convert_manifest_to_fini.py"
+    check_for_output_dir_leaks = false
 
     sources = [ intermediate_file ]
     outputs = [ manifest_file ]
