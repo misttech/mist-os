@@ -6,6 +6,7 @@
 
 import json
 import logging
+import re
 from typing import Any, List
 
 import ffxtestcase
@@ -13,6 +14,14 @@ from honeydew.transports.ffx.errors import FfxCommandError
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def remove_ansi_escape_sequences(text: str) -> str:
+    """
+    Removes ANSI escape sequences from a string.
+    """
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 class FfxDirectTest(ffxtestcase.FfxTestCase):
@@ -131,6 +140,24 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
             asserts.assert_greater(len(logs), 0)
         except json.decoder.JSONDecodeError:
             _LOGGER.info(f"Got bad JSON from ffx-log: {repr(out[:100])}")
+
+    def test_ffx_doctor(self) -> None:
+        """Test `ffx --direct doctor` does not query the daemon."""
+        # Can't run with _run_ffx_direct() because `ffx doctor` does
+        # not support JSON output.
+        out = self.run_ffx(
+            [
+                "--direct",
+                "doctor",
+            ],
+        )
+        # Remove colors from doctor output
+        out = remove_ansi_escape_sequences(out)
+
+        # Make sure we are running without a daemon
+        asserts.assert_in("No running daemons found", out)
+        # Make sure we actually find a target anyway
+        asserts.assert_regex(out, r"\[✓\] \d+ targets found")
 
 
 if __name__ == "__main__":

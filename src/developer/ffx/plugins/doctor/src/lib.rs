@@ -14,7 +14,7 @@ use ffx_config::{print_config, EnvironmentContext};
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
-use ffx_target::get_target_specifier;
+use ffx_target::{get_target_specifier, TargetInfoQuery};
 use ffx_target_show::ShowTool;
 use ffx_target_show_args::TargetShow;
 use ffx_writer::{SimpleWriter, VerifiedMachineWriter};
@@ -27,7 +27,7 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
@@ -391,6 +391,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     doctor(
         &mut handler,
         &mut ledger,
+        context.get_direct_connection_mode(),
         &daemon_manager,
         &target_str,
         cmd.retry_count,
@@ -478,6 +479,7 @@ fn get_user_config(ctx: &EnvironmentContext) -> Result<String> {
 async fn doctor<W: Write>(
     step_handler: &mut impl DoctorStepHandler,
     ledger: &mut DoctorLedger<W>,
+    direct_mode: bool,
     daemon_manager: &impl DaemonManager,
     target_str: &str,
     _retry_count: usize,
@@ -497,6 +499,7 @@ async fn doctor<W: Write>(
 
     doctor_summary(
         step_handler,
+        direct_mode,
         daemon_manager,
         target_str,
         retry_delay,
@@ -1065,6 +1068,7 @@ async fn check_ssh_keys<W: Write>(ledger: &mut DoctorLedger<W>) -> Result<()> {
 
 async fn check_daemon_status<W: Write>(
     ledger: &mut DoctorLedger<W>,
+    direct_mode: bool,
     daemon_manager: &impl DaemonManager,
     retry_delay: Duration,
     version_info: &VersionInfo,
@@ -1078,11 +1082,17 @@ async fn check_daemon_status<W: Write>(
             .add_node(&format!("Daemon found: {}", format_vec(&pid_vec)), LedgerMode::Automatic)?;
         ledger.set_outcome(node, LedgerOutcome::Success)?;
     } else {
-        let node = ledger.add_node(
-            "No running daemons found. Run `ffx doctor --restart-daemon`",
-            LedgerMode::Automatic,
-        )?;
-        ledger.set_outcome(node, LedgerOutcome::Failure)?;
+        if direct_mode {
+            let node = ledger.add_node("No running daemons found.", LedgerMode::Automatic)?;
+            ledger.set_outcome(node, LedgerOutcome::Info)?;
+            report_default_target(ledger, target_spec)?;
+        } else {
+            let node = ledger.add_node(
+                "No running daemons found. Run `ffx doctor --restart-daemon`",
+                LedgerMode::Automatic,
+            )?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+        }
         ledger.close(main_node)?;
         return Ok(None);
     }
@@ -1175,7 +1185,17 @@ async fn check_daemon_status<W: Write>(
         }
     }
 
-    match target_spec {
+    report_default_target(ledger, target_spec)?;
+
+    ledger.close(main_node)?;
+    Ok(Some(daemon_proxy))
+}
+
+fn report_default_target<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target_spec: &std::result::Result<Option<String>, String>,
+) -> Result<()> {
+    Ok(match target_spec {
         Ok(t) => {
             let default_target_display = {
                 if t.is_none() || t.as_ref().unwrap().is_empty() {
@@ -1195,10 +1215,7 @@ async fn check_daemon_status<W: Write>(
                 ledger.add_node(&format!("config read failed: {:?}", e), LedgerMode::Verbose)?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
         }
-    }
-
-    ledger.close(main_node)?;
-    Ok(Some(daemon_proxy))
+    })
 }
 
 async fn run_google_network_checks<W: Write>(
@@ -1269,11 +1286,15 @@ async fn run_google_network_checks<W: Write>(
     Ok(())
 }
 
+fn target_name(target: &TargetInfo) -> String {
+    target.nodename.clone().unwrap_or_else(|| ffx_target::UNKNOWN_TARGET_NAME.to_string())
+}
+
 // Check a single target. Most steps can fail, which means we can't (or
 // shouldn't) continue on to the later steps, so the pattern usually looks like:
 //   let done = <step>;
 //   if done { return }
-async fn check_single_target<W: Write>(
+async fn check_single_target_via_daemon<W: Write>(
     ledger: &mut DoctorLedger<W>,
     target: &TargetInfo,
     tc_proxy: &TargetCollectionProxy,
@@ -1282,9 +1303,9 @@ async fn check_single_target<W: Write>(
     run_additional_diagnostics: bool,
     retry_delay: Duration,
 ) -> Result<()> {
-    let target_name = target.nodename.clone().unwrap_or_else(|| "UNKNOWN".to_string());
+    let target_name = target_name(target);
 
-    let done = check_product_state(ledger, target, &target_name)?;
+    let done = check_product_state(ledger, target)?;
     if done {
         return Ok(());
     }
@@ -1299,7 +1320,7 @@ async fn check_single_target<W: Write>(
     }
 
     let (remote_proxy, done) =
-        get_remote_proxy(ledger, retry_delay, target_node, target_proxy).await?;
+        get_remote_proxy_via_daemon(ledger, retry_delay, target_node, target_proxy).await?;
     if done {
         return Ok(());
     }
@@ -1312,10 +1333,48 @@ async fn check_single_target<W: Write>(
     show_target(ledger, target, show_tool).await?;
 
     if run_additional_diagnostics {
-        run_target_diagnostics(ledger, target, env_context, retry_delay, target_name).await?;
+        let node = ledger.add_node(
+            &format!("Running additional diagnostics against {target_name}"),
+            LedgerMode::Verbose,
+        )?;
+        run_target_diagnostics(ledger, target, env_context, retry_delay).await?;
+        ledger.close(node)?;
     }
 
     ledger.close(target_node)?;
+    Ok(())
+}
+
+// Check a single target. Most steps can fail, which means we can't (or
+// shouldn't) continue on to the later steps, so the pattern usually looks like:
+//   let done = <step>;
+//   if done { return }
+async fn check_single_target_locally<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    env_context: &EnvironmentContext,
+    show_tool: Option<&mut ShowToolWrapper>,
+    retry_delay: Duration,
+) -> Result<()> {
+    let done = check_product_state(ledger, target)?;
+    if done {
+        return Ok(());
+    }
+
+    // We don't check compatibility in direct-mode, because we are using FDomain, which
+    // doesn't use the ssh-connection as a mechanism for establishing compatibility.
+    // Instead it relies on FIDL versioning.
+
+    // run_target-diagnostics() validates RCS, IdentifyHost, etc, so we don't need other checks
+    let node = ledger.add_node(
+        &format!("Running diagnostics against {}", target_name(target)),
+        LedgerMode::Verbose,
+    )?;
+    run_target_diagnostics(ledger, target, env_context, retry_delay).await?;
+    ledger.close(node)?;
+
+    show_target(ledger, target, show_tool).await?;
+
     Ok(())
 }
 
@@ -1326,12 +1385,7 @@ async fn run_target_diagnostics<W: Write>(
     target: &TargetInfo,
     env_context: &EnvironmentContext,
     retry_delay: Duration,
-    target_name: String,
 ) -> Result<(), anyhow::Error> {
-    let node = ledger.add_node(
-        &format!("Running additional diagnostics against {target_name}"),
-        LedgerMode::Verbose,
-    )?;
     crate::single_target_diagnostics::run_single_target_diagnostics(
         env_context,
         target.clone(),
@@ -1339,16 +1393,15 @@ async fn run_target_diagnostics<W: Write>(
         retry_delay,
     )
     .await?;
-    ledger.close(node)?;
     Ok(())
 }
 
 async fn show_target<W: Write>(
     ledger: &mut DoctorLedger<W>,
     target: &TargetInfo,
-    mut show_tool: Option<&mut ShowToolWrapper>,
+    show_tool: Option<&mut ShowToolWrapper>,
 ) -> Result<(), anyhow::Error> {
-    Ok(if let Some(ref mut show_tool) = show_tool {
+    Ok(if let Some(show_tool) = show_tool {
         let node =
             ledger.add_node("Running `ffx target show` against device", LedgerMode::Automatic)?;
         ledger.set_outcome(node, LedgerOutcome::Info)?;
@@ -1391,7 +1444,7 @@ async fn show_target<W: Write>(
             Err(e) => {
                 let node = ledger.add_node(
                     &format!("Error while setting up `target show`: {:?}", e),
-                    LedgerMode::Verbose,
+                    LedgerMode::Normal,
                 )?;
                 ledger.set_outcome(node, LedgerOutcome::Failure)?;
             }
@@ -1434,7 +1487,6 @@ async fn check_identify_host<W: Write>(
 fn check_product_state<W: Write>(
     ledger: &mut DoctorLedger<W>,
     target: &TargetInfo,
-    target_name: &String,
 ) -> Result<bool, anyhow::Error> {
     Ok(match target.target_state {
         None => false,
@@ -1452,7 +1504,7 @@ fn check_product_state<W: Write>(
         }
         Some(TargetState::Zedboot) => {
             let node = ledger.add_node(
-                &format!("Skipping target in zedboot: {}", target_name),
+                &format!("Skipping target in zedboot: {}", target_name(target)),
                 LedgerMode::Automatic,
             )?;
             ledger.set_outcome(node, LedgerOutcome::SoftWarning)?;
@@ -1461,7 +1513,7 @@ fn check_product_state<W: Write>(
     })
 }
 
-async fn get_remote_proxy<W: Write>(
+async fn get_remote_proxy_via_daemon<W: Write>(
     ledger: &mut DoctorLedger<W>,
     retry_delay: Duration,
     target_node: usize,
@@ -1576,17 +1628,80 @@ fn check_compatibility<W: Write>(
     Ok(())
 }
 
-async fn check_targets<W: Write>(
+async fn check_targets_locally<W: Write>(
     ledger: &mut DoctorLedger<W>,
-    daemon_proxy: &DaemonProxy,
+    target_str: &str,
+    env_context: &EnvironmentContext,
+    mut show_tool: Option<ShowToolWrapper>,
+    retry_delay: Duration,
+) -> Result<()> {
+    let discovery_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
+    let query = TargetInfoQuery::from(target_str);
+    let find_res = find_targets_locally(env_context, query).await;
+    let targets = check_target_discovery(ledger, find_res)?;
+    ledger.close(discovery_node)?;
+    if targets.is_empty() {
+        return Ok(());
+    }
+    let mut verify_inode = LedgerNode::new("Verifying Targets".to_string(), LedgerMode::Normal);
+    verify_inode.set_fold_function(OutcomeFoldFunction::FailureToSuccess, LedgerOutcome::Failure);
+    let main_node = ledger.add(verify_inode)?;
+    for target in targets.iter() {
+        let target_node =
+            ledger.add_node(&format!("Target: {}", target_name(target)), LedgerMode::Normal)?;
+        check_single_target_locally(ledger, target, env_context, show_tool.as_mut(), retry_delay)
+            .await?;
+        ledger.close(target_node)?;
+    }
+    ledger.close(main_node)?;
+    Ok(())
+}
+
+fn check_target_discovery<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    targets_result: Result<Vec<TargetInfo>>,
+) -> Result<Vec<TargetInfo>> {
+    Ok(match targets_result {
+        Ok(targets) => {
+            if targets.len() > 0 {
+                let node = ledger
+                    .add_node(&format!("{} targets found", targets.len()), LedgerMode::Automatic)?;
+                ledger.set_outcome(node, LedgerOutcome::Success)?;
+                targets
+            } else {
+                let node = ledger.add_node("No targets found!", LedgerMode::Automatic)?;
+                ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                vec![]
+            }
+        }
+        Err(e) => {
+            let node =
+                ledger.add_node(&format!("Error getting targets: {e}"), LedgerMode::Normal)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            vec![]
+        }
+    })
+}
+
+async fn find_targets_locally(
+    env_context: &EnvironmentContext,
+    query: TargetInfoQuery,
+) -> Result<Vec<TargetInfo>> {
+    let stream = ffx_target::get_discovery_stream(query, true, true, env_context).await?;
+    Ok(stream.map(|t| TargetInfo::from(t)).collect::<Vec<TargetInfo>>().await)
+}
+
+async fn check_targets_via_daemon<W: Write>(
+    ledger: &mut DoctorLedger<W>,
     target_str: &str,
     retry_delay: Duration,
     env_context: &EnvironmentContext,
     mut show_tool: Option<ShowToolWrapper>,
     run_additional_diagnostics: bool,
-) -> Result<()> {
-    let main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
+    daemon_proxy: &DaemonProxy,
+) -> Result<(), anyhow::Error> {
     let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>();
+    let discovery_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
     match timeout(
         retry_delay,
         daemon_proxy
@@ -1600,7 +1715,7 @@ async fn check_targets<W: Write>(
                 LedgerMode::Verbose,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
-            ledger.close(main_node)?;
+            ledger.close(discovery_node)?;
             return Ok(());
         }
         Ok(_) => {}
@@ -1608,48 +1723,33 @@ async fn check_targets<W: Write>(
             let node = ledger
                 .add_node("Timeout while connecting to target service", LedgerMode::Verbose)?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
-            ledger.close(main_node)?;
+            ledger.close(discovery_node)?;
             return Ok(());
         }
     }
-
     let targets = match timeout(retry_delay, list_targets(Some(target_str), &tc_proxy)).await {
-        Ok(Ok(list)) => {
-            if list.len() > 0 {
-                let node = ledger
-                    .add_node(&format!("{} targets found", list.len()), LedgerMode::Automatic)?;
-                ledger.set_outcome(node, LedgerOutcome::Success)?;
-                list
-            } else {
-                let node = ledger.add_node("No targets found!", LedgerMode::Automatic)?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(main_node)?;
+        Ok(targets_result) => {
+            let targets = check_target_discovery(ledger, targets_result)?;
+            if targets.is_empty() {
+                ledger.close(discovery_node)?;
                 return Ok(());
             }
-        }
-        Ok(Err(e)) => {
-            let node =
-                ledger.add_node(&format!("Error getting targets: {}", e), LedgerMode::Automatic)?;
-            ledger.set_outcome(node, LedgerOutcome::Failure)?;
-            ledger.close(main_node)?;
-            return Ok(());
+            targets
         }
         Err(_) => {
             let node =
                 ledger.add_node("Timeout while getting target list", LedgerMode::Automatic)?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
-            ledger.close(main_node)?;
+            ledger.close(discovery_node)?;
             return Ok(());
         }
     };
-
-    ledger.close(main_node)?;
+    ledger.close(discovery_node)?;
     let mut verify_inode = LedgerNode::new("Verifying Targets".to_string(), LedgerMode::Normal);
     verify_inode.set_fold_function(OutcomeFoldFunction::FailureToSuccess, LedgerOutcome::Failure);
     let main_node = ledger.add(verify_inode)?;
-
     for target in targets.iter() {
-        check_single_target(
+        check_single_target_via_daemon(
             ledger,
             target,
             &tc_proxy,
@@ -1660,7 +1760,6 @@ async fn check_targets<W: Write>(
         )
         .await?;
     }
-
     ledger.close(main_node)?;
     Ok(())
 }
@@ -1688,6 +1787,7 @@ fn print_summary_outcome<W: Write>(ledger: &mut DoctorLedger<W>, main_node: usiz
 
 async fn doctor_summary<W: Write>(
     step_handler: &mut impl DoctorStepHandler,
+    direct_mode: bool,
     daemon_manager: &impl DaemonManager,
     target_str: &str,
     retry_delay: Duration,
@@ -1711,22 +1811,33 @@ async fn doctor_summary<W: Write>(
     let main_node_depth = check_ffx_info(ledger, &version_info).await?;
     check_env_context(ledger, env_context).await?;
 
-    let daemon_proxy =
-        check_daemon_status(ledger, daemon_manager, retry_delay, &version_info, &target_spec)
-            .await?;
+    // Even in direct mode, we might as well at least report the status of the daemon.
+    let daemon_proxy = check_daemon_status(
+        ledger,
+        direct_mode,
+        daemon_manager,
+        retry_delay,
+        &version_info,
+        &target_spec,
+    )
+    .await?;
 
-    if let Some(daemon_proxy) = daemon_proxy {
-        run_google_network_checks(ledger, env_context, &gchecker).await?;
-        check_targets(
-            ledger,
-            &daemon_proxy,
-            target_str,
-            retry_delay,
-            env_context,
-            show_tool,
-            run_additional_diagnostics,
-        )
-        .await?;
+    run_google_network_checks(ledger, env_context, &gchecker).await?;
+    if direct_mode {
+        check_targets_locally(ledger, target_str, env_context, show_tool, retry_delay).await?;
+    } else {
+        if let Some(daemon_proxy) = daemon_proxy {
+            check_targets_via_daemon(
+                ledger,
+                target_str,
+                retry_delay,
+                env_context,
+                show_tool,
+                run_additional_diagnostics,
+                &daemon_proxy,
+            )
+            .await?;
+        }
     }
 
     print_summary_outcome(ledger, main_node_depth)?;
@@ -2519,6 +2630,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -2554,6 +2666,8 @@ mod test {
                    \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✗] Checking daemon\
                    \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\
+                   \n[✗] Google Network Checks\
+                   \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
@@ -2587,6 +2701,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -2665,6 +2780,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -2701,6 +2817,8 @@ mod test {
                    \n[✗] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✗] Error connecting to daemon: Some error message. Run `ffx doctor --restart-daemon`\
+                   \n[✗] Google Network Checks\
+                   \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
@@ -2734,6 +2852,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -2812,6 +2931,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             2,
@@ -2998,6 +3118,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3226,6 +3347,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             &NODENAME,
             2,
@@ -3315,6 +3437,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             &NON_EXISTENT_NODENAME,
             1,
@@ -3475,6 +3598,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3563,6 +3687,7 @@ mod test {
         assert!(doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3662,6 +3787,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3719,7 +3845,7 @@ mod test {
                 \n[✓] Searching for targets\
                 \n    [✓] 2 targets found\
                 \n[✗] Verifying Targets\
-                \n    [✗] Target: UNKNOWN\
+                \n    [✗] Target: <unknown>\
                 \n        [!] Compatibility state: absent\
                 \n            [!] Compatibility information is not available\
                 \n        [✓] Opened target handle\
@@ -3766,7 +3892,7 @@ mod test {
                 \n[✓] Searching for targets\
                 \n    [✓] 2 targets found\
                 \n[✗] Verifying Targets\
-                \n    [✗] Target: UNKNOWN\
+                \n    [✗] Target: <unknown>\
                 \n    [✗] Target: {UNRESPONSIVE_NODENAME}\
                 \n[✗] Doctor found issues in one or more categories; \
                 run 'ffx doctor -v' for more details.\n",
@@ -3800,6 +3926,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3880,6 +4007,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -3975,6 +4103,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake,
             "",
             1,
@@ -4118,6 +4247,7 @@ mod test {
         doctor(
             &mut handler,
             &mut ledger,
+            false,
             &fake_daemon,
             "",
             1,
