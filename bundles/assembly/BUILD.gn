@@ -2247,7 +2247,8 @@ assembly_input_bundle("detect_user") {
 # build-types: all
 #
 assembly_input_bundle("bluetooth_a2dp") {
-  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-a2dp" ]
+  flexible_packages =
+      [ "//src/connectivity/bluetooth/profiles/bt-a2dp:without-config" ]
   compiled_packages = [
     {
       name = "core"

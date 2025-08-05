@@ -32,6 +32,7 @@
             protocol: "fuchsia.media.AudioDeviceEnumerator",
             from: "#audio_core",
             to: "#bt-a2dp",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.bluetooth.bredr.Profile",

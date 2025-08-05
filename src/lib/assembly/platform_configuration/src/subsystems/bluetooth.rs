@@ -7,7 +7,8 @@ use anyhow::format_err;
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_settings::bluetooth_config::{
-    AudioGatewayConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId, Snoop,
+    A2dpConfig, A2dpSinkAndSource, A2dpSinkAndSourceConfig, A2dpSinkAndSourceDefaultEnabled,
+    A2dpSourceOnly, AudioGatewayConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId, Snoop,
 };
 use assembly_config_schema::platform_settings::media_config::{AudioConfig, PlatformMediaConfig};
 
@@ -63,8 +64,29 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             Config::new(ConfigValueType::Uint8, core.sco_offload_path_index.into()),
         )?;
 
-        if profiles.a2dp.enabled {
+        if let A2dpConfig::Enabled(a2dp) = profiles.a2dp {
             builder.platform_bundle("bluetooth_a2dp");
+
+            let source_type_str = match a2dp.sink_and_source {
+                A2dpSinkAndSourceConfig::Enabled(A2dpSinkAndSourceDefaultEnabled {
+                    enabled: true,
+                }) => "audio_out".to_owned(),
+                A2dpSinkAndSourceConfig::Source(A2dpSourceOnly { source })
+                | A2dpSinkAndSourceConfig::SinkAndSource(A2dpSinkAndSource { source, .. }) => {
+                    serde_json::Value::from(source).to_string()
+                }
+                _ => "none".to_owned(),
+            };
+
+            let mut a2dp_config = builder.package("bt-a2dp").component("meta/bt-a2dp.cm")?;
+            a2dp_config
+                .field("domain", "Bluetooth")?
+                .field("enable_avrcp_target", true)?
+                .field("enable_aac", true)?
+                .field("initiator_delay", 500)?
+                .field("channel_mode", "basic")?
+                .field("enable_sink", a2dp.sink_enabled())?
+                .field("source_type", source_type_str)?;
         }
         if profiles.avrcp.enabled {
             builder.platform_bundle("bluetooth_avrcp");
@@ -164,7 +186,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             builder.platform_bundle("bluetooth_affordances");
             builder.platform_bundle("bluetooth_pandora");
 
-            if !profiles.a2dp.enabled {
+            if !profiles.a2dp.enabled() {
                 if let Some(AudioConfig::FullStack(_)) = media_config.audio {
                     builder.platform_bundle("bluetooth_a2dp_with_consumer");
                 }

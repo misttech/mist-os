@@ -20,15 +20,121 @@ pub enum Snoop {
 
 /// Configuration options for Bluetooth audio streaming (bt-a2dp).
 // TODO(https://fxbug.dev/324894109): Add profile-specific arguments
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(default)]
-pub struct A2dpConfig {
-    #[serde(skip_serializing_if = "crate::common::is_default")]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum A2dpConfig {
+    #[default]
+    Disabled,
+    #[serde(untagged)]
+    Enabled(A2dpConfigEnabled),
+}
+
+impl A2dpConfig {
+    pub fn enabled(&self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+
+    pub fn sink_enabled(&self) -> bool {
+        let Self::Enabled(config) = self else {
+            return false;
+        };
+        config.sink_enabled()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct A2dpConfigEnabled {
+    // TODO(https://fxbug.dev/434204218): remove this field in favor of following
+    #[serde(flatten)]
+    pub sink_and_source: A2dpSinkAndSourceConfig,
+}
+
+impl A2dpConfigEnabled {
+    pub fn sink_enabled(&self) -> bool {
+        self.sink_and_source.sink_enabled()
+    }
+}
+
+impl Default for A2dpConfigEnabled {
+    fn default() -> Self {
+        Self {
+            sink_and_source: A2dpSinkAndSourceConfig::Enabled(A2dpSinkAndSourceDefaultEnabled {
+                enabled: false,
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case", untagged)]
+pub enum A2dpSinkAndSourceConfig {
+    // TODO(https://fxbug.dev/435705910): Remove after all products are migrated to new config
+    Enabled(A2dpSinkAndSourceDefaultEnabled),
+    SinkAndSource(A2dpSinkAndSource),
+    Sink(A2dpSinkOnly),
+    Source(A2dpSourceOnly),
+}
+
+impl A2dpSinkAndSourceConfig {
+    pub fn sink_enabled(&self) -> bool {
+        matches!(
+            self,
+            Self::Enabled(A2dpSinkAndSourceDefaultEnabled { enabled: true })
+                | Self::Sink(_)
+                | Self::SinkAndSource(_)
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct A2dpSinkAndSourceDefaultEnabled {
     pub enabled: bool,
 }
 
-/// Configuration options for Bluetooth media info and controls (bt-avrcp).
-// TODO(https://fxbug.dev/324894109): Add profile-specific arguments
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct A2dpSinkOnly {
+    pub sink: A2dpSinkType,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct A2dpSourceOnly {
+    pub source: A2dpSourceType,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct A2dpSinkAndSource {
+    pub sink: A2dpSinkType,
+    pub source: A2dpSourceType,
+}
+
+/// The method to play audio when sink is enabled.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum A2dpSinkType {
+    /// Audio will be played using a media player provided via the core at #media_player
+    MediaPlayer,
+}
+
+/// The source for audio when A2DP source is enabled.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum A2dpSourceType {
+    /// Create an Audio Output device which receives the audio from a full audio stack.
+    /// Audio will be encoded in-band using a CodecFactory to determine the available codecs
+    /// in concert with the peer capabilities.
+    AudioOut,
+    /// Use a pre-canned set of triangle waves that loosely resemble the Winchester Chimes.
+    /// Audio will be encoded in-band similar to the AudioOut setting, but no output device or
+    /// audio stack is necessary. The CodecFactory is still required to encode audio.
+    BigBen,
+}
+
+impl From<A2dpSourceType> for serde_json::Value {
+    fn from(value: A2dpSourceType) -> Self {
+        serde_json::to_value(value).unwrap()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct AvrcpConfig {
@@ -346,6 +452,24 @@ mod tests {
     }
 
     #[test]
+    fn test_serialize_profiles() {
+        let config = BluetoothConfig::Standard {
+            profiles: BluetoothProfilesConfig {
+                a2dp: A2dpConfig::Enabled(A2dpConfigEnabled {
+                    sink_and_source: A2dpSinkAndSourceConfig::SinkAndSource(A2dpSinkAndSource {
+                        sink: A2dpSinkType::MediaPlayer,
+                        source: A2dpSourceType::AudioOut,
+                    }),
+                }),
+                ..Default::default()
+            },
+            core: BluetoothCoreConfig::default(),
+            snoop: Snoop::Lazy,
+        };
+        crate::common::tests::value_serialization_helper(config);
+    }
+
+    #[test]
     fn deserialize_standard_config_no_profiles() {
         let json = serde_json::json!({
             "type": "standard",
@@ -364,6 +488,7 @@ mod tests {
 
     #[test]
     fn deserialize_standard_config_with_profiles() {
+        // TODO(https://fxbug.dev/435705910): update "a2dp: { enabled }" when enabled is removed
         let json = serde_json::json!({
             "type": "standard",
             "snoop": "eager",
@@ -415,7 +540,11 @@ mod tests {
 
         let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
         let expected_profiles = BluetoothProfilesConfig {
-            a2dp: A2dpConfig { enabled: true },
+            a2dp: A2dpConfig::Enabled(A2dpConfigEnabled {
+                sink_and_source: A2dpSinkAndSourceConfig::Enabled(
+                    A2dpSinkAndSourceDefaultEnabled { enabled: true },
+                ),
+            }),
             avrcp: AvrcpConfig { enabled: true },
             did: DeviceIdConfig {
                 enabled: true,
@@ -460,6 +589,48 @@ mod tests {
         };
 
         assert_eq!(parsed, expected);
+        let BluetoothConfig::Standard { profiles, .. } = parsed else {
+            panic!("Should be standard bluetooth");
+        };
+        assert!(profiles.a2dp.sink_enabled());
+    }
+
+    #[test]
+    fn deserialize_a2dp_profile_without_defaults() {
+        let json = serde_json::json!({
+            "type": "standard",
+            "profiles": {
+                "a2dp": {
+                    "source": "big_ben",
+                },
+            },
+        });
+
+        let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
+        let expected_profiles = BluetoothProfilesConfig {
+            hfp: HfpConfig {
+                audio_gateway: AudioGatewayConfig::Disabled,
+                hands_free: HandsFreeConfig::Disabled,
+                ..Default::default()
+            },
+            a2dp: A2dpConfig::Enabled(A2dpConfigEnabled {
+                sink_and_source: A2dpSinkAndSourceConfig::Source(A2dpSourceOnly {
+                    source: A2dpSourceType::BigBen,
+                }),
+            }),
+            ..Default::default()
+        };
+        let expected = BluetoothConfig::Standard {
+            profiles: expected_profiles,
+            core: BluetoothCoreConfig { legacy_pairing_enabled: false, sco_offload_path_index: 6 },
+            snoop: Snoop::None,
+        };
+
+        assert_eq!(parsed, expected);
+        let BluetoothConfig::Standard { profiles, .. } = parsed else {
+            panic!("Should be standard bluetooth");
+        };
+        assert!(!profiles.a2dp.sink_enabled());
     }
 
     #[test]
