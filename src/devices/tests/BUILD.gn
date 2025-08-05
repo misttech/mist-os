@@ -26,7 +26,6 @@ group("tests") {
     "fhcp:tests",
     "fidl-bindlib-generation:tests",
     "fidl-service:tests",
-    "fx-logger:tests",
     "isolateddevmgr:tests",
     "multibind-composite-test:tests",
 

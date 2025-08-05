@@ -10,7 +10,6 @@
 #include <lib/fake-bti/bti.h>
 #include <lib/image-format/image_format.h>
 #include <lib/mmio/mmio.h>
-#include <lib/syslog/global.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbitl/items/graphics.h>
 #include <stdint.h>

@@ -15,17 +15,17 @@ namespace {
 fx_log_severity_t ToFxLogSeverity(DriverLogSeverity driver_log_severity) {
   switch (driver_log_severity) {
     case DriverLogSeverity::kTRACE:
-      return FX_LOG_TRACE;
+      return DDK_LOG_TRACE;
     case DriverLogSeverity::kDEBUG:
-      return FX_LOG_DEBUG;
+      return DDK_LOG_DEBUG;
     case DriverLogSeverity::kINFO:
-      return FX_LOG_INFO;
+      return DDK_LOG_INFO;
     case DriverLogSeverity::kWARNING:
-      return FX_LOG_WARNING;
+      return DDK_LOG_WARNING;
     case DriverLogSeverity::kERROR:
-      return FX_LOG_ERROR;
+      return DDK_LOG_ERROR;
     case DriverLogSeverity::kFATAL:
-      return FX_LOG_FATAL;
+      return static_cast<fx_log_severity_t>(0x60);
   }
   ZX_DEBUG_ASSERT_MSG(false, "Invalid driver log severity: %d",
                       static_cast<int>(driver_log_severity));

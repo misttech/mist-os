@@ -1,8 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_LOG_TEST_H_
-#define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_LOG_TEST_H_
+#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_INCLUDE_WLAN_DRIVERS_TEST_LOG_OVERRIDES_H_
+#define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_INCLUDE_WLAN_DRIVERS_TEST_LOG_OVERRIDES_H_
 
 #include <string>
 
@@ -11,8 +11,10 @@
 
 namespace wlan::drivers {
 
-#define kDebugTag "dtag"
-#define kTraceTag "ttag"
+constexpr const char* kDebugTag = "dtag";
+constexpr const char* kTraceTag = "ttag";
+
+constexpr fx_log_severity_t kSeverityNone = 0x7f;
 
 class LogTest : public ::testing::Test {
  public:
@@ -24,12 +26,12 @@ class LogTest : public ::testing::Test {
   void TearDown() override { instance_ = nullptr; }
 
   void Reset() {
-    flag_ = FX_LOG_NONE;
+    flag_ = kSeverityNone;
     tag_.clear();
   }
 
   void ZxlogfEtcOverride(fx_log_severity_t flag, const char* tag, ...) {
-    ASSERT_NE(FX_LOG_NONE, flag);
+    ASSERT_NE(kSeverityNone, flag);
     flag_ = flag;
     if (tag != nullptr) {
       tag_.assign(tag);
@@ -43,7 +45,7 @@ class LogTest : public ::testing::Test {
     }
   }
 
-  bool LogInvoked() const { return (flag_ != FX_LOG_NONE); }
+  bool LogInvoked() const { return (flag_ != kSeverityNone); }
 
   static LogTest& GetInstance() {
     EXPECT_NE(instance_, nullptr);
@@ -59,4 +61,4 @@ class LogTest : public ::testing::Test {
 };
 }  // namespace wlan::drivers
 
-#endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_LOG_TEST_H_
+#endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_TEST_INCLUDE_WLAN_DRIVERS_TEST_LOG_OVERRIDES_H_

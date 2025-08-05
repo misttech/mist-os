@@ -6,12 +6,13 @@
 #define SRC_LIB_DDK_INCLUDE_LIB_DDK_DEBUG_H_
 
 #include <lib/ddk/driver.h>
-#include <lib/syslog/logger.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
+
+typedef int8_t fx_log_severity_t;
 
 // Log Flags
 
@@ -20,30 +21,30 @@ __BEGIN_CDECLS
 // should avoid flooding the log (if an error is likely to happen
 // repeatedly, rapidly, it should throttle its dprintf()s).
 // Error messages are always displayed by default.
-#define DDK_LOG_ERROR FX_LOG_ERROR
+#define DDK_LOG_ERROR ((fx_log_severity_t)0x50)
 
 // Warning messages are for situations that are not errors but
 // may be indicative of an impending problem.  As with errors they
 // should not be issued repeatedly and rapidly.
 // Warning messages are always displayed by default.
-#define DDK_LOG_WARNING FX_LOG_WARNING
+#define DDK_LOG_WARNING ((fx_log_severity_t)0x40)
 
 // Info messages should provide terse information messages
 // around driver startup, shutdown or state change.  They
 // should be concise, infrequent, and one-line whenever possible.
 // Info messages are always displayed by default.
-#define DDK_LOG_INFO FX_LOG_INFO
+#define DDK_LOG_INFO ((fx_log_severity_t)0x30)
 
 // Debug messages are intended to provide detailed information
 // about what a driver is doing (start/end of transaction, etc)
 // They should aim for terseness, but provide visibility into
 // driver operation.  They are not displayed by default.
-#define DDK_LOG_DEBUG FX_LOG_DEBUG
+#define DDK_LOG_DEBUG ((fx_log_severity_t)0x20)
 
 // Trace messages are extremely verbose driver state tracing
 // (possibly including register dumps / full state dumps).
 // They are not displayed by default.
-#define DDK_LOG_TRACE FX_LOG_TRACE
+#define DDK_LOG_TRACE ((fx_log_severity_t)0x10)
 
 // Do not use this function directly, use zxlog_level_enabled() instead.
 bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severity_t flag);

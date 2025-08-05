@@ -7,7 +7,6 @@
 
 #include <assert.h>
 #include <lib/ddk/debug.h>
-#include <lib/syslog/global.h>
 #include <zircon/syscalls.h>
 
 #include <chrono>

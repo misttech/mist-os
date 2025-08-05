@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/syslog/logger.h>
+#include <lib/ddk/debug.h>
 
 #include <gtest/gtest.h>
 
@@ -16,7 +16,7 @@ namespace {
 TEST(LoggingHardwareModule, MinimumLogLevelTrace) {
   testing::LoggingHardwareModule logging_hardware_module;
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_TRACE);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_TRACE);
   EXPECT_TRUE(logging_hardware_module.LogTrace());
   EXPECT_TRUE(logging_hardware_module.LogDebug());
   EXPECT_TRUE(logging_hardware_module.LogInfo());
@@ -27,7 +27,7 @@ TEST(LoggingHardwareModule, MinimumLogLevelTrace) {
 TEST(LoggingHardwareModule, MinimumLogLevelDebug) {
   testing::LoggingHardwareModule logging_hardware_module;
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_DEBUG);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_DEBUG);
   EXPECT_FALSE(logging_hardware_module.LogTrace());
   EXPECT_TRUE(logging_hardware_module.LogDebug());
   EXPECT_TRUE(logging_hardware_module.LogInfo());
@@ -38,7 +38,7 @@ TEST(LoggingHardwareModule, MinimumLogLevelDebug) {
 TEST(LoggingHardwareModule, MinimumLogLevelInfo) {
   testing::LoggingHardwareModule logging_hardware_module;
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_INFO);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_INFO);
   EXPECT_FALSE(logging_hardware_module.LogTrace());
   EXPECT_FALSE(logging_hardware_module.LogDebug());
   EXPECT_TRUE(logging_hardware_module.LogInfo());
@@ -49,7 +49,7 @@ TEST(LoggingHardwareModule, MinimumLogLevelInfo) {
 TEST(LoggingHardwareModule, MinimumLogLevelWarning) {
   testing::LoggingHardwareModule logging_hardware_module;
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_WARNING);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_WARNING);
   EXPECT_FALSE(logging_hardware_module.LogTrace());
   EXPECT_FALSE(logging_hardware_module.LogDebug());
   EXPECT_FALSE(logging_hardware_module.LogInfo());
@@ -60,7 +60,7 @@ TEST(LoggingHardwareModule, MinimumLogLevelWarning) {
 TEST(LoggingHardwareModule, MinimumLogLevelError) {
   testing::LoggingHardwareModule logging_hardware_module;
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_ERROR);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_ERROR);
   EXPECT_FALSE(logging_hardware_module.LogTrace());
   EXPECT_FALSE(logging_hardware_module.LogDebug());
   EXPECT_FALSE(logging_hardware_module.LogInfo());

@@ -65,31 +65,8 @@ void LogTester::GetInfo(GetInfoCompleter::Sync& completer) {
 }
 
 void LogTester::EmitLog(EmitLogRequestView request, EmitLogCompleter::Sync& completer) {
-  fx_log_severity_t severity;
-  switch (static_cast<fx_log_severity_t>(fidl::ToUnderlying(request->spec.record.severity))) {
-    case FX_LOG_TRACE:
-      severity = DDK_LOG_TRACE;
-      break;
-    case FX_LOG_DEBUG:
-      zxlogf(INFO, "Got a request to log at debug level -- this would do nothing.");
-      severity = DDK_LOG_DEBUG;
-      break;
-    case FX_LOG_INFO:
-      severity = DDK_LOG_INFO;
-      break;
-    case FX_LOG_WARNING:
-      severity = DDK_LOG_WARNING;
-      break;
-    case FX_LOG_ERROR:
-      severity = DDK_LOG_ERROR;
-      break;
-    case FX_LOG_FATAL:
-      // DDK doesn't appear to support FATAL logs.
-      abort();
-      break;
-    default:
-      abort();
-  }
+  fx_log_severity_t severity =
+      static_cast<fx_log_severity_t>(fidl::ToUnderlying(request->spec.record.severity));
   auto& txt = request->spec.record.arguments.at(0).value.text();
   std::string cpp_str(txt.begin(), txt.end());
   driver_logf_internal(__zircon_driver_rec__.driver, severity, nullptr, request->spec.file.data(),

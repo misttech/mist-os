@@ -19,7 +19,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/syslog/global.h>
 #include <lib/vfs/cpp/service.h>
 
 #include <bind/fuchsia/platform/cpp/bind.h>

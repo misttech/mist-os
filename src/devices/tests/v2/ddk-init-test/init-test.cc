@@ -7,6 +7,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <unistd.h>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>

@@ -7,7 +7,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
 #include <lib/fidl/cpp/wire/status.h>
-#include <lib/syslog/global.h>
 #include <zircon/errors.h>
 
 #include <ddktl/fidl.h>

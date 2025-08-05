@@ -11,8 +11,6 @@
 
 #include <fbl/auto_lock.h>
 
-#define logf(severity, message...) Logf((FX_LOG_##severity), __FILE__, __LINE__, message)
-
 namespace {
 
 // Temporary single global reference until C wrappers are removed.
@@ -380,19 +378,19 @@ zx_status_t IommuManager::Init(zx::unowned_resource iommu_resource, bool use_har
   zx_status_t status =
       zx::iommu::create(*iommu_resource, ZX_IOMMU_TYPE_DUMMY, &dummy, sizeof(dummy), &dummy_iommu_);
   if (status != ZX_OK) {
-    logf(ERROR, "error in zx::iommu::create: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "error in zx::iommu::create: %s", zx_status_get_string(status));
     return status;
   }
 
   if (!use_hardware_iommu) {
-    logf(INFO, "not using IOMMU");
+    zxlogf(INFO, "not using IOMMU");
     return ZX_OK;
   }
 
   ACPI_TABLE_HEADER* table = NULL;
   ACPI_STATUS acpi_status = AcpiGetTable((char*)ACPI_SIG_DMAR, 1, &table);
   if (acpi_status != AE_OK) {
-    logf(INFO, "could not find DMAR table");
+    zxlogf(INFO, "could not find DMAR table");
     return ZX_ERR_NOT_FOUND;
   }
   ACPI_TABLE_DMAR* dmar = reinterpret_cast<ACPI_TABLE_DMAR*>(table);
@@ -403,13 +401,13 @@ zx_status_t IommuManager::Init(zx::unowned_resource iommu_resource, bool use_har
   for (auto& iommu : iommus_) {
     status = iommu.CreateIommu(iommu_resource);
     if (status != ZX_OK) {
-      logf(ERROR, "acpi-bus: Failed to create iommu object: %s", zx_status_get_string(status));
+      zxlogf(ERROR, "acpi-bus: Failed to create iommu object: %s", zx_status_get_string(status));
       // Reset the iommus_ so that IommuForBdf doesn't try and use them.
       iommus_.reset();
       return status;
     }
   }
-  logf(INFO, "acpi-bus: using IOMMU");
+  zxlogf(INFO, "acpi-bus: using IOMMU");
   return ZX_OK;
 }
 
@@ -433,14 +431,14 @@ zx_status_t IommuManager::InitDesc(const ACPI_TABLE_DMAR* dmar) {
 
   size_t iommu_idx = 0;
 
-  status = for_each_record<ACPI_DMAR_HEADER>(dmar, [this, &dmar, &iommu_idx,
+  status = for_each_record<ACPI_DMAR_HEADER>(dmar, [&dmar, &iommu_idx,
                                                     &iommus](const ACPI_DMAR_HEADER* record_hdr) {
-    logf(TRACE, "DMAR record: %d", record_hdr->Type);
+    zxlogf(TRACE, "DMAR record: %d", record_hdr->Type);
     switch (record_hdr->Type) {
       case ACPI_DMAR_TYPE_HARDWARE_UNIT: {
         const auto* rec = reinterpret_cast<const ACPI_DMAR_HARDWARE_UNIT*>(record_hdr);
 
-        logf(TRACE, "DMAR Hardware Unit: %u %#llx %#x", rec->Segment, rec->Address, rec->Flags);
+        zxlogf(TRACE, "DMAR Hardware Unit: %u %#llx %#x", rec->Segment, rec->Address, rec->Flags);
         const bool whole_segment = rec->Flags & ACPI_DMAR_INCLUDE_ALL;
 
         zx_status_t status;
@@ -450,7 +448,7 @@ zx_status_t IommuManager::InitDesc(const ACPI_TABLE_DMAR* dmar) {
           status = iommus[iommu_idx].CreatePartialSegmentDesc(dmar, rec);
         }
         if (status != ZX_OK) {
-          logf(ERROR, "acpi-bus: Failed to create iommu desc: %s", zx_status_get_string(status));
+          zxlogf(ERROR, "acpi-bus: Failed to create iommu desc: %s", zx_status_get_string(status));
           return status;
         }
 
@@ -459,15 +457,15 @@ zx_status_t IommuManager::InitDesc(const ACPI_TABLE_DMAR* dmar) {
       }
       case ACPI_DMAR_TYPE_RESERVED_MEMORY: {
         ACPI_DMAR_RESERVED_MEMORY* rec = (ACPI_DMAR_RESERVED_MEMORY*)record_hdr;
-        logf(TRACE, "DMAR Reserved Memory: %u %#llx %#llx", rec->Segment, rec->BaseAddress,
-             rec->EndAddress);
+        zxlogf(TRACE, "DMAR Reserved Memory: %u %#llx %#llx", rec->Segment, rec->BaseAddress,
+               rec->EndAddress);
         uintptr_t addr = reinterpret_cast<uintptr_t>(record_hdr);
         for (uintptr_t scope = addr + 24; scope < addr + rec->Header.Length;) {
           ACPI_DMAR_DEVICE_SCOPE* s = (ACPI_DMAR_DEVICE_SCOPE*)scope;
-          logf(TRACE, "  DMAR Scope: %u, bus %u", s->EntryType, s->Bus);
+          zxlogf(TRACE, "  DMAR Scope: %u, bus %u", s->EntryType, s->Bus);
           for (size_t i = 0; i < (s->Length - sizeof(*s)) / 2; ++i) {
             uint16_t v = *(uint16_t*)(scope + sizeof(*s) + 2 * i);
-            logf(TRACE, "    Path %ld: %02x.%02x", i, v & 0xffu, (uint16_t)(v >> 8));
+            zxlogf(TRACE, "    Path %ld: %02x.%02x", i, v & 0xffu, (uint16_t)(v >> 8));
           }
           scope += s->Length;
         }
@@ -478,7 +476,7 @@ zx_status_t IommuManager::InitDesc(const ACPI_TABLE_DMAR* dmar) {
   });
 
   if (iommu_idx != num_iommus) {
-    logf(ERROR, "wrong number of IOMMUs found");
+    zxlogf(ERROR, "wrong number of IOMMUs found");
     return ZX_ERR_INTERNAL;
   }
 
