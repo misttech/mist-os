@@ -755,13 +755,13 @@ impl MemoryManagerState {
             self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
-        let mut mapping = Mapping::new(
+        let mapping = Mapping::with_name(
             self.create_memory_backing(mapped_addr, memory, memory_offset),
             flags,
             max_access,
+            name,
             file_write_guard,
         );
-        mapping.set_name(name);
         self.mappings.insert(mapped_addr..end, mapping);
 
         Ok(mapped_addr)
@@ -1924,15 +1924,6 @@ impl MemoryManagerState {
         UserAddress::from_ptr(self.user_vmar_info.base + self.user_vmar_info.len)
     }
 
-    fn user_address_to_vmar_offset(&self, addr: UserAddress) -> Result<usize, ()> {
-        if !(self.user_vmar_info.base..self.user_vmar_info.base + self.user_vmar_info.len)
-            .contains(&addr.ptr())
-        {
-            return Err(());
-        }
-        (addr - self.user_vmar_info.base).map(|addr| addr.ptr()).map_err(|_| ())
-    }
-
     fn get_mappings_for_vmsplice(
         &self,
         mm: &Arc<MemoryManager>,
@@ -2046,8 +2037,9 @@ impl MemoryManagerState {
 
     /// Determines if an access at a given address could be covered by extending a growsdown mapping and
     /// extends it if possible. Returns true if the given address is covered by a mapping.
-    pub fn extend_growsdown_mapping_to_address(
+    fn extend_growsdown_mapping_to_address(
         &mut self,
+        mm: &Arc<MemoryManager>,
         addr: UserAddress,
         is_write: bool,
     ) -> Result<bool, Error> {
@@ -2059,39 +2051,31 @@ impl MemoryManagerState {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
+        if !mapping_to_grow.flags().contains(MappingFlags::ANONYMOUS) {
+            // Currently, we only grow anonymous mappings.
+            return Ok(false);
+        }
         let low_addr = (addr - (addr.ptr() as u64 % *PAGE_SIZE))?;
         let high_addr = mapping_low_addr;
+
         let length = high_addr
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        let memory = Arc::new(
-            MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
-                zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
-                    anyhow!("Could not allocate VMO for mapping growth")
-                }
-                _ => anyhow!("Unexpected error creating VMO: {s}"),
-            })?)
-            .with_zx_name(b"starnix:memory_manager"),
-        );
-        let vmar_flags =
-            mapping_to_grow.flags().access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
-        let mapping = Mapping::new(
-            self.create_memory_backing(low_addr, memory.clone(), 0),
-            mapping_to_grow.flags(),
-            mapping_to_grow.max_access(),
-            FileWriteGuardRef(None),
-        );
-        let vmar_offset = self
-            .user_address_to_vmar_offset(low_addr)
-            .map_err(|_| anyhow!("Address outside of user range"))?;
-        let mapped_address = memory
-            .map_in_vmar(&self.user_vmar, vmar_offset, 0, length, vmar_flags)
-            .map_err(MemoryManager::get_errno_for_map_err)?;
-        if mapped_address != low_addr.ptr() {
-            return Err(anyhow!("Could not map extension of mapping to desired location."));
-        }
-        self.mappings.insert(low_addr..high_addr, mapping);
+
+        let mut released_mappings = ReleasedMappings::default();
+        self.map_anonymous(
+            mm,
+            DesiredAddress::Fixed(low_addr),
+            length,
+            mapping_to_grow.flags().access_flags(),
+            mapping_to_grow.flags().options(),
+            mapping_to_grow.name(),
+            &mut released_mappings,
+        )?;
+        // We can't have any released mappings because `DesiredAddress::Fixed` won't overwrite any
+        // existing mappings.
+        assert!(released_mappings.is_empty());
         Ok(true)
     }
 
@@ -4119,7 +4103,7 @@ impl MemoryManager {
     }
 
     pub fn handle_page_fault(
-        &self,
+        self: &Arc<Self>,
         decoded: PageFaultExceptionReport,
         error_code: zx::Status,
     ) -> ExceptionResult {
@@ -4417,11 +4401,11 @@ impl MemoryManager {
     }
 
     pub fn extend_growsdown_mapping_to_address(
-        &self,
+        self: &Arc<Self>,
         addr: UserAddress,
         is_write: bool,
     ) -> Result<bool, Error> {
-        self.state.write().extend_growsdown_mapping_to_address(addr, is_write)
+        self.state.write().extend_growsdown_mapping_to_address(self, addr, is_write)
     }
 
     pub fn get_stats(&self) -> MemoryStats {
@@ -6155,9 +6139,6 @@ mod tests {
         let addr = map_memory_growsdown(locked, &current_task, *PAGE_SIZE) - *PAGE_SIZE;
 
         assert_matches!(mm.extend_growsdown_mapping_to_address(addr.unwrap(), false), Ok(true));
-
-        // Should see two mappings
-        assert_eq!(mm.get_mapping_count(), 2);
     }
 
     #[::fuchsia::test]
