@@ -32,8 +32,8 @@ WLAN_INTERFACE_TIMEOUT = 60
 TIME_TO_WAIT_FOR_COUNTRY_CODE = 10
 
 
-class WlanTests(wlan_base_test.WlanBaseTest):
-    """Wlan affordance tests"""
+class WlanCoreTests(wlan_base_test.WlanBaseTest):
+    """Wlan_core affordance tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.
@@ -58,18 +58,18 @@ class WlanTests(wlan_base_test.WlanBaseTest):
         self.wait_for_interface(self.device.netstack, PortClass.WLAN_CLIENT)
 
     def test_iface_methods(self) -> None:
-        """Test case for device wlan iface methods.
+        """Test case for device wlan_core iface methods.
 
         This test gets the list of phy IDs present, creates an iface, then checks that
         is exists by querying it, then calls destroy on the iface, and finally gets the
         iface ID list to check that the created iface has been successfully destroyed.
 
-        This test case calls the following wlan methods:
-            * wlan.get_phy_id_list()
-            * wlan.get_iface_id_list()
-            * wlan.create_iface()
-            * wlan.query_iface()
-            * wlan.destroy_iface()
+        This test case calls the following wlan_core methods:
+            * wlan_core.get_phy_id_list()
+            * wlan_core.get_iface_id_list()
+            * wlan_core.create_iface()
+            * wlan_core.query_iface()
+            * wlan_core.destroy_iface()
         """
         # We check here to make sure the device is running a softmac WLAN driver.
         # If not, we run basic tests without create_iface().
@@ -77,27 +77,27 @@ class WlanTests(wlan_base_test.WlanBaseTest):
         # needed.
         driver_list = self.device.ffx.run(["driver", "list"])
         if driver_list.find("iwlwifi") != -1:
-            phy_ids = self.device.wlan.get_phy_id_list()
-            iface_ids = self.device.wlan.get_iface_id_list()
+            phy_ids = self.device.wlan_core.get_phy_id_list()
+            iface_ids = self.device.wlan_core.get_iface_id_list()
 
-            iface_id = self.device.wlan.create_iface(
+            iface_id = self.device.wlan_core.create_iface(
                 phy_id=phy_ids[0], role=WlanMacRole.CLIENT
             )
 
-            query_resp = self.device.wlan.query_iface(iface_id)
+            query_resp = self.device.wlan_core.query_iface(iface_id)
             asserts.assert_equal(query_resp.role, WlanMacRole.CLIENT)
             asserts.assert_equal(query_resp.id_, iface_id)
             asserts.assert_equal(query_resp.phy_id, phy_ids[0])
 
-            self.device.wlan.destroy_iface(iface_id)
-            expected_iface_ids = self.device.wlan.get_iface_id_list()
+            self.device.wlan_core.destroy_iface(iface_id)
+            expected_iface_ids = self.device.wlan_core.get_iface_id_list()
 
             asserts.assert_equal(iface_ids, expected_iface_ids)
         else:
-            phy_ids = self.device.wlan.get_phy_id_list()
-            iface_ids = self.device.wlan.get_iface_id_list()
+            phy_ids = self.device.wlan_core.get_phy_id_list()
+            iface_ids = self.device.wlan_core.get_iface_id_list()
             if iface_ids:
-                self.device.wlan.destroy_iface(iface_ids[0])
+                self.device.wlan_core.destroy_iface(iface_ids[0])
 
     def test_basic_device_methods(self) -> None:
         """Test case for basic single device wlan methods.
@@ -111,12 +111,12 @@ class WlanTests(wlan_base_test.WlanBaseTest):
             * wlan.get_country
         """
         # TODO(http://b/337930095): Add the remaining board specific country code tests.
-        phy_ids = self.device.wlan.get_phy_id_list()
-        self.device.wlan.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
+        phy_ids = self.device.wlan_core.get_phy_id_list()
+        self.device.wlan_core.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
 
         end_time = time.time() + TIME_TO_WAIT_FOR_COUNTRY_CODE
         while time.time() < end_time:
-            country_resp = self.device.wlan.get_country(phy_ids[0])
+            country_resp = self.device.wlan_core.get_country(phy_ids[0])
             if country_resp == CountryCode.UNITED_STATES_OF_AMERICA:
                 break
             _LOGGER.debug(f"Country code resp: {country_resp}")
@@ -152,17 +152,17 @@ class WlanTests(wlan_base_test.WlanBaseTest):
 
         end_time = time.time() + 30
         while time.time() < end_time:
-            iface_ids = self.device.wlan.get_iface_id_list()
+            iface_ids = self.device.wlan_core.get_iface_id_list()
             if len(iface_ids) > 0:
                 break
         else:
             asserts.fail("No iface ids present")
 
-        bss_scan_response = self.device.wlan.scan_for_bss_info()
+        bss_scan_response = self.device.wlan_core.scan_for_bss_info()
         bss_desc_for_ssid = bss_scan_response.get(test_ssid)
         if bss_desc_for_ssid:
             asserts.assert_true(
-                self.device.wlan.connect(
+                self.device.wlan_core.connect(
                     ssid=test_ssid,
                     password=None,
                     bss_desc=bss_desc_for_ssid[0],
@@ -173,8 +173,8 @@ class WlanTests(wlan_base_test.WlanBaseTest):
         else:
             asserts.fail("Scan did not find bss descriptions for test ssid")
 
-        self.device.wlan.disconnect()
-        status = self.device.wlan.status()
+        self.device.wlan_core.disconnect()
+        status = self.device.wlan_core.status()
         match status:
             case ClientStatusIdle():
                 _LOGGER.debug(status)

@@ -17,7 +17,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
 )
 
 
-class Wlan(affordance.Affordance):
+class WlanCore(affordance.Affordance):
     """Abstract base class for Wlan driver affordance."""
 
     # List all the public methods

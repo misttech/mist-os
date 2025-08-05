@@ -27,7 +27,7 @@ from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common_using_sl4f,
 )
 from honeydew.affordances.connectivity.bluetooth.gap import gap_using_fc
-from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
+from honeydew.affordances.connectivity.wlan.wlan_core import wlan_core_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
@@ -601,29 +601,29 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     @mock.patch.object(
         ffx_impl.FfxImpl,
         "run",
-        return_value="".join(wlan_using_fc._REQUIRED_CAPABILITIES),
+        return_value="".join(wlan_core_using_fc._REQUIRED_CAPABILITIES),
         autospec=True,
     )
     @mock.patch.object(
-        wlan_using_fc.Wlan,
+        wlan_core_using_fc.WlanCore,
         "__init__",
         autospec=True,
         return_value=None,
     )
-    def test_wlan_using_fc(
+    def test_wlan_core_using_fc(
         self,
-        wlan_using_fc_init: mock.Mock,
+        wlan_core_using_fc_init: mock.Mock,
         # pylint: disable-next=unused-argument
         mock_ffx_run: mock.Mock,
     ) -> None:
         """Test case to make sure fuchsia_device supports Fuchsia-Controller based wlan
         affordance."""
         self.assertIsInstance(
-            self.fd_fc_obj.wlan,
-            wlan_using_fc.Wlan,
+            self.fd_fc_obj.wlan_core,
+            wlan_core_using_fc.WlanCore,
         )
-        wlan_using_fc_init.assert_called_once_with(
-            self.fd_fc_obj.wlan,
+        wlan_core_using_fc_init.assert_called_once_with(
+            self.fd_fc_obj.wlan_core,
             device_name=self.fd_fc_obj._device_info.name,
             ffx=self.fd_fc_obj.ffx,
             fuchsia_controller=self.fd_fc_obj.fuchsia_controller,

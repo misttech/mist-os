@@ -28,7 +28,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     QueryIfaceResponse,
     WlanMacRole,
 )
-from honeydew.affordances.connectivity.wlan.wlan import wlan
+from honeydew.affordances.connectivity.wlan.wlan_core import wlan_core
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
@@ -53,8 +53,8 @@ _REGULATORY_REGION_CONFIGURATOR_PROXY = FidlEndpoint(
 )
 
 
-class Wlan(AsyncAdapter, wlan.Wlan):
-    """WLAN affordance implemented with Fuchsia Controller."""
+class WlanCore(AsyncAdapter, wlan_core.WlanCore):
+    """WLAN Core affordance implemented with Fuchsia Controller."""
 
     def __init__(
         self,
@@ -64,7 +64,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         reboot_affordance: affordances_capable.RebootCapableDevice,
         fuchsia_device_close: affordances_capable.FuchsiaDeviceClose,
     ) -> None:
-        """Create a WLAN Fuchsia Controller affordance.
+        """Create a WLAN Core Fuchsia Controller affordance.
 
         Args:
             device_name: Device name returned by `ffx target list`.
