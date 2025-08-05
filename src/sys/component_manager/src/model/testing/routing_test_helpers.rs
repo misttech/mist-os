@@ -26,7 +26,7 @@ use cm_rust::*;
 use cm_types::{Name, Url};
 use component_id_index::InstanceId;
 use errors::ModelError;
-use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy};
+use fidl::endpoints::{self, create_proxy, Proxy};
 use fidl::{self};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
@@ -1576,8 +1576,7 @@ pub mod capability_util {
         dir_proxy: fio::DirectoryProxy,
     ) {
         let mut ns = namespace.lock().await;
-        // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-        let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
+        let client_end = dir_proxy.into_client_end().unwrap();
         ns.add(path, client_end).unwrap();
     }
 
