@@ -30,9 +30,6 @@
                 // corresponding to any open file descriptors.
                 "InheritTest.FsNodePermissionDeniedFdRemappedToNull",
 
-                // TODO: https://fxbug.dev/412581419 - Swap the source and target contexts in the `ptrace_traceme` access check.
-                "PtraceTest.PtraceTraceMeAllowed",
-
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
                 "SeLinuxFsAccess.UnknownClassIdIsAccepted",

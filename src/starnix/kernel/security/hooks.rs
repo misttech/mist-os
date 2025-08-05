@@ -1362,9 +1362,9 @@ pub fn check_syslog_access(source: &CurrentTask, action: SyslogAction) -> Result
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.ptrace_traceme");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::task::ptrace_access_check(
+        selinux_hooks::task::ptrace_traceme(
             &security_server.as_permission_check(),
-            &current_task,
+            current_task,
             &parent_tracer_task,
         )
     })

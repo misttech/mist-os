@@ -789,6 +789,25 @@ pub fn task_setrlimit(
     Ok(())
 }
 
+/// Checks if the `tracer` is allowed to trace the current task.
+pub(in crate::security) fn ptrace_traceme(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    tracer: &Task,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+    let tracer_sid = tracer.security_state.lock().current_sid;
+    let tracee_sid = current_task_state(current_task).lock().current_sid;
+    check_permission(
+        permission_check,
+        current_task.kernel(),
+        tracer_sid,
+        tracee_sid,
+        ProcessPermission::Ptrace,
+        audit_context,
+    )
+}
+
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub(in crate::security) fn ptrace_access_check(
     permission_check: &PermissionCheck<'_>,
