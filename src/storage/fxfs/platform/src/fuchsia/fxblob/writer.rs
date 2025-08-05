@@ -406,14 +406,25 @@ impl DeliveryBlobWriter {
                 replacing.and_then(|(old_id, reservation)| {
                     self.parent.did_remove(&name);
                     // If the blob is in the cache, then we need to swap it.
-                    handle.owner().cache().get(old_id).and_then(|old_blob| {
-                        let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
-                        let (new_blob, deferred_work) =
-                            old_blob.overwrite_me(handle, compression_info);
-                        old_blob.mark_to_be_purged();
-                        reservation.commit(&(new_blob as Arc<dyn FxNode>));
-                        deferred_work
-                    })
+                    match handle.owner().cache().get(old_id) {
+                        Some(old_blob) => {
+                            let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
+                            let (new_blob, deferred_work) =
+                                old_blob.overwrite_me(handle, compression_info);
+                            old_blob.mark_to_be_purged();
+                            reservation.commit(&(new_blob as Arc<dyn FxNode>));
+                            deferred_work
+                        }
+                        None => {
+                            // If it isn't open now, it is no longer reachable to be opened, so just
+                            // tombstone it.
+                            self.parent.store().filesystem().graveyard().queue_tombstone_object(
+                                self.parent.store().store_object_id(),
+                                old_id,
+                            );
+                            None
+                        }
+                    }
                 })
             })
             .await
@@ -1146,7 +1157,7 @@ mod tests {
     }
 
     #[fasync::run(10, test)]
-    async fn allow_existing_cleans_up_old() {
+    async fn allow_existing_cleans_up_old_while_open() {
         let fixture = new_blob_fixture().await;
 
         let data = vec![1; 65536];
@@ -1211,6 +1222,145 @@ mod tests {
                 .on_timeout(std::time::Duration::from_secs(10), || false)
                 .await
             );
+            fixture.fs().graveyard().flush().await;
+            fixture
+                .volume()
+                .volume()
+                .get_or_load_node(old_id, ObjectDescriptor::File, None)
+                .await
+                .unwrap_err();
+
+            // Blob is still readable.
+            assert_eq!(fixture.read_blob(hash).await, data);
+        };
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn allow_existing_cleans_up_old_while_vmo_held() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![1; 65536];
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let hash_string: String = hash.into();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            assert_eq!(fixture.read_blob(hash).await, data);
+        };
+        {
+            let blob_dir =
+                fixture.volume().root().clone().into_any().downcast::<BlobDirectory>().unwrap();
+            let (old_id, _, _) =
+                blob_dir.directory().directory().lookup(&hash_string).await.unwrap().expect("");
+            let read_vmo = fixture.get_blob_vmo(hash).await;
+
+            {
+                let writer =
+                    fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+                let vmo = writer
+                    .get_vmo(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on get_vmo")
+                    .expect("failed to get vmo");
+
+                vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+                writer
+                    .bytes_ready(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
+            }
+
+            let (new_id, _, _) =
+                blob_dir.directory().directory().lookup(&hash_string).await.unwrap().expect("");
+            assert_ne!(new_id, old_id);
+
+            // The old blob data should be gone.
+            fixture.fs().graveyard().flush().await;
+            fixture
+                .volume()
+                .volume()
+                .get_or_load_node(old_id, ObjectDescriptor::File, None)
+                .await
+                .unwrap_err();
+
+            // Can read from the original vmo.
+            let mut buf = [0u8; 1];
+            read_vmo.read(buf.as_mut_slice(), 0).expect("Reading from vmo");
+            assert_eq!(buf[0], data[0]);
+        };
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn allow_existing_cleans_up_old_while_closed() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![1; 65536];
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            assert_eq!(fixture.read_blob(hash).await, data);
+        };
+        {
+            let blob_dir =
+                fixture.volume().root().clone().into_any().downcast::<BlobDirectory>().unwrap();
+            let hash_string: String = hash.into();
+            let (old_id, _, _) =
+                blob_dir.directory().directory().lookup(&hash_string).await.unwrap().expect("");
+
+            let writer =
+                fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            let new_blob = blob_dir.lookup_blob(hash).await.expect("Looking up blob");
+            assert_ne!(new_blob.object_id(), old_id);
+
             fixture.fs().graveyard().flush().await;
             fixture
                 .volume()
