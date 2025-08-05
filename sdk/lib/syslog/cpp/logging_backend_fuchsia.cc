@@ -343,10 +343,6 @@ RawLogSeverity GetMinLogSeverity() {
   return lock->min_severity();
 }
 
-}  // namespace fuchsia_logging
-
-namespace syslog_runtime {
-
 LogBuffer LogBufferBuilder::Build() {
   LogBuffer buffer;
   if (socket_) {
@@ -365,4 +361,4 @@ LogBuffer LogBufferBuilder::Build() {
   return buffer;
 }
 
-}  // namespace syslog_runtime
+}  // namespace fuchsia_logging

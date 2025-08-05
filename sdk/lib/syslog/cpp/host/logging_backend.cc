@@ -187,10 +187,6 @@ LogSettingsBuilder& LogSettingsBuilder::WithTags(const std::initializer_list<std
 // Configures the log settings.
 void LogSettingsBuilder::BuildAndInitialize() { SetLogSettings(settings_); }
 
-}  // namespace fuchsia_logging
-
-namespace syslog_runtime {
-
 LogBuffer LogBufferBuilder::Build() {
   LogBuffer buffer;
   BeginRecord(&buffer, severity_,
@@ -200,4 +196,4 @@ LogBuffer LogBufferBuilder::Build() {
   return buffer;
 }
 
-}  // namespace syslog_runtime
+}  // namespace fuchsia_logging

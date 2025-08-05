@@ -21,11 +21,7 @@
 #include <limits>
 #include <sstream>
 
-namespace syslog_runtime {
-
-template <typename K, typename V>
-using KeyValue = ::fuchsia_logging::KeyValue<K, V>;
-using LogBuffer = ::fuchsia_logging::LogBuffer;
+namespace fuchsia_logging {
 
 /// Constructs a LogBuffer
 class LogBufferBuilder {
@@ -76,10 +72,13 @@ class LogBufferBuilder {
   fuchsia_logging::RawLogSeverity severity_;
 };
 
-}  // namespace syslog_runtime
+class LogMessageVoidify final {
+ public:
+  void operator&(std::ostream&) {}
+};
 
-namespace fuchsia_logging {
 namespace internal {
+
 // A null-safe wrapper around std::optional<std::string_view>
 //
 // This class is used to represent a string that may be nullptr. It is used
@@ -130,7 +129,7 @@ class NullSafeStringView final {
 template <typename Msg, typename... Args>
 void WriteStructuredLog(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
                         Args... args) {
-  syslog_runtime::LogBufferBuilder builder(severity);
+  LogBufferBuilder builder(severity);
   if (file) {
     builder.WithFile(file, line);
   }
@@ -141,12 +140,8 @@ void WriteStructuredLog(fuchsia_logging::LogSeverity severity, const char* file,
   (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
   buffer.Flush();
 }
-}  // namespace internal
 
-class LogMessageVoidify final {
- public:
-  void operator&(std::ostream&) {}
-};
+}  // namespace internal
 
 class LogMessage final {
  public:
@@ -187,5 +182,14 @@ class LogFirstNState final {
 bool IsSeverityEnabled(RawLogSeverity severity);
 
 }  // namespace fuchsia_logging
+
+namespace syslog_runtime {
+
+template <typename K, typename V>
+using KeyValue = ::fuchsia_logging::KeyValue<K, V>;
+using LogBuffer = ::fuchsia_logging::LogBuffer;
+using LogBufferBuilder = ::fuchsia_logging::LogBufferBuilder;
+
+}  // namespace syslog_runtime
 
 #endif  // LIB_SYSLOG_CPP_LOG_MESSAGE_IMPL_H_
