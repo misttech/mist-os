@@ -279,7 +279,7 @@ class VmPageOrMarker {
     // The AwaitingCleanLength will always be a page-aligned length, so we can mask out the low
     // PAGE_SIZE_SHIFT bits and store only the upper bits.
     void SetAwaitingCleanLength(uint64_t len) {
-      DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
+      DEBUG_ASSERT(len == 0 || GetDirtyState() == DirtyState::Dirty);
       DEBUG_ASSERT(IS_ROUNDED(len, PAGE_SIZE));
       len = (len >> PAGE_SIZE_SHIFT) << kAwaitingCleanLengthShift;
       // Clear the old value.
@@ -330,7 +330,6 @@ class VmPageOrMarker {
   void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
     DEBUG_ASSERT(IsIntervalZero());
     DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
-    DEBUG_ASSERT(IsZeroIntervalDirty());
     auto interval = ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits));
     interval.SetAwaitingCleanLength(len);
     raw_ = (raw_ & BIT_MASK32(kIntervalBits)) | interval.value();
