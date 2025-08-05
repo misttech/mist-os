@@ -64,6 +64,8 @@ target(target_type, "cpp") {
   } else {
     sources += [
       "host/encoder.h",
+      "host/log_buffer.cc",
+      "host/log_buffer.h",
       "host/logging_backend.cc",
     ]
   }

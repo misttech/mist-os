@@ -36,7 +36,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           } else {
             min_log_level_ = IntoLogSeverity(interest.min_severity());
           }
-          fuchsia_syslog::LogBuffer buffer;
+          fuchsia_logging::LogBuffer buffer;
 
           BeginRecord(&buffer, min_log_level_, __FILE__, __LINE__, "Changed severity");
           buffer.FlushRecord();
@@ -45,13 +45,13 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitPuppetStarted() {
-    fuchsia_syslog::LogBuffer buffer;
+    fuchsia_logging::LogBuffer buffer;
 
     BeginRecord(&buffer, FUCHSIA_LOG_INFO, __FILE__, __LINE__, "Puppet started.");
     buffer.FlushRecord();
   }
 
-  void BeginRecord(fuchsia_syslog::LogBuffer* buffer, FuchsiaLogSeverity severity,
+  void BeginRecord(fuchsia_logging::LogBuffer* buffer, FuchsiaLogSeverity severity,
                    std::optional<std::string_view> file_name, unsigned int line,
                    std::optional<std::string_view> msg) {
     buffer->BeginRecord(severity, file_name, line, msg, socket_.borrow(), 0,
@@ -126,7 +126,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    fuchsia_syslog::LogBuffer buffer;
+    fuchsia_logging::LogBuffer buffer;
     BeginRecord(&buffer, static_cast<uint8_t>(spec.record.severity), spec.file.data(), spec.line,
                 std::nullopt /* message */);
     for (auto& arg : spec.record.arguments) {

@@ -78,7 +78,7 @@ class Logger {
   FuchsiaLogSeverity GetSeverity() const { return severity_; }
 
   // Begins a record, used by internal macros only.
-  void BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
+  void BeginRecord(fuchsia_logging::LogBuffer& buffer, FuchsiaLogSeverity severity,
                    std::optional<std::string_view> file_name, unsigned int line,
                    std::optional<std::string_view> msg) const;
 
@@ -87,7 +87,7 @@ class Logger {
                  const char* file = nullptr, uint32_t line = 0) const;
 
   // Flushes a log record to the socket, used by internal macros only.
-  void FlushRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity) const;
+  void FlushRecord(fuchsia_logging::LogBuffer& buffer, FuchsiaLogSeverity severity) const;
 
   // Sets the socket to log to, used primarily for testing purposes.
   void SetSocket(zx::socket socket) { socket_ = std::move(socket); }

@@ -14,7 +14,7 @@
 // This file contains shared implementations for writing string logs between the legacy backend and
 // the host backend
 
-namespace syslog_runtime::internal {
+namespace fuchsia_logging::internal {
 struct MsgHeader {
   fuchsia_logging::RawLogSeverity severity;
   char* offset;
@@ -110,6 +110,6 @@ const std::string GetNameForLogSeverity(fuchsia_logging::RawLogSeverity severity
 
 static_assert(sizeof(MsgHeader) <= LogBuffer::record_state_size(),
               "message header must be no larger than record_state");
-}  // namespace syslog_runtime::internal
+}  // namespace fuchsia_logging::internal
 
 #endif  // LIB_SYSLOG_CPP_HOST_ENCODER_H_

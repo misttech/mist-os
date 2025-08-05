@@ -102,16 +102,16 @@
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
 // Used internally by FX_LOG_KV
-#define FX_LOG_KV_ETC(severity, args...)                                                \
-  do {                                                                                  \
-    if (::fuchsia_logging::IsSeverityEnabled(severity)) {                               \
-      syslog_runtime::internal::WriteStructuredLog(severity, __FILE__, __LINE__, args); \
-    }                                                                                   \
+#define FX_LOG_KV_ETC(severity, args...)                                                   \
+  do {                                                                                     \
+    if (::fuchsia_logging::IsSeverityEnabled(severity)) {                                  \
+      ::fuchsia_logging::internal::WriteStructuredLog(severity, __FILE__, __LINE__, args); \
+    }                                                                                      \
   } while (0)
 
 /// Used to denote a key-value pair for use in structured logging API calls.
 /// This macro exists solely to improve readability of calls to FX_LOG_KV
-#define FX_KV(a, b) ::syslog_runtime::KeyValue(a, b)
+#define FX_KV(a, b) ::fuchsia_logging::KeyValue(a, b)
 
 /// Logs a structured message with a given severity,
 /// message, and optional key-value pairs.

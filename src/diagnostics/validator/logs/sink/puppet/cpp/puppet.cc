@@ -41,31 +41,33 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    auto builder = syslog_runtime::LogBufferBuilder(static_cast<uint8_t>(spec.record.severity));
-    auto buffer = builder.WithFile(spec.file, spec.line).Build();
-    for (auto& arg : spec.record.arguments) {
-      switch (arg.value.Which()) {
-        case fuchsia::validate::logs::Value::kUnknown:
-        case fuchsia::validate::logs::Value::Invalid:
-          break;
-        case fuchsia::validate::logs::Value::kFloating:
-          buffer.WriteKeyValue(arg.name, arg.value.floating());
-          break;
-        case fuchsia::validate::logs::Value::kSignedInt:
-          buffer.WriteKeyValue(arg.name, arg.value.signed_int());
-          break;
-        case fuchsia::validate::logs::Value::kUnsignedInt:
-          buffer.WriteKeyValue(arg.name, arg.value.unsigned_int());
-          break;
-        case fuchsia::validate::logs::Value::kText:
-          buffer.WriteKeyValue(arg.name, arg.value.text().data());
-          break;
-        case fuchsia::validate::logs::Value::kBoolean:
-          buffer.WriteKeyValue(arg.name, arg.value.boolean());
-          break;
+    if (fuchsia_logging::IsSeverityEnabled(spec.record.severity)) {
+      auto builder = syslog_runtime::LogBufferBuilder(static_cast<uint8_t>(spec.record.severity));
+      auto buffer = builder.WithFile(spec.file, spec.line).Build();
+      for (auto& arg : spec.record.arguments) {
+        switch (arg.value.Which()) {
+          case fuchsia::validate::logs::Value::kUnknown:
+          case fuchsia::validate::logs::Value::Invalid:
+            break;
+          case fuchsia::validate::logs::Value::kFloating:
+            buffer.WriteKeyValue(arg.name, arg.value.floating());
+            break;
+          case fuchsia::validate::logs::Value::kSignedInt:
+            buffer.WriteKeyValue(arg.name, arg.value.signed_int());
+            break;
+          case fuchsia::validate::logs::Value::kUnsignedInt:
+            buffer.WriteKeyValue(arg.name, arg.value.unsigned_int());
+            break;
+          case fuchsia::validate::logs::Value::kText:
+            buffer.WriteKeyValue(arg.name, arg.value.text().data());
+            break;
+          case fuchsia::validate::logs::Value::kBoolean:
+            buffer.WriteKeyValue(arg.name, arg.value.boolean());
+            break;
+        }
       }
+      buffer.Flush();
     }
-    buffer.Flush();
     callback();
   }
 

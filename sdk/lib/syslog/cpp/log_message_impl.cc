@@ -72,8 +72,13 @@ LogMessage::~LogMessage() {
     buffer.WriteKeyValue("tag", tag_);
   }
   buffer.Flush();
-  if (severity_ >= fuchsia_logging::LogSeverity::Fatal)
+  if (severity_ >= fuchsia_logging::LogSeverity::Fatal) {
+    if (condition_) {
+      std::cerr << "Check failed: " << condition_ << ". ";
+    }
+    std::cerr << str << '\n';
     __builtin_debugtrap();
+  }
 }
 
 bool LogFirstNState::ShouldLog(uint32_t n) {

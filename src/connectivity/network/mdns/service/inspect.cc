@@ -5,6 +5,7 @@
 #include "inspect.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/clock.h>
 
 namespace mdns {
 

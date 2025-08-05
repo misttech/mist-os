@@ -50,17 +50,15 @@ static std::optional<std::string_view> ToStringView(T input) {
 
 TEST(StructuredLogging, NullSafeStringView) {
   // Construct from nullptr directly.
-  ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView(nullptr)), std::nullopt);
+  ASSERT_EQ(ToStringView(internal::NullSafeStringView(nullptr)), std::nullopt);
   // Construct from nullptr via const char*.
-  ASSERT_EQ(
-      ToStringView(syslog_runtime::internal::NullSafeStringView(static_cast<const char*>(nullptr))),
-      std::nullopt);
+  ASSERT_EQ(ToStringView(internal::NullSafeStringView(static_cast<const char*>(nullptr))),
+            std::nullopt);
   // Construct from std::string
-  ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView(std::string("test"))),
+  ASSERT_EQ(ToStringView(internal::NullSafeStringView(std::string("test"))),
             std::string_view("test"));
   // Construct from non-null const char*
-  ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView("test")),
-            std::string_view("test"));
+  ASSERT_EQ(ToStringView(internal::NullSafeStringView("test")), std::string_view("test"));
 }
 
 // Test to validate that SetLogSettings and log initialization is thread-safe.
@@ -102,12 +100,12 @@ TEST(StructuredLogging, ThreadInitialization) {
 
 TEST(StructuredLogging, BackendDirect) {
   {
-    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
+    syslog_runtime::LogBufferBuilder builder(LogSeverity::Warn);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
+  syslog_runtime::LogBufferBuilder builder(LogSeverity::Warn);
   auto buffer =
       builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
@@ -122,12 +120,12 @@ TEST(StructuredLogging, Overflow) {
   memset(very_large_string.data(), 5, very_large_string.size());
   very_large_string[very_large_string.size() - 1] = 0;
   {
-    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
+    syslog_runtime::LogBufferBuilder builder(LogSeverity::Warn);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
+  syslog_runtime::LogBufferBuilder builder(LogSeverity::Warn);
   auto buffer =
       builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
@@ -154,9 +152,9 @@ TEST(StructuredLogging, SocketLimit) {
 
   std::thread writer_thread([&]() {
     for (size_t i = 0; i < kNumMessages; ++i) {
-      fuchsia_syslog::LogBuffer buffer;
-      buffer.BeginRecord(fuchsia_logging::LogSeverity::Info, {}, 0, kTestMessage,
-                         zx::unowned_socket(remote), 0, 0, 0);
+      LogBuffer buffer;
+      buffer.BeginRecord(LogSeverity::Info, {}, 0, kTestMessage, zx::unowned_socket(remote), 0, 0,
+                         0);
       if (!buffer.FlushRecord({.block_if_full = true})) {
         break;
       }

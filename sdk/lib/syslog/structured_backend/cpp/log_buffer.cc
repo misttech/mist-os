@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
+#include <lib/zx/clock.h>
 #include <stdlib.h>
 
+namespace fuchsia_logging {
 namespace {
 
 // Represents a byte offset that has no alignment guarantees.
@@ -249,11 +251,10 @@ static DataSlice<const char> SliceFromArray(const char (&array)[size]) {
 struct RecordState final {
   RecordState()
       : arg_size(WordOffset<log_word_t>::FromByteOffset(
-            ByteOffset::FromBuffer(0, sizeof(fuchsia_syslog::internal::LogBufferData::data)))),
-        current_key_size(
-            ByteOffset::FromBuffer(0, sizeof(fuchsia_syslog::internal::LogBufferData::data))),
+            ByteOffset::FromBuffer(0, sizeof(internal::LogBufferData::data)))),
+        current_key_size(ByteOffset::FromBuffer(0, sizeof(internal::LogBufferData::data))),
         cursor(WordOffset<log_word_t>::FromByteOffset(
-            ByteOffset::FromBuffer(0, sizeof(fuchsia_syslog::internal::LogBufferData::data)))) {}
+            ByteOffset::FromBuffer(0, sizeof(internal::LogBufferData::data)))) {}
   // Header of the record itself
   uint64_t* header;
   FuchsiaLogSeverity raw_severity;
@@ -271,11 +272,11 @@ struct RecordState final {
   bool encode_success = true;
   // True if end was called
   bool ended = false;
-  static RecordState* CreatePtr(fuchsia_syslog::internal::LogBufferData* buffer) {
+  static RecordState* CreatePtr(internal::LogBufferData* buffer) {
     return reinterpret_cast<RecordState*>(&buffer->record_state);
   }
 };
-static_assert(sizeof(RecordState) <= sizeof(fuchsia_syslog::internal::LogBufferData::record_state),
+static_assert(sizeof(RecordState) <= sizeof(internal::LogBufferData::record_state),
               "Expected sizeof(RecordState) <= sizeof(LogBuffer::record_state)");
 static_assert(std::alignment_of<RecordState>() == sizeof(uint64_t),
               "Expected std::alignment_of<RecordState>() == sizeof(uint64_t)");
@@ -284,7 +285,7 @@ static_assert(std::alignment_of<RecordState>() == sizeof(uint64_t),
 // Used by the Encoder to do in-place encoding of data
 class ExternalDataBuffer final {
  public:
-  explicit ExternalDataBuffer(fuchsia_syslog::internal::LogBufferData* buffer)
+  explicit ExternalDataBuffer(internal::LogBufferData* buffer)
       : buffer_(&buffer->data[0]), cursor_(RecordState::CreatePtr(buffer)->cursor) {}
 
   ExternalDataBuffer(log_word_t* data, size_t length, WordOffset<log_word_t>& cursor)
@@ -466,8 +467,6 @@ std::string_view StripDots(std::string_view path) {
 
 }  // namespace
 
-namespace fuchsia_syslog {
-
 void LogBuffer::BeginRecord(FuchsiaLogSeverity severity, std::optional<std::string_view> file_name,
                             unsigned int line, std::optional<std::string_view> message,
                             zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid,
@@ -611,4 +610,4 @@ cpp20::span<const uint8_t> LogBuffer::EndRecord() {
                      slice.slice().ToByteOffset().unsafe_get());
 }
 
-}  // namespace fuchsia_syslog
+}  // namespace fuchsia_logging

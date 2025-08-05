@@ -18,7 +18,7 @@
 
 namespace {
 
-syslog_runtime::internal::LogState* state = nullptr;
+fuchsia_logging::internal::LogState* state = nullptr;
 std::mutex state_lock;
 // This thread's koid.
 // Initialized on first use.
@@ -45,13 +45,13 @@ zx_koid_t FuchsiaLogGetCurrentThreadKoid() {
 }
 
 EXPORT
-void FuchsiaLogSetStateLocked(syslog_runtime::internal::LogState* new_state) { state = new_state; }
+void FuchsiaLogSetStateLocked(fuchsia_logging::internal::LogState* new_state) { state = new_state; }
 
 EXPORT void FuchsiaLogAcquireState() __TA_NO_THREAD_SAFETY_ANALYSIS { return state_lock.lock(); }
 
 EXPORT void FuchsiaLogReleaseState() __TA_NO_THREAD_SAFETY_ANALYSIS { return state_lock.unlock(); }
 
 EXPORT
-syslog_runtime::internal::LogState* FuchsiaLogGetStateLocked() { return state; }
+fuchsia_logging::internal::LogState* FuchsiaLogGetStateLocked() { return state; }
 
 }  // extern "C"

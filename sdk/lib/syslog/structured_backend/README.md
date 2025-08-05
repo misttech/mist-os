@@ -15,7 +15,7 @@ a socket. Use the other side of the socket to do any of the following:
 ### Encoding a regular key-value-pair message
 
 ```cpp
-fuchsia_syslog::LogBuffer buffer;
+fuchsia_logging::LogBuffer buffer;
 buffer.BeginRecord(severity, file_name, line, msg, condition, logsink_socket, number_of_dropped_messages, pid, tid);
 number_of_dropped_message+=buffer.FlushRecord() ? 0 : 1;
 ```

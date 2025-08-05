@@ -56,7 +56,7 @@ constexpr fdf_internal::KeyValue<Key, Value> KeyValueInternal(Key key, Value val
 }
 
 struct EncoderState {
-  fuchsia_syslog::LogBuffer buffer;
+  fuchsia_logging::LogBuffer buffer;
   // Does nothing (enabled when we hit the last parameter that the user passed into us)
   template <size_t i, size_t size, typename... T,
             typename std::enable_if<Not<ILessThanSize<i, size>()>(), int>::type = 0>

@@ -15,19 +15,19 @@
 
 #include "lib/syslog/cpp/host/encoder.h"
 
-namespace syslog_runtime {
+namespace fuchsia_logging {
 
 namespace {
 // It's OK to keep global state here even though this file is in a source_set because on host
 // we don't use shared libraries.
-fuchsia_logging::LogSettings g_log_settings;
+LogSettings g_log_settings;
 
 std::string_view StripDots(std::string_view path) {
   auto pos = path.rfind("../");
   return pos == std::string_view::npos ? path : path.substr(pos + 3);
 }
 
-void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
+void BeginRecordLegacy(LogBuffer* buffer, RawLogSeverity severity,
                        std::optional<std::string_view> file, unsigned int line,
                        std::optional<std::string_view> msg,
                        std::optional<std::string_view> condition) {
@@ -60,95 +60,29 @@ void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severi
   }
 }
 
-// Common initialization for all KV pairs.
-// Returns the header for writing the value.
-internal::MsgHeader* StartKv(LogBuffer* buffer, std::string_view key) {
-  auto header = internal::MsgHeader::CreatePtr(buffer);
-  if (!header->first_kv || header->has_msg) {
-    header->WriteChar(' ');
-  }
-  header->WriteString(key);
-  header->WriteChar('=');
-  header->first_kv = false;
-  return header;
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, std::string_view value) {
-  // "tag" has special meaning to our logging API
-  if (key == "tag") {
-    auto header = internal::MsgHeader::CreatePtr(buffer);
-    auto tag_size = value.size() + 1;
-    header->user_tag = reinterpret_cast<char*>(buffer->data()) + buffer->data_size() - tag_size;
-    memcpy(header->user_tag, value.data(), value.size());
-    header->user_tag[value.size()] = '\0';
-    return;
-  }
-  auto header = StartKv(buffer, key);
-  header->WriteChar('"');
-  if (memchr(value.data(), '"', value.size()) != nullptr) {
-    // Escape quotes in strings.
-    for (char c : value) {
-      if (c == '"') {
-        header->WriteChar('\\');
-      }
-      header->WriteChar(c);
-    }
-  } else {
-    header->WriteString(value);
-  }
-  header->WriteChar('"');
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, int64_t value) {
-  auto header = StartKv(buffer, key);
-  char a_buffer[128];
-  snprintf(a_buffer, 128, "%" PRId64, value);
-  header->WriteString(a_buffer);
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, uint64_t value) {
-  auto header = StartKv(buffer, key);
-  char a_buffer[128];
-  snprintf(a_buffer, 128, "%" PRIu64, value);
-  header->WriteString(a_buffer);
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, double value) {
-  auto header = StartKv(buffer, key);
-  char a_buffer[128];
-  snprintf(a_buffer, 128, "%f", value);
-  header->WriteString(a_buffer);
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, bool value) {
-  auto header = StartKv(buffer, key);
-  header->WriteString(value ? "true" : "false");
-}
-
 void EndRecordLegacy(LogBuffer* buffer) {}
 
 }  // namespace
 namespace internal {
-const std::string GetNameForLogSeverity(fuchsia_logging::RawLogSeverity severity) {
+const std::string GetNameForLogSeverity(RawLogSeverity severity) {
   switch (severity) {
-    case fuchsia_logging::LogSeverity::Trace:
+    case LogSeverity::Trace:
       return "TRACE";
-    case fuchsia_logging::LogSeverity::Debug:
+    case LogSeverity::Debug:
       return "DEBUG";
-    case fuchsia_logging::LogSeverity::Info:
+    case LogSeverity::Info:
       return "INFO";
-    case fuchsia_logging::LogSeverity::Warn:
+    case LogSeverity::Warn:
       return "WARNING";
-    case fuchsia_logging::LogSeverity::Error:
+    case LogSeverity::Error:
       return "ERROR";
-    case fuchsia_logging::LogSeverity::Fatal:
+    case LogSeverity::Fatal:
       return "FATAL";
   }
 
-  if (severity > fuchsia_logging::LogSeverity::Debug &&
-      severity < fuchsia_logging::LogSeverity::Info) {
+  if (severity > LogSeverity::Debug && severity < LogSeverity::Info) {
     std::ostringstream stream;
-    stream << "VLOG(" << (fuchsia_logging::LogSeverity::Info - severity) << ")";
+    stream << "VLOG(" << (LogSeverity::Info - severity) << ")";
     return stream.str();
   }
 
@@ -156,33 +90,28 @@ const std::string GetNameForLogSeverity(fuchsia_logging::RawLogSeverity severity
 }
 }  // namespace internal
 namespace {
-void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
+void SetLogSettings(const LogSettings& settings) {
   g_log_settings.min_log_level =
-      std::min(static_cast<uint8_t>(fuchsia_logging::LogSeverity::Fatal), settings.min_log_level);
+      std::min(static_cast<uint8_t>(LogSeverity::Fatal), settings.min_log_level);
 
   const char* raw_severity_from_env = std::getenv("FUCHSIA_HOST_LOG_MIN_SEVERITY");
   if (raw_severity_from_env) {
     std::string severity_from_env(raw_severity_from_env);
     if (severity_from_env == "FATAL") {
-      g_log_settings.min_log_level = std::min(
-          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Fatal),
-          g_log_settings.min_log_level);
+      g_log_settings.min_log_level =
+          std::min(static_cast<RawLogSeverity>(LogSeverity::Fatal), g_log_settings.min_log_level);
     } else if (severity_from_env == "ERROR") {
-      g_log_settings.min_log_level = std::min(
-          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Error),
-          g_log_settings.min_log_level);
+      g_log_settings.min_log_level =
+          std::min(static_cast<RawLogSeverity>(LogSeverity::Error), g_log_settings.min_log_level);
     } else if (severity_from_env == "INFO") {
       g_log_settings.min_log_level =
-          std::min(static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Info),
-                   g_log_settings.min_log_level);
+          std::min(static_cast<RawLogSeverity>(LogSeverity::Info), g_log_settings.min_log_level);
     } else if (severity_from_env == "DEBUG") {
-      g_log_settings.min_log_level = std::min(
-          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Debug),
-          g_log_settings.min_log_level);
+      g_log_settings.min_log_level =
+          std::min(static_cast<RawLogSeverity>(LogSeverity::Debug), g_log_settings.min_log_level);
     } else if (severity_from_env == "TRACE") {
-      g_log_settings.min_log_level = std::min(
-          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Trace),
-          g_log_settings.min_log_level);
+      g_log_settings.min_log_level =
+          std::min(static_cast<RawLogSeverity>(LogSeverity::Trace), g_log_settings.min_log_level);
     }
   }
 
@@ -210,51 +139,18 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
 
-fuchsia_logging::RawLogSeverity GetMinLogSeverity() {
-  return syslog_runtime::g_log_settings.min_log_level;
-}
+RawLogSeverity GetMinLogSeverity() { return g_log_settings.min_log_level; }
 
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
-                 internal::NullSafeStringView file, unsigned int line,
-                 internal::NullSafeStringView msg, internal::NullSafeStringView condition) {
+void BeginRecord(LogBuffer* buffer, RawLogSeverity severity, internal::NullSafeStringView file,
+                 unsigned int line, internal::NullSafeStringView msg,
+                 internal::NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
-}
-
-void LogBuffer::WriteKeyValue(std::string_view key, std::string_view value) {
-  WriteKeyValueLegacy(this, key, value);
-}
-
-void LogBuffer::WriteKeyValue(std::string_view key, int64_t value) {
-  WriteKeyValueLegacy(this, key, value);
-}
-
-void LogBuffer::WriteKeyValue(std::string_view key, uint64_t value) {
-  WriteKeyValueLegacy(this, key, value);
-}
-
-void LogBuffer::WriteKeyValue(std::string_view key, double value) {
-  WriteKeyValueLegacy(this, key, value);
-}
-
-void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
-  WriteKeyValueLegacy(this, key, value);
 }
 
 void EndRecord(LogBuffer* buffer) { EndRecordLegacy(buffer); }
 
-bool LogBuffer::Flush() {
-  auto header = internal::MsgHeader::CreatePtr(this);
-  *(header->offset++) = 0;
-  if (header->user_tag) {
-    auto tag = header->user_tag;
-    std::cerr << "[" << tag << "] ";
-  }
-  std::cerr << reinterpret_cast<const char*>(this->data()) << std::endl;
-  return true;
-}
-
-void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned int line,
-              const char* tag, const char* condition, const std::string& msg) {
+void WriteLog(LogSeverity severity, const char* file, unsigned int line, const char* tag,
+              const char* condition, const std::string& msg) {
   if (tag)
     std::cerr << "[" << tag << "] ";
 
@@ -268,27 +164,11 @@ void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned 
   std::cerr.flush();
 }
 
-LogBuffer LogBufferBuilder::Build() {
-  LogBuffer buffer;
-  BeginRecord(&buffer, severity_, internal::NullSafeStringView::CreateFromOptional(file_name_),
-              line_, internal::NullSafeStringView::CreateFromOptional(msg_),
-              internal::NullSafeStringView::CreateFromOptional(condition_));
-  return buffer;
-}
-}  // namespace syslog_runtime
-
-namespace fuchsia_logging {
-
 // Sets the default log severity. If not explicitly set,
 // this defaults to INFO, or to the value specified by Archivist.
-LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(
-    fuchsia_logging::RawLogSeverity min_log_level) {
+LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(RawLogSeverity min_log_level) {
   settings_.min_log_level = min_log_level;
   return *this;
-}
-
-fuchsia_logging::RawLogSeverity GetMinLogSeverity() {
-  return syslog_runtime::g_log_settings.min_log_level;
 }
 
 // Sets the log file.
@@ -305,6 +185,19 @@ LogSettingsBuilder& LogSettingsBuilder::WithTags(const std::initializer_list<std
 }
 
 // Configures the log settings.
-void LogSettingsBuilder::BuildAndInitialize() { syslog_runtime::SetLogSettings(settings_); }
+void LogSettingsBuilder::BuildAndInitialize() { SetLogSettings(settings_); }
 
 }  // namespace fuchsia_logging
+
+namespace syslog_runtime {
+
+LogBuffer LogBufferBuilder::Build() {
+  LogBuffer buffer;
+  BeginRecord(&buffer, severity_,
+              fuchsia_logging::internal::NullSafeStringView::CreateFromOptional(file_name_), line_,
+              fuchsia_logging::internal::NullSafeStringView::CreateFromOptional(msg_),
+              fuchsia_logging::internal::NullSafeStringView::CreateFromOptional(condition_));
+  return buffer;
+}
+
+}  // namespace syslog_runtime
