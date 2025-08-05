@@ -442,6 +442,7 @@
                 "fuchsia.hardware.power.suspend.SuspendService",
                 "fuchsia.hardware.qcom.hvdcpopti.Service",
                 "fuchsia.hardware.qualcomm.fastrpc.SecureService",
+                "fuchsia.hardware.rpmb.Service",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.vsock.Service",

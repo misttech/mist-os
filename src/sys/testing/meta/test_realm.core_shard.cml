@@ -735,5 +735,10 @@
             to: "#testing",
             source_availability: "unknown",
         },
+        {
+            service: [ "fuchsia.hardware.rpmb.Service" ],
+            from: "parent",
+            to: "#testing",
+        },
     ],
 }

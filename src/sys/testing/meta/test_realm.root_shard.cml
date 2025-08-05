@@ -39,5 +39,10 @@
             from: "#bootstrap",
             to: "#core",
         },
+        {
+            service: [ "fuchsia.hardware.rpmb.Service" ],
+            from: "#bootstrap",
+            to: "#core",
+        },
     ],
 }
