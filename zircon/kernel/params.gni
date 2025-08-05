@@ -127,7 +127,7 @@ declare_args() {
   experimental_ktrace_streaming_enabled = true
 
   # Use unified bookkeeping for the kernel scheduler.
-  experimental_unified_scheduler_enabled = false
+  experimental_unified_scheduler_enabled = true
 }
 
 declare_args() {
