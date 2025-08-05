@@ -51,6 +51,11 @@ uint64_t get_peer_id(const char *address);
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t connect_peer(uint64_t peer_id);
 
+/// Disconnect all logical links (BR/EDR & LE) to peer with given identifier.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+zx_status_t disconnect_peer(uint64_t peer_id);
+
 /// Initiate pairing with peer with given identifier.
 ///
 /// `le_security_level` is only relevant for LE pairing. Specify 1 for Encrypted or 2 for

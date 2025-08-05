@@ -176,6 +176,20 @@ pub extern "C" fn connect_peer(peer_id: u64) -> zx_status_t {
     zx::Status::OK.into_raw()
 }
 
+/// Disconnect all logical links (BR/EDR & LE) to peer with given identifier.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+#[no_mangle]
+pub extern "C" fn disconnect_peer(peer_id: u64) -> zx_status_t {
+    let peer_id = PeerId { value: peer_id };
+
+    if let Err(err) = block_on(STATE.worker.disconnect_peer(peer_id)) {
+        eprintln!("disconnect_peer encountered error: {err}");
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
+}
+
 /// Initiate pairing with peer with given identifier.
 ///
 /// `le_security_level` is only relevant for LE pairing. Specify 1 for Encrypted or 2 for

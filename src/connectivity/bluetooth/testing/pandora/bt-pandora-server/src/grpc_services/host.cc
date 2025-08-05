@@ -79,33 +79,11 @@ Status HostService::ConnectLE(::grpc::ServerContext* context,
 Status HostService::Disconnect(::grpc::ServerContext* context,
                                const ::pandora::DisconnectRequest* request,
                                ::google::protobuf::Empty* response) {
-  auto peer_it =
-      std::find_if(peers_.begin(), peers_.end(),
-                   [id = request->connection()](const fuchsia_bluetooth_sys::Peer& candidate) {
-                     if (candidate.id()) {
-                       return std::to_string(candidate.id()->value()) == id.cookie().value();
-                     }
-                     return false;
-                   });
-
-  // Disconnect from peer if found
-  if (peer_it != peers_.end() && peer_it->connected() && *peer_it->connected()) {
-    access_client_->Disconnect({*peer_it->id()})
-        .Then([this, id = *peer_it->id()](
-                  fidl::Result<fuchsia_bluetooth_sys::Access::Disconnect>& disconnect) {
-          if (disconnect.is_error()) {
-            auto err = disconnect.error_value();
-            FX_LOGS(ERROR) << "Disconnect error: " << err.FormatDescription();
-          } else {
-            FX_LOGS(INFO) << "Disconnected peer: " << std::hex << id.value();
-          }
-          cv_access_.notify_one();
-        });
-
-    std::unique_lock<std::mutex> lock(m_access_);
-    cv_access_.wait(lock);
+  uint64_t peer_id =
+      std::strtoul(request->connection().cookie().value().c_str(), nullptr, /*base=*/10);
+  if (disconnect_peer(peer_id) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }
-
   return {/*OK*/};
 }
 
