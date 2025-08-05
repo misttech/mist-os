@@ -52,18 +52,11 @@ FIDL interface is currently served under the `display-coordinator` class in
 
 ### The interface between the Display Coordinator and engine drivers
 
-The Coordinator will soon use the
+The Coordinator uses the
 [`fuchsia.hardware.display.engine/Engine`][display-engine-fidl] FIDL interface
 to communicate with hardware-specific display drivers. This FIDL interface will
 soon become a part of the Fuchsia System Interface, and will be covered by API
 stability guarantees.
-
-The Coordinator currently uses the
-[`fuchsia.hardware.display.controller/DisplayEngine`][display-controller-banjo]
-Banjo interface to communicate with display engine drivers. This interface is
-associated with the `DISPLAY_CONTROLLER_IMPL` [protocol][dfv1-protocol]
-identifier. This Banjo interface will be removed when all the supported drivers
-are migrated to FIDL.
 
 ### Display engine drivers
 
@@ -77,7 +70,7 @@ Framework v2) FIDL interface][dfv2-fidl].
 Many display engine drivers interface with the Display Coordinator using the
 [api-protocols][display-api-protocols] and [api-types][display-api-types]
 libraries. These libraries are ergonomic wrappers for proxies generated from the
-FIDL and Banjo interfaces mentioned above.
+FIDL interface mentioned above.
 
 Most display engine drivers were initially built on top of [DFv1][dfv1] and
 [migrated to DFv2][dfv2-migration]. The DFv1 legacy may show up in the drivers'
@@ -115,7 +108,6 @@ reviews.
 [dfv2-migration]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
 [display-config-states]: docs/config-states.md
 [display-hardware-overview]: docs/hardware.md
-[display-controller-banjo]: /sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
 [display-coordinator-fidl]: /sdk/fidl/fuchsia.hardware.display/coordinator.fidl
 [display-engine-fidl]: /sdk/fidl/fuchsia.hardware.display.engine/engine.fidl
 [fuchsia-system-interface]: /docs/concepts/packages/system.md
