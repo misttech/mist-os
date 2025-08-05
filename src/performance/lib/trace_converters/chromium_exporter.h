@@ -5,15 +5,15 @@
 #ifndef SRC_PERFORMANCE_LIB_TRACE_CONVERTERS_CHROMIUM_EXPORTER_H_
 #define SRC_PERFORMANCE_LIB_TRACE_CONVERTERS_CHROMIUM_EXPORTER_H_
 
+#include <fstream>
 #include <memory>
-#include <ostream>
-#include <tuple>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 #include <trace-reader/reader.h>
 
-#include "rapidjson/ostreamwrapper.h"
+#include "rapidjson/filewritestream.h"
 #include "rapidjson/writer.h"
 #include "src/performance/lib/perfmon/writer.h"
 
@@ -21,11 +21,18 @@ namespace tracing {
 
 class ChromiumExporter {
  public:
-  explicit ChromiumExporter(std::unique_ptr<std::ostream> stream_out);
-  explicit ChromiumExporter(std::ostream& out);
+  explicit ChromiumExporter(const std::filesystem::path& out_path);
   ~ChromiumExporter();
 
+  enum class Pass {
+    // First pass: read all records except scheduler events.
+    kMain,
+    // Second pass: read only scheduler events.
+    kScheduler,
+  };
+  Pass pass_ = Pass::kMain;
   void ExportRecord(const trace::Record& record);
+  void StartSchedulerPass();
 
  private:
   void Start();
@@ -42,26 +49,22 @@ class ChromiumExporter {
   // Writes argument data. Assumes it is already within an
   // "args" key object.
   void WriteArgs(const std::vector<trace::Argument>& arguments);
-
-  std::unique_ptr<std::ostream> stream_out_;
-  rapidjson::OStreamWrapper wrapper_;
-  rapidjson::Writer<rapidjson::OStreamWrapper> writer_;
+  static constexpr size_t WRITE_BUFFER_SIZE_IN_BYTES = 65536;
+  char write_buffer_[WRITE_BUFFER_SIZE_IN_BYTES];
+  FILE* fp_;
+  rapidjson::FileWriteStream wrapper_;
+  rapidjson::Writer<rapidjson::FileWriteStream> writer_;
 
   // Scale factor to get to microseconds.
   // By default ticks are in nanoseconds.
   double tick_scale_ = 0.001;
 
-  std::unordered_map<zx_koid_t, fbl::String> processes_;
+  std::unordered_map<zx_koid_t, std::string> processes_;
   // Virtual threads mean the same thread id can appear in different processes.
   // Organize threads by process to cope with this.
   std::unordered_map<zx_koid_t /* process id */,
-                     std::unordered_map<zx_koid_t /* thread id */, fbl::String /* thread name */>>
+                     std::unordered_map<zx_koid_t /* thread id */, std::string /* thread name */>>
       threads_;
-
-  // The chromium/catapult trace file format doesn't support scheduler event
-  // records, so we can't emit them inline. Save them for later emission to
-  // the systemTraceEvents section.
-  std::vector<trace::Record::SchedulerEvent> scheduler_event_records_;
 
   // The chromium/catapult trace file format doesn't support random blobs,
   // so we can't emit them inline. Save them for later emission.

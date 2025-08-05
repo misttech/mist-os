@@ -242,20 +242,25 @@ struct CgroupSkbRunContext<'a> {
     map_refs: Vec<MapValueRef<'a>>,
 }
 
-impl<'a> ebpf_api::SocketFilterContext for CgroupSkbRunContext<'a> {
-    type SkBuf<'b> = IpPacketForCgroupSkb<'b>;
-    fn get_socket_uid(&self, sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
+impl<'a, 'b> ebpf_api::SocketCookieContext<&'a IpPacketForCgroupSkb<'a>>
+    for CgroupSkbRunContext<'b>
+{
+    fn get_socket_cookie(&self, sk_buf: &'a IpPacketForCgroupSkb<'a>) -> u64 {
+        sk_buf.socket_cookie
+    }
+}
+
+impl<'a, 'b> ebpf_api::SocketFilterContext<&'a IpPacketForCgroupSkb<'a>>
+    for CgroupSkbRunContext<'b>
+{
+    fn get_socket_uid(&self, sk_buf: &'a IpPacketForCgroupSkb<'a>) -> Option<uid_t> {
         let Mark(mark_value) = sk_buf.marks.get(MarkDomain::Mark2);
         *mark_value
     }
 
-    fn get_socket_cookie(&self, sk_buf: &Self::SkBuf<'_>) -> u64 {
-        sk_buf.socket_cookie
-    }
-
     fn load_bytes_relative(
         &self,
-        sk_buf: &Self::SkBuf<'_>,
+        sk_buf: &'a IpPacketForCgroupSkb<'a>,
         base: ebpf_api::LoadBytesBase,
         offset: usize,
         buf: &mut [u8],

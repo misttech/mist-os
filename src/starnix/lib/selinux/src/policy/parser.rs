@@ -4,11 +4,10 @@
 
 use std::fmt::Debug;
 use std::io::{Cursor, Seek as _, SeekFrom};
-use std::ops::Deref;
-use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Unaligned};
 
 /// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.
-trait ParseCursor: Sized {
+pub trait ParseCursor: Sized {
     /// The inner representation that owns the underlying data.
     type Inner;
 
@@ -54,179 +53,19 @@ impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
     }
 }
 
-/// A strategy for parsing data. Parsed structures that may contain references to parsed data are
-/// generally of the form:
-///
-/// ```rust,ignore
-/// type ParserOutput<PS: ParseStrategy> {
-///     ref_or_value_t: PS::Output<T>,
-///     // ...
-/// }
-/// ```
-///
-/// The above pattern allows [`ParseStrategy`] implementations to dictate how values are stored (by
-/// copied value, or reference to parser input data).
-pub trait ParseStrategy: Debug + PartialEq + Sized {
-    /// Type of input supported by this [`ParseStrategy`].
-    type Input;
-
-    /// Type of successfully parsed output from `Self::parse()`.
-    type Output<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>: Debug
-        + PartialEq;
-
-    /// Type of successfully parsed output from `Self::parse_slice()`.
-    type Slice<T: Debug + FromBytes + Immutable + PartialEq + Unaligned>: Debug + PartialEq;
-
-    /// Parses a `Self::Output<T>` from the next bytes underlying `self`. If the parse succeeds,
-    /// then return `(Some(output), self)` after advancing past the parsed bytes. Otherwise, return
-    /// `None` without advancing past the parsed bytes.
-    fn parse<T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        self,
-    ) -> Option<(Self::Output<T>, Self)>;
-
-    /// Parses a `Self::Slice<T>` of `count` elements from the next bytes underlying `self`. If the
-    /// parse succeeds, then return `(Some(slice), self)` after advancing past the parsed bytes.
-    /// Otherwise, return `None` without advancing past the parsed bytes.
-    fn parse_slice<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        self,
-        count: usize,
-    ) -> Option<(Self::Slice<T>, Self)>;
-
-    /// Dereferences borrow of `Self::Output<T>` as borrow of `T`.
-    fn deref<'a, T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        output: &'a Self::Output<T>,
-    ) -> &'a T;
-
-    /// Dereferences borrow of `Self::Slice<T>` as borrow of `[T]`.
-    fn deref_slice<'a, T: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        slice: &'a Self::Slice<T>,
-    ) -> &'a [T];
-
-    /// Returns the number of bytes remaining to be parsed by this [`ParseStrategy`].
-    fn len(&self) -> usize;
-
-    /// Returns the complete parse input being consumed by this strategy.
-    fn into_inner(self) -> Self::Input;
-}
-
-/// A [`ParseStrategy`] that produces [`Ref<B, T>`].
-///
-/// This strategy is zero-copy, but one consequence is that the parser input and output cannot be
-/// retained outside the lexical scope from which the parser input was borrowed. For example, the
-/// following will not compile:
-///
-/// ```rust,ignore
-/// fn do_by_ref<'a, T: zerocopy::FromBytes + zerocopy::Unaligned>() -> (
-///     zerocopy::Ref<&'a [u8], T>, ByRef<&'a [u8]>,
-/// ) {
-///     let bytes: Vec<u8> = // ...
-///     let parser = ByRef::new(bytes.as_slice());
-///     parser.parse::<T>().unwrap()
-/// }
-/// ```
-///
-/// The above code induces the following error:
-///
-/// ```rust,ignore
-/// error[E0515]: cannot return value referencing local variable `bytes`
-/// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct ByRef<B: SplitByteSlice> {
-    input: B,
-    tail: B,
-}
+pub struct PolicyCursor(Cursor<Vec<u8>>);
 
-impl<B: SplitByteSlice + Clone> ByRef<B> {
-    /// Returns a new [`ByRef`] that wraps `bytes_slice`.
-    pub fn new(byte_slice: B) -> Self {
-        Self { input: byte_slice.clone(), tail: byte_slice }
-    }
-}
-
-impl<B: Debug + SplitByteSlice + PartialEq> ParseStrategy for ByRef<B> {
-    type Input = B;
-    type Output<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> = Ref<B, T>;
-    type Slice<T: Debug + FromBytes + Immutable + PartialEq + Unaligned> = Ref<B, [T]>;
-
-    /// Returns a [`Ref<B, T>`] as the parsed output of the next bytes in the underlying
-    /// [`ByteSlice`].
-    fn parse<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        self,
-    ) -> Option<(Self::Output<T>, Self)> {
-        let (output, tail) = Ref::from_prefix(self.tail).ok()?;
-        Some((output, Self { input: self.input, tail }))
-    }
-
-    /// Returns a `Ref<B, [T]>` as the parsed output of the next bytes in the underlying
-    /// [`ByteSlice`].
-    fn parse_slice<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        self,
-        num: usize,
-    ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, tail) = Ref::from_prefix_with_elems(self.tail, num).ok()?;
-        Some((slice, Self { input: self.input, tail }))
-    }
-
-    fn deref<'a, T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        output: &'a Self::Output<T>,
-    ) -> &'a T {
-        output.deref() as &T
-    }
-
-    fn deref_slice<'a, T: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        slice: &'a Self::Slice<T>,
-    ) -> &'a [T] {
-        slice.deref() as &[T]
-    }
-
-    fn len(&self) -> usize {
-        self.tail.len()
-    }
-
-    fn into_inner(self) -> Self::Input {
-        self.input
-    }
-}
-
-/// A [`ParseStrategy`] that produces (copied/cloned) `T`.
-///
-/// This strategy makes up to one copy of the parser input (in addition to parser output data
-/// structures). It is intended to support use cases where the parser input and parser output must
-/// be retained outside the lexical from which parsing is invoked. For example:
-///
-/// ```rust,ignore
-/// fn do_by_value<
-///     D: AsRef<[u8]> + Debug + PartialEq,
-///     T: zerocopy::FromBytes + zerocopy::Unaligned,
-/// >(
-///     data: D,
-/// ) -> (T, ByValue<D>) {
-///     let parser = ByValue::new(data);
-///     parser.parse::<T>().unwrap()
-/// }
-/// ```
-#[derive(Clone, Debug, PartialEq)]
-pub struct ByValue<T: AsRef<[u8]>>(Cursor<T>);
-
-impl<T: AsRef<[u8]>> ByValue<T> {
-    /// Returns a new [`ByValue`] that wraps `data` in a [`Cursor`] for parsing.
-    pub fn new(data: T) -> Self {
+impl PolicyCursor {
+    /// Returns a new [`PolicyCursor`] that wraps `data` in a [`Cursor`] for parsing.
+    pub fn new(data: Vec<u8>) -> Self {
         Self(Cursor::new(data))
     }
-}
-
-impl<T: AsRef<[u8]> + Debug + PartialEq> ParseStrategy for ByValue<T>
-where
-    Cursor<T>: Debug + ParseCursor + PartialEq,
-{
-    type Input = T;
-    type Output<O: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> = O;
-    type Slice<S: Debug + FromBytes + Immutable + PartialEq + Unaligned> = Vec<S>;
 
     /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
-    fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
+    pub fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         mut self,
-    ) -> Option<(Self::Output<P>, Self)> {
+    ) -> Option<(P, Self)> {
         let (output, _) = P::read_from_prefix(ParseCursor::remaining_slice(&self.0)).ok()?;
         if self.0.seek_forward(std::mem::size_of_val(&output)).is_err() {
             return None;
@@ -236,10 +75,10 @@ where
 
     /// Returns a `Vec<T>` of `count` items as the parsed output of the next bytes in the underlying
     /// [`Cursor`] data.
-    fn parse_slice<PS: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
+    pub fn parse_slice<PS: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         mut self,
         count: usize,
-    ) -> Option<(Self::Slice<PS>, Self)> {
+    ) -> Option<(Vec<PS>, Self)> {
         let (slice, _) =
             <[PS]>::ref_from_prefix_with_elems(ParseCursor::remaining_slice(&self.0), count)
                 .ok()?;
@@ -251,23 +90,11 @@ where
         Some((slice, self))
     }
 
-    fn deref<'a, D: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        output: &'a Self::Output<D>,
-    ) -> &'a D {
-        output
-    }
-
-    fn deref_slice<'a, DS: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        slice: &'a Self::Slice<DS>,
-    ) -> &'a [DS] {
-        slice
-    }
-
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    fn into_inner(self) -> Self::Input {
+    pub fn into_inner(self) -> Vec<u8> {
         self.0.into_inner()
     }
 }
@@ -286,56 +113,27 @@ mod tests {
         d: u8,
     }
 
-    // Ensure that "return parser + parsed output" pattern works on `ByValue`.
+    // Ensure that "return parser + parsed output" pattern works on `PolicyCursor`.
     fn do_by_value<
-        D: AsRef<[u8]> + Debug + PartialEq,
         T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
     >(
-        data: D,
-    ) -> (T, ByValue<D>) {
-        let parser = ByValue::new(data);
+        data: Vec<u8>,
+    ) -> (T, PolicyCursor) {
+        let parser = PolicyCursor::new(data);
         parser.parse::<T>().expect("some numbers")
     }
-    fn do_slice_by_value<
-        D: AsRef<[u8]> + Debug + PartialEq,
-        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
-    >(
-        data: D,
+    fn do_slice_by_value<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
+        data: Vec<u8>,
         count: usize,
-    ) -> (Vec<T>, ByValue<D>) {
-        let parser = ByValue::new(data);
+    ) -> (Vec<T>, PolicyCursor) {
+        let parser = PolicyCursor::new(data);
         parser.parse_slice::<T>(count).expect("some numbers")
-    }
-
-    #[test]
-    fn by_ref_slice_u8_parse() {
-        let bytes: Vec<u8> = (0..8).collect();
-        let parser = ByRef::new(bytes.as_slice());
-        let (some_numbers, parser) = parser.parse::<SomeNumbers>().expect("some numbers");
-        assert_eq!(0, some_numbers.a);
-        assert_eq!(7, some_numbers.d);
-        assert_eq!(0, parser.tail.len());
-    }
-
-    #[test]
-    fn by_ref_slice_u8_parse_slice() {
-        let bytes: Vec<u8> = (0..24).collect();
-        let parser = ByRef::new(bytes.as_slice());
-        let (some_numbers, parser) = parser.parse_slice::<SomeNumbers>(3).expect("some numbers");
-        assert_eq!(3, some_numbers.len());
-        assert_eq!(0, some_numbers[0].a);
-        assert_eq!(7, some_numbers[0].d);
-        assert_eq!(8, some_numbers[1].a);
-        assert_eq!(15, some_numbers[1].d);
-        assert_eq!(16, some_numbers[2].a);
-        assert_eq!(23, some_numbers[2].d);
-        assert_eq!(0, parser.tail.len());
     }
 
     #[test]
     fn by_value_cursor_vec_u8() {
         let bytes: Vec<u8> = (0..8).collect();
-        let (some_numbers, parser) = do_by_value::<_, SomeNumbers>(bytes);
+        let (some_numbers, parser) = do_by_value::<SomeNumbers>(bytes);
         assert_eq!(0, some_numbers.a);
         assert_eq!(7, some_numbers.d);
         assert_eq!(8, parser.0.position());
@@ -345,7 +143,7 @@ mod tests {
     #[test]
     fn by_value_slice_u8_parse_slice() {
         let bytes: Vec<u8> = (0..24).collect();
-        let (some_numbers, parser) = do_slice_by_value::<_, SomeNumbers>(bytes.as_slice(), 3);
+        let (some_numbers, parser) = do_slice_by_value::<SomeNumbers>(bytes, 3);
         assert_eq!(3, some_numbers.len());
         assert_eq!(0, some_numbers[0].a);
         assert_eq!(7, some_numbers[0].d);

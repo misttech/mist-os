@@ -7,6 +7,7 @@
 use std::cmp;
 use std::convert::Infallible as Never;
 use std::fmt::{self, Debug, Formatter};
+use std::marker::PhantomData;
 use std::ops::{Range, RangeBounds};
 
 use arrayvec::ArrayVec;
@@ -138,9 +139,9 @@ where
         call_method_on_either!(self, len)
     }
 
-    fn with_bytes<R, F>(&self, f: F) -> R
+    fn with_bytes<'a, R, F>(&'a self, f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R,
+        F: for<'b> FnOnce(FragmentedBytes<'b, 'a>) -> R,
     {
         call_method_on_either!(self, with_bytes, f)
     }
@@ -190,9 +191,9 @@ where
     A: FragmentedBufferMut,
     B: FragmentedBufferMut,
 {
-    fn with_bytes_mut<R, F>(&mut self, f: F) -> R
+    fn with_bytes_mut<'a, R, F>(&'a mut self, f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytesMut<'a, 'b>) -> R,
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> R,
     {
         call_method_on_either!(self, with_bytes_mut, f)
     }
@@ -220,9 +221,9 @@ where
     B: GrowBuffer,
 {
     #[inline]
-    fn with_parts<O, F>(&self, f: F) -> O
+    fn with_parts<'a, O, F>(&'a self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+        F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O,
     {
         call_method_on_either!(self, with_parts, f)
     }
@@ -251,11 +252,18 @@ where
     A: GrowBufferMut,
     B: GrowBufferMut,
 {
-    fn with_parts_mut<O, F>(&mut self, f: F) -> O
+    fn with_parts_mut<'a, O, F>(&'a mut self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
+        F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O,
     {
         call_method_on_either!(self, with_parts_mut, f)
+    }
+
+    fn with_all_contents_mut<'a, O, F>(&'a mut self, f: F) -> O
+    where
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O,
+    {
+        call_method_on_either!(self, with_all_contents_mut, f)
     }
 
     fn serialize<BB: PacketBuilder>(&mut self, builder: BB) {
@@ -394,9 +402,9 @@ impl<B: AsRef<[u8]> + AsMut<[u8]>> ParseBufferMut for Buf<B> {
 }
 
 impl<B: AsRef<[u8]>> GrowBuffer for Buf<B> {
-    fn with_parts<O, F>(&self, f: F) -> O
+    fn with_parts<'a, O, F>(&'a self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+        F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O,
     {
         let (prefix, buf) = self.buf.as_ref().split_at(self.body.start);
         let (body, suffix) = buf.split_at(self.body.end - self.body.start);
@@ -423,14 +431,22 @@ impl<B: AsRef<[u8]>> GrowBuffer for Buf<B> {
 }
 
 impl<B: AsRef<[u8]> + AsMut<[u8]>> GrowBufferMut for Buf<B> {
-    fn with_parts_mut<O, F>(&mut self, f: F) -> O
+    fn with_parts_mut<'a, O, F>(&'a mut self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
+        F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O,
     {
         let (prefix, buf) = self.buf.as_mut().split_at_mut(self.body.start);
         let (body, suffix) = buf.split_at_mut(self.body.end - self.body.start);
         let mut body = [&mut body[..]];
         f(prefix, body.as_fragmented_byte_slice(), suffix)
+    }
+
+    fn with_all_contents_mut<'a, O, F>(&'a mut self, f: F) -> O
+    where
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O,
+    {
+        let mut all = [self.buf.as_mut()];
+        f(all.as_fragmented_byte_slice())
     }
 }
 
@@ -1202,6 +1218,40 @@ pub fn new_buf_vec(len: usize) -> Result<Buf<Vec<u8>>, Never> {
     Ok(Buf::new(vec![0; len], ..))
 }
 
+/// A variant of [`BufferAlloc`] that allocates buffers with the necessary
+/// prefix, body, suffix layout.
+pub trait LayoutBufferAlloc<O> {
+    /// The type of errors returned from [`layout_alloc`].
+    ///
+    /// [`layout_alloc`]: LayoutBufferAlloc::layout_alloc
+    type Error;
+
+    /// Like [`BufferAlloc::layout_alloc`], but the returned buffer has reserved
+    /// `prefix` and `suffix` bytes around `body`.
+    fn layout_alloc(self, prefix: usize, body: usize, suffix: usize) -> Result<O, Self::Error>;
+}
+
+impl<O: ShrinkBuffer, E, F: FnOnce(usize) -> Result<O, E>> LayoutBufferAlloc<O> for F {
+    type Error = E;
+
+    #[inline]
+    fn layout_alloc(self, prefix: usize, body: usize, suffix: usize) -> Result<O, E> {
+        let mut b = self(prefix + body + suffix)?;
+        b.shrink_front(prefix);
+        b.shrink_back(suffix);
+        Ok(b)
+    }
+}
+
+impl LayoutBufferAlloc<Never> for () {
+    type Error = ();
+
+    #[inline]
+    fn layout_alloc(self, _prefix: usize, _body: usize, _suffix: usize) -> Result<Never, ()> {
+        Err(())
+    }
+}
+
 /// Attempts to reuse a buffer for the purposes of implementing
 /// [`BufferProvider::reuse_or_realloc`].
 ///
@@ -1408,7 +1458,7 @@ pub trait Serializer: Sized {
     /// that new buffer. Unlike all other serialize methods,
     /// `serialize_new_buf` takes `self` by reference. This allows to use the
     /// same `Serializer` to serialize the data more than once.
-    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1623,7 +1673,7 @@ impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSe
     }
 
     #[inline]
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1646,7 +1696,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
             .map_err(|(err, ser)| (err, ser.buffer))
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1657,10 +1707,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
 
         let padding = outer.min_body_len().saturating_sub(self.len());
         let tail_size = padding + outer.footer_len();
-        let buffer_size = outer.header_len() + self.len() + tail_size;
-        let mut buffer = alloc.alloc(buffer_size)?;
-        buffer.shrink_front(outer.header_len());
-        buffer.shrink_back(tail_size);
+        let mut buffer = alloc.layout_alloc(outer.header_len(), self.len(), tail_size)?;
         buffer.copy_from(self);
         buffer.grow_back(padding);
         Ok(buffer)
@@ -1693,7 +1740,7 @@ impl<A: Serializer, B: Serializer<Buffer = A::Buffer>> Serializer for EitherSeri
         }
     }
 
-    fn serialize_new_buf<TB: ReusableBuffer, BA: BufferAlloc<TB>>(
+    fn serialize_new_buf<TB: GrowBufferMut, BA: LayoutBufferAlloc<TB>>(
         &self,
         outer: PacketConstraints,
         alloc: BA,
@@ -1809,7 +1856,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
         }
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1818,10 +1865,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
         let discarded_bytes = self.buffer.len() - truncated_size;
         let padding = outer.min_body_len().saturating_sub(truncated_size);
         let tail_size = padding + outer.footer_len();
-        let buffer_size = outer.header_len() + truncated_size + tail_size;
-        let mut buffer = alloc.alloc(buffer_size)?;
-        buffer.shrink_front(outer.header_len());
-        buffer.shrink_back(tail_size);
+        let mut buffer = alloc.layout_alloc(outer.header_len(), truncated_size, tail_size)?;
         buffer.with_bytes_mut(|mut dst| {
             self.buffer.with_bytes(|src| {
                 let src = match (discarded_bytes > 0, self.direction) {
@@ -1864,7 +1908,7 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
     }
 
     #[inline]
-    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1910,7 +1954,7 @@ pub struct PartialSerializeResult {
 ///
 /// Partial serialization allows to serialize only packet headers without
 /// calculating packet checksums (if any).
-pub trait PartialSerializer: Sized {
+pub trait PartialSerializer {
     /// Serializes the head of the packet to the specified `buffer`.
     ///
     /// If the packet contains network or transport level headers that fit in
@@ -2002,6 +2046,251 @@ impl<I: PartialSerializer, O: PartialPacketBuilder> PartialSerializer for Nested
     }
 }
 
+mod sealed {
+    use super::*;
+
+    /// The inner workings of [`DynamicSerializer`].
+    ///
+    /// This trait is sealed because we don't want it to be implementable
+    /// outside this crate or for its methods to be callable.
+    pub trait DynamicSerializerInner {
+        /// Serializes this serializer using a dyn borrow to an allocator.
+        ///
+        /// This method behaves much like [`Serializer::serialize_new_buf`], but
+        /// with a specific shape allowing for dynamic dispatch.
+        ///
+        /// The target buffer is allocated via [`DynamicBufferAlloc`] and,
+        /// instead of returning an owned buffer, it returns the total number of
+        /// bytes in `prefix`, `suffix` that the buffer taken from the allocator
+        /// _must have_ after having serialized this entity.
+        fn serialize_dyn_alloc(
+            &self,
+            outer: PacketConstraints,
+            alloc: &mut dyn DynamicBufferAlloc,
+        ) -> Result<(usize, usize), SerializeError<DynAllocError>>;
+    }
+
+    /// Type-erased allocator allowing dynamic serializers through
+    /// [`DynamicSerializerInner`].
+    ///
+    /// This has roughly the same shape as [`LayoutBufferAlloc`], but with
+    /// dynamic dispatch capabilities.
+    pub trait DynamicBufferAlloc {
+        /// Allocates a buffer with `prefix`, `body`, `suffix` bytes, like
+        /// [`LayoutBufferAlloc::layout_alloc`].
+        ///
+        /// Note that the returned buffer has a tied lifetime to the allocator.
+        /// The type erasure here is achieved by storing the buffer within the
+        /// allocator itself, which can then be extracted to fulfill the
+        /// `Serializer` trait. See the `Adapter` implementations supporting
+        /// [`DynamicSerializerInner`] for details.
+        ///
+        /// This trait is sealed because we don't want it to be implementable
+        /// outside this crate or for its methods to be callable.
+        ///
+        /// `alloc` may only be called once per instance of
+        /// `DynamicBufferAlloc`. It reflects the single-use nature of
+        /// [`LayoutBufferAlloc`], but methods taking `self` is not dyn
+        /// compatible. Implementors may panic if called more than once on the
+        /// same instance.
+        fn alloc(
+            &mut self,
+            prefix: usize,
+            body: usize,
+            suffix: usize,
+        ) -> Result<Buf<&mut [u8]>, DynAllocError>;
+    }
+
+    /// The temporary errors returned by dynamic helpers in
+    /// [`DynamicSerializerInner`] and [`DynamicBufferAlloc`].
+    pub struct DynAllocError;
+}
+
+use sealed::{DynAllocError, DynamicBufferAlloc, DynamicSerializerInner};
+
+fn dyn_serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
+    serializer: &dyn DynamicSerializerInner,
+    outer: PacketConstraints,
+    alloc: A,
+) -> Result<B, SerializeError<A::Error>> {
+    enum Adapter<A: LayoutBufferAlloc<B>, B> {
+        Empty,
+        Alloc(A),
+        Buffer(B),
+        Error(A::Error),
+    }
+
+    impl<A: LayoutBufferAlloc<B>, B: GrowBufferMut> DynamicBufferAlloc for Adapter<A, B> {
+        fn alloc(
+            &mut self,
+            prefix: usize,
+            body: usize,
+            suffix: usize,
+        ) -> Result<Buf<&mut [u8]>, DynAllocError> {
+            let alloc = match core::mem::replace(self, Self::Empty) {
+                Self::Alloc(a) => a,
+                _ => panic!("unexpected alloc state"),
+            };
+
+            let buffer = match alloc.layout_alloc(prefix, body, suffix) {
+                Ok(b) => b,
+                Err(e) => {
+                    *self = Self::Error(e);
+                    return Err(DynAllocError);
+                }
+            };
+            *self = Self::Buffer(buffer);
+            let buffer = match self {
+                Self::Buffer(b) => b.with_all_contents_mut(|b| match b.try_into_contiguous() {
+                    Ok(b) => b,
+                    Err(_) => todo!(
+                        "https://fxbug.dev/428952155: support dyn serialize fragmented buffers"
+                    ),
+                }),
+                // We just set buffer above.
+                _ => unreachable!(),
+            };
+            Ok(Buf::new(buffer, prefix..(buffer.len() - suffix)))
+        }
+    }
+
+    let mut adapter = Adapter::Alloc(alloc);
+    let (prefix, suffix) = match serializer.serialize_dyn_alloc(outer, &mut adapter) {
+        Ok(b) => b,
+        Err(SerializeError::SizeLimitExceeded) => {
+            return Err(SerializeError::SizeLimitExceeded);
+        }
+        Err(SerializeError::Alloc(DynAllocError)) => match adapter {
+            Adapter::Error(e) => {
+                return Err(SerializeError::Alloc(e));
+            }
+            _ => {
+                unreachable!();
+            }
+        },
+    };
+
+    let mut buffer = match adapter {
+        Adapter::Buffer(b) => b,
+        _ => unreachable!("unexpected alloc state"),
+    };
+    buffer.grow_front(buffer.prefix_len().checked_sub(prefix).unwrap_or_else(|| {
+        panic!("failed to grow buffer front; want: {} got: {}", prefix, buffer.prefix_len())
+    }));
+    buffer.grow_back(buffer.suffix_len().checked_sub(suffix).unwrap_or_else(|| {
+        panic!("failed to grow buffer back; want: {} got: {}", suffix, buffer.suffix_len())
+    }));
+    Ok(buffer)
+}
+
+/// A type that provides [`Serializer`] via dynamic dispatch.
+///
+/// See discussion on [`DynamicSerializer`] for when dynamically dispatched
+/// serializers can be beneficial.
+#[derive(Copy, Clone)]
+pub struct DynSerializer<'a>(&'a dyn DynamicSerializerInner);
+
+impl<'a> DynSerializer<'a> {
+    /// Creates a new `DynSerializer` from a borrow to a concrete serializer.
+    pub fn new<S: Serializer>(s: &'a S) -> Self {
+        Self::new_dyn(s)
+    }
+
+    /// Creates a new `DynSerializer` from a fat `DynamicSerializer` pointer.
+    pub fn new_dyn(s: &'a dyn DynamicSerializer) -> Self {
+        Self(s)
+    }
+}
+
+impl Serializer for DynSerializer<'_> {
+    type Buffer = EmptyBuf;
+
+    fn serialize<B: GrowBufferMut, P: BufferProvider<Self::Buffer, B>>(
+        self,
+        outer: PacketConstraints,
+        provider: P,
+    ) -> Result<B, (SerializeError<P::Error>, Self)> {
+        struct Adapter<S, P>(P, PhantomData<S>);
+
+        impl<S, B, P> LayoutBufferAlloc<B> for Adapter<S, P>
+        where
+            P: BufferProvider<S, B>,
+        {
+            type Error = P::Error;
+
+            fn layout_alloc(
+                self,
+                prefix: usize,
+                body: usize,
+                suffix: usize,
+            ) -> Result<B, Self::Error> {
+                let Self(provider, PhantomData) = self;
+                provider.alloc_no_reuse(prefix, body, suffix)
+            }
+        }
+
+        let Self(serializer) = self;
+        match dyn_serialize_new_buf(serializer, outer, Adapter(provider, PhantomData)) {
+            Ok(b) => Ok(b),
+            Err(e) => Err((e, self)),
+        }
+    }
+
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<B, SerializeError<A::Error>> {
+        let Self(serializer) = self;
+        dyn_serialize_new_buf(*serializer, outer, alloc)
+    }
+}
+
+impl<O> DynamicSerializerInner for O
+where
+    O: Serializer,
+{
+    fn serialize_dyn_alloc(
+        &self,
+        outer: PacketConstraints,
+        alloc: &mut dyn DynamicBufferAlloc,
+    ) -> Result<(usize, usize), SerializeError<DynAllocError>> {
+        struct Adapter<'a>(&'a mut dyn DynamicBufferAlloc);
+        impl<'a> LayoutBufferAlloc<Buf<&'a mut [u8]>> for Adapter<'a> {
+            type Error = DynAllocError;
+
+            fn layout_alloc(
+                self,
+                prefix: usize,
+                body: usize,
+                suffix: usize,
+            ) -> Result<Buf<&'a mut [u8]>, Self::Error> {
+                let Self(inner) = self;
+                inner.alloc(prefix, body, suffix)
+            }
+        }
+        self.serialize_new_buf(outer, Adapter(alloc))
+            .map(|buffer| (buffer.prefix_len(), buffer.suffix_len()))
+    }
+}
+
+/// A marker trait that is used as an attestation of dynamic serialization
+/// capabilities.
+///
+/// Use [`DynSerializer`] to create instances of dynamic serializers.
+///
+/// # Discussion
+///
+/// If serializers are passed deep down the call stack, causing local
+/// instantiation of multiple functions, it might be beneficial to consider
+/// using a dynamically dispatched serializer instead. The hit taken during code
+/// generation (and compilation times) might not be worth it, depending on the
+/// task at hand. As an example, slow-path protocols might not derive much
+/// benefit from deep compiler optimization which tips the scales in favor of
+/// using a dynamically dispatched serializer instead.
+pub trait DynamicSerializer: DynamicSerializerInner {}
+impl<O> DynamicSerializer for O where O: DynamicSerializerInner {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2012,15 +2301,17 @@ mod tests {
 
     // DummyPacketBuilder:
     // - Implements PacketBuilder with the stored constraints; it fills the
-    //   header with 0xFF and the footer with 0xFE
+    //   header with header_byte and the footer with footer_byte
     // - Implements InnerPacketBuilder by consuming a `header_len`-bytes body,
-    //   and filling it with 0xFF
+    //   and filling it with header_byte
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct DummyPacketBuilder {
         header_len: usize,
         footer_len: usize,
         min_body_len: usize,
         max_body_len: usize,
+        header_byte: u8,
+        footer_byte: u8,
     }
 
     impl DummyPacketBuilder {
@@ -2030,13 +2321,14 @@ mod tests {
             min_body_len: usize,
             max_body_len: usize,
         ) -> DummyPacketBuilder {
-            DummyPacketBuilder { header_len, footer_len, min_body_len, max_body_len }
-        }
-    }
-
-    fn fill(bytes: &mut [u8], byte: u8) {
-        for b in bytes {
-            *b = byte;
+            DummyPacketBuilder {
+                header_len,
+                footer_len,
+                min_body_len,
+                max_body_len,
+                header_byte: 0xFF,
+                footer_byte: 0xFE,
+            }
         }
     }
 
@@ -2055,8 +2347,14 @@ mod tests {
             assert_eq!(target.footer.len(), self.footer_len);
             assert!(body.len() >= self.min_body_len);
             assert!(body.len() <= self.max_body_len);
-            fill(target.header, 0xFF);
-            fill(target.footer, 0xFE);
+            target.header.fill(self.header_byte);
+            target.footer.fill(self.footer_byte);
+        }
+    }
+
+    impl PartialPacketBuilder for DummyPacketBuilder {
+        fn partial_serialize(&self, _body_len: usize, buffer: &mut [u8]) {
+            buffer.fill(self.header_byte)
         }
     }
 
@@ -2067,7 +2365,7 @@ mod tests {
 
         fn serialize(&self, buffer: &mut [u8]) {
             assert_eq!(buffer.len(), self.header_len);
-            fill(buffer, 0xFF);
+            buffer.fill(self.header_byte);
         }
     }
 
@@ -2171,7 +2469,7 @@ mod tests {
             result
         }
 
-        fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+        fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
             &self,
             outer: PacketConstraints,
             alloc: A,
@@ -2871,9 +3169,9 @@ mod tests {
             self.inner.len() + (self.range.end - self.range.start)
         }
 
-        fn with_bytes<R, F>(&self, f: F) -> R
+        fn with_bytes<'a, R, F>(&'a self, f: F) -> R
         where
-            F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R,
+            F: for<'b> FnOnce(FragmentedBytes<'b, 'a>) -> R,
         {
             let (_, rest) = self.data.split_at(self.range.start);
             let (prefix_b, rest) = rest.split_at(self.mid - self.range.start);
@@ -2884,9 +3182,9 @@ mod tests {
     }
 
     impl<B: BufferMut> FragmentedBufferMut for ScatterGatherBuf<B> {
-        fn with_bytes_mut<R, F>(&mut self, f: F) -> R
+        fn with_bytes_mut<'a, R, F>(&'a mut self, f: F) -> R
         where
-            F: for<'a, 'b> FnOnce(FragmentedBytesMut<'a, 'b>) -> R,
+            F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> R,
         {
             let (_, rest) = self.data.split_at_mut(self.range.start);
             let (prefix_b, rest) = rest.split_at_mut(self.mid - self.range.start);
@@ -2897,9 +3195,9 @@ mod tests {
     }
 
     impl<B: BufferMut> GrowBuffer for ScatterGatherBuf<B> {
-        fn with_parts<O, F>(&self, f: F) -> O
+        fn with_parts<'a, O, F>(&'a self, f: F) -> O
         where
-            F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+            F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O,
         {
             let (prefix, rest) = self.data.split_at(self.range.start);
             let (prefix_b, rest) = rest.split_at(self.mid - self.range.start);
@@ -2926,15 +3224,22 @@ mod tests {
     }
 
     impl<B: BufferMut> GrowBufferMut for ScatterGatherBuf<B> {
-        fn with_parts_mut<O, F>(&mut self, f: F) -> O
+        fn with_parts_mut<'a, O, F>(&'a mut self, f: F) -> O
         where
-            F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
+            F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O,
         {
             let (prefix, rest) = self.data.split_at_mut(self.range.start);
             let (prefix_b, rest) = rest.split_at_mut(self.mid - self.range.start);
             let (suffix_b, suffix) = rest.split_at_mut(self.range.end - self.mid);
             let mut bytes = [prefix_b, self.inner.as_mut(), suffix_b];
             f(prefix, bytes.as_fragmented_byte_slice(), suffix)
+        }
+
+        fn with_all_contents_mut<'a, O, F>(&'a mut self, _f: F) -> O
+        where
+            F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O,
+        {
+            unimplemented!()
         }
     }
 
@@ -2976,5 +3281,57 @@ mod tests {
         let result = ser.serialize_outer(ScatterGatherProvider {}).unwrap();
         let flattened = result.to_flattened_vec();
         assert_eq!(&flattened[..], &[0xFF, 0xFF, 0xFF, 10, 20, 30, 40, 50, 0xFE, 0xFE]);
+    }
+
+    #[test]
+    fn dyn_serialize() {
+        let body = Buf::new(vec![10, 20, 30, 40, 50], ..);
+        let header1 = DummyPacketBuilder {
+            header_len: 5,
+            footer_len: 0,
+            min_body_len: 0,
+            max_body_len: usize::MAX,
+            header_byte: 0xAA,
+            footer_byte: 0xBB,
+        };
+        let header2 = DummyPacketBuilder {
+            header_len: 3,
+            footer_len: 2,
+            min_body_len: 0,
+            max_body_len: usize::MAX,
+            header_byte: 0xCC,
+            footer_byte: 0xDD,
+        };
+        // A reference serializer.
+        let ser1 = body.clone().wrap_in(header1).wrap_in(header2);
+        // A nested dynamic serializer.
+        let ser2 = body.wrap_in(header1);
+        let ser2 = DynSerializer::new(&ser2).wrap_in(header2);
+        // An outer dynamic serializer.
+        let ser3 = ser1.clone();
+        let ser3 = DynSerializer::new(&ser3);
+        // Two levels of dynamic serializer.
+        let ser4 = DynSerializer::new(&ser2);
+
+        fn serialize(s: impl Serializer<Buffer: ReusableBuffer>) -> Vec<u8> {
+            s.serialize_vec(PacketConstraints::UNCONSTRAINED)
+                .map_err(|(e, _)| e)
+                .unwrap()
+                .unwrap_b()
+                .into_inner()
+        }
+
+        fn serialize_new(s: impl Serializer) -> Vec<u8> {
+            s.serialize_new_buf(PacketConstraints::UNCONSTRAINED, new_buf_vec).unwrap().into_inner()
+        }
+
+        let expect = serialize(ser1.clone());
+        assert_eq!(serialize(ser2), expect);
+        assert_eq!(serialize(ser3), expect);
+        assert_eq!(serialize(ser4), expect);
+        assert_eq!(serialize_new(ser1), expect);
+        assert_eq!(serialize_new(ser2), expect);
+        assert_eq!(serialize_new(ser3), expect);
+        assert_eq!(serialize_new(ser4), expect);
     }
 }

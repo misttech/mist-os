@@ -8,14 +8,17 @@ use fdf_component::{
 };
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::NodeControllerMarker;
-use fidl_fuchsia_hardware_interconnect as icc;
+use fuchsia_async::Scope;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::{error, warn};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use zx::Status;
+
+use {fidl_fuchsia_hardware_interconnect as icc, fuchsia_trace as ftrace};
 
 mod graph;
 
@@ -30,6 +33,7 @@ struct Child {
     #[allow(unused)]
     controller: ClientEnd<NodeControllerMarker>,
     device: icc::DeviceProxy,
+    inspect: fuchsia_inspect::Node,
 }
 
 impl Child {
@@ -40,6 +44,14 @@ impl Child {
     ) -> Result<(), Status> {
         let average_bandwidth_bps = average_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
         let peak_bandwidth_bps = peak_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
+
+        ftrace::duration!(c"interconnect", c"set_bandwidth",
+            "path" => self.path.name(),
+            "average_bandwidth_bps" => average_bandwidth_bps,
+            "peak_bandwidth_bps" => peak_bandwidth_bps);
+
+        self.inspect.record_uint("average_bandwidth_bps", average_bandwidth_bps);
+        self.inspect.record_uint("peak_bandwidth_bps", peak_bandwidth_bps);
 
         let requests = {
             let mut graph = self.graph.lock();
@@ -84,8 +96,9 @@ impl Child {
 #[allow(unused)]
 struct InterconnectDriver {
     node: Node,
+    inspector: Inspector,
     children: Arc<BTreeMap<String, Child>>,
-    scope: fuchsia_async::Scope,
+    scope: Scope,
 }
 
 impl Driver for InterconnectDriver {
@@ -93,6 +106,9 @@ impl Driver for InterconnectDriver {
 
     async fn start(mut context: DriverContext) -> Result<Self, Status> {
         let node = context.take_node()?;
+
+        let inspector = Inspector::default();
+        context.publish_inspect(&inspector, Scope::current())?;
 
         let device = context
             .incoming
@@ -124,7 +140,21 @@ impl Driver for InterconnectDriver {
 
         let mut outgoing = ServiceFs::new();
 
+        let paths_inspect = inspector.root().create_child("paths");
+
         let graph = Arc::new(Mutex::new(graph));
+        let graph_clone = graph.clone();
+        inspector.root().record_lazy_child("nodes", move || {
+            Box::pin({
+                let graph = graph_clone.clone();
+                async move {
+                    let inspector = Inspector::default();
+                    graph.lock().record_inspect(inspector.root());
+                    Ok(inspector)
+                }
+            })
+        });
+
         let mut children = BTreeMap::new();
         for path in paths {
             let name = format!("{}-{}", path.name(), path.id());
@@ -143,15 +173,18 @@ impl Driver for InterconnectDriver {
             let controller = node.add_child(node_args).await?;
             let graph = graph.clone();
             let device = device.clone();
-            children.insert(name.clone(), Child { path, graph, controller, device });
+            let inspect = paths_inspect.create_child(path.name());
+            path.record_inspect(&inspect);
+            children.insert(name.clone(), Child { path, graph, controller, device, inspect });
         }
+        inspector.root().record(paths_inspect);
         // TODO(b/405206028): Initialize all nodes to initial bus bandwidths.
 
         context.serve_outgoing(&mut outgoing)?;
 
         let children = Arc::new(children);
 
-        let scope = fuchsia_async::Scope::new_with_name("outgoing_directory");
+        let scope = Scope::new_with_name("outgoing_directory");
         let children_clone = children.clone();
         scope.spawn_local(async move {
             outgoing
@@ -168,7 +201,7 @@ impl Driver for InterconnectDriver {
                 .await;
         });
 
-        Ok(Self { node, children, scope })
+        Ok(Self { node, inspector, children, scope })
     }
 
     async fn stop(&self) {}

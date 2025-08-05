@@ -491,7 +491,7 @@ mod test {
             yv12_packet.data.iter_mut().enumerate().for_each(|(i, b)| *b = nv12_packet.data[i]);
 
             // Change a random display byte.
-            let x = rng.gen_range(0..nv12_spec.display_width);
+            let x = rng.random_range(0..nv12_spec.display_width);
             let y = {
                 let y_range = [
                     // Luminance plane rows.
@@ -506,7 +506,7 @@ mod test {
                 .choose(&mut rng)
                 .expect("Sampling from nonempty slice")
                 .clone();
-                rng.gen_range(y_range)
+                rng.random_range(y_range)
             };
             let idx = y * nv12_spec.bytes_per_row + x;
             nv12_packet.data[idx] = nv12_packet.data[idx].overflowing_add(1).0;

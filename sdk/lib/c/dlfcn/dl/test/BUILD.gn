@@ -34,6 +34,7 @@ test("dl-unittests") {
     sources += [
       "dl-load-tests-basic.cc",
       "dl-load-tests-deps.cc",
+      "dl-load-tests-dlinfo.cc",
       "dl-load-tests-fail.cc",
       "dl-load-tests-global.cc",
       "dl-load-tests-initfini.cc",

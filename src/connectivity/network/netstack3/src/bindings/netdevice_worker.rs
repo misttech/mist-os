@@ -28,7 +28,8 @@ use {
     fuchsia_async as fasync,
 };
 
-use crate::bindings::devices::TxTask;
+use crate::bindings::devices::{StaticCommonInfo, TxTask};
+use crate::bindings::interfaces_admin::{maybe_create_local_route_tables, InterfaceOptions};
 use crate::bindings::util::{NeedsDataNotifier, ScopeExt as _};
 use crate::bindings::{
     devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId, Netstack,
@@ -99,6 +100,8 @@ pub(crate) enum Error {
     UnsupportedFrameType(fhardware_network::FrameType),
     #[error("scope finished")]
     ScopeFinished,
+    #[error("cannot create the local route tables")]
+    CantCreateLocalRouteTables,
 }
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
@@ -287,11 +290,6 @@ impl NetdeviceWorker {
     }
 }
 
-pub(crate) struct InterfaceOptions {
-    pub(crate) name: Option<String>,
-    pub(crate) metric: Option<u32>,
-}
-
 pub(crate) struct DeviceHandler {
     inner: Inner,
 }
@@ -397,7 +395,7 @@ impl DeviceHandler {
         &self,
         ns: &mut Netstack,
         scope: &fasync::ScopeHandle,
-        InterfaceOptions { name, metric }: InterfaceOptions,
+        InterfaceOptions { name, metric, netstack_managed_routes_designation }: InterfaceOptions,
         port: fhardware_network::PortId,
         control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
     ) -> Result<
@@ -501,6 +499,20 @@ impl DeviceHandler {
             }
         };
 
+        let local_route_tables = match maybe_create_local_route_tables(
+            &*ctx,
+            &name,
+            netstack_managed_routes_designation,
+        )
+        .await
+        {
+            Ok(tables) => tables,
+            Err(err) => {
+                log::error!("failed to create local route tables for {name}: {err:?}");
+                return Err(Error::CantCreateLocalRouteTables);
+            }
+        };
+
         // Ensure we're not going to get stopped. Holding a guard on a child
         // scope ensures a guard on the parent.
         let guard = scope
@@ -544,7 +556,7 @@ impl DeviceHandler {
                         mac,
                         _mac_proxy: mac_proxy,
                         netdevice: static_netdevice_info,
-                        common_info: Default::default(),
+                        common_info: StaticCommonInfo::new(local_route_tables),
                         dynamic_info: CoreRwLock::new(devices::DynamicEthernetInfo {
                             netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
                             neighbor_event_sink: neighbor_event_sink.clone(),
@@ -561,7 +573,10 @@ impl DeviceHandler {
                 }
                 DeviceProperties::Ip { max_frame_size } => {
                     let info = devices::PureIpDeviceInfo {
-                        common_info: Default::default(),
+                        common_info: StaticCommonInfo {
+                            authorization_token: zx::Event::create(),
+                            local_route_tables,
+                        },
                         netdevice: static_netdevice_info,
                         dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(
                             max_frame_size,

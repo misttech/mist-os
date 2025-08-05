@@ -14,11 +14,11 @@ use starnix_core::task::{
 };
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
-    FileSystemHandle, FsNodeHandle, FsNodeOps,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileObjectState,
+    FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
@@ -40,11 +40,18 @@ pub fn pressure_directory(kernel: &Kernel, fs: &FileSystemHandle) -> Option<FsNo
         return None;
     };
 
-    let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
-    dir.entry("cpu", StubPressureFile::new_node(StubPressureFileKind::CPU), mode!(IFREG, 0o666));
-    dir.entry("io", StubPressureFile::new_node(StubPressureFileKind::IO), mode!(IFREG, 0o666));
-    Some(dir.build())
+    let dir = SimpleDirectory::new();
+    dir.edit(fs, |dir| {
+        dir.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
+        dir.entry(
+            "cpu",
+            StubPressureFile::new_node(StubPressureFileKind::CPU),
+            mode!(IFREG, 0o666),
+        );
+        dir.entry("io", StubPressureFile::new_node(StubPressureFileKind::IO), mode!(IFREG, 0o666));
+    });
+    // TODO: Validate the mode bits are correct.
+    Some(dir.into_node(fs, 0o777))
 }
 
 struct PsiProvider {
@@ -130,9 +137,9 @@ impl FileOps for MemoryPressureFile {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         if let Some(monitor) = self.monitor.lock(locked).take() {

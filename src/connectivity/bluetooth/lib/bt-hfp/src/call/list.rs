@@ -80,6 +80,14 @@ impl<T> List<T> {
             .flat_map(|(i, entry)| entry.as_ref().map(|v| (Self::to_call_index(i), v)))
     }
 
+    /// Return an iterator of mutable references to the calls and associated call indices.
+    pub fn calls_mut(&mut self) -> impl Iterator<Item = (Idx, &mut T)> {
+        self.inner
+            .iter_mut()
+            .enumerate()
+            .flat_map(|(i, entry)| entry.as_mut().map(|v| (Self::to_call_index(i), v)))
+    }
+
     /// Convert a `Idx` to the internal index used to locate a call.
     ///
     /// The Idx for a call starts at 1 instead of 0, so the internal index must be decremented

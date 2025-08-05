@@ -520,7 +520,9 @@ mod tests {
     use event_queue::ClosedClient;
     use fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker;
     use fidl_fuchsia_paver::{BootManagerMarker, DataSinkMarker};
-    use fidl_fuchsia_pkg::{PackageCacheMarker, PackageResolverMarker, RetainedPackagesMarker};
+    use fidl_fuchsia_pkg::{
+        PackageCacheMarker, PackageResolverMarker, RetainedBlobsMarker, RetainedPackagesMarker,
+    };
     use fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker;
     use fidl_fuchsia_update_installer_ext::{
         PrepareFailureReason, Progress, UpdateInfo, UpdateInfoAndProgress,
@@ -560,9 +562,12 @@ mod tests {
             let (pkg_resolver, _) = fidl::endpoints::create_proxy::<PackageResolverMarker>();
             let (pkg_cache, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>();
             let (retained_packages, _) = fidl::endpoints::create_proxy::<RetainedPackagesMarker>();
+            let (retained_blobs, _) = fidl::endpoints::create_proxy::<RetainedBlobsMarker>();
             let (space_manager, _) = fidl::endpoints::create_proxy::<SpaceManagerMarker>();
             let (power_state_control, _) =
                 fidl::endpoints::create_proxy::<PowerStateControlMarker>();
+            let (ota_downloader, _) =
+                fidl::endpoints::create_proxy::<fidl_fuchsia_pkg_internal::OtaDownloaderMarker>();
 
             Ok(Environment {
                 data_sink,
@@ -570,8 +575,10 @@ mod tests {
                 pkg_resolver,
                 pkg_cache,
                 retained_packages,
+                retained_blobs,
                 space_manager,
                 power_state_control,
+                ota_downloader,
                 build_info: NamespaceBuildInfo,
                 cobalt_connector: NamespaceCobaltConnector,
                 system_info: NamespaceSystemInfo,

@@ -24,7 +24,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+    .channel = {
+        .primary = 9, .cbw = wlan_ieee80211_wire::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
                                                    'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
@@ -34,7 +35,7 @@ const int32_t kDefaultTestDis = 3;
 // This is the time when the first transmission start.
 constexpr zx::duration kFirstTransTime = zx::msec(50);
 
-void checkChannel(const wlan_common::WlanChannel& channel) {
+void checkChannel(const wlan_ieee80211_wire::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);

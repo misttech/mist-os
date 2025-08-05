@@ -7,6 +7,7 @@
 
 #include <lib/elfldltl/init-fini.h>
 #include <lib/elfldltl/link-map-list.h>
+#include <lib/elfldltl/svr4-abi.h>
 #include <lib/elfldltl/symbol.h>
 
 #include <array>

@@ -8,7 +8,6 @@
     device_async_remove;
     device_unbind_reply;
     device_suspend_reply;
-    device_resume_reply;
     device_set_profile_by_role;
     device_get_protocol;
     device_get_config_vmo;
@@ -23,8 +22,6 @@
     get_power_resource;
     load_firmware_from_driver;
     device_get_metadata;
-    device_get_metadata_size;
-    device_add_metadata;
     device_add_composite_spec;
     driver_log_severity_enabled_internal;
     driver_logvf_internal;
@@ -32,9 +29,7 @@
     device_get_fragment_protocol;
     device_get_fragment_metadata;
     device_register_service_member;
-    device_connect_fidl_protocol2;
     device_connect_fragment_fidl_protocol;
-    device_connect_runtime_protocol;
     device_connect_fragment_runtime_protocol;
     device_connect_ns_protocol;
   local:

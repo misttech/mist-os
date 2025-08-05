@@ -80,11 +80,20 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/config:starnix_clippy_lints",
   ]
 
+  # Enable performance features in release mode.
+  if (compilation_mode == "release") {
+    configs += [ "//build/config/lto:lto-rust" ]
+
+    # Enable moderate level of optimization for better performance.
+    configs += [ "//build/config:optimize_moderate" ]
+  }
+
   disable_rustdoc = false
 
-  if (target_cpu == "riscv64" || is_lto_variant) {
-    # At least for riscv64 and LTO, remote linking requires machines
-    # with more memory, particularly in the linking phase.
+  if (compilation_mode == "release" || target_cpu == "riscv64" ||
+      is_lto_variant) {
+    # LTO is enabled in release mode, and remote linking requires machines with more memory,
+    # particularly in the linking phase at least for riscv64 and LTO.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     configs += _concurrent_jobs.configs
     forward_variables_from(_concurrent_jobs.vars, "*")
@@ -208,6 +217,7 @@ rustc_library("starnix_core") {
     "task/interval_timer.rs",
     "task/iptables.rs",
     "task/kernel.rs",
+    "task/kernel_or_task.rs",
     "task/kernel_stats.rs",
     "task/kernel_threads.rs",
     "task/limits.rs",
@@ -272,7 +282,6 @@ rustc_library("starnix_core") {
     "vfs/pseudo/mod.rs",
     "vfs/pseudo/simple_directory.rs",
     "vfs/pseudo/simple_file.rs",
-    "vfs/pseudo/static_directory.rs",
     "vfs/pseudo/stub_bytes_file.rs",
     "vfs/pseudo/stub_empty_file.rs",
     "vfs/pseudo/vec_directory.rs",
@@ -391,6 +400,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/split_enum_storage",
     "//src/starnix/lib/starnix_ext",
     "//src/starnix/lib/starnix_lifecycle",
+    "//src/starnix/lib/starnix_stack",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_types",
@@ -512,6 +522,16 @@ rustc_library("starnix_core") {
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
+  # Enable performance features in release mode.
+  if (compilation_mode == "release") {
+    # Enable linker-plugin-based LTO to only generate LLVM bitcode for
+    # this library because it is only used in a binary that has LTO enabled.
+    configs += [ "//build/config/lto:lto-rust-linker-plugin" ]
+
+    # Enable moderate level of optimization for better performance.
+    configs += [ "//build/config:optimize_moderate" ]
+  }
+
   # Allows binaries that depend on this library to link.
   public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
@@ -594,8 +614,8 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/magma",
     "//src/starnix/modules/nanohub",
     "//src/starnix/modules/overlayfs",
-    "//src/starnix/modules/perfetto-producer",
     "//src/starnix/modules/perfetto_consumer",
+    "//src/starnix/modules/perfetto_producer",
     "//src/starnix/modules/thermal",
     "//src/starnix/modules/touch_power_policy",
     "//src/sys/lib/fuchsia-zbi",
@@ -752,15 +772,12 @@ loadable_module("vdso") {
     sources += [ "vdso/vdso_arm_eabi.cc" ]
   }
 
-  deps = [ "//zircon/system/public" ]
-
-  if (current_cpu != "arm") {
-    deps += [
-      ":vdso_calculate_utc",
-      "//zircon/kernel/lib/fasttime:headers",
-      "//zircon/system/ulib/affine",
-    ]
-  }
+  deps = [
+    ":vdso_calculate_utc",
+    "//zircon/kernel/lib/fasttime:headers",
+    "//zircon/system/public",
+    "//zircon/system/ulib/affine",
+  ]
 
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
@@ -770,7 +787,11 @@ loadable_module("vdso") {
     configs -= [ "//build/config/linux:implicit-host-libs" ]
   }
 
-  exclude_toolchain_tags = [ "instrumented" ]
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+    "instrumented",
+  ]
 }
 
 resource("vdso_data") {

@@ -156,9 +156,9 @@
   "include/zircon/analyzer.h": "45a91c07f622ed2c9a578e06cbc5d3c0",
   "include/zircon/assert.h": "213adb368e24fdb598cc123ae3a4e6f9",
   "include/zircon/availability.h": "63dda5d2ca3642b6352a77a33b1c6357",
-  "include/zircon/availability_levels.inc": "3fdaab43cb1a1a86e6b459431a646b1b",
+  "include/zircon/availability_levels.inc": "7e6a1d3b2f58646e27d7e038f5dc29fe",
   "include/zircon/boot/crash-reason.h": "8bc53e5d654937ec3c2f0473640b3963",
-  "include/zircon/compiler.h": "f5a6fb624c32ca4aac64d2d86f7f033a",
+  "include/zircon/compiler.h": "b2a038f9b69f78dbe7c529bfaf8d6dc5",
   "include/zircon/device/audio.h": "1834f962b6e98a453cf2d1f8835097bb",
   "include/zircon/dlfcn.h": "685741ed270128b9b02a47663a89b28c",
   "include/zircon/errors.h": "2cedd2f5229af61131f107330cbd3181",
@@ -185,7 +185,7 @@
   "include/zircon/syscalls/exception.h": "334a353a8550a46173ee8b3d01b79a60",
   "include/zircon/syscalls/hypervisor.h": "2fde38fb441710b0e02c04dad4cbd42c",
   "include/zircon/syscalls/internal/cdecls-next.inc": "269c6508e4be6cd8b1e34aeb1bc9e3c8",
-  "include/zircon/syscalls/internal/cdecls.inc": "d156649a141f8590a7f03a6abd90751e",
+  "include/zircon/syscalls/internal/cdecls.inc": "d1f75927fb70602b5e50b2c2ce922c7b",
   "include/zircon/syscalls/iob.h": "7c5ebf9caa6164398533ea56939339d0",
   "include/zircon/syscalls/iommu.h": "a6cc36174b0b1d5c34877f05d047bbc3",
   "include/zircon/syscalls/log.h": "1f6619faeaf65dd53f73cca4c107b4d2",
@@ -203,6 +203,6 @@
   "include/zircon/threads.h": "3d9db33258f43dbb97900ef69f8be18b",
   "include/zircon/time.h": "2ffa7f90ca31c1f00f23b1310065de9a",
   "include/zircon/tls.h": "a58546d629e67c2a21cb10f628afe1c2",
-  "include/zircon/types.h": "09e358e3059352ab9d65da114fac88dc",
+  "include/zircon/types.h": "2d736f50a5aa30e2b5cff8750cec4aa2",
   "include/zircon/utc.h": "8f1894e14badd899c32b1c71a760c0c2"
 }

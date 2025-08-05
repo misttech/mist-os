@@ -33,8 +33,8 @@ group("tests") {
     ":fuzzers",
     ":geometry_provider_unittests",
     ":input_unittests",
+    ":scenic_shutdown_unittests",
     ":scenic_types_unittests",
-    ":scenic_unittests",
     ":scenic_utils_unittests",
     ":scheduling_unittests",
     ":screen_capture2_unittests",
@@ -232,10 +232,10 @@ fuchsia_unittest_package("input_unittests") {
   test_type = "vulkan"
 }
 
-fuchsia_unittest_package("scenic_unittests") {
-  manifest = "meta/scenic_unittests.cml"
+fuchsia_unittest_package("scenic_shutdown_unittests") {
+  manifest = "meta/scenic_shutdown_unittests.cml"
   deps = [
-           "lib/scenic/tests:unittests",
+           "lib/shutdown/tests:unittests",
            "//src/lib/fake-clock/svc",
          ] + scenic_test_deps
   test_specs = {

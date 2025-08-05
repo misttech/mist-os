@@ -7,7 +7,7 @@ use crate::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
 use crate::environment;
 use crate::error::ComponentInstanceError;
 use crate::policy::GlobalPolicyChecker;
-use crate::resolving::{ComponentAddress, ComponentResolutionContext};
+use crate::resolving::{ComponentAddress, ComponentResolutionContext, ResolverError};
 use async_trait::async_trait;
 use cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl};
 use cm_types::{Name, Url};
@@ -136,6 +136,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
 }
 
 /// A trait providing a representation of a resolved component instance.
+#[async_trait]
 pub trait ResolvedInstanceInterface: Send + Sync {
     /// Type representing a (unlocked and potentially unresolved) component instance.
     type Component;
@@ -163,7 +164,7 @@ pub trait ResolvedInstanceInterface: Send + Sync {
 
     /// Returns the resolver-ready location of the component, which is either
     /// an absolute component URL or a relative path URL with context.
-    fn address(&self) -> ComponentAddress;
+    async fn address(&self) -> Result<ComponentAddress, ResolverError>;
 
     /// Returns the context to be used to resolve a component from a path
     /// relative to this component (for example, a component in a subpackage).
@@ -209,6 +210,7 @@ impl<T: ResolvedInstanceInterface> ResolvedInstanceInterfaceExt for T {}
 // `MappedMutexGuard<_, _, T>`, where `T : ResolvedComponentInstance`. We can't
 // implement the latter outside of this crate because of the "orphan rule". So
 // here we implement it for all `Deref`s.
+#[async_trait]
 impl<T> ResolvedInstanceInterface for T
 where
     T: std::ops::Deref + Send + Sync,
@@ -244,8 +246,8 @@ where
         T::Target::children_in_collection(&*self, collection)
     }
 
-    fn address(&self) -> ComponentAddress {
-        T::Target::address(&*self)
+    async fn address(&self) -> Result<ComponentAddress, ResolverError> {
+        T::Target::address(&*self).await
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {

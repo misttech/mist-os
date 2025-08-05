@@ -398,6 +398,10 @@ void CheckStats(const inspect::Hierarchy* hierarchy, const inspect::InspectStats
       hierarchy->node().get_property<inspect::UintPropertyValue>("maximum_size");
   ASSERT_TRUE(maximum_size_value != nullptr);
   ASSERT_EQ(expected->maximum_size, maximum_size_value->value());
+  auto utilization_per_ten_k_value =
+      hierarchy->node().get_property<inspect::UintPropertyValue>("utilization_per_ten_k");
+  ASSERT_TRUE(utilization_per_ten_k_value != nullptr);
+  ASSERT_EQ(expected->utilization_per_ten_k, utilization_per_ten_k_value->value());
   auto total_dynamic_children_value =
       hierarchy->node().get_property<inspect::UintPropertyValue>("total_dynamic_children");
   ASSERT_TRUE(total_dynamic_children_value != nullptr);
@@ -431,6 +435,7 @@ TEST(Inspect, CreateStatsNode) {
   inspect::InspectStats expected = {};
   expected.size = 1 * kPageSize;
   expected.maximum_size = 2 * kPageSize;
+  expected.utilization_per_ten_k = 5000;
   expected.dynamic_child_count = 1u;
   expected.allocated_blocks = 4u;
   expected.deallocated_blocks = 0u;
@@ -446,6 +451,7 @@ TEST(Inspect, CreateStatsNode) {
 
   expected.size = 2 * kPageSize;
   expected.maximum_size = 2 * kPageSize;
+  expected.utilization_per_ten_k = 10000;
   expected.dynamic_child_count = 1u;
   expected.allocated_blocks = 304u;
   expected.deallocated_blocks = 0u;
@@ -461,6 +467,7 @@ TEST(Inspect, CreateStatsNode) {
 
   expected.size = 2 * kPageSize;
   expected.maximum_size = 2 * kPageSize;
+  expected.utilization_per_ten_k = 10000;
   expected.dynamic_child_count = 1u;
   expected.allocated_blocks = 381u;
   expected.deallocated_blocks = 2u;

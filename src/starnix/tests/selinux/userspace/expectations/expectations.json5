@@ -34,6 +34,17 @@
                 // permission is denied.
                 "InheritTest.SiginhDeniedItimerRealReset",
 
+                // TODO: https://fxbug.dev/378655436 - Clear pending fatal and non-fatal signals when the `siginh`
+                // permission is denied.
+                "InheritTest.SiginhDeniedPendingNonFatalSignalsCleared",
+                "InheritTest.SiginhDeniedPendingFatalSignalsCleared",
+
+                // TODO: https://fxbug.dev/378655436 - Clear the signal mask when the `siginh` permission is denied.
+                "InheritTest.SiginhDeniedSignalMaskReset",
+
+                // TODO: https://fxbug.dev/378655436 - Reset signal dispositions to defaults when the `siginh` permission is denied.
+                "InheritTest.SiginhDeniedSignalDispositionsReset",
+
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
                 "SeLinuxFsAccess.UnknownClassIdIsAccepted",

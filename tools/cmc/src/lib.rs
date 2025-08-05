@@ -21,31 +21,6 @@ mod util;
 
 pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
     match opt.cmd {
-        // TODO(https://fxbug.dev/42148493): Remove `cmc validate`.
-        opts::Commands::Validate { files, must_offer_protocol, must_use_protocol } => {
-            if files.is_empty() {
-                return Err(error::Error::invalid_args("No files provided").into());
-            }
-
-            for file in files {
-                let file = file.as_ref();
-                cml::compile(
-                    &util::read_cml(file)?,
-                    cml::CompileOptions::new().file(&file).protocol_requirements(
-                        cml::CapabilityRequirements {
-                            must_offer: &must_offer_protocol
-                                .iter()
-                                .map(|value| cml::OfferToAllCapability::Protocol(value))
-                                .collect::<Vec<_>>(),
-                            must_use: &must_use_protocol
-                                .iter()
-                                .map(|value| cml::MustUseRequirement::Protocol(value))
-                                .collect::<Vec<_>>(),
-                        },
-                    ),
-                )?;
-            }
-        }
         opts::Commands::ValidateReferences { component_manifest, package_manifest, context } => {
             reference::validate(&component_manifest, &package_manifest, context.as_ref())?
         }

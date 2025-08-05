@@ -113,7 +113,7 @@ to your `fx set` invocation:
    ```posix-terminal
    fx set core.x64 \
    --with //examples/diagnostics/inspect/codelab/cpp \
-   --with //examples/diagnostics/inspect/codelab/cpp:tests
+   --with-test //examples/diagnostics/inspect/codelab/cpp:hermetic_tests
    ```
 
 * {Rust}
@@ -122,8 +122,7 @@ to your `fx set` invocation:
 
    ```posix-terminal
    fx set core.x64 \
-   --with //examples/diagnostics/inspect/codelab/rust \
-   --with //examples/diagnostics/inspect/codelab/rust:tests
+   --with //examples/diagnostics/inspect/codelab/rust
    ```
 
 

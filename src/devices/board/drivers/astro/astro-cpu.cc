@@ -38,7 +38,7 @@ const std::vector<fpbus::Mmio> cpu_mmios{
     {{
         // AOBUS
         .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
 };
 

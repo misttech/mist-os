@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl};
 use cm_types::Name;
 use errors::{EventsError, ModelError};
-use futures::lock::Mutex;
+use fuchsia_sync::Mutex;
 use hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::{HashMap, HashSet};
@@ -199,10 +199,11 @@ impl EventRegistry {
             }
         };
 
-        self.subscribe_with_routed_events(&subscriber, events).await
+        self.subscribe_with_routed_events(&subscriber, events)
     }
 
-    pub async fn subscribe_with_routed_events(
+    #[allow(clippy::result_large_err)]
+    fn subscribe_with_routed_events(
         &self,
         subscriber: &WeakExtendedInstance,
         events: Vec<RoutedEvent>,
@@ -210,7 +211,7 @@ impl EventRegistry {
         // TODO(https://fxbug.dev/42125376): get rid of this channel and use FIDL directly.
         let mut event_stream = EventStream::new();
 
-        let mut dispatcher_map = self.dispatcher_map.lock().await;
+        let mut dispatcher_map = self.dispatcher_map.lock();
         for event in &events {
             let dispatchers = dispatcher_map.entry(event.source_name.clone()).or_insert(vec![]);
             let dispatcher = event_stream.create_dispatcher(
@@ -232,7 +233,7 @@ impl EventRegistry {
             ExtendedInstance::AboveRoot(subscriber) => subscriber.task_group(),
         };
         let events = events.into_iter().map(|event| (event.source_name, event.scopes)).collect();
-        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events, &task_group).await;
+        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events, &task_group);
 
         Ok(event_stream)
     }
@@ -248,7 +249,7 @@ impl EventRegistry {
         // If task B was required to respond to event1, then this is a deadlock.
         // Neither task can make progress.
         let dispatchers = {
-            let mut dispatcher_map = self.dispatcher_map.lock().await;
+            let mut dispatcher_map = self.dispatcher_map.lock();
             if let Some(dispatchers) = dispatcher_map.get_mut(&Name::from(event.event_type())) {
                 let mut strong_dispatchers = vec![];
                 dispatchers.retain(|dispatcher| {
@@ -272,7 +273,7 @@ impl EventRegistry {
             // valid for a EventStream to be dropped. That simply means
             // that the EventStream is no longer interested in future
             // events.
-            let _ = dispatcher.dispatch(event).await;
+            let _: Result<(), anyhow::Error> = dispatcher.dispatch(event).await;
         }
     }
 
@@ -385,8 +386,8 @@ impl EventRegistry {
     }
 
     #[cfg(all(test, not(feature = "src_model_tests")))]
-    async fn dispatchers_per_event_type(&self, event_type: EventType) -> usize {
-        let dispatcher_map = self.dispatcher_map.lock().await;
+    fn dispatchers_per_event_type(&self, event_type: EventType) -> usize {
+        let dispatcher_map = self.dispatcher_map.lock();
         dispatcher_map
             .get(&Name::from(event_type))
             .map(|dispatchers| dispatchers.len())
@@ -446,7 +447,7 @@ mod tests {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
         let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
 
-        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved));
         let mut event_stream_a = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
@@ -463,7 +464,7 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved));
 
         let mut event_stream_b = event_registry
             .subscribe(
@@ -481,29 +482,29 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved));
 
         dispatch_fake_event(&event_registry).await;
 
         // Verify that both EventStreams receive the event.
         assert!(event_stream_a.next().await.is_some());
         assert!(event_stream_b.next().await.is_some());
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved));
 
         drop(event_stream_a);
 
         // EventRegistry won't drop EventDispatchers until an event is dispatched.
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved));
 
         dispatch_fake_event(&event_registry).await;
 
         assert!(event_stream_b.next().await.is_some());
-        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved));
 
         drop(event_stream_b);
 
         dispatch_fake_event(&event_registry).await;
-        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
+        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved));
     }
 
     #[fuchsia::test]
@@ -511,10 +512,7 @@ mod tests {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
         let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
 
-        assert_eq!(
-            0,
-            event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
-        );
+        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::CapabilityRequested));
 
         let mut event_stream_a = event_registry
             .subscribe(
@@ -532,10 +530,7 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(
-            1,
-            event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
-        );
+        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::CapabilityRequested));
 
         let mut event_stream_b = event_registry
             .subscribe(
@@ -552,10 +547,7 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(
-            2,
-            event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
-        );
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::CapabilityRequested));
 
         dispatch_capability_requested_event(&event_registry).await;
 

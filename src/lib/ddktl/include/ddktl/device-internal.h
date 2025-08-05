@@ -17,7 +17,6 @@
 #include <ddktl/fidl.h>
 #endif
 #include <ddktl/init-txn.h>
-#include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
 
@@ -269,38 +268,6 @@ constexpr void CheckSuspendable() {
   static_assert(std::is_same<decltype(&D::DdkSuspend), void (D::*)(SuspendTxn txn)>::value,
                 "DdkSuspend must be a public non-static member function with signature "
                 "'zx_status_t DdkSuspend(SuspendTxn txn)'.");
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_auto_configure_suspend, DdkConfigureAutoSuspend);
-
-template <typename D>
-constexpr void CheckConfigureAutoSuspend() {
-  static_assert(has_ddk_auto_configure_suspend<D>::value,
-                "ConfigureAutoSuspendable classes must implement DdkConfigureAutoSuspend");
-  static_assert(
-      std::is_same<decltype(&D::DdkConfigureAutoSuspend), zx_status_t (D::*)(bool, uint8_t)>::value,
-      "DdkConfigureAutoSuspend must be a public non-static member function with signature "
-      "'zx_status_t DdkConfigureAutoSuspend(bool, uint8_t)'.");
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_resume, DdkResume);
-
-template <typename D>
-constexpr void CheckResumable() {
-  static_assert(has_ddk_resume<D>::value, "Resumable classes must implement DdkResume");
-  static_assert(std::is_same<decltype(&D::DdkResume), void (D::*)(ResumeTxn txn)>::value,
-                "DdkResume must be a public non-static member function with signature "
-                "'void DdkResume(ResumeTxn)'.");
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_rxrpc, DdkRxrpc);
-
-template <typename D>
-constexpr void CheckRxrpcable() {
-  static_assert(has_ddk_rxrpc<D>::value, "Rxrpcable classes must implement DdkRxrpc");
-  static_assert(std::is_same<decltype(&D::DdkRxrpc), zx_status_t (D::*)(uint32_t)>::value,
-                "DdkRxrpc must be a public non-static member function with signature "
-                "'zx_status_t DdkRxrpc(zx_handle_t)'.");
 }
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_child_pre_release, DdkChildPreRelease);

@@ -11,7 +11,7 @@ use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
 use errors::ModelError;
-use futures::lock::Mutex;
+use fuchsia_sync::Mutex;
 use moniker::Moniker;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,6 +30,9 @@ pub struct ModelContext {
     config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
     pub scope_factory: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
     remote_capabilities: Arc<Mutex<RemotedRuntimeCapabilities>>,
+    #[cfg(test)]
+    pub extra_framework_capabilities:
+        std::sync::Mutex<HashMap<cm_types::Name, sandbox::Capability>>,
 }
 
 impl ModelContext {
@@ -57,6 +60,8 @@ impl ModelContext {
             config_developer_overrides: Mutex::new(HashMap::new()),
             scope_factory,
             remote_capabilities: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(test)]
+            extra_framework_capabilities: std::sync::Mutex::new(HashMap::new()),
         })
     }
 
@@ -98,23 +103,25 @@ impl ModelContext {
         f: Vec<Box<dyn FrameworkCapability>>,
     ) {
         {
-            let mut builtin_capabilities = self.builtin_capabilities.lock().await;
+            let mut builtin_capabilities = self.builtin_capabilities.lock();
             assert!(builtin_capabilities.is_none(), "already initialized");
             *builtin_capabilities = Some(b);
         }
         {
-            let mut framework_capabilities = self.framework_capabilities.lock().await;
+            let mut framework_capabilities = self.framework_capabilities.lock();
             assert!(framework_capabilities.is_none(), "already initialized");
             *framework_capabilities = Some(f);
         }
     }
 
     #[cfg(all(test, feature = "src_model_tests"))]
-    pub async fn add_framework_capability(&self, c: Box<dyn FrameworkCapability>) {
-        // Internal capabilities added for a test should preempt existing ones that match the
-        // same metadata.
-        let mut framework_capabilities = self.framework_capabilities.lock().await;
-        framework_capabilities.as_mut().unwrap().insert(0, c);
+    pub async fn add_framework_capability(
+        &self,
+        name: impl Into<String>,
+        capability: impl Into<sandbox::Capability>,
+    ) {
+        let mut framework_capabilities = self.extra_framework_capabilities.lock().unwrap();
+        framework_capabilities.insert(cm_types::Name::new(name.into()).unwrap(), capability.into());
     }
 
     /// Adds a configuration override for the component identified by moniker.
@@ -126,7 +133,6 @@ impl ModelContext {
     ) {
         self.config_developer_overrides
             .lock()
-            .await
             .entry(moniker)
             .or_default()
             .insert(config_override.key, config_override.value);
@@ -138,12 +144,7 @@ impl ModelContext {
         &self,
         moniker: &Moniker,
     ) -> HashMap<String, cm_rust::ConfigValue> {
-        self.config_developer_overrides
-            .lock()
-            .await
-            .get(&moniker)
-            .cloned()
-            .unwrap_or_else(HashMap::new)
+        self.config_developer_overrides.lock().get(&moniker).cloned().unwrap_or_else(HashMap::new)
     }
 
     /// Removes the configuration overrides for the component identified by
@@ -153,7 +154,7 @@ impl ModelContext {
         &self,
         moniker: &Moniker,
     ) -> Result<(), ModelError> {
-        match self.config_developer_overrides.lock().await.remove(moniker) {
+        match self.config_developer_overrides.lock().remove(moniker) {
             Some(_) => Ok(()),
             None => Err(ModelError::instance_not_found(moniker.clone())),
         }
@@ -165,7 +166,6 @@ impl ModelContext {
         let scoped_components = self
             .config_developer_overrides
             .lock()
-            .await
             .keys()
             .filter(|k| k.has_prefix(scope_moniker))
             .cloned()
@@ -187,7 +187,7 @@ impl ModelContext {
     ) -> Option<Box<dyn CapabilityProvider>> {
         match source {
             CapabilitySource::Builtin(BuiltinSource { capability, .. }) => {
-                let builtin_capabilities = self.builtin_capabilities.lock().await;
+                let builtin_capabilities = self.builtin_capabilities.lock();
                 for c in builtin_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
                         return Some(c.new_provider(target));
@@ -196,12 +196,22 @@ impl ModelContext {
                 None
             }
             CapabilitySource::Framework(FrameworkSource { capability, moniker }) => {
-                let framework_capabilities = self.framework_capabilities.lock().await;
-                for c in framework_capabilities.as_ref().expect("not initialized") {
-                    if c.matches(capability) {
-                        let source_component =
-                            target.upgrade().ok()?.find_absolute(moniker).await.ok()?.as_weak();
-                        return Some(c.new_provider(source_component, target));
+                {
+                    let lock = self.framework_capabilities.lock();
+                    let framework_capabilities = lock.as_ref().expect("not initialized");
+                    if !framework_capabilities.iter().any(|c| c.matches(capability)) {
+                        return None;
+                    }
+                }
+                let source_component =
+                    target.upgrade().ok()?.find_absolute(moniker).await.ok()?.as_weak();
+                {
+                    let lock = self.framework_capabilities.lock();
+                    let framework_capabilities = lock.as_ref().expect("not initialized");
+                    for c in framework_capabilities {
+                        if c.matches(capability) {
+                            return Some(c.new_provider(source_component, target));
+                        }
                     }
                 }
                 None

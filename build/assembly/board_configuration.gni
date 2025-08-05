@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
+import("//build/zbi/zbi.gni")
 
 # Creates the assembly Board configuration file, and it's main Hardware Support
 # Bundle, which respectively provide information about the board and components
@@ -79,6 +80,11 @@ import("//build/compiled_action.gni")
 #    [GN Label] The GN label of the devicetree binary for this board. This
 #    should be a devicetree() target.
 #
+#  zbi_extra_items (optional)
+#    [list; GN Labels] The GN labels of ZBI containers to be included in this
+#    in this board. The ZBI containers provide additional items to be incorporated
+#    that are specific to the board.
+#
 #  trusted_app_guids (optional)
 #    [list; strings of valid GUIDs] The GUIDs of optee Trusted Applications
 #    coordinated tee_manager and which tee_manager should expose. Specifying
@@ -124,6 +130,9 @@ template("board_configuration") {
 
     # Intermediate Files
     base_info = "${target_name}.base_info"
+
+    # Internal manifest of the ZBI items being incoorporated by assembly.
+    zbi_extra_items = "${target_name}.zbi_extra_items"
   }
 
   files = {
@@ -150,6 +159,8 @@ template("board_configuration") {
     partitions_config =
         get_label_info(invoker.partitions_config, "target_out_dir") + "/" +
         get_label_info(invoker.partitions_config, "name")
+
+    zbi_extra_items = "${bundles_dir}/${labels.zbi_extra_items}.zbi"
   }
 
   if (defined(invoker.input_bundles)) {
@@ -192,6 +203,19 @@ template("board_configuration") {
     _filesystems.vbmeta = {
     }
     _filesystems.vbmeta = _vbmeta
+  }
+  has_zbi_extra_items =
+      defined(invoker.zbi_extra_items) && invoker.zbi_extra_items != []
+  if (has_zbi_extra_items) {
+    zbi(labels.zbi_extra_items) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":*" ]
+
+      # Must not be a bootable ZBI.
+      cpu = ""
+      output_dir = bundles_dir
+      deps = invoker.zbi_extra_items
+    }
   }
 
   base_info_contents = {
@@ -236,6 +260,10 @@ template("board_configuration") {
         version = "intermediate_version"
       }
       bib_sets = []
+    }
+
+    if (has_zbi_extra_items) {
+      zbi_extra_items = rebase_path(files.zbi_extra_items, root_build_dir)
     }
   }
 
@@ -327,6 +355,9 @@ template("board_configuration") {
     }
     if (defined(invoker.devicetree)) {
       deps += [ invoker.devicetree ]
+    }
+    if (has_zbi_extra_items) {
+      deps += [ ":${labels.zbi_extra_items}" ]
     }
 
     metadata = {

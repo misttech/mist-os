@@ -7,137 +7,20 @@ package bazel2gn
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"go.starlark.net/syntax"
 )
 
-// indentPrefix is the string value used to indent a line by one level.
+// Parse takes a path to a starlark file and returns a parsed AST.
 //
-// NOTE: This prefix is only used by the internal representation of this package.
-// The final output is formatted by `gn format`.
-const indentPrefix = "\t"
-
-// bazelRuleToGNTemplate maps from Bazel rule names to GN template names. They can
-// be the same if Bazel and GN shared the same template name.
-//
-// This map is also used to check known Bazel rules that can be converted to GN.
-// i.e. Bazel rules not found in this map is not supported by bazel2gn yet.
-var bazelRuleToGNTemplate = map[string]string{
-	// Go
-	"go_binary":  "go_binary",
-	"go_library": "go_library",
-	"go_test":    "go_test",
-
-	// Rust
-	"rust_binary":     "rustc_binary",
-	"rust_library":    "rustc_library",
-	"rustc_binary":    "rustc_binary",
-	"rustc_library":   "rustc_library",
-	"rust_proc_macro": "rustc_macro",
-
-	// C++
-	"cc_library": "source_set",
-
-	// IDK & SDK
-	"idk_cc_source_library": "sdk_source_set",
-	"sdk_host_tool":         "sdk_host_tool",
-
-	// Other
-	"install_host_tools": "install_host_tools",
-	"package":            "package",
-}
-
-// attrsToOmitByRules stores a mapping from known Bazel rules to attributes to
-// omit when converting them to GN.
-var attrsToOmitByRules = map[string]map[string]bool{
-	"go_library": {
-		// In GN we default cgo to true when compiling Go code, and explicitly disable
-		// it in very few places. However, in Bazel, cgo defaults to false, and
-		// require users to explicitly set when C sources are included.
-		"cgo": true,
-	},
-}
-
-// Common Bazel attributes that use different names in GN.
-var commonAttrMap = map[string]string{
-	"srcs": "sources",
-	"hdrs": "public",
-}
-
-// ccAttrMap maps from attribute names in Bazel CC rules to GN parameter names.
-// This map only includes attributes that have different names in Bazel and GN.
-var ccAttrMap = map[string]string{
-	"copts":               "configs",
-	"deps":                "public_deps",
-	"implementation_deps": "deps",
-}
-
-// rustAttrMap maps from attribute name in Bazel Rust rules to GN parameter names.
-// This map only includes attributes that have different names in Bazel and GN.
-var rustAttrMap = map[string]string{
-	"crate_features": "features",
-}
-
-// idkAttrMap maps from attribute name in Bazel IDK rules to GN parameter names.
-// This map only includes attributes that have different names in Bazel and GN.
-var idkAttrMap = map[string]string{
-	"api_area": "sdk_area",
-	"idk_name": "sdk_name",
-}
-
-// A mapping from Bazel rule names to attribute mappings.
-// Attribute mappings map from Bazel rule attributes that use different names in GN.
-var attrMapsByRules = map[string]map[string]string{
-	// C++
-	"cc_library": ccAttrMap,
-
-	// Rust
-	"rust_binary":     rustAttrMap,
-	"rust_library":    rustAttrMap,
-	"rust_proc_macro": rustAttrMap,
-	"rustc_binary":    rustAttrMap,
-	"rustc_library":   rustAttrMap,
-
-	// IDK
-	"idk_cc_source_library": idkAttrMap,
-}
-
-// These identifiers with the same meanings are represented differently in Bazel
-// and GN. specialIdentifiers maps from their Bazel representations to GN
-// representations.
-var specialIdentifiers = map[string]string{
-	"True":  "true",
-	"False": "false",
-}
-
-// specialTokens maps from special tokens in Bazel to their GN equivalents.
-var specialTokens = map[syntax.Token]string{
-	syntax.AND: "&&",
-	syntax.OR:  "||",
-}
-
-var bazelConstraintsToGNConditions = map[string]string{
-	"HOST_CONSTRAINTS": "is_host",
-}
-
-var thirdPartyRustCrateRE = regexp.MustCompile(`^"\/\/third_party\/rust_crates.+:`)
-
-// coptToConfig maps from Bazel copt values to configs to use in GN.
-var coptToConfig = map[string]string{
-	"-Wno-implicit-fallthrough": "//build/config:Wno-implicit-fallthrough",
-}
-
-// attrGNAssignmentOps maps from GN attribute names to the assignment operators to use in GN.
-//
-// NOTE: Entries in this map should be clearly documented.
-var attrGNAssignmentOps = map[string]string{
-	// `configs` in GN are rarely (never?) empty lists because we set them in BUILDCONFIG.gn.
-	// Trying to overwrite a non-empty list in GN with a non-empty value will fail.
-	// Simply replacing assignment with `+=` works for the initial use cases we need.
-	// More complex mechanism may be required if we need to selectively overwrite config assignments.
-	"configs": "+=",
+// This delegates to the starlark parser library we are using.
+// Create a function wrapper here to capture the settings and modes we use during parsing.
+func Parse(path string) (*syntax.File, error) {
+	opts := syntax.FileOptions{
+		// Empty means default file-level settings for parsing.
+	}
+	return opts.Parse(path, nil, syntax.RetainComments)
 }
 
 // indent indents input lines by input levels.
@@ -387,6 +270,31 @@ func convertAttrName(attrName, bazelRule string) string {
 	return attrName
 }
 
+// hasClearAnnotation returns true if the input expr has a clear annotation comment.
+//
+// This function only picks up suffix comments, for example:
+//
+// ```
+//
+//	# This comment is NOT considered
+//	copts = [] # This comment is considered
+//
+//	copts = [ # This comment is NOT considered
+//	] # This comment is considered
+//
+// ```
+func hasClearAnnotation(expr syntax.Expr) bool {
+	comments := expr.Comments()
+	if comments != nil {
+		for _, c := range comments.Suffix {
+			if c.Text == clearAnnotation {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // attrAssignmentToGN converts a Bazel assignment [0] to GN. These assignments
 // are used to assign values to fields during target definitions in Bazel.
 //
@@ -406,6 +314,11 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 
 	op, ok := attrGNAssignmentOps[attrName]
 	if !ok {
+		op = "="
+	}
+
+	// TODO(https://fxbug.dev/430953918): Figure out a better way to handle configs and public_configs conversion.
+	if attrName == "configs" && hasClearAnnotation(expr) {
 		op = "="
 	}
 
@@ -449,6 +362,17 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 
 	ret := []string{fmt.Sprintf("%s %s %s", attrName, op, rhs[0])}
 	ret = append(ret, rhs[1:]...)
+
+	// Handle any additional work necessary for specific assignments.
+	if attrName == "sdk_headers_for_internal_use" {
+		// While the files in GN's `sdk_headers_for_internal_use` are included
+		// in `public` (or `sources`), that is not the cases for Bazel's
+		// `hdrs_for_internal_use`. To match the GN behavior, add all the files
+		// specified in `hdrs_for_internal_use` to `public` in the GN target.
+		// For more information, see `idk_cc_source_library()`.`
+		ret = append(ret, "public += sdk_headers_for_internal_use")
+	}
+
 	return ret, nil
 }
 

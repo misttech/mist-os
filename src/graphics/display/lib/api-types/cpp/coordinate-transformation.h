@@ -21,6 +21,9 @@ namespace display {
 // See `::fuchsia_hardware_display_types::wire::CoordinateTransformation` for references.
 //
 // Instances are guaranteed to represent valid enum members.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class CoordinateTransformation {
  public:
   // True iff `fidl_transformation` is convertible to a valid CoordinateTransformation.

@@ -11,17 +11,22 @@
 #include <array>
 #include <optional>
 
+#include "src/ui/scenic/lib/types/blend_mode.h"
 #include "src/ui/scenic/lib/types/rectangle.h"
+#include "src/ui/scenic/lib/types/rectangle_f.h"
 
 #include <glm/glm.hpp>
 
 namespace flatland {
 
 // The sample region to use for an image when texturing a rectangle.
-using ImageSampleRegion = fuchsia::math::RectF;
+using ImageSampleRegion = types::RectangleF;
 
 // The clip region for a transform to bound its children.
 using TransformClipRegion = types::Rectangle;
+
+// Alpha blending mode.
+using BlendMode = types::BlendMode;
 
 // Represents an image rectangle, parameterized by an origin point, an extent representing the width
 // and height. The texel UV coordinates specify, in clockwise order, the unnormalized clockwise
@@ -61,7 +66,10 @@ std::ostream& operator<<(std::ostream& str, const flatland::ImageRect& r);
 class HitRegion {
  public:
   // Finite hit region with default interaction.
-  explicit HitRegion(fuchsia::math::RectF region,
+  explicit HitRegion(const types::RectangleF& region,
+                     const fuchsia::ui::composition::HitTestInteraction& interaction =
+                         fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+  explicit HitRegion(types::RectangleF::ConstructorArgs region,
                      fuchsia::ui::composition::HitTestInteraction interaction =
                          fuchsia::ui::composition::HitTestInteraction::DEFAULT);
 
@@ -73,7 +81,7 @@ class HitRegion {
   bool is_finite() const;
 
   // Finite region accessor. Caller ensures is_finite() is true.
-  const fuchsia::math::RectF& region() const;
+  const types::RectangleF& region() const;
 
   // Hit test interaction accessor.
   fuchsia::ui::composition::HitTestInteraction interaction() const;
@@ -84,7 +92,7 @@ class HitRegion {
 
   // Presence indicates a finite hit region.
   // Absence indicates an infinite hit region.
-  std::optional<fuchsia::math::RectF> region_;
+  std::optional<types::RectangleF> region_;
 
   fuchsia::ui::composition::HitTestInteraction interaction_ =
       fuchsia::ui::composition::HitTestInteraction::DEFAULT;

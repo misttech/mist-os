@@ -17,8 +17,11 @@ cc_test_executable("unittests") {
 
   testonly = true
   sources = [
+    "extent2_f_unittest.cc",
     "extent2_unittest.cc",
+    "point2_f_unittest.cc",
     "point2_unittest.cc",
+    "rectangle_f_unittest.cc",
     "rectangle_unittest.cc",
   ]
   deps = [

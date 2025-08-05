@@ -43,6 +43,7 @@
                 "fuchsia.recovery.UseFxBlob",
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
+                "fuchsia.scenic.FrameCounterOverlay",
                 "fuchsia.scenic.FramePredictionMarginInUs",
                 "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
                 "fuchsia.scenic.ICanHazDisplayId",
@@ -181,12 +182,14 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.fshost.Admin",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.logger.Log",
                 "fuchsia.paver.Paver",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.clientlevel.Connector",
@@ -281,6 +284,7 @@
         {
             service: [
                 "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.google.nanohub.DisplayService",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.nfc.Service",
@@ -391,6 +395,12 @@
             from: "#core",
             as: "toolbox-core",
             to: "#toolbox",
+        },
+        {
+            protocol: [ "fuchsia.dash.Launcher" ],
+            from: "#core",
+            to: "#toolbox",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.process.Resolver" ],

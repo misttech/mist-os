@@ -6,20 +6,25 @@ use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
 use crate::logs::repository::LogsRepository;
 use crate::logs::servers::LogServer;
+use crate::logs::shared_buffer::create_ring_buffer;
 use crate::logs::stored_message::StoredMessage;
-use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-use diagnostics_log_encoding::{Argument, Record};
+use diagnostics_log_encoding::encode::{
+    Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
+};
+use diagnostics_log_encoding::{Argument, RawSeverity, Record};
 use diagnostics_log_types::Severity;
-use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
+use diagnostics_message::MAX_DATAGRAM_LEN;
 use fidl::prelude::*;
 use fidl_fuchsia_logger::{
-    LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy, LogSinkMarker, LogSinkProxy,
+    LogFilterOptions, LogMarker, LogMessage, LogProxy, LogSinkMarker, LogSinkProxy,
+    MAX_DATAGRAM_LEN_BYTES,
 };
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::marker::PhantomData;
@@ -81,8 +86,12 @@ impl TestHarness {
     fn new(hold_sinks: bool) -> Self {
         let scope = fasync::Scope::new();
         let inspector = Inspector::default();
-        let log_manager =
-            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_manager = LogsRepository::new(
+            create_ring_buffer(1_000_000),
+            std::iter::empty(),
+            inspector.root(),
+            scope.new_child(),
+        );
         let log_server = LogServer::new(Arc::clone(&log_manager), scope.new_child());
 
         let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
@@ -143,28 +152,28 @@ impl TestHarness {
     }
 
     pub async fn manager_test(mut self, test_dump_logs: bool) {
-        let mut p = setup_default_packet();
         let lm1 = LogMessage {
-            time: zx::BootInstant::from_nanos(p.metadata.time),
-            pid: p.metadata.pid,
-            tid: p.metadata.tid,
-            dropped_logs: p.metadata.dropped_logs,
-            severity: p.metadata.severity,
+            time: zx::BootInstant::get(),
+            pid: 1,
+            tid: 2,
+            dropped_logs: 3,
+            severity: Severity::Info as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let mut p = to_record(&lm1);
         let mut lm2 = copy_log_message(&lm1);
         let mut lm3 = copy_log_message(&lm1);
-        let mut stream = self.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = self.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packet(p.clone());
 
-        p.metadata.severity = LogLevelFilter::Info.into_primitive().into();
-        lm2.severity = LogLevelFilter::Info.into_primitive().into();
-        lm3.severity = LogLevelFilter::Info.into_primitive().into();
+        p.severity = Severity::Info as u8;
+        lm2.severity = Severity::Info as i32;
+        lm3.severity = Severity::Info as i32;
         stream.write_packet(p.clone());
 
-        p.metadata.pid = 2;
-        lm3.pid = 2;
+        lm3.pid += 10;
+        p = to_record(&lm3);
         stream.write_packet(p);
         drop(stream);
         self.check_pending_streams();
@@ -177,23 +186,10 @@ impl TestHarness {
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
     /// `manager_test`.
-    pub fn create_stream(
-        &mut self,
-        identity: Arc<ComponentIdentity>,
-    ) -> TestStream<LogPacketWriter> {
-        self.make_stream(Arc::new(DefaultLogReader::new(
-            Arc::clone(&self.log_manager),
-            identity,
-            self.scope.to_handle(),
-        )))
-    }
-
-    /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
-    /// `manager_test`.
     pub fn create_stream_from_log_reader(
         &mut self,
         log_reader: Arc<dyn LogReader>,
-    ) -> TestStream<LogPacketWriter> {
+    ) -> TestStream<StructuredMessageWriter> {
         self.make_stream(log_reader)
     }
 
@@ -238,25 +234,9 @@ pub trait LogWriter {
     fn write(sout: &zx::Socket, packet: Self::Packet);
 }
 
-/// A `LogWriter` that writes `fx_log_packet_t` to a LogSink in the syslog
-/// format.
-pub struct LogPacketWriter;
-
 /// A `LogWriter` that writes `Record` to a LogSink in the structured
 /// log format.
 pub struct StructuredMessageWriter;
-
-impl LogWriter for LogPacketWriter {
-    type Packet = fx_log_packet_t;
-
-    fn connect(log_sink: &LogSinkProxy, sout: zx::Socket) {
-        log_sink.connect(sout).expect("unable to connect out socket to log sink");
-    }
-
-    fn write(sin: &zx::Socket, packet: fx_log_packet_t) {
-        sin.write(packet.as_bytes()).unwrap();
-    }
-}
 
 impl LogWriter for StructuredMessageWriter {
     type Packet = Record<'static>;
@@ -422,8 +402,12 @@ pub async fn debuglog_test(
     scope: fasync::Scope,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm =
-        LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+    let lm = LogsRepository::new(
+        create_ring_buffer(1_000_000),
+        std::iter::empty(),
+        inspector.root(),
+        scope.new_child(),
+    );
     let log_server = LogServer::new(Arc::clone(&lm), scope);
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
     log_server.spawn(log_stream);
@@ -433,16 +417,17 @@ pub async fn debuglog_test(
     inspector
 }
 
-pub fn setup_default_packet() -> fx_log_packet_t {
-    let mut p: fx_log_packet_t = Default::default();
-    p.metadata.pid = 1;
-    p.metadata.tid = 1;
-    p.metadata.severity = LogLevelFilter::Warn.into_primitive().into();
-    p.metadata.dropped_logs = 2;
-    p.data[0] = 5;
-    p.fill_data(1..6, 65);
-    p.fill_data(7..12, 66);
-    p
+pub fn to_record(
+    LogMessage { pid, tid, time, severity, dropped_logs, tags, msg }: &LogMessage,
+) -> Record<'static> {
+    let mut arguments = vec![
+        Argument::Pid(zx::Koid::from_raw(*pid)),
+        Argument::Tid(zx::Koid::from_raw(*tid)),
+        Argument::Dropped(*dropped_logs as u64),
+        Argument::Message(Cow::Owned(msg.clone())),
+    ];
+    arguments.extend(tags.iter().map(|t| Argument::Tag(Cow::Owned(t.clone()))));
+    Record { timestamp: *time, severity: *severity as RawSeverity, arguments }
 }
 
 pub fn copy_log_message(log_message: &LogMessage) -> LogMessage {
@@ -546,7 +531,11 @@ impl LogSinkHelper {
 
     pub fn connect(&self) -> zx::Socket {
         let (sin, sout) = zx::Socket::create_datagram();
-        self.log_sink.as_ref().unwrap().connect(sin).expect("unable to send socket to log sink");
+        self.log_sink
+            .as_ref()
+            .unwrap()
+            .connect_structured(sin)
+            .expect("unable to send socket to log sink");
         sout
     }
 
@@ -565,15 +554,55 @@ impl LogSinkHelper {
     }
 
     pub fn write_log_at(sock: &zx::Socket, msg: &str) {
-        let mut p: fx_log_packet_t = Default::default();
-        p.metadata.pid = 1;
-        p.metadata.tid = 1;
-        p.metadata.severity = LogLevelFilter::Info.into_primitive().into();
-        p.metadata.dropped_logs = 0;
-        p.data[0] = 0;
-        p.add_data(1, msg.as_bytes());
+        let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
+        let mut encoder = Encoder::new(Cursor::new(&mut buf[..]), EncoderOpts::default());
 
-        sock.write(p.as_bytes()).unwrap();
+        struct LogEvent<'a>(&'a str);
+
+        impl RecordEvent for LogEvent<'_> {
+            fn raw_severity(&self) -> RawSeverity {
+                Severity::Info as RawSeverity
+            }
+
+            fn file(&self) -> Option<&str> {
+                unreachable!();
+            }
+
+            fn line(&self) -> Option<u32> {
+                unreachable!();
+            }
+
+            fn target(&self) -> &str {
+                unreachable!();
+            }
+
+            fn write_arguments<B: MutableBuffer>(
+                self,
+                encoder: &mut Encoder<B>,
+            ) -> Result<(), EncodingError> {
+                encoder.write_argument(Argument::message(self.0))?;
+                Ok(())
+            }
+
+            fn timestamp(&self) -> zx::BootInstant {
+                zx::BootInstant::get()
+            }
+        }
+
+        let tags: &[&str] = &[];
+        encoder
+            .write_event(WriteEventParams {
+                event: LogEvent(msg),
+                tags,
+                metatags: std::iter::empty(),
+                pid: zx::Koid::from_raw(1),
+                tid: zx::Koid::from_raw(1),
+                dropped: 0,
+            })
+            .unwrap();
+        let end = encoder.inner().cursor();
+        let packet = &encoder.inner().get_ref()[..end];
+        sock.write(packet).unwrap();
     }
 
     pub fn kill_log_sink(&mut self) {

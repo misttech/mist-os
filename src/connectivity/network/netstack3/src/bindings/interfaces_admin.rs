@@ -73,13 +73,15 @@ use crate::bindings::interface_config::{
     FidlInterfaceConfig, InterfaceConfig, InterfaceConfigUpdate,
 };
 use crate::bindings::routes::admin::RouteSet;
-use crate::bindings::routes::{self};
+use crate::bindings::routes::interface_local::LocalRouteTables;
+use crate::bindings::routes::TableIdOverflowsError;
 use crate::bindings::time::StackTime;
 use crate::bindings::util::{
-    ErrorLogExt, IntoCore as _, RemoveResourceResultExt as _, ScopeExt as _, TryIntoCore,
+    ErrorLogExt, IntoCore as _, RemoveResourceResultExt as _, ResultExt as _, ScopeExt as _,
+    TryIntoCore,
 };
 use crate::bindings::{
-    netdevice_worker, BindingId, CoreRwLock, Ctx, DeviceIdExt as _, InterfaceProperties,
+    netdevice_worker, routes, BindingId, CoreRwLock, Ctx, DeviceIdExt as _, InterfaceProperties,
     LifetimeExt as _, Netstack,
 };
 
@@ -124,13 +126,21 @@ async fn run_blackhole_interface(
         return;
     };
 
-    let fnet_interfaces_admin::Options {
-        name,
-        metric,
-        // TODO(https://fxbug.dev/42083010): Use the designation.
-        netstack_managed_routes_designation: _,
-        __source_breaking: _,
-    } = options;
+    let InterfaceOptions { name, metric, netstack_managed_routes_designation } = match options
+        .try_into()
+    {
+        Ok(options) => options,
+        Err(err @ fnet_interfaces_ext::admin::UnknownNetstackManagedRoutesDesignation(_)) => {
+            error!("invalid option: {err}");
+            let (_stream, control_handle) = control_server_end.into_stream_and_control_handle();
+            control_handle
+                .send_on_interface_removed(
+                    fnet_interfaces_admin::InterfaceRemovedReason::InvalidNetstackManagedRoutesDesignation,
+                )
+                .unwrap_or_log("failed to send OnInterfaceRemoved");
+            return;
+        }
+    };
 
     let (binding_id, binding_id_alloc, name) = match name {
         Some(name) => {
@@ -155,11 +165,6 @@ async fn run_blackhole_interface(
         }
     };
 
-    let (control_sender, control_receiver) =
-        OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
-    let (interface_control_stop_sender, interface_control_stop_receiver) =
-        futures::channel::oneshot::channel();
-
     let events = ns.create_interface_event_producer(
         binding_id,
         InterfaceProperties {
@@ -167,8 +172,33 @@ async fn run_blackhole_interface(
             port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Blackhole,
         },
     );
+    let local_route_tables =
+        match maybe_create_local_route_tables(&ns.ctx, &name, netstack_managed_routes_designation)
+            .await
+        {
+            Ok(tables) => tables,
+            Err(err @ TableIdOverflowsError) => {
+                error!("cannot create local route tables for {name}: {err:?}");
+                let (_stream, control_handle) = control_server_end.into_stream_and_control_handle();
+                control_handle
+                    .send_on_interface_removed(
+                        fnet_interfaces_admin::InterfaceRemovedReason::LocalRouteTableUnavailable,
+                    )
+                    .unwrap_or_log("failed to send OnInterfaceRemoved");
+                return;
+            }
+        };
+
+    let (control_sender, control_receiver) =
+        OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
+    let (interface_control_stop_sender, interface_control_stop_receiver) =
+        futures::channel::oneshot::channel();
+
     let info = BlackholeDeviceInfo {
-        common_info: StaticCommonInfo { authorization_token: zx::Event::create() },
+        common_info: StaticCommonInfo {
+            authorization_token: zx::Event::create(),
+            local_route_tables,
+        },
         dynamic_common_info: CoreRwLock::new(DynamicCommonInfo::new(
             net_types::ip::Mtu::no_limit(),
             events,
@@ -364,6 +394,43 @@ impl OwnedControlHandle {
     }
 }
 
+pub(crate) struct InterfaceOptions {
+    pub(crate) name: Option<String>,
+    pub(crate) metric: Option<u32>,
+    pub(crate) netstack_managed_routes_designation:
+        fnet_interfaces_ext::admin::NetstackManagedRoutesDesignation,
+}
+
+impl TryFrom<fnet_interfaces_admin::Options> for InterfaceOptions {
+    type Error = fnet_interfaces_ext::admin::UnknownNetstackManagedRoutesDesignation;
+
+    fn try_from(value: fnet_interfaces_admin::Options) -> Result<Self, Self::Error> {
+        let fnet_interfaces_admin::Options {
+            name,
+            metric,
+            netstack_managed_routes_designation,
+            __source_breaking,
+        } = value;
+        let netstack_managed_routes_designation = netstack_managed_routes_designation
+            .map_or_else(|| Ok(Default::default()), |designation| designation.try_into())?;
+        Ok(Self { name, metric, netstack_managed_routes_designation })
+    }
+}
+
+pub(crate) async fn maybe_create_local_route_tables(
+    ctx: &Ctx,
+    if_name: &str,
+    designation: fnet_interfaces_ext::admin::NetstackManagedRoutesDesignation,
+) -> Result<Option<LocalRouteTables>, TableIdOverflowsError> {
+    match designation {
+        fnet_interfaces_ext::admin::NetstackManagedRoutesDesignation::InterfaceLocal => {
+            let tables = LocalRouteTables::new(&ctx, if_name).await?;
+            Ok(Some(tables))
+        }
+        fnet_interfaces_ext::admin::NetstackManagedRoutesDesignation::Main => Ok(None),
+    }
+}
+
 /// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface
 /// request.
 async fn create_interface(
@@ -375,25 +442,22 @@ async fn create_interface(
     handler: &netdevice_worker::DeviceHandler,
 ) {
     debug!("creating interface from {:?} with {:?}", port, options);
-    let fnet_interfaces_admin::Options {
-        name,
-        metric,
-        // TODO(https://fxbug.dev/42083010): Use the designation.
-        netstack_managed_routes_designation: _,
-        __source_breaking: _,
-    } = options;
+    let interface_options = match options.try_into() {
+        Ok(options) => options,
+        Err(err @ fnet_interfaces_ext::admin::UnknownNetstackManagedRoutesDesignation(_)) => {
+            error!("unknown option: {err}");
+            let (_stream, control_handle) = control.into_stream_and_control_handle();
+            control_handle
+                .send_on_interface_removed(
+                    fnet_interfaces_admin::InterfaceRemovedReason::InvalidNetstackManagedRoutesDesignation,
+                )
+                .unwrap_or_log("failed to send OnInterfaceRemoved");
+            return;
+        }
+    };
     let (control_sender, mut control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control).await;
-    match handler
-        .add_port(
-            ns,
-            scope,
-            netdevice_worker::InterfaceOptions { name, metric },
-            port,
-            control_sender,
-        )
-        .await
-    {
+    match handler.add_port(ns, scope, interface_options, port, control_sender).await {
         Ok((binding_id, status_stream, guard, tx_task)) => {
             let _: fasync::JoinHandle<()> =
                 guard.as_handle().spawn(run_netdevice_interface_control(
@@ -452,7 +516,8 @@ async fn create_interface(
                 netdevice_worker::Error::DuplicateName(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::DuplicateName)
                 }
-                netdevice_worker::Error::InvalidPortInfo(_) => None,
+                netdevice_worker::Error::InvalidPortInfo(_)
+                | netdevice_worker::Error::CantCreateLocalRouteTables => None,
             };
             if let Some(removed_reason) = removed_reason {
                 // Retrieve the original control handle from the receiver.
@@ -1238,7 +1303,8 @@ fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthori
         .expect("device lifetime should be tied to channel lifetime");
 
     let external_state = core_id.external_state();
-    let StaticCommonInfo { authorization_token } = external_state.static_common_info();
+    let StaticCommonInfo { authorization_token, local_route_tables: _ } =
+        external_state.static_common_info();
 
     GrantForInterfaceAuthorization {
         interface_id: id.get(),
@@ -1334,8 +1400,8 @@ async fn run_address_state_provider(
                     .expect("missing device info for interface")
                     .downgrade();
 
-                let route_set_v4 = routes::admin::UserRouteSet::from_main_table(ctx.clone());
-                let route_set_v6 = routes::admin::UserRouteSet::from_main_table(ctx.clone());
+                let route_set_v4 = routes::admin::UserRouteSet::from_main_table(&ctx);
+                let route_set_v6 = routes::admin::UserRouteSet::from_main_table(&ctx);
 
                 let add_route_result = match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => {

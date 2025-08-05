@@ -32,6 +32,15 @@ class FakeDeviceListenerRegistry final : public fuchsia::ui::policy::DeviceListe
     ZX_PANIC("Not Implemented: OnMediaButtonsEvent");
 #endif
   }
+  void RegisterTouchButtonsListener(
+      fuchsia::ui::policy::TouchButtonsListenerHandle listener,
+      fuchsia::ui::policy::DeviceListenerRegistry::RegisterTouchButtonsListenerCallback callback)
+      override {
+    FX_LOGS(ERROR) << "OnEvent not implemented";
+#ifndef NDEBUG
+    ZX_PANIC("Not Implemented: OnEvent");
+#endif
+  }
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::ui::policy::DeviceListenerRegistry> bindings_;
   std::map<uint32_t, fuchsia::ui::policy::MediaButtonsListenerPtr> listeners_;

@@ -126,12 +126,11 @@ glm::mat4 Convert2DTransformTo3D(glm::mat3 in_matrix) {
 }
 
 // Wrapper function to check against implementation's sentinel value for infinite regions.
-bool HitRegionContainsPoint(flatland::HitRegion region, float x, float y) {
+bool HitRegionContainsPoint(const flatland::HitRegion& region, float x, float y) {
   if (!region.is_finite()) {
     return true;
   }
-
-  return utils::RectFContainsPoint(region.region(), x, y);
+  return region.region().Contains({.x = x, .y = y});
 }
 
 // Easier-to-read input data to HitTest() below.
@@ -174,8 +173,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
     FX_DCHECK(root_transforms.contains(transform));
     const auto& root_transform = root_transforms.at(transform);
 
-    // TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.
-    const auto clip_region = global_clip_regions[i].ToFidlRectF();
+    const auto clip_region = types::RectangleF::From(global_clip_regions[i]);
 
     // Skip anonymous views.
     if (const auto local_root = view_refs.find(root_transform);
@@ -197,8 +195,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
 
           // Instead of clipping the hit region with the clip region, simply check if the hit
           // point is in both.
-          if (HitRegionContainsPoint(region, x, y) &&
-              utils::RectFContainsPoint(clip_region, x, y)) {
+          if (HitRegionContainsPoint(region, x, y) && clip_region.Contains({.x = x, .y = y})) {
             hits.push_back(view_ref_koid);
             break;
           }

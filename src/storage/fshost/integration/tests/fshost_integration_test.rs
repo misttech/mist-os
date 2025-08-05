@@ -730,9 +730,10 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
 }
 
 #[fuchsia::test]
-async fn netboot_set() {
-    // Set the netboot flag
-    let mut builder = new_builder().netboot();
+async fn ramdisk_image_set() {
+    // Set the ramdisk_image flag
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
@@ -1440,7 +1441,7 @@ async fn initialized_gpt() {
 #[fuchsia::test]
 async fn uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
@@ -1454,7 +1455,7 @@ async fn uninitialized_gpt() {
 #[fuchsia::test]
 async fn reset_uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
@@ -1486,7 +1487,7 @@ async fn reset_uninitialized_gpt() {
 async fn reset_initialized_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
@@ -1723,7 +1724,11 @@ async fn gpt_all_binds_multiple_disks() {
     }]);
     builder.fshost().set_config_value("gpt_all", true);
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.with_extra_disk().with_gpt().with_extra_gpt_partition("test_part");
+    builder
+        .with_extra_disk()
+        .with_gpt()
+        .with_unformatted_volume_manager()
+        .with_extra_gpt_partition("test_part");
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -1736,6 +1741,13 @@ async fn gpt_all_binds_multiple_disks() {
             .unwrap();
     let metadata = volume.get_metadata().await.unwrap().unwrap();
     assert_eq!(metadata.num_blocks, Some(1));
+
+    // One of the disks has one gpt partition and the other has two. Because of a quirk of the
+    // integration tests, the one that actually doesn't have any formatted information (the one
+    // with two partitions) gets registered as the system gpt and exported via the service in
+    // storage-host. We double check that happened how we expect. On storage-host, this function
+    // goes through the PartitionService, confirming that works as well.
+    assert_eq!(gpt_num_partitions(&fixture).await, 2);
 
     fixture.tear_down().await;
 }

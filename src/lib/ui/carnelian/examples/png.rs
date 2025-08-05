@@ -157,11 +157,11 @@ impl ViewAssistant for PngViewAssistant {
                 panic!("failed to open file /pkg/data/static/{}: {:?}", filename, e)
             });
             let decoder = png::Decoder::new(file);
-            let (info, mut reader) = decoder.read_info().unwrap();
+            let mut reader = decoder.read_info().unwrap();
             let image = render_context.new_image_from_png(&mut reader).unwrap_or_else(|e| {
                 panic!("failed to decode file /pkg/data/static/{}: {:?}", filename, e)
             });
-            let size = size2(info.width as f32, info.height as f32);
+            let size = size2(reader.info().width as f32, reader.info().height as f32);
             let mut raster_builder = render_context.raster_builder().expect("raster_builder");
             raster_builder
                 .add(&path_for_rectangle(&Rect::new(Point2D::zero(), size), render_context), None);

@@ -11,9 +11,9 @@ use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_fs::directory::WatcherCreateError;
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::future::{join_all, BoxFuture};
-use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use log::{error, warn};
@@ -185,14 +185,14 @@ impl AnonymizedAggregateServiceDir {
     }
 
     /// Returns the backing directory that represents this service directory.
-    pub async fn dir_entry(&self) -> Arc<SimpleImmutableDir> {
-        self.inner.lock().await.dir.clone()
+    pub fn dir_entry(&self) -> Arc<SimpleImmutableDir> {
+        self.inner.lock().dir.clone()
     }
 
     /// Returns metadata about all the service instances in their original representation,
     /// useful for exposing debug info. The results are returned in no particular order.
-    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry>> {
-        self.inner.lock().await.entries.values().cloned().collect()
+    pub fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry>> {
+        self.inner.lock().entries.values().cloned().collect()
     }
 
     /// Adds directory entries from services exposed by a member of the aggregate.
@@ -215,7 +215,7 @@ impl AnonymizedAggregateServiceDir {
                 // idle_receiver so we do our state checking and modification while holding the
                 // lock, then return if we should do the idle_receiver wait.
                 let do_wait = {
-                    let mut inner = self.inner.lock().await;
+                    let mut inner = self.inner.lock();
                     if let Some(existing) = inner.watchers_spawned.get(instance) {
                         // We have an existing entry. This means the watcher has already been
                         // spawned.
@@ -403,7 +403,7 @@ impl AnonymizedAggregateServiceDir {
                     let result = watcher
                         .map_err(|e| StreamErrorType::StreamError(e))
                         .try_for_each(|entry| async move {
-                            let mut inner = self.inner.lock().await;
+                            let mut inner = self.inner.lock();
                             if !inner.watchers_spawned.contains_key(&instance) {
                                 // Our task entry doesn't exist, it is removed in
                                 // |on_stopped_async|, so we can exit early.
@@ -555,7 +555,7 @@ impl AnonymizedAggregateServiceDir {
             .map_err(|e| Some(e))
             .try_for_each(|message| async move {
                 let filename = message.filename.as_path().to_str().unwrap().to_owned();
-                let mut inner = self.inner.lock().await;
+                let mut inner = self.inner.lock();
                 if !inner.watchers_spawned.contains_key(&instance) {
                     // Our task entry doesn't exist, it is removed in |on_stopped_async|,
                     // so we can exit early.
@@ -584,7 +584,7 @@ impl AnonymizedAggregateServiceDir {
                         if inner.entries.contains_key(&instance_key) {
                             return Ok(());
                         }
-                        let name = Self::generate_instance_id(&mut rand::thread_rng());
+                        let name = Self::generate_instance_id(&mut rand::rng());
 
                         let Ok(child_proxy) = fuchsia_fs::directory::open_directory_async(
                             proxy,
@@ -717,7 +717,7 @@ impl AnonymizedAggregateServiceDir {
                 self.aggregate_capability_provider.route_instance(&instance).await?;
 
             // If we have not already spawned a watcher task we want to do that here.
-            let mut inner = self.inner.lock().await;
+            let mut inner = self.inner.lock();
             if !inner.watchers_spawned.contains_key(&instance) {
                 // We have not spawned the watcher, so we create the entry with a None oneshot
                 // sender that will eventually be replaced with one if necessary from the
@@ -736,7 +736,7 @@ impl AnonymizedAggregateServiceDir {
         // is routed, remove any of its service instances from the aggregated service.
         if self.route.matches_child_component(target_moniker) {
             let target_child_moniker = target_moniker.leaf().expect("root is impossible");
-            let mut inner = self.inner.lock().await;
+            let mut inner = self.inner.lock();
             for entry in inner.entries.values() {
                 if matches!(&entry.source_id, AggregateInstance::Child(n) if n == target_child_moniker)
                 {
@@ -887,7 +887,7 @@ mod tests {
             &self,
             instance: &AggregateInstance,
         ) -> Result<(Router<DirEntry>, CapabilitySource), RoutingError> {
-            let instances_guard = self.instances.lock().await;
+            let instances_guard = self.instances.lock();
             let Some(component_instance) = instances_guard.get(instance) else {
                 let err = match instance {
                     AggregateInstance::Parent => RoutingError::OfferFromParentNotFound {
@@ -949,7 +949,7 @@ mod tests {
         }
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
-            Ok(self.instances.lock().await.keys().cloned().collect())
+            Ok(self.instances.lock().keys().cloned().collect())
         }
     }
 
@@ -1122,20 +1122,20 @@ mod tests {
             dir.add_entries_from_children().await.expect("failed to add entries");
         }
 
-        root.hooks.install(dir.hooks()).await;
+        root.hooks.install(dir.hooks());
         (test, dir)
     }
 
     #[fuchsia::test]
     async fn test_anonymized_service_directory() {
         let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
 
         // List the entries of the directory served by `open`, and compare them to the
         // internal state.
         let instance_names = {
             let instance_names: HashSet<_> =
-                dir_arc.entries().await.into_iter().map(|e| e.name.to_string()).collect();
+                dir_arc.entries().into_iter().map(|e| e.name.to_string()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
                 .await
                 .expect("failed to read directory entries");
@@ -1173,14 +1173,12 @@ mod tests {
         let dir_contents = {
             let previous_entries: HashSet<_> = dir_arc
                 .entries()
-                .await
                 .into_iter()
                 .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
             dir_arc.add_entries_from_children().await.unwrap();
             let entries: HashSet<_> = dir_arc
                 .entries()
-                .await
                 .into_iter()
                 .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
@@ -1284,13 +1282,13 @@ mod tests {
             route,
             Box::new(provider.clone()),
         ));
-        root.hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir_arc.hooks());
         dir_arc.add_entries_from_children().await.unwrap();
 
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
 
         // Ensure the instance we had initially in "bar" is there.
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 1);
 
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
@@ -1308,7 +1306,7 @@ mod tests {
             .add_node("my.service.Service", foo_service.clone())
             .expect("Could not add service node.");
         let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, previous_entries + 1);
         let previous_entries = entries;
 
@@ -1322,7 +1320,7 @@ mod tests {
             )
             .expect("Could not add service node.");
         let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, previous_entries + 1);
         let previous_entries = entries;
 
@@ -1336,7 +1334,7 @@ mod tests {
             )
             .expect("Could not add service node.");
         let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, previous_entries + 1);
         let previous_entries = entries;
 
@@ -1359,7 +1357,7 @@ mod tests {
             // in case we caught the change before both were seen.
             wait_for_dir_content_change(&dir_proxy, dir_contents).await;
         }
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, previous_entries + 2);
 
         // Read the directory for final check.
@@ -1427,12 +1425,12 @@ mod tests {
             route,
             Box::new(provider.clone()),
         ));
-        root.hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir_arc.hooks());
 
         // Initialize the aggregate. There are no components yet so it will be empty.
         dir_arc.add_entries_from_children().await.unwrap();
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
-        let entries = dir_arc.entries().await.len();
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 0);
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
             .await
@@ -1443,13 +1441,13 @@ mod tests {
         test.create_dynamic_child(&Moniker::root(), "coll2", ChildBuilder::new().name("baz")).await;
         let baz_component =
             root.find_and_maybe_resolve(&"coll2:baz".parse().unwrap()).await.unwrap();
-        provider.instances.lock().await.insert(
+        provider.instances.lock().insert(
             AggregateInstance::Child("coll2:baz".try_into().unwrap()),
             baz_component.as_weak(),
         );
         baz_component.ensure_started(&StartReason::Eager).await.unwrap();
         let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 1);
         let previous_entries = entries;
 
@@ -1463,7 +1461,7 @@ mod tests {
             )
             .expect("Could not add service node.");
         wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, previous_entries + 1);
 
         // Validate they both have "member".
@@ -1539,9 +1537,9 @@ mod tests {
             route,
             Box::new(provider.clone()),
         ));
-        root.hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir_arc.hooks());
 
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
 
         // Ensure we are starting with 0 entries.
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
@@ -1554,7 +1552,7 @@ mod tests {
 
         // Ensure that the start hook added the instance.
         let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 1);
         assert_eq!(dir_contents.len(), 1);
 
@@ -1563,7 +1561,7 @@ mod tests {
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
             .await
             .expect("failed to read directory entries");
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 1);
         assert_eq!(dir_contents.len(), 1);
 
@@ -1577,7 +1575,7 @@ mod tests {
             )
             .expect("Could not add service node.");
         wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-        let entries = dir_arc.entries().await.len();
+        let entries = dir_arc.entries().len();
         assert_eq!(entries, 2);
 
         // Check both.
@@ -1747,15 +1745,15 @@ mod tests {
             Arc::new(AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider)));
         dir.add_entries_from_children().await.unwrap();
 
-        root.hooks.install(dir.hooks()).await;
+        root.hooks.install(dir.hooks());
 
-        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry());
 
         // List the entries of the directory served by `open`, and compare them to the
         // internal state.
         let instance_names = {
             let instance_names: HashSet<_> =
-                dir.entries().await.into_iter().map(|e| e.name.to_string()).collect();
+                dir.entries().into_iter().map(|e| e.name.to_string()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
             let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
             assert_eq!(instance_names.len(), 4);
@@ -1782,19 +1780,11 @@ mod tests {
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
         let dir_contents = {
-            let previous_entries: HashSet<_> = dir
-                .entries()
-                .await
-                .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone()))
-                .collect();
+            let previous_entries: HashSet<_> =
+                dir.entries().into_iter().map(|e| (e.name.clone(), e.source_id.clone())).collect();
             dir.add_entries_from_children().await.unwrap();
-            let entries: HashSet<_> = dir
-                .entries()
-                .await
-                .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone()))
-                .collect();
+            let entries: HashSet<_> =
+                dir.entries().into_iter().map(|e| (e.name.clone(), e.source_id.clone())).collect();
             assert_eq!(entries, previous_entries);
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
             let dir_instance_names: HashSet<_> =
@@ -1819,7 +1809,7 @@ mod tests {
     async fn test_anonymized_service_directory_component_started() {
         let (test, dir_arc) = create_anonymized_service_test_realm(false).await;
 
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
 
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
@@ -1857,7 +1847,7 @@ mod tests {
     async fn test_anonymized_service_directory_component_stopped() {
         let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
 
-        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry());
 
         // List the entries of the directory served by `open`.
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
@@ -1938,7 +1928,7 @@ mod tests {
 
         dir.add_entries_from_children().await.unwrap();
         // Entries from foo should be available even though we can't route to bar
-        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry());
 
         // List the entries of the directory served by `open`.
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
@@ -2009,7 +1999,7 @@ mod tests {
 
         dir.add_entries_from_children().await.unwrap();
 
-        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry());
 
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
 

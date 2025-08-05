@@ -27,7 +27,7 @@ use netstack3_base::{
 };
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::Rng;
 
 use crate::device::Ipv6AddrSlaacConfig;
@@ -327,7 +327,9 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
             // If the preferred lifetime is greater than the valid lifetime,
             // silently ignore the Prefix Information option, as per RFC 4862
             // section 5.5.3.
-            trace!("receive_ndp_packet: autonomous prefix's preferred lifetime is greater than valid lifetime, ignoring");
+            trace!(
+                "receive_ndp_packet: autonomous prefix's preferred lifetime is greater than valid lifetime, ignoring"
+            );
             return;
         }
 
@@ -976,9 +978,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext<D>>(
             Lifetime::Finite(valid_until) => {
                 trace!(
                     "receive_ndp_packet: updating valid lifetime to {:?} for SLAAC address {:?} on device {:?}",
-                    valid_until,
-                    addr,
-                    device_id
+                    valid_until, addr, device_id
                 );
 
                 // Set the valid lifetime for this address.
@@ -1363,7 +1363,7 @@ fn desync_factor<R: Rng>(
     temp_preferred_lifetime.checked_sub(regen_advance.get()).map(|max_desync_factor| {
         let max_desync_factor =
             core::cmp::min(max_desync_factor, (temp_preferred_lifetime * 2) / 5);
-        rng.sample(Uniform::new(Duration::ZERO, max_desync_factor))
+        rng.sample(Uniform::new(Duration::ZERO, max_desync_factor).unwrap())
     })
 }
 
@@ -1798,7 +1798,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                     temp_preferred_lifetime,
                     temp_idgen_retries,
                 } => {
-                    let per_attempt_random_seed: u64 = bindings_ctx.rng().r#gen();
+                    let per_attempt_random_seed: u64 = bindings_ctx.rng().random();
 
                     // Per RFC 8981 Section 3.4.4:
                     //    When creating a temporary address, DESYNC_FACTOR MUST be computed
@@ -2024,7 +2024,10 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 }
             }
             Ok(addr_sub) => {
-                trace!("receive_ndp_packet: Successfully configured new IPv6 address {:?} on device {:?} via SLAAC", addr_sub, device_id);
+                trace!(
+                    "receive_ndp_packet: Successfully configured new IPv6 address {:?} on device {:?} via SLAAC",
+                    addr_sub, device_id
+                );
                 break;
             }
         }
@@ -2590,7 +2593,7 @@ mod tests {
         // Consider the address we will generate as already assigned without
         // SLAAC.
         let mut dup_rng = bindings_ctx.rng().deep_clone();
-        let seed = dup_rng.r#gen();
+        let seed = dup_rng.random();
         let first_attempt =
             generate_global_temporary_address(&SUBNET, &IID, seed, &TEMP_SECRET_KEY);
         core_ctx.state.slaac_addrs.non_slaac_addrs = vec![first_attempt.addr()];
@@ -2651,7 +2654,7 @@ mod tests {
         );
 
         let mut dup_rng = bindings_ctx.rng().deep_clone();
-        let mut seed = dup_rng.r#gen();
+        let mut seed = dup_rng.random();
 
         let link_local_subnet =
             Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), REQUIRED_PREFIX_BITS).unwrap();
@@ -3357,7 +3360,7 @@ mod tests {
                           config_greater_than_ra_desync_factor_offset| {
             let valid_until = creation_time + Duration::from_secs(expected_vl_addr.into());
             let addr_sub =
-                generate_global_temporary_address(&SUBNET, &IID, rng.r#gen(), &TEMP_SECRET_KEY);
+                generate_global_temporary_address(&SUBNET, &IID, rng.random(), &TEMP_SECRET_KEY);
             let desync_factor =
                 desync_factor(rng, NonZeroDuration::new(pl_config).unwrap(), regen_advance)
                     .unwrap();

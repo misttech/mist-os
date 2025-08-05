@@ -360,7 +360,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
 
   async::Loop env_loop(&kAsyncLoopConfigNeverAttachToThread);
   FakeSysmem fake_sysmem(env_loop.dispatcher(), framebuffer_vmo.borrow(),
-                         display::ToBanjoDriverBufferCollectionId(kBufferCollectionId));
+                         kBufferCollectionId.ToBanjo());
   FakeMmio fake_mmio;
 
   env_loop.StartThread("env-loop");
@@ -391,9 +391,9 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   EXPECT_OK(display.ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints.client)));
 
   // Set Buffer collection constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(display.SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
@@ -405,13 +405,11 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   // attention to any settings, so this way if that changes, this test will fail intentionally so
   // that this test can be updated to have settings that achieve this test's goals.
   auto settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
-  EXPECT_OK(heap->AllocateVmo(0, settings.Build(),
-                              display::ToBanjoDriverBufferCollectionId(kBufferCollectionId), 0)
-                .status());
+  EXPECT_OK(heap->AllocateVmo(0, settings.Build(), kBufferCollectionId.ToBanjo(), 0).status());
 
   bind_ref.Unbind();
 
-  fake_sysmem.SetupFakeVmoInfo(display::ToBanjoDriverBufferCollectionId(kBufferCollectionId), 0);
+  fake_sysmem.SetupFakeVmoInfo(kBufferCollectionId.ToBanjo(), 0);
 
   // Invalid import: bad collection id
   static constexpr display::ImageMetadata kDisplayImageMetadata(

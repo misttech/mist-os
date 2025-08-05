@@ -173,6 +173,9 @@ ShutdownManager::ShutdownManager(NodeRemover* node_remover, async_dispatcher_t* 
   } else {
     power_resource_ = std::move(power_resource.value());
   }
+  zx::result log_flush = component::Connect<fuchsia_diagnostics::LogFlusher>();
+  ZX_ASSERT(log_flush.is_ok());
+  log_flush_ = std::move(log_flush.value());
   if (zx::result mexec_resource = get_mexec_resource(); mexec_resource.is_error()) {
     LOGF(INFO, "Failed to get mexec resource, assuming test environment and continuing (%s)",
          mexec_resource.status_string());
@@ -304,6 +307,10 @@ void ShutdownManager::SystemExecute() {
       exit(0);
     }
     return;
+  }
+  LOGF(INFO, "Executing powerctl.");
+  if (log_flush_.is_valid()) {
+    std::ignore = fidl::WireCall(log_flush_)->WaitUntilFlushed();
   }
   switch (shutdown_system_state) {
     case SystemPowerState::kReboot:

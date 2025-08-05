@@ -161,7 +161,6 @@ mod tests {
     use fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest};
     use fuchsia_sync::Mutex;
     use futures::{pin_mut, select};
-    use rand::{thread_rng, Rng as _};
     use std::sync::Arc;
     use zx::HandleBased;
 
@@ -227,7 +226,7 @@ mod tests {
     #[fuchsia::test]
     async fn invalid_write_past_end_of_blob() {
         let mut data = [0; VMO_SIZE];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let write_fun = |proxy: BlobWriterProxy| {
             async move {
@@ -250,7 +249,7 @@ mod tests {
     #[fuchsia::test]
     async fn do_not_split_writes_if_blob_fits_in_vmo() {
         let mut data = [0; VMO_SIZE - 1];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let write_fun = |proxy: BlobWriterProxy| {
             async move {
@@ -268,7 +267,7 @@ mod tests {
     #[fuchsia::test]
     async fn split_writes_if_blob_does_not_fit_in_vmo() {
         let mut data = [0; VMO_SIZE + 1];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let write_fun = |proxy: BlobWriterProxy| {
             async move {
@@ -286,7 +285,7 @@ mod tests {
     #[fuchsia::test]
     async fn third_write_wraps() {
         let mut data = [0; 1024 * 6];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let writes =
             [(0, 1024 * 2), (1024 * 2, 1024 * 3), (1024 * 3, 1024 * 5), (1024 * 5, 1024 * 6)];
@@ -309,7 +308,7 @@ mod tests {
     #[fuchsia::test]
     async fn many_wraps() {
         let mut data = [0; VMO_SIZE * 3];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let write_fun = |proxy: BlobWriterProxy| {
             async move {

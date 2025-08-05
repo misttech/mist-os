@@ -43,11 +43,16 @@ async fn main() -> Result<()> {
     fs.take_and_serve_directory_handle()
         .context("while trying to serve fuchsia.time.alarms/Wake")?;
 
+    let scope = fuchsia_async::Scope::new();
     let timer_loop = alarms::connect_to_hrtimer_async()
         .await
         .inspect_err(|e| log::error!("could not connect to hrtimer: {}", &e))
         .map(|proxy| {
-            Rc::new(alarms::Loop::new(proxy, inspector.root().create_child("wake_alarms")))
+            Rc::new(alarms::Loop::new(
+                scope.to_handle(),
+                proxy,
+                inspector.root().create_child("wake_alarms"),
+            ))
         })?;
     fs.for_each_concurrent(/*limit=*/ None, move |connection| {
         let timer_loop = Rc::clone(&timer_loop);

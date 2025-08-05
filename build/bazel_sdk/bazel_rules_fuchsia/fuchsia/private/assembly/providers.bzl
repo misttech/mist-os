@@ -33,6 +33,14 @@ FuchsiaProductConfigInfo = provider(
     },
 )
 
+FuchsiaProductInputBundleInfo = provider(
+    doc = "A product input bundle info used to contain the product input bundle directory",
+    fields = {
+        "directory": "Directory of the product input bundle container",
+        "build_id_dirs": "Directories containing the debug symbols",
+    },
+)
+
 FuchsiaBoardInputBundleInfo = provider(
     doc = "A board input bundle info used to containing the board input bundle directory",
     fields = {
@@ -108,7 +116,7 @@ FuchsiaPartitionsConfigInfo = provider(
 )
 
 FuchsiaProductImageInfo = provider(
-    doc = "Info needed to pave a Fuchsia image",
+    doc = "Info needed to create a product bundle from the output of create-system",
     fields = {
         "images_out": "images out directory",
         "product_assembly_out": "product assembly out directory",
@@ -128,7 +136,8 @@ FuchsiaUpdatePackageInfo = provider(
 FuchsiaProductAssemblyInfo = provider(
     doc = "Info populated by product assembly",
     fields = {
-        "product_assembly_out": "product assembly out directory",
+        "product_assembly_out": "Product assembly out directory",
+        "product_assembly_inputs": "Inputs referenced by the product assembly",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
         "build_type": "The build type of the product",
         "build_id_dirs": "Directories containing the debug symbols",

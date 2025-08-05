@@ -185,8 +185,8 @@ static bool count_committed_bytes(vaddr_t start, vaddr_t end, size_t* committed,
   uint64_t mapping_offset;
   {
     Guard<CriticalMutex> guard{mapping->lock()};
-    start_off = ROUNDDOWN(start, PAGE_SIZE) - mapping->base_locked();
-    end_off = ROUNDUP(end, PAGE_SIZE) - mapping->base_locked();
+    start_off = ROUNDDOWN_PAGE_SIZE(start) - mapping->base_locked();
+    end_off = ROUNDUP_PAGE_SIZE(end) - mapping->base_locked();
     mapping_offset = mapping->object_offset_locked();
   }
   const VmObject::AttributionCounts counts =
@@ -221,8 +221,8 @@ static bool committing_tests() {
   size_t atotal = sizeof(TestObj);
 
   // The page containing the object should be committed.
-  auto ps = ROUNDDOWN(obj, PAGE_SIZE);
-  auto pe = ROUNDUP(obj + sizeof(TestObj), PAGE_SIZE);
+  auto ps = ROUNDDOWN_PAGE_SIZE(obj);
+  auto pe = ROUNDUP_PAGE_SIZE(obj + sizeof(TestObj));
   EXPECT_TRUE(count_committed_bytes(ps, pe, &committed, &uncommitted));
   EXPECT_GT(committed, 0u);
   EXPECT_EQ(0u, uncommitted);

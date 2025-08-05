@@ -537,10 +537,20 @@ void CommandBufferPipelineState::SetToDefaultState(DefaultState default_state) {
     case DefaultState::kOpaque: {
       static_state_.blend_enable = false;
     } break;
-    case DefaultState::kTranslucent: {
+    case DefaultState::kPremultipliedAlpha: {
       // See definition in header for explanation of these blend factors.
       static_state_.blend_enable = true;
       static_state_.src_color_blend = VK_BLEND_FACTOR_ONE;
+      static_state_.dst_color_blend = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+      static_state_.src_alpha_blend = VK_BLEND_FACTOR_ONE;
+      static_state_.dst_alpha_blend = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+      static_state_.color_blend_op = VK_BLEND_OP_ADD;
+      static_state_.alpha_blend_op = VK_BLEND_OP_ADD;
+    } break;
+    case DefaultState::kStraightAlpha: {
+      // See definition in header for explanation of these blend factors.
+      static_state_.blend_enable = true;
+      static_state_.src_color_blend = VK_BLEND_FACTOR_SRC_ALPHA;
       static_state_.dst_color_blend = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
       static_state_.src_alpha_blend = VK_BLEND_FACTOR_ONE;
       static_state_.dst_alpha_blend = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;

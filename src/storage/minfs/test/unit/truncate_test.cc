@@ -48,8 +48,6 @@ TEST_F(TruncateTest, EnsureOldDataWhenTransactionFails) {
   ASSERT_TRUE(root.is_ok());
   fbl::RefPtr<fs::Vnode> foo;
   ASSERT_EQ(root->Lookup("foo", &foo), ZX_OK);
-  auto validated_options = foo->ValidateOptions(fs::VnodeConnectionOptions());
-  ASSERT_TRUE(validated_options.is_ok());
   ASSERT_EQ(foo->Open(&foo), ZX_OK);
   auto close = fit::defer([foo]() { ASSERT_EQ(foo->Close(), ZX_OK); });
 

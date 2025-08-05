@@ -758,6 +758,80 @@ fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
     assert!(net.step().is_idle());
 }
 
+enum WhichLinkLocalAddr {
+    Source,
+    Destination,
+    Both,
+}
+
+#[test_case(WhichLinkLocalAddr::Source)]
+#[test_case(WhichLinkLocalAddr::Destination)]
+#[test_case(WhichLinkLocalAddr::Both)]
+fn drop_ipv6_link_local_packets(which_link_local_addr: WhichLinkLocalAddr) {
+    // Test that NS3 won't forward an IPv6 packet if it has a link-local source
+    // or destination address.
+    //
+    // There's only one netstack here, but we're pretending it's on a network
+    // where the netstack is acting as a router to some wider network:
+    //
+    // <client> - <netstack> - <server>
+    //
+    // In terms of the names of the IP addresses, this is:
+    //
+    // <extra> - <local> - <remote>
+    //
+    // In particular, this test fakes packets from either the client or server
+    // that have link-local addresses as either the source or destination, in
+    // which case we expect the netstack to just drop them.
+
+    let fake_config = Ipv6::TEST_ADDRS;
+    let mut dispatcher_builder = FakeCtxBuilder::with_addrs(fake_config.clone());
+    let extra_ip = UnicastAddr::new(Ipv6::get_other_ip_address(7).get()).unwrap();
+    let extra_mac = UnicastAddr::new(Mac::new([12, 13, 14, 15, 16, 17])).unwrap();
+    // This is done for the other IPs in FakeCtxBuilder::with_addrs
+    dispatcher_builder.add_ndp_table_entry(0, extra_ip, extra_mac);
+    dispatcher_builder.add_ndp_table_entry(
+        0,
+        extra_mac.to_ipv6_link_local().addr().get(),
+        extra_mac,
+    );
+    let (mut ctx, device_ids) = dispatcher_builder.build();
+
+    let device: DeviceId<_> = device_ids[0].clone().into();
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
+    let frame_dst = FrameDestination::Individual { local: true };
+
+    let (src_addr, dst_addr): (Ipv6Addr, Ipv6Addr) = match which_link_local_addr {
+        WhichLinkLocalAddr::Source => {
+            (**extra_mac.to_ipv6_link_local().addr(), *fake_config.remote_ip)
+        }
+        WhichLinkLocalAddr::Destination => {
+            (extra_ip.into_addr(), **fake_config.remote_mac.to_ipv6_link_local().addr())
+        }
+        WhichLinkLocalAddr::Both => (
+            **extra_mac.to_ipv6_link_local().addr(),
+            **fake_config.remote_mac.to_ipv6_link_local().addr(),
+        ),
+    };
+
+    let ipv6_packet_buf = Buf::new(vec![0; 128], ..)
+        .wrap_in(Ipv6PacketBuilder::new(src_addr, dst_addr, 64, IpProto::Udp.into()))
+        .serialize_vec_outer()
+        .unwrap();
+    // Receive the IP packet.
+    ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), ipv6_packet_buf);
+
+    IpCounterExpectations::<Ipv6> {
+        receive_ip_packet: 1,
+        dispatch_receive_ip_packet: 0,
+        forward: 0,
+        dropped: 1,
+        send_ip_packet: 0,
+        ..Default::default()
+    }
+    .assert_counters(&ctx.core_ctx(), &device);
+}
+
 #[test]
 fn test_ipv6_packet_too_big() {
     // Test sending an IPv6 Packet Too Big Error when receiving a packet
@@ -784,7 +858,7 @@ fn test_ipv6_packet_too_big() {
     // body itself is 5000). Note, the final packet will be larger because
     // of IP header data.
     let mut rng = new_rng(70812476915813);
-    let body: Vec<u8> = core::iter::repeat_with(|| rng.r#gen()).take(5000).collect();
+    let body: Vec<u8> = core::iter::repeat_with(|| rng.random()).take(5000).collect();
 
     // Ip packet from some node destined to a remote on this network,
     // arriving locally.

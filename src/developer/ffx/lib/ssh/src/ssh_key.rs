@@ -661,7 +661,6 @@ mod test {
             .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", "/expected/default", "someother"]))
-            .await
             .expect("set ssh.pub");
         env.context
             .query("ssh.priv")
@@ -671,7 +670,6 @@ mod test {
                 "/expected/default/private",
                 "someother/place"
             ]))
-            .await
             .expect("set ssh.priv");
 
         // set the config

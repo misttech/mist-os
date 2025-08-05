@@ -149,8 +149,9 @@ pub fn sys_reboot(
                     || reboot_args.contains(&&b"System update during setup"[..])
                 {
                     fpower::RebootReason2::SystemUpdate
+                } else if reboot_args.contains(&&b"shell"[..]) {
+                    fpower::RebootReason2::DeveloperRequest
                 } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
-                    || reboot_args.contains(&&b"shell"[..])
                     || reboot_args.contains(&&b"userrequested"[..])
                 {
                     fpower::RebootReason2::UserRequest

@@ -4,7 +4,7 @@
 
 use crate::ie;
 use anyhow::format_err;
-use fidl_fuchsia_wlan_common as fidl_common;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use std::fmt;
 
 // IEEE Std 802.11-2016, Annex E
@@ -34,33 +34,33 @@ pub enum Cbw {
 
 impl Cbw {
     // TODO(https://fxbug.dev/42164482): Implement `From `instead.
-    pub fn to_fidl(&self) -> (fidl_common::ChannelBandwidth, u8) {
+    pub fn to_fidl(&self) -> (fidl_ieee80211::ChannelBandwidth, u8) {
         match self {
-            Cbw::Cbw20 => (fidl_common::ChannelBandwidth::Cbw20, 0),
-            Cbw::Cbw40 => (fidl_common::ChannelBandwidth::Cbw40, 0),
-            Cbw::Cbw40Below => (fidl_common::ChannelBandwidth::Cbw40Below, 0),
-            Cbw::Cbw80 => (fidl_common::ChannelBandwidth::Cbw80, 0),
-            Cbw::Cbw160 => (fidl_common::ChannelBandwidth::Cbw160, 0),
+            Cbw::Cbw20 => (fidl_ieee80211::ChannelBandwidth::Cbw20, 0),
+            Cbw::Cbw40 => (fidl_ieee80211::ChannelBandwidth::Cbw40, 0),
+            Cbw::Cbw40Below => (fidl_ieee80211::ChannelBandwidth::Cbw40Below, 0),
+            Cbw::Cbw80 => (fidl_ieee80211::ChannelBandwidth::Cbw80, 0),
+            Cbw::Cbw160 => (fidl_ieee80211::ChannelBandwidth::Cbw160, 0),
             Cbw::Cbw80P80 { secondary80 } => {
-                (fidl_common::ChannelBandwidth::Cbw80P80, *secondary80)
+                (fidl_ieee80211::ChannelBandwidth::Cbw80P80, *secondary80)
             }
         }
     }
 
     pub fn from_fidl(
-        fidl_cbw: fidl_common::ChannelBandwidth,
+        fidl_cbw: fidl_ieee80211::ChannelBandwidth,
         fidl_secondary80: u8,
     ) -> Result<Self, anyhow::Error> {
         match fidl_cbw {
-            fidl_common::ChannelBandwidth::Cbw20 => Ok(Cbw::Cbw20),
-            fidl_common::ChannelBandwidth::Cbw40 => Ok(Cbw::Cbw40),
-            fidl_common::ChannelBandwidth::Cbw40Below => Ok(Cbw::Cbw40Below),
-            fidl_common::ChannelBandwidth::Cbw80 => Ok(Cbw::Cbw80),
-            fidl_common::ChannelBandwidth::Cbw160 => Ok(Cbw::Cbw160),
-            fidl_common::ChannelBandwidth::Cbw80P80 => {
+            fidl_ieee80211::ChannelBandwidth::Cbw20 => Ok(Cbw::Cbw20),
+            fidl_ieee80211::ChannelBandwidth::Cbw40 => Ok(Cbw::Cbw40),
+            fidl_ieee80211::ChannelBandwidth::Cbw40Below => Ok(Cbw::Cbw40Below),
+            fidl_ieee80211::ChannelBandwidth::Cbw80 => Ok(Cbw::Cbw80),
+            fidl_ieee80211::ChannelBandwidth::Cbw160 => Ok(Cbw::Cbw160),
+            fidl_ieee80211::ChannelBandwidth::Cbw80P80 => {
                 Ok(Cbw::Cbw80P80 { secondary80: fidl_secondary80 })
             }
-            fidl_common::ChannelBandwidthUnknown!() => {
+            fidl_ieee80211::ChannelBandwidthUnknown!() => {
                 Err(format_err!("Unknown channel bandwidth from fidl: {:?}", fidl_cbw))
             }
         }
@@ -284,30 +284,30 @@ impl Channel {
     }
 }
 
-impl From<Channel> for fidl_common::WlanChannel {
-    fn from(channel: Channel) -> fidl_common::WlanChannel {
-        fidl_common::WlanChannel::from(&channel)
+impl From<Channel> for fidl_ieee80211::WlanChannel {
+    fn from(channel: Channel) -> fidl_ieee80211::WlanChannel {
+        fidl_ieee80211::WlanChannel::from(&channel)
     }
 }
 
-impl From<&Channel> for fidl_common::WlanChannel {
-    fn from(channel: &Channel) -> fidl_common::WlanChannel {
+impl From<&Channel> for fidl_ieee80211::WlanChannel {
+    fn from(channel: &Channel) -> fidl_ieee80211::WlanChannel {
         let (cbw, secondary80) = channel.cbw.to_fidl();
-        fidl_common::WlanChannel { primary: channel.primary, cbw, secondary80 }
+        fidl_ieee80211::WlanChannel { primary: channel.primary, cbw, secondary80 }
     }
 }
 
-impl TryFrom<fidl_common::WlanChannel> for Channel {
+impl TryFrom<fidl_ieee80211::WlanChannel> for Channel {
     type Error = anyhow::Error;
-    fn try_from(fidl_channel: fidl_common::WlanChannel) -> Result<Channel, Self::Error> {
+    fn try_from(fidl_channel: fidl_ieee80211::WlanChannel) -> Result<Channel, Self::Error> {
         Channel::try_from(&fidl_channel)
     }
 }
 
-impl TryFrom<&fidl_common::WlanChannel> for Channel {
+impl TryFrom<&fidl_ieee80211::WlanChannel> for Channel {
     type Error = anyhow::Error;
 
-    fn try_from(fidl_channel: &fidl_common::WlanChannel) -> Result<Channel, Self::Error> {
+    fn try_from(fidl_channel: &fidl_ieee80211::WlanChannel) -> Result<Channel, Self::Error> {
         Ok(Channel {
             primary: fidl_channel.primary,
             cbw: Cbw::from_fidl(fidl_channel.cbw, fidl_channel.secondary80)?,
@@ -326,7 +326,7 @@ pub fn derive_channel(
     dsss_channel: Option<u8>,
     ht_op: Option<ie::HtOperation>,
     vht_op: Option<ie::VhtOperation>,
-) -> fidl_common::WlanChannel {
+) -> fidl_ieee80211::WlanChannel {
     let primary = ht_op
         .as_ref()
         .map(|ht_op| ht_op.primary_channel)
@@ -349,7 +349,7 @@ pub fn derive_channel(
     }
     .to_fidl();
 
-    fidl_common::WlanChannel { primary, cbw, secondary80 }
+    fidl_ieee80211::WlanChannel { primary, cbw, secondary80 }
 }
 
 /// Derive a CBW for a primary channel or channel switch.
@@ -529,37 +529,39 @@ mod tests {
 
     #[test]
     fn test_convert_fidl_channel() {
-        let mut f = fidl_common::WlanChannel::from(Channel::new(1, Cbw::Cbw20));
+        let mut f = fidl_ieee80211::WlanChannel::from(Channel::new(1, Cbw::Cbw20));
         assert!(
-            f.primary == 1 && f.cbw == fidl_common::ChannelBandwidth::Cbw20 && f.secondary80 == 0
+            f.primary == 1
+                && f.cbw == fidl_ieee80211::ChannelBandwidth::Cbw20
+                && f.secondary80 == 0
         );
 
         f = Channel::new(36, Cbw::Cbw80P80 { secondary80: 155 }).into();
         assert!(
             f.primary == 36
-                && f.cbw == fidl_common::ChannelBandwidth::Cbw80P80
+                && f.cbw == fidl_ieee80211::ChannelBandwidth::Cbw80P80
                 && f.secondary80 == 155
         );
 
-        let mut c = Channel::try_from(fidl_common::WlanChannel {
+        let mut c = Channel::try_from(fidl_ieee80211::WlanChannel {
             primary: 11,
-            cbw: fidl_common::ChannelBandwidth::Cbw40Below,
+            cbw: fidl_ieee80211::ChannelBandwidth::Cbw40Below,
             secondary80: 123,
         })
         .unwrap();
         assert!(c.primary == 11 && c.cbw == Cbw::Cbw40Below);
-        c = fidl_common::WlanChannel {
+        c = fidl_ieee80211::WlanChannel {
             primary: 149,
-            cbw: fidl_common::ChannelBandwidth::Cbw80P80,
+            cbw: fidl_ieee80211::ChannelBandwidth::Cbw80P80,
             secondary80: 42,
         }
         .try_into()
         .unwrap();
         assert!(c.primary == 149 && c.cbw == Cbw::Cbw80P80 { secondary80: 42 });
 
-        let r = Channel::try_from(fidl_common::WlanChannel {
+        let r = Channel::try_from(fidl_ieee80211::WlanChannel {
             primary: 11,
-            cbw: fidl_common::ChannelBandwidth::unknown(),
+            cbw: fidl_ieee80211::ChannelBandwidth::unknown(),
             secondary80: 123,
         });
         assert!(r.is_err());
@@ -573,9 +575,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, None, None, None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: RX_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }
         );
@@ -586,9 +588,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), None, None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 6,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0
             }
         );
@@ -596,9 +598,9 @@ mod tests {
 
     #[test]
     fn test_derive_channel_with_ht_20mhz() {
-        let expected_channel = fidl_common::WlanChannel {
+        let expected_channel = fidl_ieee80211::WlanChannel {
             primary: HT_PRIMARY_CHAN,
-            cbw: fidl_common::ChannelBandwidth::Cbw20,
+            cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
             secondary80: 0,
         };
 
@@ -623,9 +625,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), Some(ht_op), None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: HT_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw40,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                 secondary80: 0,
             }
         );
@@ -638,9 +640,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), Some(ht_op), None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: HT_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw40Below,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40Below,
                 secondary80: 0,
             }
         );
@@ -654,9 +656,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), Some(ht_op), Some(vht_op));
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: HT_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80,
                 secondary80: 0,
             }
         );
@@ -670,9 +672,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), Some(ht_op), Some(vht_op));
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: HT_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw160,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw160,
                 secondary80: 0,
             }
         );
@@ -686,9 +688,9 @@ mod tests {
         let channel = derive_channel(RX_PRIMARY_CHAN, Some(6), Some(ht_op), Some(vht_op));
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: HT_PRIMARY_CHAN,
-                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80P80,
                 secondary80: 1,
             }
         );
@@ -699,9 +701,9 @@ mod tests {
         let channel = derive_channel(8, None, None, None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 8,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }
         );
@@ -712,9 +714,9 @@ mod tests {
         let channel = derive_channel(8, Some(6), None, None);
         assert_eq!(
             channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 6,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }
         )

@@ -22,7 +22,7 @@ group("tools") {
     "//tools/dupefinder($host_toolchain)",
     "//tools/fidl($host_toolchain)",
     "//tools/fidlcat:fidlcat_host($host_toolchain)",
-    "//tools/funnel:($host_toolchain)",
+    "//tools/funnel:host($host_toolchain)",
     "//tools/host_test_component($host_toolchain)",
     "//tools/jq5:install($host_toolchain)",
     "//tools/loglistener:host($host_toolchain)",

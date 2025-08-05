@@ -438,11 +438,16 @@ impl FxNode for FxFile {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
     }
 
-    // Mark the state as to be purged. Returns true if there are no open references.
-    fn mark_to_be_purged(&self) -> bool {
+    fn mark_to_be_purged(&self) {
         let old = State(self.state.fetch_or(TO_BE_PURGED, Ordering::Relaxed));
         assert!(!old.to_be_purged());
-        old.open_count() == 0
+        if old.open_count() == 0 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }
 
@@ -779,7 +784,7 @@ mod tests {
     use fxfs::fsck::fsck;
     use fxfs::object_handle::INVALID_OBJECT_ID;
     use fxfs::object_store::Timestamp;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use std::sync::atomic::{self, AtomicBool};
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
@@ -1873,7 +1878,7 @@ mod tests {
         .await;
 
         let mut data: Vec<u8> = vec![0x00u8; 1052672];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
 
         for chunk in data.chunks(8192) {
             file.write(chunk)
@@ -2017,7 +2022,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_fsverity_enabled_file_verified_reads() {
         let mut data: Vec<u8> = vec![0x00u8; 1052672];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
         let mut num_chunks = 0;
 
         let reused_device = {
@@ -2179,7 +2184,7 @@ mod tests {
         .await;
 
         let mut data: Vec<u8> = vec![0x00u8; 8192];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
 
         file.write(&data)
             .await

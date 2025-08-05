@@ -12,7 +12,6 @@
 #define SHIFT_16K (14)
 #define SHIFT_64K (16)
 
-/* arm specific stuff */
 #ifdef ARM64_LARGE_PAGESIZE_64K
 #define PAGE_SIZE_SHIFT (SHIFT_64K)
 #elif ARM64_LARGE_PAGESIZE_16K
@@ -33,34 +32,14 @@ static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
 #define USER_PAGE_SIZE (1L << USER_PAGE_SIZE_SHIFT)
 #define USER_PAGE_MASK (USER_PAGE_SIZE - 1)
 
-// Mask for PMU version section of ID_AA64DFR0_EL1.
-#define FEAT_PMUVER_MASK 0xF00
-
 // Align the heap to 2MiB to optionally support large page mappings in it.
 #define ARCH_HEAP_ALIGN_BITS 21
 
-/* the maximum cache line seen on any known ARM hardware */
-#define MAX_CACHE_LINE 128
+// The maximum cache line seen on any known ARM hardware.
+#define MAX_CACHE_LINE 64
 
-#ifndef __ASSEMBLER__
-#define BM(base, count, val) (((val) & ((1UL << (count)) - 1)) << (base))
-#else
-#define BM(base, count, val) (((val) & ((0x1 << (count)) - 1)) << (base))
-#endif
-
-#define ARM64_MMFR0_ASIDBITS_16 BM(4, 4, 2)
-#define ARM64_MMFR0_ASIDBITS_8 BM(4, 4, 0)
-#define ARM64_MMFR0_ASIDBITS_MASK BM(4, 4, 15)
-
-#define ARCH_DEFAULT_STACK_SIZE 8192
-
-/* map 512GB at the base of the kernel. this is the max that can be mapped with a
- * single level 1 page table using 1GB pages.
- */
-#ifndef __ASSEMBLER__
+// Map 512GB at the base of the kernel. this is the max that can be mapped with a
+// single level 1 page table using 1GB pages.
 #define ARCH_PHYSMAP_SIZE (1UL << 39)
-#else
-#define ARCH_PHYSMAP_SIZE (0x1 << 39)
-#endif
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_DEFINES_H_

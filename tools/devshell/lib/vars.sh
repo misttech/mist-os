@@ -374,53 +374,6 @@ function fx-if-target-set-by-env {
   fi
 }
 
-# Provides a best-effort check against whether a ffx default target is set,
-# which can overshadow fx-level targets.
-# If this is the case, emit a helpful warning by default or error if `--error`
-# is specified.
-# Attempts to unset the ffx default target if `--fix` is specified.
-# To minimize DX disruptions, suggests the user to verify if ffx hasn't been
-# built yet.
-function fx-check-ffx-default-target {
-  # Refresh $FUCHSIA_NODENAME.
-  fx-export-default-target
-
-  # Skip check with warning if ffx hasn't been built.
-  local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
-  if [[ ! -x "${ffx_binary}" ]]; then
-    fx-warn "ffx not found in build directory, skipping verification that effective target device is ${FUCHSIA_NODENAME:-"unset"}."
-    # shellcheck disable=SC2016
-    fx-warn 'Please run `ffx target default get` after the build to confirm.'
-    return 0
-  fi
-
-  # Get the default target configured within ffx.
-  local ffx_configured_target
-  ffx_configured_target="$(FUCHSIA_NODENAME= FUCHSIA_DEVICE_ADDR= $ffx_binary target default get 2>/dev/null)"
-  if [[ -z "$ffx_configured_target" ]]; then
-    return 0
-  fi
-
-  local -r args=$*
-  function log {
-    if [[ $args == *"--error"* ]]; then
-      fx-error "$@"
-    else
-      fx-warn "$@"
-    fi
-  }
-
-  log "The build level device ${FUCHSIA_NODENAME:-"is unset, but"} is overridden by the user level device \"$ffx_configured_target\"."
-  if [[ $* == *"--fix"* ]]; then
-    log 'Attempting to fix this by running `ffx target default unset`...'
-    FUCHSIA_NODENAME= FUCHSIA_DEVICE_ADDR= $ffx_binary target default unset
-    return $?
-  else
-    log 'Please run `ffx target default unset` to fix this.'
-    return 1
-  fi
-}
-
 function fx-change-build-dir {
   local build_dir="$1"
 

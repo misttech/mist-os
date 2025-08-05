@@ -10,7 +10,8 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject,
+    FileObjectState, FileOps,
 };
 use bstr::ByteSlice;
 #[cfg(not(feature = "starnix_lite"))]
@@ -423,7 +424,7 @@ impl SeccompState {
     // audit log.  Also, it does not match the Linux format.  Still, the machinery
     // is in place for when we have to support it for real.
     fn log_action(task: &CurrentTask, syscall: &Syscall) {
-        let creds = task.creds();
+        let creds = task.current_creds();
         let uid = creds.uid;
         let gid = creds.gid;
         let comm_r = task.command();
@@ -931,9 +932,9 @@ impl FileOps for SeccompNotifierFileObject {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let mut state = self.notifier.lock();

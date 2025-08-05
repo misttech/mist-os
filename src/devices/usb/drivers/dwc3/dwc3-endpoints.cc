@@ -72,6 +72,7 @@ void Dwc3::EpServer::CancelAll(zx_status_t reason) {
   for (; !queued_reqs.empty(); queued_reqs.pop()) {
     RequestComplete(reason, 0, std::move(queued_reqs.front()));
   }
+  uep_->fifo.Clear();
 }
 
 void Dwc3::UserEpQueueNext(UserEndpoint& uep) {

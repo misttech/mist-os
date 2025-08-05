@@ -529,6 +529,12 @@ impl Drop for InterfaceInterface500 {
 pub struct DeviceInterface500(*mut *mut iokit_usb::IOUSBDeviceInterface500);
 
 impl DeviceInterface500 {
+    /// SAFETY: Pointer passed to the function must be valid.
+    unsafe fn new(ptr: *mut libc::c_void) -> Result<DeviceInterface500> {
+        assert!(!ptr.is_null(), "Tried to construct DeviceeInterface500 with null ptr");
+
+        Ok(DeviceInterface500(ptr.cast()))
+    }
     /// Derive a crate::DeviceDescriptor from this device.
     pub fn descriptor(&self) -> DeviceDescriptor {
         let mut ret =
@@ -558,30 +564,34 @@ impl DeviceInterface500 {
             );
         }
         if sn_string_index > 0 {
-            let mut buf: Vec<u16> = vec![0, 256];
-            let mut request = iokit_usb::IOUSBDeviceRequest::default();
+            let buf: Vec<u16> = vec![0, 256];
+            let mut request = iokit_usb::IOUSBDevRequest::default();
             request.bmRequestType =
-                iokit_usb::kUSBIn | iokit_usb::kUSBStandard | iokit_usb::kUSBDevice;
-            reqeust.bRequest = iokit_usb::kUSBRqGetDescriptor;
-            request.wValue - (iokit_usb::kUSBStringDesc << 8) | sn_string_index;
+                (iokit_usb::kUSBIn | iokit_usb::kUSBStandard | iokit_usb::kUSBDevice) as u8;
+            request.bRequest = iokit_usb::kUSBRqGetDescriptor as u8;
+            request.wValue = (iokit_usb::kUSBStringDesc << 8) as u16 | (sn_string_index as u16);
             // language ID (en-us) for serial number string
-            request.wIndex - 0x0409;
-            request.wLength = buffer.len();
+            request.wIndex = 0x0409;
+            request.wLength = buf.len() as u16;
             request.pData = buf.as_ptr().cast_mut().cast();
 
             // SAFETY: This object assures the validity of self.0 and the other pointer is outputs
             // so local stack locations should be fine.
             unsafe {
-                ioreturn_check(((**self.0).DeviceRequest.unwrap())(self.0.cast(), &mut request))?;
+                if ioreturn_check(((**self.0).DeviceRequest.unwrap())(self.0.cast(), &mut request))
+                    .is_err()
+                {
+                    return None;
+                }
             }
             // skip first word, and copy the rest to the serial string, changing shorts to bytes.
-            let count = (req.wLenDone - 1) / 2;
-            let mut sn_buf: Vec<u8> = vec![count];
+            let count: usize = ((request.wLenDone - 1) / 2).try_into().unwrap();
+            let mut sn_buf: Vec<u8> = vec![0; count];
             for i in 0..count {
-                sn_buf[i] = buf[i + 1].into();
+                sn_buf[i] = buf[i + 1].try_into().unwrap();
             }
             let serial_number = String::from_utf8_lossy(&sn_buf);
-            Some(serial_number)
+            Some(serial_number.to_string())
         } else {
             None
         }
@@ -614,13 +624,13 @@ impl DeviceInterface500 {
     }
 }
 
-impl QueryableInterface for DeviceInterface500 {
+impl QueryableInterface for Result<DeviceInterface500> {
     fn uuid() -> iokit_usb::CFUUIDRef {
         GetIOUSBDeviceInterfaceID500()
     }
 
-    unsafe fn get(ptr: *mut libc::c_void) -> DeviceInterface500 {
-        DeviceInterface500(ptr.cast())
+    unsafe fn get(ptr: *mut libc::c_void) -> Result<DeviceInterface500> {
+        DeviceInterface500::new(ptr)
     }
 }
 

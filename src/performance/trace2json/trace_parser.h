@@ -10,6 +10,7 @@
 
 #include <array>
 #include <ostream>
+#include <string>
 #include <vector>
 
 #include <trace-reader/reader.h>
@@ -20,7 +21,7 @@ namespace tracing {
 
 class FuchsiaTraceParser {
  public:
-  explicit FuchsiaTraceParser(std::ostream* out);
+  explicit FuchsiaTraceParser(const std::filesystem::path& out);
   ~FuchsiaTraceParser();
 
   bool ParseComplete(std::istream*);
@@ -31,6 +32,7 @@ class FuchsiaTraceParser {
   std::array<char, kReadBufferSize> buffer_;
   // The number of bytes of |buffer_| in use.
   size_t buffer_end_ = 0;
+
   trace::TraceReader reader_;
 };
 

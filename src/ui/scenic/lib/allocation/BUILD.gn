@@ -6,8 +6,6 @@ source_set("allocation") {
   sources = [
     "allocator.cc",
     "allocator.h",
-    "buffer_collection_import_export_tokens.cc",
-    "buffer_collection_import_export_tokens.h",
     "buffer_collection_importer.h",
     "id.cc",
     "id.h",
@@ -18,6 +16,7 @@ source_set("allocation") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//src/lib/fxl",
+    "//src/ui/scenic/lib/types",
   ]
 
   deps = [

@@ -12,6 +12,7 @@
 #include <lib/sync/cpp/completion.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -28,7 +29,6 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/epsilon_compare.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
@@ -244,13 +244,6 @@ struct BufferCollectionImportExportTokensNatural {
 const uint32_t kDefaultSize = 1;
 const glm::vec2 kDefaultDisplayPixelRatio = {1.0f, 1.0f};
 const int32_t kDefaultInset = 0;
-
-void ExpectRectFEquals(const fuchsia::math::RectF& rect1, const fuchsia::math::RectF& rect2) {
-  EXPECT_FLOAT_EQ(rect1.x, rect2.x);
-  EXPECT_FLOAT_EQ(rect1.y, rect2.y);
-  EXPECT_FLOAT_EQ(rect1.width, rect2.width);
-  EXPECT_FLOAT_EQ(rect1.height, rect2.height);
-}
 
 fuchsia_ui_composition::ViewBoundProtocols NoViewProtocols() { return {}; }
 
@@ -1693,14 +1686,14 @@ TEST_F(FlatlandTest, SetImageBlendFunctionErrorCases) {
   // Zero is not a valid content ID.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageBlendingFunction({0}, fuchsia_ui_composition::BlendMode::kSrc);
+    flatland->SetImageBlendingFunction({0}, BlendMode::kReplace());
     PRESENT(flatland, false);
   }
 
   // Content does not exist.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageBlendingFunction(kIdNotCreated, fuchsia_ui_composition::BlendMode::kSrc);
+    flatland->SetImageBlendingFunction(kIdNotCreated, BlendMode::kReplace());
     PRESENT(flatland, false);
   }
 }
@@ -1737,7 +1730,7 @@ TEST_F(FlatlandTest, SetImageBlendFunctionUberstructTest) {
     flatland->CreateTransform(kTransformId1);
     flatland->SetRootTransform(kTransformId1);
     flatland->SetContent(kTransformId1, kImageId1);
-    flatland->SetImageBlendingFunction(kImageId1, fuchsia_ui_composition::BlendMode::kSrc);
+    flatland->SetImageBlendingFunction(kImageId1, BlendMode::kReplace());
     PRESENT(flatland, true);
   }
 
@@ -1758,7 +1751,7 @@ TEST_F(FlatlandTest, SetImageBlendFunctionUberstructTest) {
     flatland->CreateTransform(kTransformId2);
     flatland->AddChild(kTransformId1, kTransformId2);
     flatland->SetContent(kTransformId2, kImageId2);
-    flatland->SetImageBlendingFunction(kImageId2, fuchsia_ui_composition::BlendMode::kSrcOver);
+    flatland->SetImageBlendingFunction(kImageId2, BlendMode::kPremultipliedAlpha());
     PRESENT(flatland, true);
   }
 
@@ -1784,8 +1777,8 @@ TEST_F(FlatlandTest, SetImageBlendFunctionUberstructTest) {
   EXPECT_NE(image_2_kv, uber_struct->images.end());
 
   // Make sure the opacity fields are set properly.
-  EXPECT_TRUE(image_1_kv->second.blend_mode == fuchsia_ui_composition::BlendMode::kSrc);
-  EXPECT_TRUE(image_2_kv->second.blend_mode == fuchsia_ui_composition::BlendMode::kSrcOver);
+  EXPECT_TRUE(image_1_kv->second.blend_mode == BlendMode::kReplace());
+  EXPECT_TRUE(image_2_kv->second.blend_mode == BlendMode::kPremultipliedAlpha());
 }
 
 TEST_F(FlatlandTest, SetImageFlipErrorCases) {
@@ -2518,9 +2511,9 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
       auto hit_region = hit_regions[handle2][0];
 
       ASSERT_TRUE(hit_region.is_finite());
-      auto rect = hit_region.region();
-      fuchsia::math::RectF expected_rect = {0, 1, 2, 3};
-      ExpectRectFEquals(rect, expected_rect);
+      const auto rect = hit_region.region();
+      const types::RectangleF expected_rect({.x = 0, .y = 1, .width = 2, .height = 3});
+      EXPECT_EQ(rect, expected_rect);
       EXPECT_EQ(hit_region.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
     }
   }
@@ -2541,9 +2534,9 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
     auto hit_region = hit_regions[handle1][0];
 
     ASSERT_TRUE(hit_region.is_finite());
-    auto rect = hit_region.region();
-    fuchsia::math::RectF expected_rect = {1, 2, 3, 4};
-    ExpectRectFEquals(rect, expected_rect);
+    const auto rect = hit_region.region();
+    const types::RectangleF expected_rect({.x = 1, .y = 2, .width = 3, .height = 4});
+    EXPECT_EQ(rect, expected_rect);
     EXPECT_EQ(hit_region.interaction(),
               fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE);
   }
@@ -2572,9 +2565,9 @@ TEST_F(FlatlandTest, SetRootTransformAfterSetHitRegions_DoesNotChangeHitRegion) 
   auto hit_region = hit_regions[handle1][0];
 
   ASSERT_TRUE(hit_region.is_finite());
-  auto rect = hit_region.region();
-  fuchsia::math::RectF expected_rect = {0, 1, 2, 3};
-  ExpectRectFEquals(rect, expected_rect);
+  const auto rect = hit_region.region();
+  const types::RectangleF expected_rect({.x = 0, .y = 1, .width = 2, .height = 3});
+  EXPECT_EQ(rect, expected_rect);
   EXPECT_EQ(hit_region.interaction(),
             fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE);
 }
@@ -2614,10 +2607,10 @@ TEST_F(FlatlandTest, MultipleTransformsWithHitRegions) {
     auto rect1 = hit_region1.region();
     ASSERT_TRUE(hit_region2.is_finite());
     auto rect2 = hit_region2.region();
-    fuchsia::math::RectF expected_rect1 = {0, 1, 2, 3};
-    fuchsia::math::RectF expected_rect2 = {1, 2, 3, 4};
-    ExpectRectFEquals(rect1, expected_rect1);
-    ExpectRectFEquals(rect2, expected_rect2);
+    const types::RectangleF expected_rect1({.x = 0, .y = 1, .width = 2, .height = 3});
+    const types::RectangleF expected_rect2({.x = 1, .y = 2, .width = 3, .height = 4});
+    EXPECT_EQ(rect1, expected_rect1);
+    EXPECT_EQ(rect2, expected_rect2);
 
     EXPECT_EQ(hit_region1.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
     EXPECT_EQ(hit_region2.interaction(),
@@ -2652,8 +2645,9 @@ TEST_F(FlatlandTest, ManuallyAddedMaximalHitRegionPersists) {
 
   ASSERT_TRUE(hit_region1.is_finite());
   auto rect = hit_region1.region();
-  fuchsia::math::RectF expected_rect = {FLT_MIN, FLT_MIN, FLT_MAX, FLT_MAX};
-  ExpectRectFEquals(rect, expected_rect);
+  types::RectangleF expected_rect(
+      {.x = FLT_MIN, .y = FLT_MIN, .width = FLT_MAX, .height = FLT_MAX});
+  EXPECT_EQ(rect, expected_rect);
 }
 
 TEST_F(FlatlandTest, ChildViewWatcherFailsIdCollision) {
@@ -4339,13 +4333,14 @@ TEST_F(FlatlandTest, CreateImageSetsDefaults) {
   auto sample_region_kv = uber_struct->local_image_sample_regions.find(image_handle);
   EXPECT_NE(sample_region_kv, uber_struct->local_image_sample_regions.end());
   fuchsia::math::RectF rect = {0, 0, kWidth, kHeight};
-  ExpectRectFEquals(sample_region_kv->second, rect);
+  EXPECT_EQ(sample_region_kv->second,
+            types::RectangleF({.x = 0, .y = 0, .width = kWidth, .height = kHeight}));
 
   // Default destination rect should be same as size.
   auto matrix_kv = uber_struct->local_matrices.find(image_handle);
   EXPECT_NE(matrix_kv, uber_struct->local_matrices.end());
-  EXPECT_EQ(sample_region_kv->second.width, static_cast<float>(kWidth));
-  EXPECT_EQ(sample_region_kv->second.height, static_cast<float>(kHeight));
+  EXPECT_EQ(sample_region_kv->second.width(), static_cast<float>(kWidth));
+  EXPECT_EQ(sample_region_kv->second.height(), static_cast<float>(kHeight));
 }
 
 TEST_F(FlatlandTest, SetImageOpacityTestCases) {
@@ -4684,14 +4679,14 @@ TEST_F(FlatlandTest, SetImageSampleRegionTestCases) {
   // Zero is not a valid content ID.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageSampleRegion({0}, {0, 0, kImageWidth, kImageHeight});
+    flatland->SetImageSampleRegion({0}, types::RectangleF({0, 0, kImageWidth, kImageHeight}));
     PRESENT(flatland, false);
   }
 
   // The content id hasn't been imported yet.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageSampleRegion(kId, {0, 0, kImageWidth, kImageHeight});
+    flatland->SetImageSampleRegion(kId, types::RectangleF({0, 0, kImageWidth, kImageHeight}));
     PRESENT(flatland, false);
   }
 
@@ -4712,7 +4707,7 @@ TEST_F(FlatlandTest, SetImageSampleRegionTestCases) {
 
   // Testing now with good values should finally work.
   {
-    flatland->SetImageSampleRegion(kId, {0, 0, kImageWidth, kImageHeight});
+    flatland->SetImageSampleRegion(kId, types::RectangleF({0, 0, kImageWidth, kImageHeight}));
     PRESENT(flatland, true);
 
     const float kYDeltaCoefficient = 0.370833f;
@@ -4724,14 +4719,14 @@ TEST_F(FlatlandTest, SetImageSampleRegionTestCases) {
     // precision.
     EXPECT_GT(kYDelta + kYHeight, static_cast<float>(kImageHeight));
     EXPECT_TRUE(escher::CompareFloat(kYDelta + kYHeight, static_cast<float>(kImageHeight), 0.01f));
-    flatland->SetImageSampleRegion(kId, {0, kYDelta, kImageWidth, kYHeight});
+    flatland->SetImageSampleRegion(kId, types::RectangleF({0, kYDelta, kImageWidth, kYHeight}));
     PRESENT(flatland, true);
   }
 
   // Test one more time with out of bounds values and it should fail.
   {
     // (x + width) exceeeds the image width and should fail.
-    flatland->SetImageSampleRegion(kId, {1, 0, kImageWidth, kImageHeight});
+    flatland->SetImageSampleRegion(kId, types::RectangleF({1, 0, kImageWidth, kImageHeight}));
     PRESENT(flatland, false);
   }
 }

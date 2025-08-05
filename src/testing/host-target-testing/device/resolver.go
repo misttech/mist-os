@@ -29,14 +29,14 @@ type DeviceResolver interface {
 	WaitToFindDeviceInNetboot(ctx context.Context) (string, error)
 }
 
-// ConstnatAddressResolver returns a fixed hostname for the specified nodename.
+// ConstantHostResolver returns a fixed hostname for the specified nodename.
 type ConstantHostResolver struct {
 	nodeName string
 	host     string
 	sshPort  int
 }
 
-// NewConstantAddressResolver constructs a fixed host.
+// NewConstantHostResolver constructs a fixed host.
 func NewConstantHostResolver(
 	ctx context.Context,
 	nodeName string,

@@ -99,7 +99,7 @@ type Peer = table {
     10: periodic_advertising_interval uint16;
 };
 
-@available(added=NEXT)
+@available(added=28)
 type PeriodicAdvertisingSyncTransferError = flexible enum : uint32 {
     FAILED = 0;
     /// The `PeriodicAdvertisingSyncId` does not correspond to an active `PeriodicAdvertisingSync`.
@@ -171,7 +171,7 @@ closed protocol Connection {
 
     /// Send synchronization information for a periodic advertising train identified by `sync_id` to
     /// the connected peer.
-    @available(added=NEXT)
+    @available(added=28)
     strict TransferPeriodicAdvertisingSync(table {
         /// Required.
         1: sync_id PeriodicAdvertisingSyncId;
@@ -183,7 +183,7 @@ closed protocol Connection {
 
     /// Accept the next Periodic Advertising Sync Transfer from the peer. A response will be sent
     /// when the host is ready to accept the transfer. Only one request can be pending at a time.
-    @available(added=NEXT)
+    @available(added=28)
     strict AcceptPeriodicAdvertisingSyncTransfer(resource table {
         /// When the sync is established, the `PeriodicAdvertisingSync.OnEstablished` event will be
         /// sent containing the service data received with the transfer. Closing the client end will

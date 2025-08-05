@@ -13,6 +13,9 @@
 namespace display {
 
 // Bundles a display mode and the ID that represents it.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class ModeAndId {
  private:
   // Enables creating instances using the designated initializer syntax.

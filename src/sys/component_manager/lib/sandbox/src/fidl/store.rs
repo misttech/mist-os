@@ -5,6 +5,7 @@
 use crate::dict::Key;
 use crate::fidl::registry;
 use crate::{Capability, Connector, Dict, DirConnector, Message};
+use cm_types::RelativePath;
 use fidl::handle::Signals;
 use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
@@ -80,7 +81,7 @@ pub async fn serve_capability_store(
             fsandbox::CapabilityStoreRequest::DirConnectorOpen { id, server_end, responder } => {
                 let result = (|| {
                     let this = get_dir_connector(&store, id)?;
-                    let _ = this.send(server_end);
+                    let _ = this.send(server_end, RelativePath::dot(), None);
                     Ok(())
                 })();
                 responder.send(result)?;

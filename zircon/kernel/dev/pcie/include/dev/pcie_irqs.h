@@ -156,11 +156,6 @@ class SharedLegacyIrqHandler
  private:
   explicit SharedLegacyIrqHandler(uint irq_id);
 
-  static void HandlerThunk(void* arg) {
-    DEBUG_ASSERT(arg);
-    reinterpret_cast<SharedLegacyIrqHandler*>(arg)->Handler();
-  }
-
   void Handler();
 
   DeviceHandlerList device_handler_list_;

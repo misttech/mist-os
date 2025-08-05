@@ -845,12 +845,20 @@ void Dwc3::UserEpReset(UserEndpoint& uep) {
 }
 
 void Dwc3::Ep0Reset() {
+  if (ep0_.transfer_in_progress_) {
+    bool is_out = (ep0_.cur_setup.bm_request_type & USB_DIR_MASK) == USB_DIR_OUT;
+    if (ep0_.state == Ep0::State::Status) {
+      // Flip direction for status.
+      is_out = !is_out;
+    }
+    CmdEpEndTransfer(is_out ? ep0_.out : ep0_.in);
+  }
+  EpReset(ep0_.out);
+  EpReset(ep0_.in);
   ep0_.cur_setup = {};
   ep0_.cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
   ep0_.state = Ep0::State::None;
-  CmdEpEndTransfer(ep0_.out);
-  EpReset(ep0_.out);
-  EpReset(ep0_.in);
+  ep0_.transfer_in_progress_ = false;
   ep0_.shared_fifo.Clear();
 }
 

@@ -42,12 +42,12 @@ type HtOperation = struct {
     bytes array<uint8, HT_OP_LEN>;
 };
 
-// IEEE Std 802.11-2016 9.5.2.158
+// IEEE Std 802.11-2016 9.4.2.158
 type VhtCapabilities = struct {
     bytes array<uint8, VHT_CAP_LEN>;
 };
 
-// IEEE Std 802.11-2016 9.5.2.159
+// IEEE Std 802.11-2016 9.4.2.159
 type VhtOperation = struct {
     bytes array<uint8, VHT_OP_LEN>;
 };

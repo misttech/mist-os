@@ -74,7 +74,7 @@ impl Resolver for RealmBuilderResolver {
     ) -> Result<ResolvedComponent, ResolverError> {
         let (component_url, some_context) = component_address.to_url_and_context();
         let fresolution::Component {
-            url,
+            url: _,
             decl,
             package,
             config_values,
@@ -84,7 +84,6 @@ impl Resolver for RealmBuilderResolver {
         } = self
             .resolve_async(component_url, some_context.map(|context| context.into()).as_ref())
             .await?;
-        let resolved_url = url.unwrap();
         let context_to_resolve_children = resolution_context.map(Into::into);
         let decl = resolving::read_and_validate_manifest(&decl.unwrap())?;
         let config_values = if let Some(data) = config_values {
@@ -93,7 +92,6 @@ impl Resolver for RealmBuilderResolver {
             None
         };
         Ok(ResolvedComponent {
-            resolved_url,
             context_to_resolve_children,
             decl,
             package: package.map(|p| p.try_into()).transpose()?,

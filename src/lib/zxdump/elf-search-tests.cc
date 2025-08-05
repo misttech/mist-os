@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <ostream>
+#include <ranges>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -34,32 +35,50 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::byte>& bytes) 
 }  // namespace std
 
 namespace zxdump::testing {
+namespace {
 
 using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::Field;
 using ::testing::IsEmpty;
+using ::testing::IsSupersetOf;
 using ::testing::Not;
 
 using ByteVector = std::vector<std::byte>;
 
 struct ElfId {
+  constexpr auto operator<=>(const ElfId&) const = default;
+
   ByteVector build_id;
   std::string soname;
-  uint64_t base = 0;
+};
+
+struct ElfIdAtBase : public ElfId {
+  constexpr ElfIdAtBase(ElfId id, uint64_t id_base) : ElfId{std::move(id)}, base{id_base} {}
+
+  constexpr auto operator<=>(const ElfIdAtBase&) const = default;
+
+  uint64_t base;
 };
 
 std::ostream& operator<<(std::ostream& os, const ElfId& id) {
-  return os << "{ build ID: " << id.build_id << ", SONAME: \"" << id.soname << "\", 0x" << std::hex
-            << id.base << " }";
+  if (id.soname.empty()) {
+    return os << "\n    { build ID: " << id.build_id << ", no SONAME }";
+  }
+  return os << "\n    { build ID: " << id.build_id << ", SONAME: \"" << id.soname << "\" }";
 }
 
-auto MakeElfId(std::initializer_list<uint8_t> id, std::string_view soname) {
+std::ostream& operator<<(std::ostream& os, const ElfIdAtBase& id) {
+  return os << static_cast<const ElfId&>(id) << "\n    @ " <<  //
+         std::showbase << std::hex << id.base;
+}
+
+ElfId MakeElfId(std::initializer_list<uint8_t> id, std::string_view soname) {
   ByteVector bytes;
   for (uint8_t byte : id) {
     bytes.push_back(static_cast<std::byte>(byte));
   }
-  return ElfId{std::move(bytes), std::string(soname)};
+  return ElfId{.build_id = std::move(bytes), .soname = std::string(soname)};
 }
 
 // The generated .inc file has `MakeElfId({0x...,...}, "soname"),` lines.
@@ -67,18 +86,21 @@ const std::array kElfSearchIds = {
 #include "test-child-elf-search.inc"
 };
 
-auto ElfIdEq(const ElfId& id, bool use_soname) {
-  return AllOf(Field("build ID", &ElfId::build_id, id.build_id),
-               use_soname ? Field("SONAME", &ElfId::soname, id.soname)
-                          : Field("SONAME", &ElfId::soname, IsEmpty()));
+constexpr auto kElfSearchIdsWithoutSonameRange = std::views::transform(  //
+    kElfSearchIds, [](ElfId id) {
+      id.soname = {};
+      return id;
+    });
+
+// gtest container matchers don't like ranges/views.
+template <std::ranges::input_range Range>
+std::vector<std::ranges::range_value_t<Range>> RangeVector(Range&& range) {
+  return {range.begin(), range.end()};
 }
 
-auto HasElfSearchIds(bool use_soname) {
-  auto has_ids = [use_soname](auto... ids) {
-    return AllOf(Contains(ElfIdEq(ids, use_soname)).Times(1)...);
-  };
-  return std::apply(has_ids, kElfSearchIds);
-}
+const auto kElfSearchIdsWithoutSoname = RangeVector(kElfSearchIdsWithoutSonameRange);
+
+}  // namespace
 
 // This is called before dumping starts to make callbacks.
 void TestProcessForElfSearch::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
@@ -147,55 +169,62 @@ void TestProcessForElfSearch::CheckDump(zxdump::TaskHolder& holder) {
     EXPECT_EQ(name, std::string_view(kChildName));
   }
 
-  std::vector<ElfId> found_elf;
+  std::vector<ElfIdAtBase> found_elf;
   auto maps = read_process.get_info<ZX_INFO_PROCESS_MAPS>();
   ASSERT_TRUE(maps.is_ok()) << maps.error_value();
-  auto first = maps->begin();
-  do {
-    auto [next, last] = zxdump::ElfSearch(read_process, first, maps->end());
-    if (next != last) {
-      const zx_info_maps_t& segment = *next;
-      ASSERT_EQ(segment.type, ZX_INFO_MAPS_TYPE_MAPPING);
-      auto detect = zxdump::DetectElf(read_process, segment);
-      ASSERT_TRUE(detect.is_ok()) << detect.error_value();
-      std::span phdrs = **detect;
-      EXPECT_THAT(phdrs, Not(IsEmpty()));
-      auto identity = zxdump::DetectElfIdentity(read_process, segment, phdrs);
-      ASSERT_TRUE(identity.is_ok()) << identity.error_value();
-      EXPECT_GT(identity->build_id.size, zxdump::ElfIdentity::kBuildIdOffset);
-      auto id_bytes = read_process.read_memory<std::byte, zxdump::ByteView>(
-          identity->build_id.vaddr + zxdump::ElfIdentity::kBuildIdOffset,
-          identity->build_id.size - zxdump::ElfIdentity::kBuildIdOffset);
-      ASSERT_TRUE(id_bytes.is_ok()) << id_bytes.error_value();
-      std::string soname;
-      if (identity->soname.size != 0) {
-        auto result = read_process.read_memory<char, std::string_view>(  //
-            identity->soname.vaddr, identity->soname.size);
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        soname = **result;
-      }
-      found_elf.push_back({
-          .build_id{id_bytes.value()->begin(), id_bytes.value()->end()},
-          .soname{std::move(soname)},
-          .base = segment.base,
-      });
+  while (!maps->empty()) {
+    auto result = zxdump::ElfSearch(read_process, *maps);
+    ASSERT_TRUE(result.is_ok());
+    if (result->empty()) {
+      // Nothing more found.
+      break;
     }
-    first = last;
-  } while (first != maps->end());
 
-  EXPECT_THAT(found_elf, HasElfSearchIds(true));
+    const zx_info_maps_t& segment = result->front();
+    ASSERT_EQ(segment.type, ZX_INFO_MAPS_TYPE_MAPPING);
+    auto detect = zxdump::DetectElf(read_process, segment);
+    ASSERT_TRUE(detect.is_ok()) << detect.error_value();
+
+    std::span phdrs = **detect;
+    EXPECT_THAT(phdrs, Not(IsEmpty()));
+    auto identity = zxdump::DetectElfIdentity(read_process, segment, phdrs);
+    ASSERT_TRUE(identity.is_ok()) << identity.error_value();
+
+    EXPECT_GT(identity->build_id.size, zxdump::ElfIdentity::kBuildIdOffset);
+    auto id_bytes = read_process.read_memory<std::byte, zxdump::ByteView>(
+        identity->build_id.vaddr + zxdump::ElfIdentity::kBuildIdOffset,
+        identity->build_id.size - zxdump::ElfIdentity::kBuildIdOffset);
+    ASSERT_TRUE(id_bytes.is_ok()) << id_bytes.error_value();
+    ElfId elf_id = {
+        .build_id{id_bytes.value()->begin(), id_bytes.value()->end()},
+    };
+
+    if (identity->soname.size != 0) {
+      auto read = read_process.read_memory<char, std::string_view>(  //
+          identity->soname.vaddr, identity->soname.size);
+      ASSERT_TRUE(result.is_ok()) << result.error_value();
+      elf_id.soname = **read;
+    }
+
+    found_elf.emplace_back(std::move(elf_id), segment.base);
+
+    // Iterate on the remainder not covered.
+    *maps = maps->subspan(result->data() - maps->data() + result->size());
+  }
+
+  EXPECT_THAT(found_elf, IsSupersetOf(kElfSearchIds));
 
   // Only the main executable should have no SONAME.
   EXPECT_THAT(found_elf, Contains(Field("soname", &ElfId::soname, IsEmpty())).Times(1));
 
   // That module's base should be what dladdr said in the child.
   EXPECT_THAT(found_elf, Contains(AllOf(Field("soname", &ElfId::soname, IsEmpty()),
-                                        Field("load address", &ElfId::base, main_ptr()))));
+                                        Field("load address", &ElfIdAtBase::base, main_ptr()))));
 
   // Similar pair for the DSO module.
   EXPECT_THAT(found_elf, Contains(Field(&ElfId::soname, kDsoSoname)).Times(1));
   EXPECT_THAT(found_elf, Contains(AllOf(Field("soname", &ElfId::soname, kDsoSoname),
-                                        Field("load address", &ElfId::base, dso_ptr()))));
+                                        Field("load address", &ElfIdAtBase::base, dso_ptr()))));
 }
 
 void TestProcessForElfSearch::CheckNotes(int fd) {
@@ -212,7 +241,7 @@ void TestProcessForElfSearch::CheckNotes(int fd) {
   std::vector<zxdump::Elf::Phdr> phdrs(ehdr.phnum);
   ASSERT_NO_FATAL_FAILURE(must_read(phdrs, ehdr.phoff));
 
-  std::vector<ElfId> found_elf;
+  std::vector<ElfIdAtBase> found_elf;
   for (const zxdump::Elf::Phdr& phdr : phdrs) {
     if (phdr.type == elfldltl::ElfPhdrType::kNote) {
       ByteVector bytes(phdr.filesz, {});
@@ -221,21 +250,27 @@ void TestProcessForElfSearch::CheckNotes(int fd) {
       for (const auto& note : notes) {
         if (note.IsBuildId()) {
           found_elf.push_back({
-              .build_id{note.desc.begin(), note.desc.end()},
-              .base = (&phdr)[-1].vaddr,
+              {.build_id{note.desc.begin(), note.desc.end()}},
+              (&phdr)[-1].vaddr,
           });
         }
       }
     }
   }
 
-  EXPECT_THAT(found_elf, HasElfSearchIds(false));
+  // First check that the right build IDs were found at all.
+  const std::vector<ElfId> found_ids{found_elf.begin(), found_elf.end()};
+  EXPECT_THAT(found_ids, IsSupersetOf(kElfSearchIdsWithoutSoname));
 
-  for (const auto& module : kElfSearchIds) {
-    const uint64_t base = module.soname.empty() ? main_ptr_ : dso_ptr_;
-    auto base_eq = Field("load address", &ElfId::base, base);
-    EXPECT_THAT(found_elf, Contains(AllOf(ElfIdEq(module, false), base_eq)));
-  }
+  // Now check that each was found at its expected load address.
+  const auto expected_elf = RangeVector(std::views::transform(  //
+      kElfSearchIds, [this](const ElfId& id) -> ElfIdAtBase {
+        return {
+            {.build_id = id.build_id},
+            id.soname.empty() ? main_ptr_ : dso_ptr_,
+        };
+      }));
+  EXPECT_THAT(found_elf, IsSupersetOf(expected_elf));
 }
 
 }  // namespace zxdump::testing

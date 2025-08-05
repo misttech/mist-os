@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bedrock::program::{Program, StopConclusion, StopDisposition};
-use crate::framework::{build_framework_dictionary, controller};
+use crate::framework::{controller, get_framework_router};
 use crate::model::actions::{shutdown, StopAction};
 use crate::model::component::{
     Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
@@ -23,6 +23,7 @@ use crate::sandbox_util::RoutableExt;
 use ::routing::bedrock::program_output_dict::{
     build_program_output_dictionary, ProgramOutputGenerator,
 };
+use ::routing::bedrock::request_metadata::Metadata;
 use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
@@ -32,18 +33,20 @@ use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
     WeakComponentInstanceInterface,
 };
-use ::routing::error::{ComponentInstanceError, RoutingError};
-use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
-use ::routing::{DictExt, RouteRequest, WeakInstanceTokenExt};
+use ::routing::error::{ComponentInstanceError, RouteRequestErrorInfo, RoutingError};
+use ::routing::resolving::{ComponentAddress, ComponentResolutionContext, ResolverError};
+use ::routing::rights::Rights;
+use ::routing::subdir::SubDir;
+use ::routing::{DictExt, RouteRequest, WeakInstanceTokenExt, WithPorcelain};
 use async_trait::async_trait;
 use async_utils::async_once::Once;
 use clonable_error::ClonableError;
 use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
 use cm_rust::{
-    CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
+    Availability, CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl,
+    DeliveryType, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
 };
-use cm_types::{Name, Path};
+use cm_types::{Name, Path, RelativePath};
 use config_encoder::ConfigFields;
 use derivative::Derivative;
 use errors::{
@@ -52,14 +55,15 @@ use errors::{
     ResolveActionError, StopError,
 };
 use fidl::endpoints::{create_proxy, ServerEnd};
+use flyweights::FlyStr;
 use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
 use log::warn;
 use moniker::{BorrowedChildName, ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Routable, Router,
-    RouterResponse, WeakInstanceToken,
+    Capability, Connector, Dict, DirConnector, DirEntry, RemotableCapability, Request, Routable,
+    Router, RouterResponse, WeakInstanceToken,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -340,7 +344,7 @@ pub struct ResolvedInstanceState {
 
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.
-    address: ComponentAddress,
+    address: ComponentDomain,
 
     /// The sandbox holds all dictionaries involved in capability routing.
     pub sandbox: ComponentSandbox,
@@ -349,6 +353,39 @@ pub struct ResolvedInstanceState {
     /// its outgoing directory server endpoint. Present if and only if the component
     /// has a program.
     program_escrow: Option<escrow::Actor>,
+}
+
+/// Abbreviated equivalent to [ComponentAddress] that omits the actual url string.
+/// This is a memory optimization: we can reconstruct the full [ComponentAddress]
+/// by combining this type with the string [`ComponentInstance::component_url`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComponentDomain {
+    /// A fully-qualified component URL.
+    Absolute,
+
+    /// A relative Component URL, starting with the package path; for example a
+    /// subpackage relative URL such as "needed_package#meta/dep_component.cm".
+    RelativePath {
+        /// An opaque value (from the perspective of component resolution)
+        /// required by the resolver when resolving a relative package path.
+        /// For a given child component, this property is populated from a
+        /// parent component's `resolution_context`, as returned by the parent
+        /// component's resolver.
+        context: ComponentResolutionContext,
+
+        scheme: FlyStr,
+    },
+}
+
+impl From<ComponentAddress> for ComponentDomain {
+    fn from(a: ComponentAddress) -> Self {
+        match a {
+            ComponentAddress::Absolute { .. } => ComponentDomain::Absolute,
+            ComponentAddress::RelativePath { context, scheme, .. } => {
+                ComponentDomain::RelativePath { context, scheme: scheme.into() }
+            }
+        }
+    }
 }
 
 /// Extracts a mutable reference to the `target` field of an `OfferDecl`, or
@@ -370,7 +407,7 @@ impl ResolvedInstanceState {
     pub async fn new(
         component: &Arc<ComponentInstance>,
         resolved_component: Component,
-        address: ComponentAddress,
+        address: ComponentDomain,
         instance_token_state: InstanceTokenState,
         component_input: ComponentInput,
     ) -> Result<Self, ResolveActionError> {
@@ -461,6 +498,17 @@ impl ResolvedInstanceState {
                     component, decl, capability,
                 )
             }
+
+            fn new_outgoing_dir_dir_connector_router(
+                &self,
+                component: &Arc<ComponentInstance>,
+                decl: &cm_rust::ComponentDecl,
+                capability: &cm_rust::CapabilityDecl,
+            ) -> Router<DirConnector> {
+                ResolvedInstanceState::make_program_outgoing_dir_connector_router(
+                    component, decl, capability,
+                )
+            }
         }
         let child_outgoing_dictionary_routers =
             state.get_child_component_output_dictionary_routers();
@@ -473,7 +521,7 @@ impl ResolvedInstanceState {
             &decl,
             component_input,
             program_output_dict,
-            build_framework_dictionary(component),
+            get_framework_router(&component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
             RoutingFailureErrorReporter::new(),
@@ -484,6 +532,11 @@ impl ResolvedInstanceState {
             &state.resolved_component.decl,
             &component_sandbox.program_input.namespace(),
         );
+        Self::extend_program_input_namespace_with_injected_capabilities(
+            &component,
+            &component_sandbox.program_input.namespace(),
+        )
+        .await;
 
         state.sandbox = component_sandbox;
         state.populate_child_inputs(&state.sandbox.child_inputs).await;
@@ -578,6 +631,45 @@ impl ResolvedInstanceState {
         })
     }
 
+    /// Creates a `Router<DirConnector>` that requests the specified capability from the
+    /// program's outgoing directory.
+    pub fn make_program_outgoing_dir_connector_router(
+        component: &Arc<ComponentInstance>,
+        component_decl: &ComponentDecl,
+        capability_decl: &cm_rust::CapabilityDecl,
+    ) -> Router<DirConnector> {
+        if component_decl.get_runner().is_none() {
+            return Router::<DirConnector>::new_error(OpenOutgoingDirError::InstanceNonExecutable);
+        }
+        let rights = match capability_decl {
+            cm_rust::CapabilityDecl::Directory(decl) => decl.rights,
+            _ => panic!("unsupported capability type for DirConnector"),
+        };
+        let path = capability_decl.path().expect(
+            "unable to construct dir connector router for capability type that doesn't \
+                    have a source path",
+        );
+        let path = vfs::path::Path::validate_and_split(format!("{}", path)).unwrap();
+        let router = Router::new(DirConnectorOutgoingRouter {
+            source_component: component.as_weak(),
+            capability_source: CapabilitySource::Component(ComponentSource {
+                capability: capability_decl.clone().into(),
+                moniker: component.moniker.clone(),
+            }),
+            path,
+        });
+        WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+            router,
+            capability_decl.into(),
+        )
+        .availability(Availability::Required)
+        .rights(Some(rights.into()))
+        .target(component)
+        .error_info(RouteRequestErrorInfo::from(capability_decl))
+        .error_reporter(RoutingFailureErrorReporter::new())
+        .build()
+    }
+
     /// Returns a reference to the component's validated declaration.
     pub fn decl(&self) -> &ComponentDecl {
         &self.resolved_component.decl
@@ -607,11 +699,11 @@ impl ResolvedInstanceState {
         self.program_escrow.as_ref()
     }
 
-    pub fn address_for_relative_url(
+    pub async fn address_for_relative_url(
         &self,
         fragment: &str,
     ) -> Result<ComponentAddress, ::routing::resolving::ResolverError> {
-        self.address.clone_with_new_resource(fragment.strip_prefix("#"))
+        self.address().await?.consume_with_new_resource(fragment.strip_prefix("#"))
     }
 
     /// Returns an iterator over all children.
@@ -708,6 +800,42 @@ impl ResolvedInstanceState {
         }
     }
 
+    async fn extend_program_input_namespace_with_injected_capabilities(
+        component: &Arc<ComponentInstance>,
+        out_dict: &Dict,
+    ) {
+        let top_instance = component.top_instance().await;
+
+        for inject_bundle in &component.context.runtime_config().inject {
+            // Skip this bundle if it doesn't match the moniker of the component being created.
+            if !inject_bundle.components.iter().any(|filter| filter.matches(&component.moniker)) {
+                continue;
+            }
+
+            for use_ in &inject_bundle.use_ {
+                let (capability, path) = match use_ {
+                    cm_config::InjectedUse::Protocol(use_protocol) => {
+                        let routable = top_instance
+                            .as_ref()
+                            .expect("Failed to get the top instance")
+                            .get_root_exposed_capability_router(use_protocol.source_name.clone());
+                        let router = Router::new(routable);
+                        let capability = Capability::ConnectorRouter(router);
+                        (capability, &use_protocol.target_path)
+                    }
+                };
+
+                // Our injected capability takes precedence over the regular one, if present.
+                if let Some(_) = out_dict.remove_capability(path) {
+                    warn!("injected capability will shadow the one at {path}");
+                }
+                out_dict
+                    .insert_capability(path, capability)
+                    .expect("Failed to insert the injected capability");
+            }
+        }
+    }
+
     /// This function transforms a sequence of [`UseDecl`] such that the duplicate event stream
     /// uses by paths are removed.
     ///
@@ -763,11 +891,12 @@ impl ResolvedInstanceState {
         for ((target_name, _target), exposes) in exposes_by_target_name {
             let first_expose = exposes.first().expect("invalid empty expose list");
             let request = match first_expose {
-                cm_rust::ExposeDecl::Service(_) | cm_rust::ExposeDecl::Directory(_) => {
+                cm_rust::ExposeDecl::Service(_) => {
                     Some(RouteRequest::from_expose_decls(&component.moniker, exposes).unwrap())
                 }
                 // These types use bedrock routing.
                 cm_rust::ExposeDecl::Protocol(_)
+                | cm_rust::ExposeDecl::Directory(_)
                 | cm_rust::ExposeDecl::Runner(_)
                 | cm_rust::ExposeDecl::Resolver(_)
                 | cm_rust::ExposeDecl::Config(_) => None,
@@ -928,7 +1057,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.component_input,
                 &dynamic_offers,
                 &self.sandbox.program_output_dict,
-                &self.sandbox.framework_dict,
+                &self.sandbox.framework_router(),
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
                 RoutingFailureErrorReporter::new(),
@@ -1127,6 +1256,7 @@ impl ResolvedInstanceState {
     }
 }
 
+#[async_trait]
 impl ResolvedInstanceInterface for ResolvedInstanceState {
     type Component = ComponentInstance;
 
@@ -1167,8 +1297,21 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
         ResolvedInstanceState::children_in_collection(self, collection)
     }
 
-    fn address(&self) -> ComponentAddress {
-        self.address.clone()
+    async fn address(&self) -> Result<ComponentAddress, ResolverError> {
+        let component = self.weak_component.upgrade()?;
+        match &self.address {
+            ComponentDomain::Absolute => {
+                ComponentAddress::from_url(&component.component_url, &component).await
+            }
+            ComponentDomain::RelativePath { context, scheme: _ } => {
+                ComponentAddress::from_url_and_context(
+                    &component.component_url,
+                    context.clone(),
+                    &component,
+                )
+                .await
+            }
+        }
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {
@@ -1429,6 +1572,98 @@ impl Routable<DirEntry> for DirEntryOutgoingRouter {
             RouterResponse::<DirEntry>::Capability(self.dir_entry.clone())
         };
         Ok(resp)
+    }
+}
+
+#[derive(Debug)]
+struct DirConnectorOutgoingRouter {
+    source_component: WeakComponentInstance,
+    capability_source: CapabilitySource,
+    path: vfs::path::Path,
+}
+
+#[async_trait]
+impl Routable<DirConnector> for DirConnectorOutgoingRouter {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<RouterResponse<DirConnector>, RouterError> {
+        let request = request.ok_or(RouterError::InvalidArgs)?;
+        let subdir: SubDir =
+            request.metadata.get_metadata().unwrap_or_else(|| SubDir::new(".").unwrap());
+        let subdir = vfs::path::Path::validate_and_split(format!("{}", subdir))
+            .map_err(|_| RouterError::InvalidArgs)?;
+        let path = subdir.with_prefix(&self.path);
+        let rights: Rights = request.metadata.get_metadata().ok_or(RouterError::InvalidArgs)?;
+        let source_component = self.source_component.upgrade().map_err(RoutingError::from)?;
+
+        struct OutgoingDirConnector {
+            outgoing_dir: Arc<dyn DirectoryEntry>,
+            scope: ExecutionScope,
+            moniker: Moniker,
+            path: vfs::path::Path,
+            rights: Rights,
+        }
+        impl fmt::Debug for OutgoingDirConnector {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(&format!(
+                    "OutgoingDirConnector {{ moniker: {}, path: {}, rights: {} }}",
+                    &self.moniker,
+                    self.path.as_ref(),
+                    self.rights
+                ))
+            }
+        }
+        impl sandbox::DirConnectable for OutgoingDirConnector {
+            fn send(
+                &self,
+                dir: ServerEnd<fio::DirectoryMarker>,
+                subdir: RelativePath,
+                rights: Option<fio::Operations>,
+            ) -> Result<(), ()> {
+                let allowed_flags: fio::Flags = self.rights.into();
+                let flags = if let Some(rights) = rights {
+                    fio::Flags::from_bits(rights.bits()).ok_or(())?
+                } else {
+                    allowed_flags | fio::Flags::PROTOCOL_DIRECTORY
+                };
+                let subdir = vfs::path::Path::validate_and_split(subdir).unwrap();
+                let path = subdir.with_prefix(&self.path);
+                let mut obj_request = vfs::object_request::ObjectRequest::new(
+                    flags,
+                    &fio::Options::default(),
+                    dir.into(),
+                );
+                let open_request = vfs::directory::entry::OpenRequest::new(
+                    self.scope.clone(),
+                    flags,
+                    path,
+                    &mut obj_request,
+                );
+                // Nothing we can do about an error here. If the source component closed their
+                // outgoing directory unexpectedly, then this handle is getting dropped.
+                let _ = self.outgoing_dir.clone().open_entry(open_request);
+                Ok(())
+            }
+        }
+        let dir_connector = sandbox::DirConnector::new_sendable(OutgoingDirConnector {
+            outgoing_dir: source_component.get_outgoing().to_directory_entry(),
+            scope: source_component.execution_scope.clone(),
+            moniker: source_component.moniker.clone(),
+            path,
+            rights,
+        });
+        if debug {
+            Ok(RouterResponse::Debug(
+                self.capability_source
+                    .clone()
+                    .try_into()
+                    .expect("failed to convert capability source to Data"),
+            ))
+        } else {
+            Ok(RouterResponse::Capability(dir_connector))
+        }
     }
 }
 

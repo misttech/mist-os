@@ -63,6 +63,12 @@ pub fn expect_frame(
     }
 }
 
+#[track_caller]
+pub fn assert_user_data_frame(frame: &Frame, expected: UserData, expected_credits: Option<u8>) {
+    assert_eq!(frame.data, FrameData::UnnumberedInfoHeaderCheck(UIHData::User(expected)));
+    assert_eq!(frame.credits, expected_credits);
+}
+
 /// Expects the `expected` UserData with potential `credits` on the `receiver`.
 #[track_caller]
 pub fn expect_user_data_frame(
@@ -72,8 +78,7 @@ pub fn expect_user_data_frame(
     expected_credits: Option<u8>,
 ) {
     let frame = expect_ready(exec, receiver);
-    assert_eq!(frame.data, FrameData::UnnumberedInfoHeaderCheck(UIHData::User(expected)));
-    assert_eq!(frame.credits, expected_credits);
+    assert_user_data_frame(&frame, expected, expected_credits);
 }
 
 /// Expects the provided `expected` MuxCommand on the `receiver`.

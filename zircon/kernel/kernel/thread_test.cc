@@ -20,7 +20,6 @@
 #include <zircon/types.h>
 
 #include <fbl/array.h>
-#include <kernel/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/event.h>

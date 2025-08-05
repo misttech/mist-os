@@ -435,7 +435,7 @@ where
         FdTable::default(),
         system_task.mm().cloned(),
         system_task.fs(),
-        system_task.creds(),
+        system_task.real_creds(),
         Arc::clone(&system_task.abstract_socket_namespace),
         Arc::clone(&system_task.abstract_vsock_namespace),
         Default::default(),

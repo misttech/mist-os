@@ -94,6 +94,8 @@ class Driver : public fdf::DriverBase {
 
   bool stop_triggered() const { return stop_triggered_; }
 
+  const fdf::ServiceValidator& service_validator() { return service_validator_.value(); }
+
  private:
   bool IsComposite();
 
@@ -156,6 +158,8 @@ class Driver : public fdf::DriverBase {
   zx::resource iommu_resource_;
   zx::resource framebuffer_resource_;
   zx::vmo config_vmo_;
+
+  std::optional<fdf::ServiceValidator> service_validator_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;

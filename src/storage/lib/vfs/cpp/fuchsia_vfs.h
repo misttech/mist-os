@@ -167,7 +167,7 @@ class FuchsiaVfs : public Vfs {
   // on failure. This does not apply to node reference connections, which should not open |vnode|.
   // TODO(https://fxbug.dev/324080864): Remove this method when we no longer need to support Open1.
   zx_status_t ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
-                              VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
+                              DeprecatedOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Begins serving VFS messages over the specified channel. The protocol to use will be determined
   // by the intersection of the protocols requested in |flags| and those supported by |vnode|.
@@ -208,7 +208,7 @@ class FuchsiaVfs : public Vfs {
   // |object_request| was not consumed, the caller should close it with an epitaph.
   //
   // *NOTE*: |rights| and |flags| are ignored for services.
-  zx::result<> ServeResult(Open2Result open_result, fuchsia_io::Rights rights,
+  zx::result<> ServeResult(OpenResult open_result, fuchsia_io::Rights rights,
                            zx::channel& object_request, fuchsia_io::Flags flags,
                            const fuchsia_io::wire::Options& options);
 
@@ -219,7 +219,7 @@ class FuchsiaVfs : public Vfs {
   // On success, starts handling requests for |vnode| over |server_end|. On failure, callers are
   // responsible for closing |vnode| and |server_end|.
   zx_status_t ServeDeprecatedImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
-                                  VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
+                                  DeprecatedOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
   // |connection|. Consumes |channel| on success. On error, callers must close the associated vnode.

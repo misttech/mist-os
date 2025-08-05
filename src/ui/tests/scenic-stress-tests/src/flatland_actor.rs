@@ -29,7 +29,7 @@ fn find_random_instance<'a>(
     rng: &mut SmallRng,
 ) -> &'a mut FlatlandInstance {
     let mut current = root;
-    while current.has_children() && rng.gen_bool(0.8) {
+    while current.has_children() && rng.random_bool(0.8) {
         current = current.get_random_child_mut(rng);
     }
     current
@@ -39,7 +39,7 @@ fn find_random_instance<'a>(
 impl Actor for FlatlandActor {
     async fn perform(&mut self) -> Result<(), ActorError> {
         let instance = find_random_instance(&mut self.root, &mut self.rng);
-        if instance.has_children() && self.rng.gen_bool(0.5) {
+        if instance.has_children() && self.rng.random_bool(0.5) {
             instance.delete_child(&mut self.rng).await;
         } else {
             instance.add_child(&self.realm.root).await;

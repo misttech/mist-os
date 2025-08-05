@@ -25,6 +25,7 @@ use {
 };
 
 use crate::bindings::devices::StaticCommonInfo;
+use crate::bindings::routes::interface_local::LocalRouteTable;
 use crate::bindings::routes::witness::TableId;
 use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
 use crate::bindings::util::{ScopeExt as _, TryFromFidlWithContext};
@@ -40,6 +41,7 @@ pub(crate) async fn serve_route_set<
     stream: I::RouteSetRequestStream,
     route_set: &mut R,
     cancel_token: C,
+    ctx: &Ctx,
 ) -> Result<(), fidl::Error> {
     let debug_name =
         <<I::RouteSetRequestStream as RequestStream>::Protocol as ProtocolMarker>::DEBUG_NAME;
@@ -54,7 +56,7 @@ pub(crate) async fn serve_route_set<
             },
             request = stream.try_next() => match request? {
                 Some(request) => {
-                    route_set.handle_request(request).await.unwrap_or_else(|e| {
+                    route_set.handle_request(request, ctx).await.unwrap_or_else(|e| {
                         if !e.is_closed() {
                             error!("error handling {debug_name} request: {e:?}");
                         }
@@ -66,13 +68,18 @@ pub(crate) async fn serve_route_set<
     }
 }
 
-pub(crate) fn spawn_user_route_set<
+/// Spawns a new task to handle the user route set and keep a value alive
+/// until finish serving the route set.
+pub(crate) fn spawn_user_route_set_and_keep_alive<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     F: FnOnce() -> UserRouteSet<I>,
+    K: Send + 'static,
 >(
     scope: &fasync::ScopeHandle,
     stream: I::RouteSetRequestStream,
     create_route_set: F,
+    ctx: &Ctx,
+    keep_alive: K,
 ) {
     let Some(guard) = scope.active_guard() else {
         warn!("aborted serving user route set because scope is finished");
@@ -80,16 +87,70 @@ pub(crate) fn spawn_user_route_set<
         return;
     };
     let mut user_route_set = create_route_set();
+    let ctx = ctx.clone();
     scope.spawn_request_stream_handler(stream, |stream| async move {
         // Stop serving and hold the guard until we've been able to close
         // the route set.
         let stop = guard.on_cancel();
         let result =
-            serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, stop).await;
+            serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, stop, &ctx).await;
         user_route_set.close().await;
-        std::mem::drop(guard);
+        std::mem::drop((guard, keep_alive));
         result
     });
+}
+
+pub(crate) fn spawn_user_route_set<
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    F: FnOnce() -> UserRouteSet<I>,
+>(
+    scope: &fasync::ScopeHandle,
+    stream: I::RouteSetRequestStream,
+    create_route_set: F,
+    ctx: &Ctx,
+) {
+    spawn_user_route_set_and_keep_alive(scope, stream, create_route_set, ctx, ());
+}
+
+// This creates a new reference to the underlying local route table that
+// keeps the table alive.
+fn get_local_route_table<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
+    ctx: &Ctx,
+    ProofOfInterfaceAuthorization { interface_id, token }: ProofOfInterfaceAuthorization,
+) -> Result<Arc<LocalRouteTable<I>>, fnet_routes_admin::GetInterfaceLocalTableError> {
+    let bindings_id = interface_id
+        .try_into()
+        .map_err(|_| fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication)?;
+
+    let core_id = ctx.bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
+        warn!("authentication interface {bindings_id} does not exist");
+        fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication
+    })?;
+
+    let external_state = core_id.external_state();
+    let StaticCommonInfo { authorization_token: netstack_token, local_route_tables } =
+        external_state.static_common_info();
+
+    let netstack_koid = netstack_token
+        .basic_info()
+        .expect("failed to get basic info for netstack-owned token")
+        .koid;
+
+    let client_koid = token
+        .basic_info()
+        .map_err(|e| {
+            error!("failed to get basic info for client-provided token: {}", e);
+            fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication
+        })?
+        .koid;
+
+    if netstack_koid != client_koid {
+        return Err(fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication);
+    }
+    let local_tables = local_route_tables
+        .as_ref()
+        .ok_or(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable)?;
+    Ok(Arc::clone(local_tables.get::<I>()))
 }
 
 pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
@@ -107,7 +168,7 @@ pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRout
             } => {
                 let route_table = match ctx.bindings_ctx().routes.add_table::<I>(name).await {
                     Ok((table_id, route_work_sink, token)) => {
-                        UserRouteTable::new(ctx.clone(), token, table_id, route_work_sink)
+                        UserRouteTable::new(token, table_id, route_work_sink)
                     }
                     Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
@@ -116,17 +177,32 @@ pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRout
                 };
                 let stream = provider.into_stream();
 
-                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
-                    serve_route_table::<I, UserRouteTable<I>>(stream, route_table)
-                });
+                let ctx = ctx.clone();
+                fasync::Scope::current().spawn_request_stream_handler(
+                    stream,
+                    |stream| async move {
+                        serve_route_table::<I, UserRouteTable<I>>(stream, route_table, &ctx).await
+                    },
+                );
             }
             fnet_routes_ext::admin::RouteTableProviderRequest::GetInterfaceLocalTable {
-                credential: _,
+                credential,
                 responder,
-            } => {
-                responder
-                    .send(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))?;
-            }
+            } => match get_local_route_table(&ctx, credential) {
+                Ok(local_table) => {
+                    let (client_end, request_stream) =
+                        fidl::endpoints::create_request_stream::<I::RouteTableMarker>();
+                    let ctx = ctx.clone();
+                    fasync::Scope::current().spawn_request_stream_handler(
+                        request_stream,
+                        |stream| async move {
+                            serve_route_table::<I, _>(stream, local_table, &ctx).await
+                        },
+                    );
+                    responder.send(Ok(client_end))?;
+                }
+                Err(err) => responder.send(Err(err))?,
+            },
         }
     }
     Ok(())
@@ -138,6 +214,7 @@ pub(crate) async fn serve_route_table<
 >(
     mut stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
     mut route_table: R,
+    ctx: &Ctx,
 ) -> Result<(), fidl::Error> {
     let route_table_ref = &mut route_table;
     let serve = || async move {
@@ -145,7 +222,7 @@ pub(crate) async fn serve_route_table<
             match I::into_route_table_request(request) {
                 RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
                     let set_request_stream = route_set.into_stream();
-                    route_table_ref.serve_user_route_set(set_request_stream);
+                    route_table_ref.serve_user_route_set(set_request_stream, ctx);
                 }
                 RouteTableRequest::GetTableId { responder } => {
                     responder.send(route_table_ref.id().into())?;
@@ -186,7 +263,7 @@ pub(crate) async fn serve_route_table<
             let fidl_result = match removed {
                 Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
                 Err(TableRemoveError::InvalidOp) => {
-                    Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
+                    Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOp)
                 }
             };
             responder.send(fidl_result)
@@ -226,16 +303,22 @@ pub(crate) trait RouteTable<I: FidlRouteAdminIpExt + FidlRouteIpExt>: Send + Syn
     /// Returns whether the table was detached.
     fn detached(&self) -> bool;
     /// Serves the user route set.
-    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream);
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream, ctx: &Ctx);
 }
 
 pub(crate) struct MainRouteTable {
-    ctx: Ctx,
+    token: zx::Event,
 }
 
 impl MainRouteTable {
-    pub(crate) fn new(ctx: Ctx) -> Self {
-        Self { ctx }
+    pub(crate) fn new<I: Ip>(ctx: &Ctx) -> Self {
+        let token = ctx
+            .bindings_ctx()
+            .routes
+            .main_table_token::<I>()
+            .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
+            .expect("failed to duplicate");
+        Self { token }
     }
 }
 
@@ -244,10 +327,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
         routes::main_table_id::<I>()
     }
     fn token(&self) -> zx::Event {
-        self.ctx
-            .bindings_ctx()
-            .routes
-            .main_table_token::<I>()
+        self.token
             .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
             .expect("failed to duplicate")
     }
@@ -260,15 +340,17 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
     fn detached(&self) -> bool {
         true
     }
-    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
-        spawn_user_route_set::<I, _>(&fasync::Scope::current(), stream, || {
-            UserRouteSet::from_main_table(self.ctx.clone())
-        })
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream, ctx: &Ctx) {
+        spawn_user_route_set::<I, _>(
+            &fasync::Scope::current(),
+            stream,
+            || UserRouteSet::from_main_table(ctx),
+            ctx,
+        )
     }
 }
 
 pub(crate) struct UserRouteTable<I: Ip> {
-    ctx: Ctx,
     token: Arc<zx::Event>,
     table_id: TableId<I>,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
@@ -278,13 +360,11 @@ pub(crate) struct UserRouteTable<I: Ip> {
 
 impl<I: Ip> UserRouteTable<I> {
     fn new(
-        ctx: Ctx,
         token: Arc<zx::Event>,
         table_id: TableId<I>,
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
         Self {
-            ctx,
             token,
             table_id,
             route_work_sink,
@@ -307,8 +387,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
             .expect("failed to duplicate")
     }
     async fn remove(self) -> Result<(), TableRemoveError> {
-        let Self { ctx: _, token: _, table_id, route_work_sink, route_set_scope, detached: _ } =
-            self;
+        let Self { token: _, table_id, route_work_sink, route_set_scope, detached: _ } = self;
         let (responder, receiver) = oneshot::channel();
         let work_item = RouteWorkItem {
             change: routes::Change::RemoveTable(table_id),
@@ -336,10 +415,13 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
     fn detached(&self) -> bool {
         self.detached
     }
-    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
-        spawn_user_route_set::<I, _>(&self.route_set_scope, stream, || {
-            UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone())
-        })
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream, ctx: &Ctx) {
+        spawn_user_route_set::<I, _>(
+            &self.route_set_scope,
+            stream,
+            || UserRouteSet::new(self.table_id, self.route_work_sink.clone()),
+            ctx,
+        )
     }
 }
 
@@ -364,7 +446,6 @@ impl<I: Ip> UserRouteSetId<I> {
 
 #[must_use = "UserRouteSets must explicitly have `.close()` called on them before dropping them"]
 pub(crate) struct UserRouteSet<I: Ip> {
-    ctx: Ctx,
     set: Option<netstack3_core::sync::PrimaryRc<UserRouteSetId<I>>>,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     authorization_set: HashSet<WeakDeviceId>,
@@ -381,17 +462,16 @@ impl<I: Ip> Drop for UserRouteSet<I> {
 impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
     #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn new(
-        ctx: Ctx,
         table: TableId<I>,
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
         let set = netstack3_core::sync::PrimaryRc::new(UserRouteSetId { table_id: table });
-        Self { ctx, set: Some(set), authorization_set: HashSet::new(), route_work_sink }
+        Self { set: Some(set), authorization_set: HashSet::new(), route_work_sink }
     }
 
-    pub(crate) fn from_main_table(ctx: Ctx) -> Self {
+    pub(crate) fn from_main_table(ctx: &Ctx) -> Self {
         let route_work_sink = ctx.bindings_ctx().routes.main_table_route_work_sink::<I>().clone();
-        Self::new(ctx, routes::main_table_id::<I>(), route_work_sink)
+        Self::new(routes::main_table_id::<I>(), route_work_sink)
     }
 
     fn weak_set_id(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId<I>> {
@@ -431,7 +511,7 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
             self.apply_route_change(routes::Change::RemoveSet(self.weak_set_id())).await,
         );
 
-        let UserRouteSet { ctx: _, set, authorization_set: _, route_work_sink: _ } = &mut self;
+        let UserRouteSet { set, authorization_set: _, route_work_sink: _ } = &mut self;
         let UserRouteSetId { table_id: _ } = netstack3_core::sync::PrimaryRc::unwrap(
             set.take().expect("close() can't be called twice"),
         );
@@ -441,10 +521,6 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
 impl<I: Ip + FidlRouteAdminIpExt> RouteSet<I> for UserRouteSet<I> {
     fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId<I>>> {
         routes::SetMembership::User(self.weak_set_id())
-    }
-
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
     }
 
     fn authorization_set(&self) -> &HashSet<WeakDeviceId> {
@@ -460,27 +536,26 @@ impl<I: Ip + FidlRouteAdminIpExt> RouteSet<I> for UserRouteSet<I> {
     }
 }
 
-pub(crate) struct GlobalRouteSet {
-    ctx: Ctx,
+pub(crate) struct GlobalRouteSet<I: Ip> {
+    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     authorization_set: HashSet<WeakDeviceId>,
 }
 
-impl GlobalRouteSet {
+impl<I: Ip> GlobalRouteSet<I> {
     #[cfg_attr(feature = "instrumented", track_caller)]
-    pub(crate) fn new(ctx: Ctx) -> Self {
-        Self { ctx, authorization_set: HashSet::new() }
+    pub(crate) fn new(ctx: &Ctx) -> Self {
+        // TODO(https://fxbug.dev/339567592): GlobalRouteSet should be aware of
+        // the route table as well.
+        let route_work_sink = ctx.bindings_ctx().routes.main_table_route_work_sink::<I>().clone();
+        Self { route_work_sink, authorization_set: HashSet::new() }
     }
 }
 
-impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
+impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet<I> {
     fn set(
         &self,
     ) -> routes::SetMembership<netstack3_core::sync::WeakRc<routes::admin::UserRouteSetId<I>>> {
         routes::SetMembership::Global
-    }
-
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
     }
 
     fn authorization_set(&self) -> &HashSet<WeakDeviceId> {
@@ -492,9 +567,7 @@ impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
     }
 
     fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I>> {
-        // TODO(https://fxbug.dev/339567592): GlobalRouteSet should be aware of
-        // the route table as well.
-        &self.ctx.bindings_ctx().routes.main_table_route_work_sink::<I>()
+        &self.route_work_sink
     }
 }
 
@@ -510,12 +583,15 @@ pub(crate) enum ModifyTableError {
 
 pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId<I>>>;
-    fn ctx(&self) -> &Ctx;
     fn authorization_set(&self) -> &HashSet<WeakDeviceId>;
     fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId>;
     fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I>>;
 
-    async fn handle_request(&mut self, request: RouteSetRequest<I>) -> Result<(), fidl::Error> {
+    async fn handle_request(
+        &mut self,
+        request: RouteSetRequest<I>,
+        ctx: &Ctx,
+    ) -> Result<(), fidl::Error> {
         debug!("RouteSet::handle_request {request:?}");
 
         match request {
@@ -527,7 +603,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
                     }
                 };
 
-                match self.add_fidl_route(route).await {
+                match self.add_fidl_route(route, ctx).await {
                     Ok(modified) => responder.send(Ok(modified)),
                     Err(ModifyTableError::Fidl(err)) => Err(err),
                     Err(ModifyTableError::RouteSetError(err)) => responder.send(Err(err)),
@@ -545,7 +621,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
                     }
                 };
 
-                match self.remove_fidl_route(route).await {
+                match self.remove_fidl_route(route, ctx).await {
                     Ok(modified) => responder.send(Ok(modified)),
                     Err(ModifyTableError::Fidl(err)) => Err(err),
                     Err(ModifyTableError::RouteSetError(err)) => responder.send(Err(err)),
@@ -556,7 +632,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
                 }
             }
             RouteSetRequest::AuthenticateForInterface { credential, responder } => {
-                responder.send(self.authenticate_for_interface(credential))
+                responder.send(self.authenticate_for_interface(credential, ctx))
             }
         }
     }
@@ -587,8 +663,9 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     async fn add_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
+        ctx: &Ctx,
     ) -> Result<bool, ModifyTableError> {
-        let addable_entry = try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)
+        let addable_entry = try_to_addable_entry::<I>(ctx.bindings_ctx(), route)
             .map_err(ModifyTableError::RouteSetError)?
             .map_device_id(|d| d.downgrade());
 
@@ -623,9 +700,10 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     async fn remove_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
+        ctx: &Ctx,
     ) -> Result<bool, ModifyTableError> {
         let AddableEntry { subnet, device, gateway, metric } =
-            try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)
+            try_to_addable_entry::<I>(ctx.bindings_ctx(), route)
                 .map_err(ModifyTableError::RouteSetError)?
                 .map_device_id(|d| d.downgrade());
 
@@ -667,20 +745,20 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn authenticate_for_interface(
         &mut self,
         client_credential: ProofOfInterfaceAuthorization,
+        ctx: &Ctx,
     ) -> Result<(), fnet_routes_admin::AuthenticateForInterfaceError> {
         let bindings_id = client_credential
             .interface_id
             .try_into()
             .map_err(|_| fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication)?;
 
-        let core_id =
-            self.ctx().bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
-                warn!("authentication interface {bindings_id} does not exist");
-                fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
-            })?;
+        let core_id = ctx.bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
+            warn!("authentication interface {bindings_id} does not exist");
+            fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
+        })?;
 
         let external_state = core_id.external_state();
-        let StaticCommonInfo { authorization_token: netstack_token } =
+        let StaticCommonInfo { authorization_token: netstack_token, local_route_tables: _ } =
             external_state.static_common_info();
 
         let netstack_koid = netstack_token

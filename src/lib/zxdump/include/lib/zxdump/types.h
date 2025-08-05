@@ -28,6 +28,8 @@ using ByteView = std::span<const std::byte>;
 // fit::result<zxdump::Error> is used as the return type of many operations.
 // It carries a zx_status_t and a string describing what operation failed.
 struct Error {
+  constexpr auto operator<=>(const Error&) const = default;
+
   std::string_view status_string() const;
 
   std::string_view op_;

@@ -575,7 +575,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.fold_buffered_samples();
         assert_eq!(
             &time_matrix_calls.drain::<u64>("rx_unicast_total")[..],
             &[TimeMatrixCall::Fold(Timed::now(100u64))]
@@ -662,10 +662,11 @@ mod tests {
             Poll::Ready(())
         );
 
-        let time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        let time_matrix_calls = test_helper.mock_time_matrix_client.fold_buffered_samples();
         assert!(time_matrix_calls.is_empty());
 
-        let mut driver_counters_matrix_calls = driver_counters_mock_matrix_client.drain_calls();
+        let mut driver_counters_matrix_calls =
+            driver_counters_mock_matrix_client.fold_buffered_samples();
         assert_eq!(
             &driver_counters_matrix_calls.drain::<u64>("foo_counter")[..],
             &[TimeMatrixCall::Fold(Timed::now(50))]
@@ -679,7 +680,7 @@ mod tests {
             &[TimeMatrixCall::Fold(Timed::now(150))]
         );
 
-        let driver_gauges_matrix_calls = driver_gauges_mock_matrix_client.drain_calls();
+        let driver_gauges_matrix_calls = driver_gauges_mock_matrix_client.fold_buffered_samples();
         assert!(driver_gauges_matrix_calls.is_empty());
     }
 
@@ -760,13 +761,15 @@ mod tests {
             Poll::Ready(())
         );
 
-        let time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        let time_matrix_calls = test_helper.mock_time_matrix_client.fold_buffered_samples();
         assert!(time_matrix_calls.is_empty());
 
-        let driver_counters_matrix_calls = driver_counters_mock_matrix_client.drain_calls();
+        let driver_counters_matrix_calls =
+            driver_counters_mock_matrix_client.fold_buffered_samples();
         assert!(driver_counters_matrix_calls.is_empty());
 
-        let mut driver_gauges_matrix_calls = driver_gauges_mock_matrix_client.drain_calls();
+        let mut driver_gauges_matrix_calls =
+            driver_gauges_mock_matrix_client.fold_buffered_samples();
         assert_eq!(
             &driver_gauges_matrix_calls.drain::<i64>("foo_gauge.mean")[..],
             &[TimeMatrixCall::Fold(Timed::now(50))]

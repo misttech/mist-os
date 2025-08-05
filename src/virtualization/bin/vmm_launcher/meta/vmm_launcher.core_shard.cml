@@ -63,7 +63,6 @@
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
             to: "#vmm_launcher",

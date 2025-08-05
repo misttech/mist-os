@@ -537,7 +537,9 @@ void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::
     std::lock_guard lock(mtx_);
     vsync_config_stamp = config_stamp_;
   }
-  engine_events_.OnDisplayVsync(kDisplayId, next_vsync_time_, vsync_config_stamp);
+  if (vsync_config_stamp != display::kInvalidDriverConfigStamp) {
+    engine_events_.OnDisplayVsync(kDisplayId, next_vsync_time_, vsync_config_stamp);
+  }
 
   next_vsync_time_ += kVSyncInterval;
   zx_status_t post_status = vsync_task_.PostForTime(&dispatcher_, next_vsync_time_);

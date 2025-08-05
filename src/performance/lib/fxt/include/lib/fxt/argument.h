@@ -13,11 +13,15 @@
 
 #include <zircon/types.h>
 
+#include <span>
+
 #include "fields.h"
 #include "record_types.h"
 #include "string_ref.h"
 
 namespace fxt {
+
+static constexpr WordSize kMaxArgumentSize = WordSize(0x8000);
 
 // Represents an FXT Argument, a typed Key Value pair.
 //
@@ -543,6 +547,66 @@ template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId
           EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
 Argument(T&& name, U&& value) -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
 
+template <RefType name_type>
+class Argument<ArgumentType::kBlob, name_type> {
+ public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  constexpr Argument(T&& name, std::span<const uint8_t> value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
+
+  constexpr Argument(StringRef<name_type> name, std::span<const uint8_t> value)
+      : name_(name), value_(value) {}
+
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
+
+  constexpr WordSize PayloadSize() const { return HeaderAndNameSize() + ValueSize(); }
+  constexpr uint64_t Header() const {
+    return BlobArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kBlob)) |
+           BlobArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
+           BlobArgumentFields::NameRef::Make(name_.HeaderEntry()) |
+           BlobArgumentFields::ByteSize::Make(value_.size());
+  }
+
+  template <typename Reservation>
+  constexpr void Write(Reservation& res) const {
+    res.WriteWord(Header());
+    name_.Write(res);
+    // Reservation will pad to 8 byte alignment with zeroes.
+    res.WriteBytes(value_.data(), std::min(value_.size(), ValueSize().SizeInBytes()));
+  }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr const std::span<const uint8_t>& value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
+
+ private:
+  constexpr WordSize HeaderAndNameSize() const {
+    return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
+  }
+  // Size of the value, possibly truncated to fit.
+  constexpr WordSize ValueSize() const {
+    return WordSize::FromBytes(value_.size_bytes()).Clamp(kMaxArgumentSize - HeaderAndNameSize());
+  }
+
+  StringRef<name_type> name_;
+  std::span<const uint8_t> value_;
+};
+
+template <RefType name_type>
+Argument(StringRef<name_type>, std::span<const uint8_t>)
+    -> Argument<ArgumentType::kBlob, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, std::span<const uint8_t>) -> Argument<ArgumentType::kBlob, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, std::span<const uint8_t>) -> Argument<ArgumentType::kBlob, RefType::kInline>;
+
 // Builds an instance of Argument from the given parameters. Each overload uses explicit
 // instantiations of StringRef to avoid limitations in type deduction from convertible types. Since
 // no type deduction occurs, implicit parameter conversions are considered.
@@ -648,6 +712,14 @@ constexpr Argument<ArgumentType::kString, RefType::kId, RefType::kInline> MakeAr
 constexpr Argument<ArgumentType::kString, RefType::kInline, RefType::kInline> MakeArgument(
     StringRef<RefType::kInline> name, const char* value, size_t size) {
   return {name, StringRef{value, size}};
+}
+constexpr Argument<ArgumentType::kBlob, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, std::span<const uint8_t> value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kBlob, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                   std::span<const uint8_t> value) {
+  return {name, value};
 }
 
 }  // namespace fxt

@@ -4,18 +4,17 @@
 
 #include <zircon/errors.h>
 
-#include <wifi/wifi-config.h>
-
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
@@ -105,18 +104,19 @@ TEST_F(TimeoutTest, AssocTimeout) {
             wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 }
 
-// verify the disassociation timeout is triggered.
-TEST_F(TimeoutTest, DisassocTimeout) {
+// Verify the deauthentication timeout is triggered.
+TEST_F(TimeoutTest, DeauthTimeout) {
   Init();
 
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap.EnableBeacon(kBeaconInterval);
   client_ifc_.AssociateWith(ap, zx::msec(10));
 
-  // Ignore disassociation req in sim-fw.
+  // Ignore deauthentication req in sim-fw.
   WithSimDevice([this](brcmfmac::SimDevice* device) {
     brcmf_simdev* sim = device->GetSim();
-    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_DISASSOC, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, ZX_OK, BCME_OK,
+                                       client_ifc_.iface_id_);
   });
   env_->ScheduleNotification(
       std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_, kDefaultBssid,

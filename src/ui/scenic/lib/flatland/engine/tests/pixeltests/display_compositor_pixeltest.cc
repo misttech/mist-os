@@ -52,7 +52,6 @@ using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
-using fuchsia_ui_composition::BlendMode;
 
 namespace flatland {
 namespace test {
@@ -422,7 +421,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // This should only be running on devices with capture support.
     bool capture_supported = scenic_impl::IsCaptureSupported(*display_coordinator);
     if (!capture_supported) {
-      FX_LOGS(WARNING) << "Capture is not supported on this device. Test skipped.";
+      FX_LOGS(FATAL) << "Capture is not supported on this device. Test skipped.";
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
@@ -787,15 +786,15 @@ Vulkan Renderer, try creating a DisplayCompositor with the NullRenderer
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      true, 1);
+      flatland::DisplayCompositorConfig{});
 
 Lastly, if you are specifically testing the Vulkan Renderer and do not need Display Compositing, try
-creating a DisplayCompositor with enable_display_composition=false:
+creating a DisplayCompositor with enable_direct_to_display=false:
 
    auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      false, 1);
+      flatland::DisplayCompositorConfig{.enable_direct_to_display = false});
 
 When uploading a CL that makes changes to these tests, also make sure that they run on NUC
 environments with basic envs. This should happen automatically because this is specified in
@@ -816,7 +815,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
@@ -911,8 +910,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   // Now we can finally render.
@@ -964,7 +966,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition=*/true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
@@ -1014,7 +1016,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 1.0f, 0, 1},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1037,8 +1039,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   display_compositor->SetColorConversionValues({0.2f, 0, 0, 0, 0.2f, 0, 0, 0, 0.2f}, {0, 0, 0},
@@ -1072,7 +1077,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
@@ -1119,7 +1124,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0.2f, 0, 1},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1142,8 +1147,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   // Now we can finally render.
@@ -1171,7 +1179,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
@@ -1236,7 +1244,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   /// black rectangle will be clamped to the minimum allowed value.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0, 0, 0},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1259,8 +1267,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   display_compositor->SetMinimumRgb(kMinimum);
@@ -1330,7 +1341,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = BlendMode::kSrc};
+                          .blend_mode = BlendMode::kReplace()};
   }
 
   // Use the VK renderer here so we can make use of software rendering.
@@ -1338,7 +1349,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto texture_collection = SetupClientTextures(display_compositor.get(), kTextureCollectionId,
                                                 GetParam(), kTextureWidth, kTextureHeight,
@@ -1508,7 +1519,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
   for (uint32_t i = 0; i < 2; i++) {
-    auto blend_mode = (i != 1) ? BlendMode::kSrc : BlendMode::kSrcOver;
+    auto blend_mode = (i != 1) ? BlendMode::kReplace() : BlendMode::kPremultipliedAlpha();
     image_metadatas[i] = {.collection_id = kTextureCollectionId,
                           .identifier = allocation::GenerateUniqueImageId(),
                           .vmo_index = i,
@@ -1522,7 +1533,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId,
@@ -1688,7 +1699,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ false, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{.enable_direct_to_display = false});
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
@@ -1719,7 +1730,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
                                   .vmo_index = 0,
                                   .width = kTextureWidth,
                                   .height = kTextureHeight,
-                                  .blend_mode = BlendMode::kSrc};
+                                  .blend_mode = BlendMode::kReplace()};
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
@@ -1787,8 +1798,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 
     // The child has a built in scale of 2x2.
     uberstruct->local_matrices[child_handle] = glm::scale(glm::mat3(1.0), glm::vec2(2, 2));
-    uberstruct->local_image_sample_regions[child_handle] = {
-        0.f, 0.f, static_cast<float>(kTextureWidth), static_cast<float>(kTextureHeight)};
+    uberstruct->local_image_sample_regions[child_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kTextureWidth),
+                           .height = static_cast<float>(kTextureHeight)});
     session.PushUberStruct(std::move(uberstruct));
   }
 
@@ -1798,7 +1812,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
       GenerateDisplayListForTest(
           {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {},
-      // NOTE: this is somewhat redundant, since we also pass enable_display_composition=false into
+      // NOTE: this is somewhat redundant, since we also pass enable_direct_to_display=false into
       // the DisplayCompositor constructor.  But, no harm is done.
       DisplayCompositor::RenderFrameTestArgs{.force_gpu_composition = true});
   EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kGpuComposition);
@@ -1946,7 +1960,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition=*/false, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{.enable_direct_to_display = false});
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
@@ -2034,8 +2048,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
     matrix = glm::rotate(matrix, glm::pi<float>());
     matrix = glm::scale(matrix, glm::vec2(2, 2));
     uberstruct->local_matrices[parent_handle] = matrix;
-    uberstruct->local_image_sample_regions[parent_handle] = {
-        0.f, 0.f, static_cast<float>(kTextureWidth), static_cast<float>(kTextureHeight)};
+    uberstruct->local_image_sample_regions[parent_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kTextureWidth),
+                           .height = static_cast<float>(kTextureHeight)});
     session.PushUberStruct(std::move(uberstruct));
   }
 
@@ -2136,7 +2153,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_coordinator, renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition=*/true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
@@ -2192,7 +2209,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = BlendMode::kSrc};
+                          .blend_mode = BlendMode::kReplace()};
   }
 
   auto& blue_image_metadata = image_metadatas[0];
@@ -2231,8 +2248,11 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
     uberstruct->images[image_handle] = im;
     uberstruct->local_matrices[image_handle] = glm::scale(
         glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-    uberstruct->local_image_sample_regions[image_handle] = {
-        0.f, 0.f, static_cast<float>(kRectWidth), static_cast<float>(kRectHeight)};
+    uberstruct->local_image_sample_regions[image_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kRectWidth),
+                           .height = static_cast<float>(kRectHeight)});
     session.PushUberStruct(std::move(uberstruct));
   };
   push_uberstruct_for_image_into_session(blue_image_metadata);

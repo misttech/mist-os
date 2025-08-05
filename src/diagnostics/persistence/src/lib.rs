@@ -68,7 +68,8 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     let (fetch_requester, _fetcher_task) =
         on_error!(Fetcher::new(&config), "Error initializing fetcher: {}")?;
 
-    let scheduler = Scheduler::new(fetch_requester, &config);
+    let scope = fasync::Scope::new();
+    let scheduler = Scheduler::new(scope.to_handle(), fetch_requester, &config);
 
     // Add a persistence fidl service for each service defined in the config files.
     let scope = fasync::Scope::new();

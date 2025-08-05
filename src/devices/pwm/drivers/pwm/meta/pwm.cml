@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -19,6 +18,7 @@
         { service: "fuchsia.hardware.pwm.Service" },
     ],
     use: [
+        { service: 'fuchsia.driver.compat.Service' },
         { service: "fuchsia.hardware.pwm.PwmChannelsMetadata" },
     ],
     expose: [

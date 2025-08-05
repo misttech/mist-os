@@ -33,6 +33,8 @@ rustc_library("cgroupfs") {
     "hwasan",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix_sync",

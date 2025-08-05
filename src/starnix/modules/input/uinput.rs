@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::uinput::vfs::{CloseFreeSafe, NamespaceNode};
 use crate::{
     InputEventsRelay, InputFile, LinuxKeyboardEventParser, LinuxTouchEventParser, OpenedFiles,
 };
@@ -18,10 +19,10 @@ use starnix_core::fileops_impl_seekless;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
-    self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsString,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::INPUT_MAJOR;
 use starnix_uapi::errors::Errno;
@@ -46,7 +47,7 @@ pub fn register_uinput_device(
     locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     input_event_relay: Arc<InputEventsRelay>,
-) {
+) -> Result<(), Errno> {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
@@ -58,7 +59,8 @@ pub fn register_uinput_device(
         DeviceMetadata::new("uinput".into(), device_type::DeviceType::UINPUT, DeviceMode::Char),
         misc_class,
         device,
-    );
+    )?;
+    Ok(())
 }
 
 fn add_and_register_input_device<L>(
@@ -66,7 +68,7 @@ fn add_and_register_input_device<L>(
     system_task: &CurrentTask,
     dev_ops: impl DeviceOps,
     device_id: u32,
-) -> Device
+) -> Result<Device, Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
@@ -103,10 +105,10 @@ impl UinputDevice {
 impl DeviceOps for UinputDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(UinputDeviceFile::new(self.input_event_relay.clone())))
@@ -339,7 +341,7 @@ impl UinputDeviceFile {
                     current_task,
                     VirtualDevice { input_id, device_type, open_files },
                     registered_device_id,
-                );
+                )?;
                 inner.k_device = Some(device);
 
                 new_device();
@@ -406,6 +408,8 @@ pub fn uinput_running() -> bool {
     COUNT_OF_UINPUT_DEVICE.load(Ordering::SeqCst) > 0
 }
 
+/// `UinputDeviceFile` doesn't implement the `close` method.
+impl CloseFreeSafe for UinputDeviceFile {}
 impl FileOps for UinputDeviceFile {
     fileops_impl_seekless!();
     fileops_impl_noop_sync!();
@@ -523,10 +527,10 @@ pub struct VirtualDevice {
 impl DeviceOps for VirtualDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let input_file = match &self.device_type {

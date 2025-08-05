@@ -215,8 +215,7 @@ impl BootfsSvc {
         original_size: u64,
     ) -> Result<zx::Vmo, BootfsError> {
         let aligned_size = range.end - range.start;
-        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, aligned_size)
-            .map_err(BootfsError::Vmo)?;
+        let vmo = zx::Vmo::create(original_size).map_err(BootfsError::Vmo)?;
         vmo.transfer_data(
             zx::TransferDataOptions::empty(),
             0,
@@ -225,8 +224,6 @@ impl BootfsSvc {
             range.start,
         )
         .map_err(BootfsError::Vmo)?;
-        // Set the VMO content size back to the original size.
-        vmo.set_size(original_size).map_err(BootfsError::Vmo)?;
         Ok(vmo)
     }
 

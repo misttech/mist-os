@@ -15,18 +15,18 @@ use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::power::{mark_proxy_message_handled, LockSource};
-use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use starnix_core::task::{CurrentTask, Kernel, LockedAndTask, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
-    NamespaceNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileObjectState, FileOps,
+    FsString, NamespaceNode,
 };
 use starnix_lifecycle::DropWaiter;
 use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
     CATEGORY_STARNIX,
 };
-use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
@@ -34,7 +34,7 @@ use starnix_uapi::errors::{Errno, ErrnoCode, EAGAIN, EINTR};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserCStringPtr, UserRef};
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};
+use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::CStr;
 use std::rc::Rc;
@@ -86,10 +86,10 @@ pub struct RemoteBinderDevice {}
 impl DeviceOps for RemoteBinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(RemoteBinderFileOps::new(current_task))
@@ -118,9 +118,9 @@ impl FileOps for RemoteBinderFileOps {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.0.close();
@@ -674,13 +674,14 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
     /// Serve the LutexController protocol.
     async fn serve_lutex_controller(
-        kernel: Arc<Kernel>,
+        locked_and_task: LockedAndTask<'_>,
         server_end: ServerEnd<fbinder::LutexControllerMarker>,
     ) -> Result<(), Error> {
         async fn handle_request(
-            kernel: &Kernel,
+            locked_and_task: &LockedAndTask<'_>,
             event: fbinder::LutexControllerRequest,
         ) -> Result<(), Error> {
+            let kernel = locked_and_task.current_task().kernel();
             match event {
                 fbinder::LutexControllerRequest::WaitBitset { payload, responder } => {
                     let deadline_and_receiver = (|| {
@@ -691,7 +692,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let deadline = payload.deadline.map(zx::MonotonicInstant::from_nanos);
                         kernel
                             .shared_futexes
-                            .external_wait(vmo.into(), offset, value, mask)
+                            .external_wait(
+                                &mut locked_and_task.unlocked(),
+                                vmo.into(),
+                                offset,
+                                value,
+                                mask,
+                            )
                             .map(|receiver| (deadline, receiver))
                     })();
                     let result = match deadline_and_receiver {
@@ -721,6 +728,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let count = payload.count.ok_or_else(|| errno!(EINVAL))?;
                         let mask = payload.mask.unwrap_or(u32::MAX);
                         kernel.shared_futexes.external_wake(
+                            &mut locked_and_task.unlocked(),
                             vmo.into(),
                             offset,
                             count as usize,
@@ -751,7 +759,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         );
         stream
             .map(|result| result.context("failed fbinder::LutexController request"))
-            .try_for_each_concurrent(None, |event| handle_request(&kernel, event))
+            .try_for_each_concurrent(None, |event| handle_request(&locked_and_task, event))
             .await
     }
 
@@ -970,10 +978,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
         let node = current_task.lookup_path_from_root(locked, path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
-        let device: Arc<dyn DeviceOps> = current_task
+        let device = current_task
             .kernel()
             .device_registry
-            .get_device(device_type, DeviceMode::Char)
+            .get_device(locked, device_type, DeviceMode::Char)
             .or_else(|_| error!(ENOTSUP))?;
         let device_ref: &BinderDevice = device
             .as_ref()
@@ -993,7 +1001,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         service_address_ref: UserCStringPtr,
     ) -> Result<(), Errno> {
         let service_address = current_task.read_multi_arch_ptr(service_address_ref)?;
-        let service = current_task.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
+        let service = current_task.read_path(service_address)?;
         let service_name = String::from_utf8(service.to_vec()).map_err(|_| errno!(EINVAL))?;
         let remote_controller_client =
             F::connect_to_remote_controller(current_task, &service_name)?;
@@ -1018,11 +1026,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawn_with_role(
+        current_task.kernel().kthreads.spawn_async_with_role(
             EXECUTOR_THREAD_ROLE,
-            move |_locked, _current_task| {
-                let mut exec = fuchsia_async::LocalExecutor::new();
-
+            async move |locked_and_task: LockedAndTask<'_>| {
                 // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
                 // to keep a strong reference to the thread_group itself.
                 let kernel_and_drop_waiter = handle
@@ -1035,31 +1041,29 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     return;
                 };
 
-                exec.run_singlethreaded(async move {
-                    // Start the 3 servers.
-                    let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
-                    let lutex_fut = Self::serve_lutex_controller(
-                        kernel.clone(),
-                        lutex_controller_server_end.into(),
-                    );
-                    let power_fut = Self::serve_container_power_controller(
-                        power_controller_server_end.into(),
-                        power_controller_event,
-                        kernel,
-                        &service_name,
-                    );
-                    // Wait until all are done, or the task exits.
-                    let (binder_res, lutex_res, power_res) = futures::join!(
-                        future_or_task_end(&drop_waiter, binder_fut),
-                        future_or_task_end(&drop_waiter, lutex_fut),
-                        future_or_task_end(&drop_waiter, power_fut),
-                    );
-                    let result = binder_res.and(lutex_res).and(power_res);
-                    if let Err(e) = &result {
-                        log_error!("Error when servicing the DevBinder protocol: {e:#}");
-                    }
-                    handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
-                });
+                // Start the 3 servers.
+                let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
+                let lutex_fut = Self::serve_lutex_controller(
+                    locked_and_task,
+                    lutex_controller_server_end.into(),
+                );
+                let power_fut = Self::serve_container_power_controller(
+                    power_controller_server_end.into(),
+                    power_controller_event,
+                    kernel,
+                    &service_name,
+                );
+                // Wait until all are done, or the task exits.
+                let (binder_res, lutex_res, power_res) = futures::join!(
+                    future_or_task_end(&drop_waiter, binder_fut),
+                    future_or_task_end(&drop_waiter, lutex_fut),
+                    future_or_task_end(&drop_waiter, power_fut),
+                );
+                let result = binder_res.and(lutex_res).and(power_res);
+                if let Err(e) = &result {
+                    log_error!("Error when servicing the DevBinder protocol: {e:#}");
+                }
+                handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
             },
         );
 
@@ -1161,7 +1165,7 @@ mod tests {
     use crate::BinderFs;
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
     use fidl::HandleBased;
-    use rand::distributions::{Alphanumeric, DistString};
+    use rand::distr::{Alphanumeric, SampleString};
     use starnix_core::mm::MemoryAccessor;
     use starnix_core::power::LockSource;
     use starnix_core::testing::*;
@@ -1208,7 +1212,7 @@ mod tests {
         spawn_kernel_and_run(|_, init_task| {
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async move {
-                let service_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+                let service_name = Alphanumeric.sample_string(&mut rand::rng(), 16);
                 let (remote_controller_client, remote_controller_server) =
                     create_endpoints::<fbinder::RemoteControllerMarker>();
                 REMOTE_CONTROLLER_CLIENT

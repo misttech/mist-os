@@ -6,8 +6,8 @@
 
 #ifdef FS_TRACE_DEBUG_ENABLED
 
-std::ostream& operator<<(std::ostream& os, const fs::VnodeConnectionOptions& options) {
-  return os << "VnodeConnectionOptions{ flags: " << fidl::ostream::Formatted(options.flags)
+std::ostream& operator<<(std::ostream& os, const fs::DeprecatedOptions& options) {
+  return os << "DeprecatedOptions{ flags: " << fidl::ostream::Formatted(options.flags)
             << ", rights: " << fidl::ostream::Formatted(options.rights) << "}";
 }
 

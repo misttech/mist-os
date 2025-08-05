@@ -29,16 +29,16 @@ namespace display {
 // resolution, vsync interval, last vsync time, etc.
 class Display {
  public:
-  Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
-          uint32_t height_in_px, uint32_t width_in_mm, uint32_t height_in_mm,
-          std::vector<fuchsia_images2::PixelFormat> pixel_formats,
-          uint32_t maximum_refresh_rate_in_millihertz);
+  Display(fuchsia_hardware_display_types::wire::DisplayId id,
+          const fuchsia_hardware_display_types::wire::Mode& mode, uint32_t width_in_mm,
+          uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats);
   Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
           uint32_t height_in_px);
   virtual ~Display() = default;
 
-  using VsyncCallback = fit::function<void(
-      zx::time timestamp, fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp)>;
+  using VsyncCallback =
+      fit::function<void(zx::time_monotonic timestamp,
+                         fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback) { vsync_callback_ = std::move(callback); }
 
   using DPRCallback = fit::function<void(const glm::vec2& dpr)>;
@@ -59,10 +59,12 @@ class Display {
     }
   }
 
+  const fuchsia_hardware_display_types::wire::Mode& Mode() const { return mode_; }
+
   // The display's ID in the context of the DisplayManager's DisplayController.
   fuchsia_hardware_display_types::wire::DisplayId display_id() const { return display_id_; }
-  uint32_t width_in_px() const { return width_in_px_; }
-  uint32_t height_in_px() const { return height_in_px_; }
+  uint32_t width_in_px() const { return mode_.active_area.width; }
+  uint32_t height_in_px() const { return mode_.active_area.height; }
   uint32_t width_in_mm() const { return width_in_mm_; }
   uint32_t height_in_mm() const { return height_in_mm_; }
 
@@ -70,16 +72,14 @@ class Display {
 
   const std::vector<fuchsia_images2::PixelFormat>& pixel_formats() const { return pixel_formats_; }
 
-  uint32_t maximum_refresh_rate_in_millihertz() const {
-    return maximum_refresh_rate_in_millihertz_;
-  }
+  uint32_t maximum_refresh_rate_in_millihertz() const { return mode_.refresh_rate_millihertz; }
 
   // Event signaled by DisplayManager when ownership of the display
   // changes. This event backs Scenic's GetDisplayOwnershipEvent API.
   const zx::event& ownership_event() const { return ownership_event_; }
 
   // Called by DisplayManager, other users of Display should probably not call this.  Except tests.
-  void OnVsync(zx::time timestamp,
+  void OnVsync(zx::time_monotonic timestamp,
                fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp);
 
  protected:
@@ -95,8 +95,7 @@ class Display {
   static constexpr zx::duration kMinimumVsyncInterval = zx::usec(/*1000000/240=*/4167);
 
   const fuchsia_hardware_display_types::wire::DisplayId display_id_;
-  const uint32_t width_in_px_;
-  const uint32_t height_in_px_;
+  const fuchsia_hardware_display_types::wire::Mode mode_;
   const uint32_t width_in_mm_;
   const uint32_t height_in_mm_;
   // |device_pixel_ratio_| may be written from FlatlandDisplay thread and read by SingletonDisplay
@@ -104,7 +103,6 @@ class Display {
   std::atomic<glm::vec2> device_pixel_ratio_;
   zx::event ownership_event_;
   std::vector<fuchsia_images2::PixelFormat> pixel_formats_;
-  const uint32_t maximum_refresh_rate_in_millihertz_;
 
   bool claimed_ = false;
 

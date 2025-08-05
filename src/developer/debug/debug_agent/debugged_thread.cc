@@ -364,10 +364,10 @@ void DebuggedThread::SendExceptionNotification(debug_ipc::NotifyException* excep
 }
 
 void DebuggedThread::ClientResume(const debug_ipc::ResumeRequest& request) {
-  DEBUG_LOG(Thread) << ThreadPreamble(this)
-                    << "Resuming. Run mode: " << debug_ipc::ResumeRequest::HowToString(request.how)
-                    << ", Count: " << request.count << ", Range: [" << request.range_begin << ", "
-                    << request.range_end << ").";
+  LOGS(Info) << ThreadPreamble(this)
+             << "Resuming. Run mode: " << debug_ipc::ResumeRequest::HowToString(request.how)
+             << ", Count: " << request.count << ", Range: [" << request.range_begin << ", "
+             << request.range_end << ").";
 
   run_mode_ = request.how;
   step_count_ = request.count;
@@ -378,7 +378,7 @@ void DebuggedThread::ClientResume(const debug_ipc::ResumeRequest& request) {
   if (client_suspend_handle_) {
     // Normally the single-step flat is set by the exception resumption code, but if we're resuming
     // from a pause that will do nothing so set here.
-    DEBUG_LOG(Thread) << ThreadPreamble(this) << "Resuming from client suspend.";
+    LOGS(Info) << ThreadPreamble(this) << "Resuming from client suspend.";
     SetSingleStepForRunMode();
     client_suspend_handle_.reset();
   }
@@ -462,8 +462,10 @@ debug_ipc::ThreadRecord DebuggedThread::GetThreadRecord(
       uint32_t max_stack_depth =
           stack_amount == debug_ipc::ThreadRecord::StackAmount::kMinimal ? 2 : 256;
 
+      LOGS(Info) << "Unwinding stack";
       UnwindStack(process_->process_handle(), process_->module_list(), thread_handle(), *regs,
                   max_stack_depth, &record.frames);
+      LOGS(Info) << "Done.";
     }
   } else {
     // Didn't bother querying the stack.

@@ -466,7 +466,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Pending);
 
         // Generate and send scan results
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let scan_result_list = if randomize {
             (0..number_of_scan_results).map(|_| random_scan_result(&mut rng).into()).collect()
         } else {
@@ -582,7 +582,7 @@ mod tests {
 
         // TODO(https://fxbug.dev/42164451): Merge this with a similar function in wlancfg.
         wlan_common::scan::ScanResult {
-            compatibility: match rng.gen_range(0..4) {
+            compatibility: match rng.random_range(0..4) {
                 0 => wlan_common::scan::Compatible::expect_ok([SecurityDescriptor::OPEN]),
                 1 => wlan_common::scan::Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
                 2 => wlan_common::scan::Compatible::expect_ok([
@@ -591,7 +591,7 @@ mod tests {
                 ]),
                 _ => Incompatible::unknown(),
             },
-            timestamp: zx::MonotonicInstant::from_nanos(rng.gen()),
+            timestamp: zx::MonotonicInstant::from_nanos(rng.random()),
             bss_description: random_bss_description!(),
         }
     }

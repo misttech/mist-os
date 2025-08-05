@@ -14,6 +14,10 @@ driver_source_split("mac") {
     "mac_interface.h",
     "public/network_mac.h",
   ]
+  non_driver_deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/connectivity/network/drivers/network-device/log",
+  ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",

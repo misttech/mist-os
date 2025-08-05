@@ -23,6 +23,8 @@
 
 namespace {
 
+namespace fio = fuchsia_io;
+
 class TestLazyDirHelper : public fs::LazyDir {
  public:
   struct TestContent {
@@ -65,7 +67,7 @@ TEST(LazyDir, ApiTest) {
 
     EXPECT_EQ(test.Readdir(&cookie, buffer, sizeof(buffer), &len), ZX_OK);
     fs::DirentChecker dc(buffer, len);
-    dc.ExpectEntry(".", V_TYPE_DIR);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
     dc.ExpectEnd();
   }
 
@@ -77,8 +79,8 @@ TEST(LazyDir, ApiTest) {
 
     EXPECT_EQ(test.Readdir(&cookie, buffer, sizeof(buffer), &len), ZX_OK);
     fs::DirentChecker dc(buffer, len);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("test", V_TYPE_FILE);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("test", fio::DirentType::kFile);
     dc.ExpectEnd();
 
     fbl::RefPtr<fs::Vnode> out;
@@ -97,9 +99,9 @@ TEST(LazyDir, ApiTest) {
 
     EXPECT_EQ(test.Readdir(&cookie, buffer, sizeof(buffer), &len), ZX_OK);
     fs::DirentChecker dc(buffer, len);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("test", V_TYPE_FILE);
-    dc.ExpectEntry("aaaa", V_TYPE_FILE);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("test", fio::DirentType::kFile);
+    dc.ExpectEntry("aaaa", fio::DirentType::kFile);
     dc.ExpectEnd();
 
     fbl::RefPtr<fs::Vnode> out;
@@ -117,8 +119,8 @@ TEST(LazyDir, ApiTest) {
 
     EXPECT_EQ(test.Readdir(&cookie, buffer, sizeof(buffer), &len), ZX_OK);
     fs::DirentChecker dc(buffer, len);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("aaaa", V_TYPE_FILE);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("aaaa", fio::DirentType::kFile);
     dc.ExpectEnd();
 
     // Expect that "." is missing when reusing the cookie.

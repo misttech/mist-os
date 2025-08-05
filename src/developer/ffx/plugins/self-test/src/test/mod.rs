@@ -25,12 +25,7 @@ async fn set_value_in_isolate(
     config_key: &str,
     value: Value,
 ) -> Result<()> {
-    isolate
-        .env_context()
-        .query(config_key)
-        .level(Some(ffx_config::ConfigLevel::User))
-        .set(value)
-        .await
+    isolate.env_context().query(config_key).level(Some(ffx_config::ConfigLevel::User)).set(value)
 }
 
 fn subtest_log_file(isolate: &ffx_isolate::Isolate) -> PathBuf {

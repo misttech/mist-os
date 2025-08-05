@@ -13,7 +13,6 @@ use fidl_fuchsia_fxfs::{
 use fuchsia_sync::Mutex;
 use futures::stream::StreamExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
-use rand::{thread_rng, Rng};
 use starnix_logging::log_error;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -84,7 +83,7 @@ impl CryptService {
         let nonce = zero_extended_nonce(owner);
 
         let mut key = [0u8; 32];
-        thread_rng().fill(&mut key[..]);
+        rand::fill(&mut key[..]);
 
         let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
             log_error!("Failed to wrap key error: {:?}", e);
@@ -109,7 +108,7 @@ impl CryptService {
         let nonce = zero_extended_nonce(owner);
 
         let mut key = [0u8; 32];
-        thread_rng().fill(&mut key[..]);
+        rand::fill(&mut key[..]);
 
         let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|error| {
             log_error!("Failed to wrap key error: {:?}", error);

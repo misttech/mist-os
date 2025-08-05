@@ -224,7 +224,7 @@ void WlantapPhy::WlantapMacQueueTx(const fuchsia_wlan_softmac::wire::WlanTxPacke
   }
 }
 
-void WlantapPhy::WlantapMacSetChannel(const wlan_common::WlanChannel& channel) {
+void WlantapPhy::WlantapMacSetChannel(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel) {
   if (!phy_config_->quiet) {
     FDF_LOG(INFO, "%s: WlantapMacSetChannel channel=%u", name_.c_str(), channel.primary);
   }

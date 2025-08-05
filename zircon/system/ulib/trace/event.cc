@@ -245,7 +245,7 @@ void trace_internal_send_alert_and_release_context(trace_context_t* context,
   trace_release_context(context);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 uint64_t trace_internal_time_based_id(void) {
   trace_context_t* ctx = trace_acquire_context();
   if (unlikely(ctx)) {

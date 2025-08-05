@@ -5,6 +5,7 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -13,13 +14,12 @@
 #include <zxtest/zxtest.h>
 
 #include "fuchsia/ui/test/context/cpp/fidl.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
-#include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/pixel.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/buffers_helper.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -183,38 +183,38 @@ TEST_P(CpuRendererIntegrationTestWithFormat, RendersImage) {
 
   const utils::Pixel color = utils::kBlue;
   std::vector<uint8_t> pixel_data = color.ToFormat(GetParam());
-  flatland::MapHostPointer(info.buffers()[0].vmo(), flatland::HostPointerAccessMode::kWriteOnly,
-                           [&num_pixels, &color, &pixel_data, &info, bytes_per_pixel](
-                               uint8_t* vmo_ptr, uint32_t num_bytes) {
-                             ASSERT_EQ(num_bytes, num_pixels * bytes_per_pixel);
-                             ASSERT_EQ(num_bytes, info.settings().buffer_settings().size_bytes());
+  ui_testing::MapHostPointer(
+      info.buffers()[0].vmo(), ui_testing::HostPointerAccessMode::kWriteOnly,
+      [&num_pixels, &color, &pixel_data, &info, bytes_per_pixel](uint8_t* vmo_ptr,
+                                                                 uint32_t num_bytes) {
+        ASSERT_EQ(num_bytes, num_pixels * bytes_per_pixel);
+        ASSERT_EQ(num_bytes, info.settings().buffer_settings().size_bytes());
 
-                             if (info.settings().image_format_constraints().pixel_format() ==
-                                 fuchsia::images2::PixelFormat::B8G8R8A8) {
-                               for (uint32_t i = 0; i < num_bytes; i += bytes_per_pixel) {
-                                 // For BGRA32 pixel format, the first and the third byte in the
-                                 // pixel corresponds to the blue and the red channel respectively.
-                                 vmo_ptr[i] = color.blue;
-                                 vmo_ptr[i + 1] = color.green;
-                                 vmo_ptr[i + 2] = color.red;
-                                 vmo_ptr[i + 3] = color.alpha;
-                               }
-                             } else {
-                               ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
-                                         fuchsia::images2::PixelFormat::R5G6B5);
-                               for (uint32_t i = 0; i < num_bytes; i += 2) {
-                                 vmo_ptr[i] = pixel_data[0];
-                                 vmo_ptr[i + 1] = pixel_data[1];
-                               }
-                             }
+        if (info.settings().image_format_constraints().pixel_format() ==
+            fuchsia::images2::PixelFormat::B8G8R8A8) {
+          for (uint32_t i = 0; i < num_bytes; i += bytes_per_pixel) {
+            // For BGRA32 pixel format, the first and the third byte in the
+            // pixel corresponds to the blue and the red channel respectively.
+            vmo_ptr[i] = color.blue;
+            vmo_ptr[i + 1] = color.green;
+            vmo_ptr[i + 2] = color.red;
+            vmo_ptr[i + 3] = color.alpha;
+          }
+        } else {
+          ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
+                    fuchsia::images2::PixelFormat::R5G6B5);
+          for (uint32_t i = 0; i < num_bytes; i += 2) {
+            vmo_ptr[i] = pixel_data[0];
+            vmo_ptr[i + 1] = pixel_data[1];
+          }
+        }
 
-                             if (info.settings().buffer_settings().coherency_domain() ==
-                                 fuchsia::sysmem2::CoherencyDomain::RAM) {
-                               EXPECT_EQ(ZX_OK,
-                                         info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0,
-                                                                          num_bytes, nullptr, 0));
-                             }
-                           });
+        if (info.settings().buffer_settings().coherency_domain() ==
+            fuchsia::sysmem2::CoherencyDomain::RAM) {
+          EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, num_bytes,
+                                                            nullptr, 0));
+        }
+      });
 
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};

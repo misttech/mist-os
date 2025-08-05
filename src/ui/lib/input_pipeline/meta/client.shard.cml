@@ -70,7 +70,6 @@
                 // Used to distribute focus.
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
     ],

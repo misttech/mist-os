@@ -430,7 +430,6 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
             to: [ "#system-tests" ],
@@ -478,7 +477,6 @@
             dictionary: "tee_session",
             from: "parent",
             to: [ "#system-tests" ],
-            availability: "optional",
         },
     ],
 }

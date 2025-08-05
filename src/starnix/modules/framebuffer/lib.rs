@@ -13,9 +13,11 @@ use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, Kernel};
-use starnix_core::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
+use starnix_core::vfs::{
+    fileops_impl_memory, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, NamespaceNode,
+};
 use starnix_logging::{log_info, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -89,7 +91,7 @@ impl Framebuffer {
             DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
             graphics_class,
             FramebufferDevice { framebuffer: framebuffer.clone() },
-        );
+        )?;
 
         Ok(framebuffer)
     }
@@ -226,16 +228,16 @@ struct FramebufferDevice {
 impl DeviceOps for FramebufferDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         dev: DeviceType,
-        node: &FsNode,
+        node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         if dev.minor() != 0 {
             return error!(ENODEV);
         }
-        node.update_info(|info| {
+        node.entry.node.update_info(|info| {
             info.size = self.framebuffer.memory_len();
             info.blocks = self.framebuffer.memory_size() / info.blksize;
             Ok(())
@@ -243,7 +245,8 @@ impl DeviceOps for FramebufferDevice {
         Ok(Box::new(Arc::clone(&self.framebuffer)))
     }
 }
-
+/// `Framebuffer` doesn't implement the `close` method.
+impl CloseFreeSafe for Framebuffer {}
 impl FileOps for Framebuffer {
     fileops_impl_memory!(self, &self.get_memory()?);
     fileops_impl_noop_sync!();

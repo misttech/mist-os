@@ -69,6 +69,7 @@ async fn test_stats_returns_default_values() -> Result<()> {
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
     Ok(())
 }
 
@@ -198,6 +199,7 @@ async fn test_activity_governor_with_no_suspender_returns_not_supported_after_su
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -234,6 +236,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
@@ -260,6 +263,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+               ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -300,6 +304,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(Some(2), current_stats.last_time_in_suspend);
+    assert_eq!(Some(2), current_stats.total_time_in_suspend);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -323,6 +328,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
@@ -341,6 +347,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: AnyProperty,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: AnyProperty,
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -394,6 +401,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(Some(3), current_stats.last_time_in_suspend);
+    assert_eq!(Some(5), current_stats.total_time_in_suspend);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -417,12 +425,14 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 5u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 5u64,
                 },
                 "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -505,6 +515,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -554,6 +565,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_FAIL_COUNT: 1u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
@@ -653,6 +665,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -702,6 +715,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_FAIL_COUNT: 1u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
@@ -788,12 +802,14 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_FAIL_COUNT: 1u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 },
                 "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -812,7 +828,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                  },
                 "20": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
+                },
                 "21": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
@@ -838,6 +854,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
@@ -901,6 +918,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -957,6 +975,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(Some(2), current_stats.last_time_in_suspend);
+    assert_eq!(Some(2), current_stats.total_time_in_suspend);
 
     // OnResume should have been called once.
     on_resume_rx.next().await.unwrap();
@@ -984,12 +1003,14 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -1044,6 +1065,7 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
@@ -1253,6 +1275,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             // Events 0 and 1 are resume callback phase start/end
@@ -1273,6 +1296,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -1335,6 +1359,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 5u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
@@ -1353,6 +1378,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 5u64,
                 },
                 "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -1393,6 +1419,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     // Initial state should show execution_state is active and booting is true.
     block_until_inspect_matches!(
@@ -1415,6 +1442,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -1463,6 +1491,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
@@ -2445,6 +2474,7 @@ async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
                 "6": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -3001,6 +3031,7 @@ async fn test_activity_governor_suspends_after_suspend_blocker_hangs_after_resum
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     let (suspend_blocker_client_end, mut suspend_blocker_stream) =
         fidl::endpoints::create_request_stream();
@@ -3067,6 +3098,7 @@ async fn test_activity_governor_suspends_after_suspend_blocker_hangs_after_resum
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -3140,6 +3172,7 @@ async fn test_activity_governor_suspends_after_suspend_blocker_hangs_after_resum
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(Some(2), current_stats.last_time_in_suspend);
+    assert_eq!(Some(2), current_stats.total_time_in_suspend);
 
     // AfterResume should have been called once.
     after_resume_rx.next().await.unwrap();
@@ -3167,12 +3200,14 @@ async fn test_activity_governor_suspends_after_suspend_blocker_hangs_after_resum
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "11": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_CUMULATIVE_DURATION: 2u64,
                 },
                 "12": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
@@ -3227,6 +3262,7 @@ async fn test_activity_governor_blocks_for_before_suspend() -> Result<()> {
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    assert_eq!(Some(0), current_stats.total_time_in_suspend);
 
     let (suspend_blocker_client_end, mut suspend_blocker_stream) =
         fidl::endpoints::create_request_stream();

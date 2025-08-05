@@ -309,7 +309,7 @@ static constexpr uint32_t kClockRate = kBaudRate * kOversampling;
 static constexpr uint32_t kClockDiv = kFrequency / kClockRate;
 
 // FIFO fill watermark in terms of FIFO words (kFifoWidth bytes)
-static constexpr uint32_t kTxFifoWatermark = 4;
+static constexpr uint32_t kTxFifoWatermark = 1;
 
 static constexpr uint32_t kFifoWidth = 4;     // in bytes
 static constexpr uint32_t kRxFifoDepth = 16;  // in fifos
@@ -385,36 +385,80 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
 
   template <class IoProvider>
   uint32_t TxReady(IoProvider& io) {
-    // If the engine is busy with the last call, don't bother
-    // checking the FIFO status.
-    auto geni_status = GeniStatusRegister::Get().ReadFrom(io.io());
-    if (geni_status.m_command_active()) {
+    // If we have queued all of our data to the fifo, but there is still a job
+    // in progress, we need to wait until the job finishes.
+    if (tx_pending_bytes_ == 0) {
+      auto geni_status = GeniStatusRegister::Get().ReadFrom(io.io());
+      if (geni_status.m_command_active()) {
+        return 0;
+      }
+    }
+
+    // Otherwise report the total number of bytes we could fit into our fifo.
+    const uint32_t fifo_count = TxFifoStatusRegister::Get().ReadFrom(io.io()).word_count();
+    if (fifo_count > tx_fifo_depth_) {
+      // This should never happen, but if it does, just say we have no room and
+      // try to soldier on.  ASSERTing in the serial port driver is going to be
+      // fatal.
       return 0;
     }
 
-    auto fifo_count = TxFifoStatusRegister::Get().ReadFrom(io.io()).word_count();
-    // Block until it drops below the watermark.
-    if (fifo_count >= kTxFifoWatermark) {
-      return 0;
-    }
-    if (fifo_count > tx_fifo_depth_) {
-      return 0;
-    }
-    // Return available bytes to be filled in the FIFO.
-    return (tx_fifo_depth_ - fifo_count) * tx_fifo_width_;
+    const uint32_t avail = (tx_fifo_depth_ - fifo_count) * tx_fifo_width_;
+    return avail;
   }
 
   template <class IoProvider, typename It1, typename It2>
   auto Write(IoProvider& io, uint32_t ready_space, It1 it, const It2& end) {
-    ptrdiff_t remaining = std::distance(it, end);
-    if (remaining <= 0 || remaining >= INT_MAX) {
+    const auto job_size = std::distance(it, end);
+    if (job_size <= 0) {
       return it;
     }
-    uint32_t bytes = std::min(static_cast<uint32_t>(remaining), ready_space);
-    auto txl = UartTransmitLengthRegister::Get().FromValue(0);
-    txl.set_length(bytes).WriteTo(io.io());
-    auto m_cmd = MainCommandRegister::Get().FromValue(0);
-    m_cmd.set_command(StartTx).WriteTo(io.io());
+
+    // Start a new job if there is not one already in progress.
+    if (tx_pending_bytes_ == 0) {
+      tx_pending_bytes_ = static_cast<uint32_t>(std::min<decltype(job_size)>(job_size, INT_MAX));
+      UartTransmitLengthRegister::Get().FromValue(0).set_length(tx_pending_bytes_).WriteTo(io.io());
+      MainCommandRegister::Get().FromValue(0).set_command(StartTx).WriteTo(io.io());
+    }
+
+    // Pack as many of the job's remaining bytes into the TX fifo.
+    //
+    // Note; given the somewhat strange "job" structure of this UART (probably
+    // present to support the 4 byte wide TX FIFO), it is very important the
+    // higher level code (KernelDebug::Write) always deliver all of the bytes it
+    // initially tries to write when processing a string handed down from above,
+    // and to do so in the largest chunks possible.
+    //
+    // If it fails to do this, we could end up in a situation where we are given
+    // not enough data to either fill the FIFO, or finish the job, and end up
+    // packing a partial word into the FIFO resulting in null characters
+    // accidentally being transmitted instead.
+    //
+    // For example:
+    //
+    // 1) Write is called at the higher level, and we need to write 200 bytes.
+    // 2) There are 64 bytes free in the FIFO, so we pack 64 bytes.
+    // 3) There is no more space, so the upper level needs to block until the
+    //    FIFO is low.  There are 136 bytes left in the job.
+    // 4) When the FIFO becomes low, the upper level decides to give us 6 bytes
+    //    to write instead of all 136 which remain in the job.
+    // 5) We pack one complete word with the first 4 bytes, but can only pack 2
+    //    bytes into the next word, even through there are 130 left in the job
+    //    after this.
+    // 6) The UART HW thinks there are 136 bytes left to transmit, so it treats
+    //    the next two words it pulls out of the FIFO as 8 bytes to transmit.
+    // 7) As a result, it ends up sending two 0x00 values, and thinking that
+    //    there are only 128 bytes left in the job instead of 130.
+    //
+    // As long as the higher level of code:
+    //
+    // 1) Always calls write with whatever is left in its job, and never a
+    //    smaller amount.
+    // 2) And, never gives up in the middle and fails to write remaining bytes.
+    //
+    // We should be OK.
+    //
+    uint32_t bytes = std::min(tx_pending_bytes_, ready_space);
     do {
       auto tx = TxFifoRegister::Get().FromValue(0);
       uint32_t value = 0;
@@ -422,10 +466,63 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
       for (uint32_t i = 0; i < fifo_len; ++i, it++, bytes--) {
         // Fill out the value
         value |= (*it & 0xff) << (i * CHAR_BIT);
+        --tx_pending_bytes_;
       }
       tx.set_data(value).WriteTo(io.io());
       arch::DeviceMemoryBarrier();
-    } while (it != end && bytes > 0);
+    } while (bytes > 0);
+
+    // We just attempted to top off our TX FIFO.  Clear the TX low-water IRQ
+    // status bit so that we don't end up accidentally double triggering the
+    // TX-low IRQ.
+    //
+    // Some observations about this IRQ status bit:
+    //
+    // The FIFO-low state is clearly a level-triggered condition, yet the
+    // status bit latches and must be acknowledged, as if it is more of an
+    // edge-triggered condition.  This is a bit odd, but there might be a
+    // reason for it.  The GENI unit seems like it may be micro-controller
+    // assisted hardware (they have an entire section on how to load firmware
+    // into it).
+    //
+    // Some casual experiments suggest that this interrupt does behave more like
+    // an edge triggered interrupt, and is only asserted when the
+    // microcontroller takes a word out of the fifo and notices that we are
+    // currently below the low water threshold.
+    //
+    // If that is the case, then we could be setting up a race by clearing
+    // this status bit after filling up the FIFO.  In some alternate reality,
+    // where large delays in this section of code _could_ be possible (they
+    // aren't really, since we have interrupts off), the following could
+    // hypothetically happen:
+    //
+    // 1) We fill the FIFO entirely.
+    // 2) Before we manage to clear this bit, the FIFO drains completely.
+    //    There are no more words to take out of the FIFO, so no more chances
+    //    to re-assert the interrupt.
+    // 3) We clear the bit, and become stuck.
+    //
+    // Q: What protects us from this?
+    //
+    // What protects us here is the fact that the higher level write operation
+    // (KernelDriver::Write in uart.h) will re-compute ready_space immediately
+    // after we return here, and will pack even more data if we can.  So, if the
+    // race (above) were able to happen, after clearing the bit, we would notice
+    // that there is now space in the buffer.  There are now two possibilities:
+    //
+    // 1) We still have bytes in this job to send, so we send some more of
+    //    them.
+    // 2) We run out of bytes to send in this job.
+    //
+    // So, when we leave this function and return to the main Write loop, one of
+    // two things must be true.  We either observed the FIFO being full after
+    // clearing the bit (in which case, we didn't lose the race), or we have
+    // finished packing all of the job's bytes, in which case we don't care
+    // about the TX-fifo-low interrupt anymore; we only care about the job
+    // complete interrupt. Either way we should be safe.
+    //
+    MainIrqStatusClearRegister::Get().FromValue(0).set_tx_fifo_watermark(1).WriteTo(io.io());
+
     return it;
   }
 
@@ -440,11 +537,15 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
   template <class IoProvider>
   void EnableTxInterrupt(IoProvider& io, bool enable = true) {
     if (enable) {
-      auto enable_set = MainIrqEnableSetRegister::Get().FromValue(0);
-      enable_set.set_tx_fifo_watermark(1);
-      enable_set.set_command_done(1);
-      enable_set.set_command_cancel(1);
-      enable_set.set_command_abort(1);
+      auto enable_set = MainIrqEnableSetRegister::Get()
+                            .FromValue(0)
+                            .set_command_done(1)
+                            .set_command_cancel(1)
+                            .set_command_abort(1);
+      if (tx_pending_bytes_) {
+        enable_set.set_tx_fifo_watermark(1);
+      }
+
       enable_set.WriteTo(io.io());
     } else {
       auto m_en_clear = MainIrqEnableClearRegister::Get().FromValue(0);
@@ -516,13 +617,58 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
 
   template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
   void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
-    auto m_status = MainIrqStatusRegister::Get().ReadFrom(io.io());
-    auto s_status = SecondaryIrqStatusRegister::Get().ReadFrom(io.io());
+    // Read the IRQ status registers, but mask them with the current value in
+    // the IRQ Enable register.
+    //
+    // We are going to use these bits to decide the reason that we woke up, but
+    // the status registers give the _unmasked_ interrupt status.  The normal
+    // idle state of the TX side of things should pretty much always indicate
+    // that the TX-fifo is below the low-water mark.  If we receive an RX
+    // interrupt, and fail to mask properly, it is going to look (to us) like we
+    // need to process a TX-fifo-low interrupt when we don't actually expect one
+    // (nor do we want to process one).
+    //
+    // Applying the current value of the mask register helps us to avoid stuff
+    // like this.
+    auto m_status = MainIrqStatusRegister::Get().FromValue(
+        MainIrqStatusRegister::Get().ReadFrom(io.io()).reg_value() &
+        MainIrqEnableRegister::Get().ReadFrom(io.io()).reg_value());
+    auto s_status = SecondaryIrqStatusRegister::Get().FromValue(
+        SecondaryIrqStatusRegister::Get().ReadFrom(io.io()).reg_value() &
+        SecondaryIrqEnableRegister::Get().ReadFrom(io.io()).reg_value());
+
+    // Interrupts like "command done" are effectively edge triggered.  Make sure
+    // to clear the pending flags before proceeding with processing so that we
+    // don't accidentally miss a subsequent "command done" interrupt.
+    //
+    // Note, the only way that this could happen in theory is if we were racing
+    // with the TX thread and somehow got held off for an excessive length of
+    // time after signaling the thread, and before acking the interrupts; but
+    // still.
+    //
+    // 1) A command completes, and the IRQ fires.
+    // 2) The IRQ notices there is space in buffer, so it signals the thread to
+    //    add more data.
+    // 3) The thread runs and queues some more data, starting a new command as
+    //    it does.
+    // 4) The command completes and sets the "command complete" pending bit.
+    // 5) Back in IRQ land, we finish finish up by acking what we thought was
+    //    the _previous_ command complete interrupt.  Unfortunately, we
+    //    accidentally acked the command which was just queued by the TX thread.
+    // 6) Now we might be stuck.  We are not going to signal the TX thread again
+    // until
+    //
+    // If we signal that thread, and then clear the "command done" status bit,
+    // we might accidentally end up in a race we don't want.
+    auto m_clear = MainIrqStatusClearRegister::Get().FromValue(m_status.reg_value());
+    m_clear.WriteTo(io.io());
+    auto s_clear = SecondaryIrqStatusClearRegister::Get().FromValue(s_status.reg_value());
+    s_clear.WriteTo(io.io());
 
     // As this driver is for debug output only, there is no handling of errors,
     // illegal commands, etc.
 
-    // Drain characters in the fifo.
+    // Drain characters in the RX fifo.
     if (s_status.rx_fifo_watermark() || s_status.rx_fifo_last()) {
       auto rx_fifo_status = RxFifoStatusRegister::Get().ReadFrom(io.io());
       bool ignore_rx = false;
@@ -573,12 +719,6 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
       auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
       tx(tx_irq);
     }
-
-    // Clear the flags we're handling.
-    auto m_clear = MainIrqStatusClearRegister::Get().FromValue(m_status.reg_value());
-    m_clear.WriteTo(io.io());
-    auto s_clear = SecondaryIrqStatusClearRegister::Get().FromValue(s_status.reg_value());
-    s_clear.WriteTo(io.io());
   }
 
  private:
@@ -586,6 +726,8 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
   uint32_t tx_fifo_depth_ = kTxFifoDepth;
   uint32_t rx_fifo_width_ = kFifoWidth;
   uint32_t tx_fifo_width_ = kFifoWidth;
+
+  uint32_t tx_pending_bytes_{0};
 };
 
 }  // namespace uart::geni

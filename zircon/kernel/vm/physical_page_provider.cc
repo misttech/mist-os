@@ -51,8 +51,8 @@ PageSourceProperties PhysicalPageProvider::properties() const {
 
 void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, paddr_t phys_base) {
   DEBUG_ASSERT(cow_pages);
-  DEBUG_ASSERT(!IS_PAGE_ALIGNED(kInvalidPhysBase));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(phys_base));
+  DEBUG_ASSERT(!IS_PAGE_ROUNDED(kInvalidPhysBase));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(phys_base));
   DEBUG_ASSERT(!cow_pages_);
   DEBUG_ASSERT(phys_base_ == kInvalidPhysBase);
   Guard<Mutex> guard{&mtx_};
@@ -258,7 +258,7 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
           bool needs_evict = true;
 
           // Check if we should attempt to replace the page to avoid eviction.
-          if (pmm_physical_page_borrowing_config()->is_replace_on_unloan_enabled()) {
+          if (PhysicalPageBorrowingConfig::Get().is_replace_on_unloan_enabled()) {
             __UNINITIALIZED AnonymousPageRequest page_request;
             zx_status_t replace_result = cow_container->ReplacePage(page, vmo_backlink.offset,
                                                                     false, nullptr, &page_request);
@@ -390,10 +390,11 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
       auto loan_pages = fit::defer([&] {
         while (!splice_list.IsProcessed()) {
           VmPageOrMarker page_or_marker = splice_list.Pop();
-          DEBUG_ASSERT(page_or_marker.IsPage());
-          vm_page_t* p = page_or_marker.ReleasePage();
-          DEBUG_ASSERT(!list_in_list(&p->queue_node));
-          list_add_tail(&contiguous_pages, &p->queue_node);
+          if (page_or_marker.IsPage()) {
+            vm_page_t* p = page_or_marker.ReleasePage();
+            DEBUG_ASSERT(!list_in_list(&p->queue_node));
+            list_add_tail(&contiguous_pages, &p->queue_node);
+          }
         }
         if (!list_is_empty(&contiguous_pages)) {
           Guard<Mutex> guard{&loaned_state_lock_};
@@ -401,8 +402,8 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
         }
       });
 
-      zx_status_t status = VmPageSpliceList::CreateFromPageList(supply_offset, supply_length,
-                                                                &contiguous_pages, &splice_list);
+      zx_status_t status =
+          VmPageSpliceList::CreateFromPageList(supply_length, &contiguous_pages, &splice_list);
       if (status != ZX_OK) {
         // Only possible error is out of memory.
         ASSERT(status == ZX_ERR_NO_MEMORY);

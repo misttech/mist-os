@@ -267,16 +267,6 @@ void device_unbind_reply(zx_device_t* device);
 // state that the device can go into.
 void device_suspend_reply(zx_device_t* device, zx_status_t status, uint8_t out_state);
 
-// This is used to signal completion of the device's |resume| hook.
-// Need not necessarily need to be called from within the |resume| hook.
-// |status| is the status of the resume operation.
-// If |status| is success, the |out_perf_state| has the working performance state
-// that the device is in currently.
-// If |status| is failure, the |out_power_state| has the power state
-// the device is in currently.
-void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_power_state,
-                         uint32_t out_perf_state);
-
 // Requests that the given thread be assigned a profile with parameters appropriate for the given
 // role. The available roles and the specific parameters assigned are device-dependent and may also
 // vary across builds. Requests are not guaranteed to be honored for all roles and requestors, and
@@ -364,31 +354,6 @@ static inline zx_status_t load_firmware(zx_device_t* device, const char* path, z
                                         size_t* size) {
   return load_firmware_from_driver(__zircon_driver_rec__.driver, device, path, fw, size);
 }
-
-// Opens a connection to the specified FIDL protocol offered by |device|.
-//
-// |device| is typically the parent of the device invoking this function.
-// |protocol_name| can be constructed with
-// fidl::DiscoverableProtocolName<my_protocol_name>.
-// |request| must be the server end of a zircon channel.
-//
-// If you are inside a C++ device class, it may be more convenient to use the
-// DdkConnectFidlProtocol wrapper method from ddktl, which supplies |device| and
-// |protocol_name| automatically.
-zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
-                                         zx_handle_t request);
-
-// Opens a connection to the specified FIDL service offered by |device|.
-//
-// |device| is typically the parent of the device invoking this function.
-// |service_name| can be constructed with `my_service_name::Name`.
-// |request| must be the server end of a zircon channel.
-//
-// If you are inside a C++ device class, it may be more convenient to use the
-// DdkConnectFidlProtocol wrapper method from ddktl, which supplies |device| and
-// |service_name| automatically.
-zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                          const char* protocol_name, zx_handle_t request);
 
 // Opens a connection to the specified FIDL protocol offered by |device|.
 //

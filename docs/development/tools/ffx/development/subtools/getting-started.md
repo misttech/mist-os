@@ -116,6 +116,33 @@ experimental status and exits early if it's not enabled. When writing a new
 subcommand, it should have this declaration on it to discourage people from relying
 on it before it's ready for wider use.
 
+##### Direct Connections
+FFX subtools by default communicate through the FFX daemon. If a subtool
+requires a direct connection to a target, it can add a declaration:
+```rust
+#[derive(FfxTool)]
+#[target(direct)]
+pub struct MyTool {
+    ...
+}
+```
+
+##### No Target Connection
+If a subtool does not require a target connection, it may declare this with
+`#[target(None)]`:
+```rust
+#[derive(FfxTool)]
+#[target(None)]
+pub struct MyTool {
+    ...
+}
+```
+
+This is only _required_ when a command supports `ffx --strict`, which will
+verify that the target is specified on the command line, unless the tool has
+this declaration. However, it is good practice to add this attribute to any tool
+that does not interact with a target device.
+
 ## FIDL protocols {#fidl-proxy}
 
 FFX subtools can communicate with a target device using FIDL protocols through

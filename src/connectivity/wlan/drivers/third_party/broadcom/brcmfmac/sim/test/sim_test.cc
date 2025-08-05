@@ -347,7 +347,7 @@ void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
 
 void SimInterface::StartConnect(const common::MacAddr& bssid,
                                 const fuchsia_wlan_ieee80211::Ssid& ssid,
-                                const wlan_common::WlanChannel& channel) {
+                                const wlan_ieee80211::WlanChannel& channel) {
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
@@ -386,7 +386,7 @@ void SimInterface::AssociateWith(const simulation::FakeAp& ap, std::optional<zx:
 
   common::MacAddr bssid = ap.GetBssid();
   fuchsia_wlan_ieee80211::Ssid ssid = ap.GetSsid();
-  wlan_common::WlanChannel channel = ap.GetChannel();
+  wlan_ieee80211::WlanChannel channel = ap.GetChannel();
 
   if (delay) {
     env_->ScheduleNotification(std::bind(&SimInterface::StartConnect, this, bssid, ssid, channel),
@@ -397,7 +397,7 @@ void SimInterface::AssociateWith(const simulation::FakeAp& ap, std::optional<zx:
 }
 
 void SimInterface::StartRoam(const common::MacAddr& bssid,
-                             const wlan_common::WlanChannel& channel) {
+                             const wlan_ieee80211::WlanChannel& channel) {
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
   ++stats_.roam_attempts;
@@ -491,7 +491,7 @@ SimInterface::ScanResultList(uint64_t txn_id) {
 }
 
 void SimInterface::StartSoftAp(const fuchsia_wlan_ieee80211::Ssid& ssid,
-                               const wlan_common::WlanChannel& channel, uint32_t beacon_period,
+                               const wlan_ieee80211::WlanChannel& channel, uint32_t beacon_period,
                                uint32_t dtim_period) {
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);

@@ -54,7 +54,7 @@ impl RingBuffer {
     /// Returns a new RingBuffer and Reader. `capacity` must be a multiple of the page size and
     /// should be at least `MAX_MESSAGE_SIZE`. The `capacity` does not include the additional page
     /// used to store the head and tail indices.
-    pub fn new(capacity: usize) -> (Arc<Self>, Reader) {
+    pub fn create(capacity: usize) -> Reader {
         let page_size = zx::system_get_page_size() as usize;
 
         assert_eq!(capacity % page_size, 0);
@@ -114,13 +114,10 @@ impl RingBuffer {
         .unwrap();
 
         let this = Arc::new(Self { shared_region, _vmar: vmar, base, capacity });
-        (
-            this.clone(),
-            Reader {
-                ring_buffer: this,
-                registration: fasync::EHandle::local().register_receiver(Receiver::default()),
-            },
-        )
+        Reader {
+            ring_buffer: this,
+            registration: fasync::EHandle::local().register_receiver(Receiver::default()),
+        }
     }
 
     /// Returns an IOBuffer that can be used to write to the ring buffer. A tuple is returned; the
@@ -314,8 +311,8 @@ mod tests {
     #[fuchsia::test]
     async fn read_message() {
         const TAG: u64 = 56;
-        let (ring_buffer, mut reader) = RingBuffer::new(128 * 1024);
-        let (iob, _) = ring_buffer.new_iob_writer(TAG).unwrap();
+        let mut reader = RingBuffer::create(128 * 1024);
+        let (iob, _) = reader.new_iob_writer(TAG).unwrap();
         const DATA: &[u8] = b"test";
         iob.write(Default::default(), 0, DATA).unwrap();
         let (tag, data) = reader.read_message().await.expect("read_message failed");
@@ -326,7 +323,8 @@ mod tests {
     #[fuchsia::test]
     async fn writing_wakes_reader() {
         const TAG: u64 = 56;
-        let (ring_buffer, mut reader) = RingBuffer::new(128 * 1024);
+        let mut reader = RingBuffer::create(128 * 1024);
+        let (iob, _) = reader.new_iob_writer(TAG).unwrap();
 
         // Use FuturesUnordered so that it uses its own waker.
         let mut read_message = FuturesUnordered::from_iter([reader.read_message()]);
@@ -334,7 +332,6 @@ mod tests {
         // Poll the reader once to prime it.
         assert!(read_message.next().now_or_never().is_none());
 
-        let (iob, _) = ring_buffer.new_iob_writer(TAG).unwrap();
         const DATA: &[u8] = b"test";
         iob.write(Default::default(), 0, DATA).unwrap();
 
@@ -346,13 +343,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn corrupt() {
-        let (ring_buffer, mut reader) = RingBuffer::new(128 * 1024);
+        let mut reader = RingBuffer::create(128 * 1024);
 
         const HEAD_OFFSET: usize = 0;
         const TAIL_OFFSET: usize = 8;
         let message_len_offset: usize = zx::system_get_page_size() as usize + 8;
 
-        let base = ring_buffer.base;
+        let base = reader.base;
         let write_u64 = |offset, value| unsafe {
             (*((base + offset) as *const AtomicU64)).store(value, Ordering::Release);
         };

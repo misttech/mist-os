@@ -14,6 +14,7 @@ from typing import Protocol
 import fidl_fuchsia_wlan_common as f_wlan_common
 import fidl_fuchsia_wlan_common_security as f_wlan_common_security
 import fidl_fuchsia_wlan_device_service as f_wlan_device_service
+import fidl_fuchsia_wlan_ieee80211 as f_wlan_ieee80211
 import fidl_fuchsia_wlan_policy as f_wlan_policy
 import fidl_fuchsia_wlan_sme as f_wlan_sme
 
@@ -303,35 +304,37 @@ class ChannelBandwidth(enum.StrEnum):
     UNKNOWN = "Unknown"
 
     @staticmethod
-    def from_fidl(fidl: f_wlan_common.ChannelBandwidth) -> "ChannelBandwidth":
+    def from_fidl(
+        fidl: f_wlan_ieee80211.ChannelBandwidth,
+    ) -> "ChannelBandwidth":
         match fidl:
-            case f_wlan_common.ChannelBandwidth.CBW20:
+            case f_wlan_ieee80211.ChannelBandwidth.CBW20:
                 return ChannelBandwidth.CBW20
-            case f_wlan_common.ChannelBandwidth.CBW40:
+            case f_wlan_ieee80211.ChannelBandwidth.CBW40:
                 return ChannelBandwidth.CBW40
-            case f_wlan_common.ChannelBandwidth.CBW40_BELOW:
+            case f_wlan_ieee80211.ChannelBandwidth.CBW40_BELOW:
                 return ChannelBandwidth.CBW40BELOW
-            case f_wlan_common.ChannelBandwidth.CBW80:
+            case f_wlan_ieee80211.ChannelBandwidth.CBW80:
                 return ChannelBandwidth.CBW80
-            case f_wlan_common.ChannelBandwidth.CBW80_P80:
+            case f_wlan_ieee80211.ChannelBandwidth.CBW80_P80:
                 return ChannelBandwidth.CBW80P80
             case _:
                 raise TypeError(f"Unknown ChannelBandwidth FIDL value: {fidl}")
 
-    def to_fidl(self) -> f_wlan_common.ChannelBandwidth:
+    def to_fidl(self) -> f_wlan_ieee80211.ChannelBandwidth:
         match self:
             case ChannelBandwidth.CBW20:
-                return f_wlan_common.ChannelBandwidth.CBW20
+                return f_wlan_ieee80211.ChannelBandwidth.CBW20
             case ChannelBandwidth.CBW40:
-                return f_wlan_common.ChannelBandwidth.CBW40
+                return f_wlan_ieee80211.ChannelBandwidth.CBW40
             case ChannelBandwidth.CBW40BELOW:
-                return f_wlan_common.ChannelBandwidth.CBW40_BELOW
+                return f_wlan_ieee80211.ChannelBandwidth.CBW40_BELOW
             case ChannelBandwidth.CBW80:
-                return f_wlan_common.ChannelBandwidth.CBW80
+                return f_wlan_ieee80211.ChannelBandwidth.CBW80
             case ChannelBandwidth.CBW160:
-                return f_wlan_common.ChannelBandwidth.CBW160
+                return f_wlan_ieee80211.ChannelBandwidth.CBW160
             case ChannelBandwidth.CBW80P80:
-                return f_wlan_common.ChannelBandwidth.CBW80_P80
+                return f_wlan_ieee80211.ChannelBandwidth.CBW80_P80
             case ChannelBandwidth.UNKNOWN:
                 raise TypeError(
                     "ChannelBandwidth.UNKNOWN doesn't have FIDL equivalent"
@@ -616,19 +619,19 @@ class WlanChannel:
     secondary80: int
 
     @staticmethod
-    def from_fidl(fidl: f_wlan_common.WlanChannel) -> "WlanChannel":
+    def from_fidl(fidl: f_wlan_ieee80211.WlanChannel) -> "WlanChannel":
         """Parse from a fuchsia.wlan.common/WlanChannel."""
         return WlanChannel(
             primary=fidl.primary,
             cbw=ChannelBandwidth.from_fidl(
-                f_wlan_common.ChannelBandwidth(fidl.cbw)
+                f_wlan_ieee80211.ChannelBandwidth(fidl.cbw)
             ),
             secondary80=fidl.secondary80,
         )
 
-    def to_fidl(self) -> f_wlan_common.WlanChannel:
+    def to_fidl(self) -> f_wlan_ieee80211.WlanChannel:
         """Convert to a fuchsia.wlan.common/WlanChannel."""
-        return f_wlan_common.WlanChannel(
+        return f_wlan_ieee80211.WlanChannel(
             primary=self.primary,
             cbw=self.cbw.to_fidl(),
             secondary80=self.secondary80,

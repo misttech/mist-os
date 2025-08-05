@@ -8,6 +8,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/types.h>
 
+#include <filesystem>
+#include <fstream>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -60,7 +63,7 @@ const trace::ArgumentValue* GetArgumentValue(const std::vector<trace::Argument>&
 // replaces any invalid unicode sequences with the replacement character, so
 // that the output will be valid UTF-8, even if a trace provider gives us
 // invalid UTF-8 in a string.
-std::string CleanString(fbl::String str) {
+std::string CleanString(std::string_view str) {
   std::string result;
   const char* data = str.data();
   const size_t len = str.length();
@@ -85,16 +88,17 @@ std::string CleanString(fbl::String str) {
 
 }  // namespace
 
-ChromiumExporter::ChromiumExporter(std::unique_ptr<std::ostream> stream_out)
-    : stream_out_(std::move(stream_out)), wrapper_(*stream_out_), writer_(wrapper_) {
+ChromiumExporter::ChromiumExporter(const std::filesystem::path& out_path)
+    : fp_(std::fopen(out_path.c_str(), "wb")),
+      wrapper_(fp_, write_buffer_, sizeof(write_buffer_)),
+      writer_(wrapper_) {
   Start();
 }
 
-ChromiumExporter::ChromiumExporter(std::ostream& out) : wrapper_(out), writer_(wrapper_) {
-  Start();
+ChromiumExporter::~ChromiumExporter() {
+  Stop();
+  std::fclose(fp_);
 }
-
-ChromiumExporter::~ChromiumExporter() { Stop(); }
 
 void ChromiumExporter::Start() {
   writer_.StartObject();
@@ -104,7 +108,7 @@ void ChromiumExporter::Start() {
   writer_.StartArray();
 }
 
-void ChromiumExporter::Stop() {
+void ChromiumExporter::StartSchedulerPass() {
   writer_.EndArray();
   writer_.Key("systemTraceEvents");
   writer_.StartObject();
@@ -115,7 +119,7 @@ void ChromiumExporter::Stop() {
 
   for (const auto& pair : processes_) {
     const zx_koid_t process_koid = pair.first;
-    const fbl::String& name = pair.second;
+    const std::string& name = pair.second;
 
     writer_.StartObject();
     writer_.Key("ph");
@@ -136,7 +140,7 @@ void ChromiumExporter::Stop() {
     const zx_koid_t process_koid = process_threads.first;
     for (const auto& thread : process_threads.second) {
       const zx_koid_t thread_koid = thread.first;
-      const fbl::String& name = thread.second;
+      const std::string& name = thread.second;
       writer_.StartObject();
       writer_.Key("ph");
       writer_.String("t");
@@ -149,14 +153,15 @@ void ChromiumExporter::Stop() {
       writer_.EndObject();
     }
   }
+  pass_ = Pass::kScheduler;
+}
 
-  for (const auto& record : scheduler_event_records_) {
-    ExportSchedulerEvent(record);
+void ChromiumExporter::Stop() {
+  if (pass_ == Pass::kMain) {
+    ChromiumExporter::StartSchedulerPass();
   }
-
   writer_.EndArray();
   writer_.EndObject();  // Finishes systemTraceEvents
-
   if (last_branch_records_.size() > 0) {
     writer_.Key("lastBranch");
     writer_.StartObject();
@@ -173,6 +178,12 @@ void ChromiumExporter::Stop() {
 }
 
 void ChromiumExporter::ExportRecord(const trace::Record& record) {
+  if (pass_ == Pass::kScheduler) {
+    if (record.type() == trace::RecordType::kScheduler) {
+      ExportSchedulerEvent(record.GetSchedulerEvent());
+    }
+    return;
+  }
   switch (record.type()) {
     case trace::RecordType::kMetadata:
       ExportMetadata(record.GetMetadata());
@@ -204,9 +215,6 @@ void ChromiumExporter::ExportRecord(const trace::Record& record) {
       ExportLog(record.GetLog());
       break;
     case trace::RecordType::kScheduler:
-      // We can't emit these into the regular stream, save them for later.
-      scheduler_event_records_.emplace_back(record.GetSchedulerEvent());
-      break;
     case trace::RecordType::kString:
     case trace::RecordType::kThread:
       // We can ignore these, trace::TraceReader consumes them and maintains
@@ -679,6 +687,14 @@ void ChromiumExporter::WriteArgs(const std::vector<trace::Argument>& arguments) 
       case trace::ArgumentType::kKoid:
         writer_.Key(CleanString(arg.name()));
         writer_.String(fxl::StringPrintf("#%" PRIu64, arg.value().GetKoid()).c_str());
+        break;
+      case trace::ArgumentType::kBlob:
+        writer_.Key(CleanString(arg.name()));
+        {
+          std::string blob_str(reinterpret_cast<const char*>(arg.value().GetBlob().data()),
+                               arg.value().GetBlob().size());
+          writer_.String(modp_b64_encode(blob_str));
+        }
         break;
       default:
         break;

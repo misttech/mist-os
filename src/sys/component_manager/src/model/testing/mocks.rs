@@ -54,7 +54,7 @@ impl MockResolver {
         &self,
         component_url: String,
     ) -> Result<ResolvedComponent, ResolverError> {
-        let (name, decl, config_values, maybe_blocker, client) = {
+        let (decl, config_values, maybe_blocker, client) = {
             const NAME_PREFIX: &str = "test:///";
             debug_assert!(component_url.starts_with(NAME_PREFIX), "invalid component url");
             let (_, name) = component_url.split_at(NAME_PREFIX.len());
@@ -90,7 +90,7 @@ impl MockResolver {
             let client = sub_dir_proxy.into_client_end().unwrap();
 
             let maybe_blocker = { guard.blockers.get_mut(name).and_then(|b| b.take()) };
-            (name, decl, config_values, maybe_blocker, client)
+            (decl, config_values, maybe_blocker, client)
         };
         if let Some(blocker) = maybe_blocker {
             let (send, recv) = blocker;
@@ -99,7 +99,6 @@ impl MockResolver {
         }
 
         Ok(ResolvedComponent {
-            resolved_url: format!("test:///{}_resolved", name),
             context_to_resolve_children: None,
             decl: decl.clone(),
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
@@ -223,7 +222,7 @@ impl MockRunner {
     /// Cause the component `name` to return an error when started.
     #[cfg(not(feature = "src_model_tests"))]
     pub fn cause_failure(&self, name: &str) {
-        self.add_failing_url(&format!("test:///{}_resolved", name))
+        self.add_failing_url(&format!("test:///{}", name))
     }
 
     /// Register `function` to serve the outgoing directory of component with `url`.

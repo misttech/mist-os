@@ -17,7 +17,7 @@ use super::symbols::{
     CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES, CONSTRAINT_TERM_TYPE_NOT_OPERATOR,
     CONSTRAINT_TERM_TYPE_OR_OPERATOR,
 };
-use super::{ParseStrategy, RoleId, TypeId, UserId};
+use super::{RoleId, TypeId, UserId};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -59,8 +59,8 @@ pub(super) enum ConstraintError {
 /// access decisions.
 // TODO: https://fxbug.dev/372400976 - Consider optimizations if this is a
 // performance bottleneck.
-pub(super) fn evaluate_constraint<PS: ParseStrategy>(
-    constraint_expr: &ConstraintExpr<PS>,
+pub(super) fn evaluate_constraint(
+    constraint_expr: &ConstraintExpr,
     source: &SecurityContext,
     target: &SecurityContext,
 ) -> Result<bool, ConstraintError> {
@@ -106,8 +106,8 @@ enum ConstraintNode {
 }
 
 impl ConstraintNode {
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<ConstraintNode, ConstraintError> {
@@ -132,8 +132,8 @@ enum BooleanOperator {
 }
 
 impl BooleanOperator {
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
     ) -> Result<BooleanOperator, ConstraintError> {
         match value.constraint_term_type() {
             CONSTRAINT_TERM_TYPE_NOT_OPERATOR => Ok(BooleanOperator::Not),
@@ -232,8 +232,8 @@ impl ContextExpression {
         }
     }
 
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<ContextExpression, ConstraintError> {
@@ -311,9 +311,9 @@ impl ContextExpression {
         }
     }
 
-    fn operands_from_expr_with_names<PS: ParseStrategy>(
+    fn operands_from_expr_with_names(
         operand_type: u32,
-        names: &ExtensibleBitmap<PS>,
+        names: &ExtensibleBitmap,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<(ContextOperand, ContextOperand), ConstraintError> {
@@ -367,7 +367,7 @@ impl ContextExpression {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::{find_class_by_name, parse_policy_by_reference};
+    use crate::policy::{find_class_by_name, parse_policy_by_value};
 
     fn normalize_context_expr(expr: ContextExpression) -> ContextExpression {
         let (left, right) = match expr.operator {
@@ -407,8 +407,9 @@ mod tests {
     #[test]
     fn decode_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();
@@ -475,8 +476,9 @@ mod tests {
     #[test]
     fn evaluate_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();
@@ -555,8 +557,9 @@ mod tests {
     #[test]
     fn evaluate_mls_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();

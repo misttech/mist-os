@@ -8,10 +8,10 @@ use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps,
-    FsNode,
+    NamespaceNode,
 };
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{DeviceOpen, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -24,10 +24,10 @@ pub const BPIOCXBP: u32 = 0xC1304201;
 pub const BPIOCXBPTABLE: u32 = 0xC00C4202;
 
 pub fn create_battery_profile_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     _current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(BatteryProfileFile::new()))

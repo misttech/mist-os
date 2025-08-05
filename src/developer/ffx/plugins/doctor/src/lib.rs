@@ -2328,18 +2328,12 @@ mod test {
         let pub_key = test_env.isolate_root.path().join("test_authorized_keys");
         let priv_key = test_env.isolate_root.path().join("test_ed25519_key");
         // Set the paths to use for the SSH keys
-        test_env
-            .context
-            .query("ssh.pub")
-            .level(Some(ConfigLevel::User))
-            .set(json!([&pub_key]))
-            .await?;
+        test_env.context.query("ssh.pub").level(Some(ConfigLevel::User)).set(json!([&pub_key]))?;
         test_env
             .context
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
-            .set(json!([&priv_key]))
-            .await?;
+            .set(json!([&priv_key]))?;
         let keys = SshKeyFiles::load(Some(&test_env.context)).await?;
         keys.create_keys_if_needed(false)?;
         Ok(())
@@ -3788,14 +3782,12 @@ mod test {
             .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!([&pub_key]))
-            .await
             .unwrap();
         test_env
             .context
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!([&priv_key]))
-            .await
             .unwrap();
 
         // Do not generate the keys - so they are missing.

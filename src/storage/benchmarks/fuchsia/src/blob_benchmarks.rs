@@ -8,7 +8,8 @@ use fidl_fuchsia_io as fio;
 use fuchsia_pkg_testing::PackageBuilder;
 use fuchsia_storage_benchmarks::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance};
 use futures::stream::{self, StreamExt};
-use rand::distributions::{Distribution, WeightedIndex};
+use rand::distr::weighted::WeightedIndex;
+use rand::distr::Distribution;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -338,8 +339,9 @@ fn create_compressible_data(size: usize, rng: &mut XorShiftRng) -> DeliveryBlob 
     let mut data = vec![0u8; size];
     let mut rest = data.as_mut_slice();
     while !rest.is_empty() {
-        let chunk = if rest.len() < RUN_RANGE.end { rest.len() } else { rng.gen_range(RUN_RANGE) };
-        let value: u8 = rng.gen();
+        let chunk =
+            if rest.len() < RUN_RANGE.end { rest.len() } else { rng.random_range(RUN_RANGE) };
+        let value: u8 = rng.random();
         let (l, r) = rest.split_at_mut(chunk);
         rest = r;
         l.fill(value);

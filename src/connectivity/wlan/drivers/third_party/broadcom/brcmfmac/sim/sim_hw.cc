@@ -38,7 +38,8 @@ SimHardware::~SimHardware() {
 
 void SimHardware::SetCallbacks(const EventHandlers& handlers) { event_handlers_ = handlers; }
 
-static bool ChannelsMatch(const wlan_common::WlanChannel& c1, const wlan_common::WlanChannel& c2) {
+static bool ChannelsMatch(const wlan_ieee80211_wire::WlanChannel& c1,
+                          const wlan_ieee80211_wire::WlanChannel& c2) {
   return (c1.primary == c2.primary) && (c1.cbw == c2.cbw) && (c1.secondary80 == c2.secondary80);
 }
 

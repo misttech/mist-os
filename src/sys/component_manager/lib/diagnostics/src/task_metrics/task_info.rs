@@ -7,9 +7,7 @@ use crate::task_metrics::measurement::{Measurement, MeasurementsQueue};
 use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, HistogramProperty, UintLinearHistogramProperty};
-use futures::future::BoxFuture;
-use futures::lock::Mutex;
-use futures::FutureExt;
+use fuchsia_sync::Mutex;
 use injectable_time::TimeSource;
 use log::debug;
 use moniker::ExtendedMoniker;
@@ -107,10 +105,9 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
             // If we failed to duplicate the handle then still mark this task as terminated to
             // ensure it's cleaned up.
             if let Some(task_state) = weak_task_state.upgrade() {
-                let mut terminated_at_nanos_guard =
-                    movable_most_recent_measurement_nanos.lock().await;
+                let mut terminated_at_nanos_guard = movable_most_recent_measurement_nanos.lock();
                 *terminated_at_nanos_guard = Some(movable_time_source.now());
-                let mut state = task_state.lock().await;
+                let mut state = task_state.lock();
                 *state = match std::mem::replace(&mut *state, TaskState::TerminatedAndMeasured) {
                     s @ TaskState::TerminatedAndMeasured => s,
                     TaskState::Alive(t) => TaskState::Terminated(t),
@@ -139,14 +136,14 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     /// Take a new measurement. If the handle of this task is invalid, then it keeps track of how
     /// many measurements would have been done. When the maximum amount allowed is hit, then it
     /// drops the oldest measurement.
-    pub async fn measure_if_no_parent(&mut self) -> Option<&Measurement> {
+    pub fn measure_if_no_parent(&mut self) -> Option<&Measurement> {
         // Tasks with a parent are measured by the parent as done right below in the internal
         // `measure_subtree`.
         if self.has_parent_task {
             return None;
         }
 
-        self.measure_subtree().await
+        self.measure_subtree()
     }
 
     /// Adds a weak pointer to a task for which this task is the parent.
@@ -154,15 +151,15 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
         self.children.push(task);
     }
 
-    pub async fn most_recent_measurement(&self) -> Option<zx::BootInstant> {
-        self.most_recent_measurement_nanos.lock().await.map(|t| zx::BootInstant::from_nanos(t))
+    pub fn most_recent_measurement(&self) -> Option<zx::BootInstant> {
+        self.most_recent_measurement_nanos.lock().map(|t| zx::BootInstant::from_nanos(t))
     }
 
     /// Takes the MeasurementsQueue from this task, replacing it with an empty one.
     /// This function is only valid when `self.task == TaskState::Terminated*`.
     /// The task will be considered stale after this function runs.
-    pub async fn take_measurements_queue(&mut self) -> Result<MeasurementsQueue, ()> {
-        match &*self.task.lock().await {
+    pub fn take_measurements_queue(&mut self) -> Result<MeasurementsQueue, ()> {
+        match &*self.task.lock() {
             TaskState::TerminatedAndMeasured | TaskState::Terminated(_) => Ok(std::mem::replace(
                 &mut self.measurements,
                 MeasurementsQueue::new(COMPONENT_CPU_MAX_SAMPLES, self.time_source.clone()),
@@ -185,56 +182,52 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
         self.measurements.insert(m);
     }
 
-    fn measure_subtree<'a>(&'a mut self) -> BoxFuture<'a, Option<&'a Measurement>> {
-        async move {
-            let (task_terminated_can_measure, runtime_info_res) = {
-                let mut guard = self.task.lock().await;
-                match &*guard {
-                    TaskState::TerminatedAndMeasured => {
-                        self.measurements.insert_post_invalidation();
-                        return None;
-                    }
-                    TaskState::Terminated(task) => {
-                        let result = task.get_runtime_info().await;
-                        *guard = TaskState::TerminatedAndMeasured;
-                        let mut terminated_at_nanos_guard =
-                            self.most_recent_measurement_nanos.lock().await;
-                        *terminated_at_nanos_guard = Some(self.time_source.now());
-                        (true, result)
-                    }
-                    TaskState::Alive(task) => (false, task.get_runtime_info().await),
-                }
-            };
-            if let Ok(runtime_info) = runtime_info_res {
-                let mut measurement = Measurement::from_runtime_info(
-                    runtime_info,
-                    zx::BootInstant::from_nanos(self.time_source.now()),
-                );
-                // Subtract all child measurements.
-                let mut alive_children = vec![];
-                while let Some(weak_child) = self.children.pop() {
-                    if let Some(child) = weak_child.upgrade() {
-                        let mut child_guard = child.lock().await;
-                        if let Some(child_measurement) = child_guard.measure_subtree().await {
-                            measurement -= child_measurement;
-                        }
-                        if child_guard.is_alive().await {
-                            alive_children.push(weak_child);
-                        }
-                    }
-                }
-                self.children = alive_children;
-                self.record_measurement(measurement);
-
-                if task_terminated_can_measure {
-                    self.exited_cpu = self.measurements.most_recent_measurement().cloned();
+    fn measure_subtree<'a>(&'a mut self) -> Option<&'a Measurement> {
+        let (task_terminated_can_measure, runtime_info_res) = {
+            let mut guard = self.task.lock();
+            match &*guard {
+                TaskState::TerminatedAndMeasured => {
+                    self.measurements.insert_post_invalidation();
                     return None;
                 }
-                return self.measurements.most_recent_measurement();
+                TaskState::Terminated(task) => {
+                    let result = task.get_runtime_info();
+                    *guard = TaskState::TerminatedAndMeasured;
+                    let mut terminated_at_nanos_guard = self.most_recent_measurement_nanos.lock();
+                    *terminated_at_nanos_guard = Some(self.time_source.now());
+                    (true, result)
+                }
+                TaskState::Alive(task) => (false, task.get_runtime_info()),
             }
-            None
+        };
+        if let Ok(runtime_info) = runtime_info_res {
+            let mut measurement = Measurement::from_runtime_info(
+                runtime_info,
+                zx::BootInstant::from_nanos(self.time_source.now()),
+            );
+            // Subtract all child measurements.
+            let mut alive_children = vec![];
+            while let Some(weak_child) = self.children.pop() {
+                if let Some(child) = weak_child.upgrade() {
+                    let mut child_guard = child.lock();
+                    if let Some(child_measurement) = child_guard.measure_subtree() {
+                        measurement -= child_measurement;
+                    }
+                    if child_guard.is_alive() {
+                        alive_children.push(weak_child);
+                    }
+                }
+            }
+            self.children = alive_children;
+            self.record_measurement(measurement);
+
+            if task_terminated_can_measure {
+                self.exited_cpu = self.measurements.most_recent_measurement().cloned();
+                return None;
+            }
+            return self.measurements.most_recent_measurement();
         }
-        .boxed()
+        None
     }
 
     // Add a measurement to this task's histogram.
@@ -263,15 +256,15 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     /// A task is alive when:
     /// - Its handle is valid, or
     /// - There's at least one measurement saved.
-    pub async fn is_alive(&self) -> bool {
+    pub fn is_alive(&self) -> bool {
         let task_state_terminated_and_measured =
-            matches!(*self.task.lock().await, TaskState::TerminatedAndMeasured);
+            matches!(*self.task.lock(), TaskState::TerminatedAndMeasured);
         let task_has_real_measurements = !self.measurements.no_true_measurements();
 
         !task_state_terminated_and_measured || task_has_real_measurements
     }
 
-    pub async fn exited_cpu(&self) -> Option<&Measurement> {
+    pub fn exited_cpu(&self) -> Option<&Measurement> {
         self.exited_cpu.as_ref()
     }
 
@@ -301,14 +294,14 @@ mod tests {
     use diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchyGetter, LinearHistogram};
     use injectable_time::FakeTime;
 
-    async fn take_measurement_then_tick_clock<
+    fn take_measurement_then_tick_clock<
         'a,
         T: 'static + RuntimeStatsSource + Debug + Send + Sync,
     >(
         ti: &'a mut TaskInfo<T>,
         clock: &Arc<FakeTime>,
     ) -> Option<&'a Measurement> {
-        let m = ti.measure_if_no_parent().await;
+        let m = ti.measure_if_no_parent();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         m
     }
@@ -319,15 +312,15 @@ mod tests {
         let clock = Arc::new(FakeTime::new());
         let mut task: TaskInfo<FakeTask> =
             TaskInfo::try_from(FakeTask::default(), None /* histogram */, clock.clone()).unwrap();
-        assert!(task.is_alive().await);
+        assert!(task.is_alive());
 
         // Take three measurements.
-        take_measurement_then_tick_clock(&mut task, &clock).await;
+        take_measurement_then_tick_clock(&mut task, &clock);
         assert_eq!(task.measurements.true_measurement_count(), 1);
-        take_measurement_then_tick_clock(&mut task, &clock).await;
+        take_measurement_then_tick_clock(&mut task, &clock);
         assert_eq!(task.measurements.true_measurement_count(), 2);
-        take_measurement_then_tick_clock(&mut task, &clock).await;
-        assert!(task.is_alive().await);
+        take_measurement_then_tick_clock(&mut task, &clock);
+        assert!(task.is_alive());
         assert_eq!(task.measurements.true_measurement_count(), 3);
 
         // Terminate the task
@@ -335,28 +328,28 @@ mod tests {
 
         // This will perform the post-termination measurement and bring the state to terminated and
         // measured.
-        take_measurement_then_tick_clock(&mut task, &clock).await;
+        take_measurement_then_tick_clock(&mut task, &clock);
         assert_eq!(task.measurements.true_measurement_count(), 4);
-        assert_matches!(*task.task.lock().await, TaskState::TerminatedAndMeasured);
+        assert_matches!(*task.task.lock(), TaskState::TerminatedAndMeasured);
 
         for _ in 4..COMPONENT_CPU_MAX_SAMPLES {
-            take_measurement_then_tick_clock(&mut task, &clock).await;
+            take_measurement_then_tick_clock(&mut task, &clock);
             assert_eq!(task.measurements.true_measurement_count(), 4);
         }
 
-        take_measurement_then_tick_clock(&mut task, &clock).await; // 1 dropped, 3 left
-        assert!(task.is_alive().await);
+        take_measurement_then_tick_clock(&mut task, &clock); // 1 dropped, 3 left
+        assert!(task.is_alive());
         assert_eq!(task.measurements.true_measurement_count(), 3);
-        take_measurement_then_tick_clock(&mut task, &clock).await; // 2 dropped, 2 left
-        assert!(task.is_alive().await);
+        take_measurement_then_tick_clock(&mut task, &clock); // 2 dropped, 2 left
+        assert!(task.is_alive());
         assert_eq!(task.measurements.true_measurement_count(), 2);
-        take_measurement_then_tick_clock(&mut task, &clock).await; // 3 dropped, 1 left
-        assert!(task.is_alive().await);
+        take_measurement_then_tick_clock(&mut task, &clock); // 3 dropped, 1 left
+        assert!(task.is_alive());
         assert_eq!(task.measurements.true_measurement_count(), 1);
 
         // Take one last measure.
-        take_measurement_then_tick_clock(&mut task, &clock).await; // 4 dropped, 0 left
-        assert!(!task.is_alive().await);
+        take_measurement_then_tick_clock(&mut task, &clock); // 4 dropped, 0 left
+        assert!(!task.is_alive());
         assert_eq!(task.measurements.true_measurement_count(), 0);
     }
 
@@ -385,9 +378,9 @@ mod tests {
         .unwrap();
 
         time.set_ticks(1);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         time.set_ticks(2);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
 
         let inspector = inspect::Inspector::default();
         task.record_to_node(inspector.root());
@@ -426,7 +419,7 @@ mod tests {
         .unwrap();
 
         for _ in 0..(COMPONENT_CPU_MAX_SAMPLES + 10) {
-            assert!(take_measurement_then_tick_clock(&mut task, &clock).await.is_some());
+            assert!(take_measurement_then_tick_clock(&mut task, &clock).is_some());
         }
 
         assert_eq!(task.measurements.true_measurement_count(), COMPONENT_CPU_MAX_SAMPLES);
@@ -472,15 +465,15 @@ mod tests {
         .unwrap();
 
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES {
-            assert!(take_measurement_then_tick_clock(&mut task, &clock).await.is_some());
+            assert!(take_measurement_then_tick_clock(&mut task, &clock).is_some());
         }
 
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
 
         // this will create >COMPONENT_CPU_MAX_SAMPLES within the max duration of one hour,
         // but should still cause eviction
         clock.add_ticks((CPU_SAMPLE_PERIOD - std::time::Duration::from_secs(1)).as_nanos() as i64);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
 
         assert_eq!(task.measurements.true_measurement_count(), COMPONENT_CPU_MAX_SAMPLES);
         task.record_to_node(inspector.root());
@@ -560,16 +553,16 @@ mod tests {
         task.add_child(Arc::downgrade(&child_2));
 
         {
-            let measurement = take_measurement_then_tick_clock(&mut task, &clock).await.unwrap();
+            let measurement = take_measurement_then_tick_clock(&mut task, &clock).unwrap();
             assert_eq!(measurement.cpu_time().into_nanos(), 100 - 10 - 5);
             assert_eq!(measurement.queue_time().into_nanos(), 200 - 20 - 2);
         }
-        assert_eq!(child_1.lock().await.total_measurements(), 1);
-        assert_eq!(child_2.lock().await.total_measurements(), 1);
+        assert_eq!(child_1.lock().total_measurements(), 1);
+        assert_eq!(child_2.lock().total_measurements(), 1);
 
         // Fake child 2 not being alive anymore. It should be removed.
         {
-            let mut child_2_guard = child_2.lock().await;
+            let mut child_2_guard = child_2.lock();
             child_2_guard.task = Arc::new(Mutex::new(TaskState::TerminatedAndMeasured));
             child_2_guard.measurements =
                 MeasurementsQueue::new(COMPONENT_CPU_MAX_SAMPLES, clock.clone());
@@ -577,13 +570,13 @@ mod tests {
 
         assert_eq!(task.children.len(), 2);
         {
-            let measurement = take_measurement_then_tick_clock(&mut task, &clock).await.unwrap();
+            let measurement = take_measurement_then_tick_clock(&mut task, &clock).unwrap();
             assert_eq!(measurement.cpu_time().into_nanos(), 300 - 30);
             assert_eq!(measurement.queue_time().into_nanos(), 400 - 40);
         }
 
         assert_eq!(task.children.len(), 1); // after measuring dead children are cleaned.
-        assert_eq!(child_1.lock().await.total_measurements(), 2);
+        assert_eq!(child_1.lock().total_measurements(), 2);
     }
 
     type BucketPairs = Vec<(i64, i64)>;
@@ -650,42 +643,42 @@ mod tests {
         .unwrap();
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 1
+        task.measure_if_no_parent(); // 1
         let answer = vec![(1, 1)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 0
+        task.measure_if_no_parent(); // 0
         let answer = vec![(0, 1), (1, 1)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 500
+        task.measure_if_no_parent(); // 500
         let answer = vec![(0, 1), (1, 1), (50, 1)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 989
+        task.measure_if_no_parent(); // 989
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 1)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 990
+        task.measure_if_no_parent(); // 990
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 991
+        task.measure_if_no_parent(); // 991
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2), (100, 1)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 999
+        task.measure_if_no_parent(); // 999
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2), (100, 2)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await; // 0...
+        task.measure_if_no_parent(); // 0...
         let answer = vec![(0, 2), (1, 1), (50, 1), (99, 2), (100, 2)];
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
     }
@@ -712,19 +705,19 @@ mod tests {
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![]);
 
         clock.add_ticks(900);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(12, 1)]);
 
         clock.add_ticks(899);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(12, 1)]); // No change
 
         clock.add_ticks(2000);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, (vec![(5, 1), (12, 1)]));
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         assert_eq!(
             linear_histogram_non_zero_values(&inspector).await,
             (vec![(5, 1), (10, 1), (12, 1)])
@@ -752,7 +745,7 @@ mod tests {
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![]);
 
         clock.add_ticks(1000);
-        task.measure_if_no_parent().await;
+        task.measure_if_no_parent();
         assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(10, 1)]);
     }
 }

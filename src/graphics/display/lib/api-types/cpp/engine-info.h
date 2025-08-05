@@ -21,6 +21,9 @@ namespace display {
 // See `::fuchsia_hardware_display_engine::wire::EngineInfo` for references.
 //
 // Instances are guaranteed to represent display valid engine information.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class EngineInfo {
  private:
   // Enables creating instances using the designated initializer syntax.

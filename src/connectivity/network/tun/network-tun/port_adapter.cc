@@ -4,8 +4,6 @@
 
 #include "port_adapter.h"
 
-#include <lib/syslog/global.h>
-
 #include <fbl/auto_lock.h>
 
 namespace network {

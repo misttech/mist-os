@@ -22,6 +22,8 @@
 
 namespace {
 
+namespace fio = fuchsia_io;
+
 TEST(PseudoDir, ApiTest) {
   auto dir = fbl::MakeRefCounted<fs::PseudoDir>();
   auto subdir = fbl::MakeRefCounted<fs::PseudoDir>();
@@ -42,16 +44,9 @@ TEST(PseudoDir, ApiTest) {
   EXPECT_EQ(ZX_OK, dir->RemoveEntry("file2"));
   EXPECT_EQ(ZX_ERR_NOT_FOUND, dir->RemoveEntry("file2"));
 
-  // open as directory
-  fs::VnodeConnectionOptions options_directory{.flags = fuchsia_io::OpenFlags::kDirectory};
-  fbl::RefPtr<fs::Vnode> redirect;
-  auto validated_options = dir->ValidateOptions(options_directory);
-  EXPECT_TRUE(validated_options.is_ok());
-  EXPECT_EQ(ZX_OK, dir->Open(&redirect));
-  EXPECT_EQ(redirect, nullptr);
-
-  // verify node protocol type
+  // verify node protocol type and rights (directories should support all rights)
   EXPECT_EQ(dir->GetProtocols(), fuchsia_io::NodeProtocolKinds::kDirectory);
+  EXPECT_TRUE(dir->ValidateRights(fuchsia_io::Rights{uint64_t{fuchsia_io::kMaskKnownPermissions}}));
 
   // verify node attributes
   zx::result attr = dir->GetAttributes();
@@ -76,29 +71,29 @@ TEST(PseudoDir, ApiTest) {
     size_t length;
     EXPECT_EQ(dir->Readdir(&cookie, buffer, sizeof(buffer), &length), ZX_OK);
     fs::DirentChecker dc(buffer, length);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("subdir", V_TYPE_DIR);
-    dc.ExpectEntry("file1", V_TYPE_FILE);
-    dc.ExpectEntry("file2b", V_TYPE_FILE);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("subdir", fio::DirentType::kDirectory);
+    dc.ExpectEntry("file1", fio::DirentType::kFile);
+    dc.ExpectEntry("file2b", fio::DirentType::kFile);
     dc.ExpectEnd();
   }
 
   // readdir with small buffer
   {
     fs::VdirCookie cookie;
-    uint8_t buffer[2 * sizeof(vdirent) + 13];
+    uint8_t buffer[(2 * sizeof(fs::DirectoryEntry)) + 13];
     size_t length;
     EXPECT_EQ(dir->Readdir(&cookie, buffer, sizeof(buffer), &length), ZX_OK);
     fs::DirentChecker dc(buffer, length);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("subdir", V_TYPE_DIR);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("subdir", fio::DirentType::kDirectory);
     dc.ExpectEnd();
 
     // readdir again
     EXPECT_EQ(dir->Readdir(&cookie, buffer, sizeof(buffer), &length), ZX_OK);
     fs::DirentChecker dc1(buffer, length);
-    dc1.ExpectEntry("file1", V_TYPE_FILE);
-    dc1.ExpectEntry("file2b", V_TYPE_FILE);
+    dc1.ExpectEntry("file1", fio::DirentType::kFile);
+    dc1.ExpectEntry("file2b", fio::DirentType::kFile);
     dc1.ExpectEnd();
   }
 
@@ -110,9 +105,9 @@ TEST(PseudoDir, ApiTest) {
     size_t length;
     EXPECT_EQ(dir->Readdir(&cookie, buffer, sizeof(buffer), &length), ZX_OK);
     fs::DirentChecker dc(buffer, length);
-    dc.ExpectEntry(".", V_TYPE_DIR);
-    dc.ExpectEntry("subdir", V_TYPE_DIR);
-    dc.ExpectEntry("file2b", V_TYPE_FILE);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
+    dc.ExpectEntry("subdir", fio::DirentType::kDirectory);
+    dc.ExpectEntry("file2b", fio::DirentType::kFile);
     dc.ExpectEnd();
   }
   EXPECT_EQ(ZX_ERR_NOT_FOUND, dir->Lookup("file1", &node));
@@ -127,19 +122,9 @@ TEST(PseudoDir, ApiTest) {
     size_t length;
     EXPECT_EQ(dir->Readdir(&cookie, buffer, sizeof(buffer), &length), ZX_OK);
     fs::DirentChecker dc(buffer, length);
-    dc.ExpectEntry(".", V_TYPE_DIR);
+    dc.ExpectEntry(".", fio::DirentType::kDirectory);
     dc.ExpectEnd();
   }
-
-  // FIXME(https://fxbug.dev/42106069): Can't unittest watch/notify (hard to isolate right now).
-}
-
-TEST(PseudoDir, RejectOpenFlagNotDirectory) {
-  auto dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  auto result = dir->ValidateOptions(fs::VnodeConnectionOptions{
-      .flags = fuchsia_io::OpenFlags::kNotDirectory, .rights = fuchsia_io::kRStarDir});
-  ASSERT_TRUE(result.is_error());
-  EXPECT_EQ(ZX_ERR_NOT_FILE, result.status_value());
 }
 
 }  // namespace

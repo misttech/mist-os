@@ -1754,7 +1754,6 @@ mod tests {
     use futures::Future;
     use ieee80211::Ssid;
     use ifaces::test_utils::{ClientIfaceCall, TestIfaceManager, FAKE_IFACE_RESPONSE};
-    use rand::Rng as _;
     use std::pin::{pin, Pin};
     use test_case::test_case;
     use wlan_common::assert_variant;
@@ -2796,7 +2795,7 @@ mod tests {
             Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
         );
 
-        let connection_length_nanos: u16 = rand::thread_rng().gen();
+        let connection_length_nanos: u16 = rand::random();
         test_helper
             .exec
             .set_fake_time(fasync::MonotonicInstant::from_nanos(connection_length_nanos.into()));
@@ -2891,7 +2890,7 @@ mod tests {
             Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
         );
 
-        let connection_length_nanos: u16 = rand::thread_rng().gen();
+        let connection_length_nanos: u16 = rand::random();
         test_helper
             .exec
             .set_fake_time(fasync::MonotonicInstant::from_nanos(connection_length_nanos.into()));

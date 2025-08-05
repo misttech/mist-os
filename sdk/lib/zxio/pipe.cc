@@ -213,7 +213,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
   ops.getpeername = ops.getsockname;
 
   ops.flags_get_deprecated = [](zxio_t* io, uint32_t* out_flags) {
-    zx_info_handle_basic info;
+    zx_info_handle_basic_t info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {
@@ -232,7 +232,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
   };
 
   ops.flags_set_deprecated = [](zxio_t* io, uint32_t flags) {
-    zx_info_handle_basic info;
+    zx_info_handle_basic_t info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {
@@ -253,7 +253,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
   };
 
   ops.flags_get = [](zxio_t* io, uint64_t* out_flags) {
-    zx_info_handle_basic info;
+    zx_info_handle_basic_t info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {
@@ -272,7 +272,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
   };
 
   ops.flags_set = [](zxio_t* io, uint64_t flags) {
-    zx_info_handle_basic info;
+    zx_info_handle_basic_t info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {

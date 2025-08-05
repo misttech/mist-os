@@ -59,12 +59,18 @@ impl FhoTargetEnvironment {
         b.as_ref().map(|boxed| *boxed.clone())
     }
 
-    pub fn set_behavior(&self, new_behavior: FhoConnectionBehavior) {
+    pub fn set_behavior(&self, new_behavior: FhoConnectionBehavior) -> Result<()> {
         log::debug!("setting behavior");
         let mut behavior = self.behavior.lock().expect("poisoned behavior lock");
+        // Return an error if it is already set -- even if the behavior is the same type.
+        if let Some(ref b) = *behavior {
+            return_bug!("Fho Connection behavior is already set (to {b:?})");
+        }
         *behavior = Some(Box::new(new_behavior));
         log::debug!("setting behavior done");
+        Ok(())
     }
+
     /// While the surface of this function is a little awkward, this is necessary to provide a
     /// readable error. Authors shouldn't use this directly, they should instead use
     /// `TryFromEnv`.
@@ -109,4 +115,20 @@ pub fn target_interface(env: &fho::FhoEnvironment) -> FhoTargetEnvironment {
         env.set_interface(target_interface);
     }
     env.get_interface::<FhoTargetEnvironment>().expect("No target interface in FhoEnvironment??")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_behavior_fails_when_called_twice() {
+        let beh1 =
+            FhoConnectionBehavior::DirectConnector(Arc::new(connector::MockDirectConnector::new()));
+        let fho_env = FhoTargetEnvironment::new_for_test(beh1);
+        let beh2 =
+            FhoConnectionBehavior::DirectConnector(Arc::new(connector::MockDirectConnector::new()));
+        let res = fho_env.set_behavior(beh2);
+        assert!(matches!(res, Err(fho::Error::Unexpected(_))));
+    }
 }

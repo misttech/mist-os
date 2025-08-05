@@ -31,6 +31,7 @@
 #include <thread>
 #include <vector>
 
+#include <arch/kernel_aspace.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
@@ -215,6 +216,79 @@ TEST(VmoTestCase, Map) {
       EXPECT_OK(status, "unmap");
     }
   }
+}
+
+// Ensure that zx_vmo_read and zx_vmo_write  returns ZX_ERR_NOT_FOUND with a null buffer. Ensure
+// that it does not return ERR_INVALID_ARGS. See: https://fxbug.dev/42054407
+TEST(VmoTestCase, ReadWriteInvalidNullBuffer) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo), "vmo create");
+  EXPECT_STATUS(vmo.read(nullptr, 0, 1), ZX_ERR_NOT_FOUND, "vmo read nullptr");
+  EXPECT_STATUS(vmo.write(nullptr, 0, 1), ZX_ERR_NOT_FOUND, "vmo write nullptr");
+}
+
+// Ensure that zx_vmo_read and zx_vmo_write returns ZX_ERR_NOT_FOUND with a kernel buffer. Ensure
+// that it does not return ERR_INVALID_ARGS. See: https://fxbug.dev/42054407
+TEST(VmoTestCase, ReadWriteInvalidKernelBuffer) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo), "vmo create");
+
+  // buffer address starting in the kernel
+  void *const kernel_start = reinterpret_cast<void *>(KERNEL_ASPACE_BASE);
+  EXPECT_STATUS(vmo.read(kernel_start, 0, 10), ZX_ERR_NOT_FOUND, "vmo read kernel");
+  EXPECT_STATUS(vmo.write(kernel_start, 0, 10), ZX_ERR_NOT_FOUND, "vmo write kernel");
+
+  // buffer spanning between between userspace and kernel space
+  uintptr_t before_kernel_start_addr;
+  ASSERT_FALSE(sub_overflow(KERNEL_ASPACE_BASE, 5, &before_kernel_start_addr));
+  void *const before_kernel_start = reinterpret_cast<void *>(before_kernel_start_addr);
+  EXPECT_STATUS(vmo.read(before_kernel_start, 0, 10), ZX_ERR_NOT_FOUND, "vmo read before kernel");
+  EXPECT_STATUS(vmo.write(before_kernel_start, 0, 10), ZX_ERR_NOT_FOUND, "vmo write before kernel");
+}
+
+// Ensure that zx_vmo_read and zx_vmo_write return ZX_ERR_NOT_FOUND with an unmapped buffer. Ensure
+// that it does not return ERR_INVALID_ARGS. See: https://fxbug.dev/42054407
+TEST(VmoTestCase, ReadWriteInvalidUserBuffer) {
+  const size_t mapped_size = zx_system_get_page_size();
+  const size_t vmo_size = 2 * mapped_size;
+  const auto root_vmar = zx::vmar::root_self();
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo), "vmo create");
+
+  uintptr_t vmar_addr;
+  zx::vmar vmar;
+  ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0, mapped_size, &vmar,
+                                &vmar_addr));
+  const auto destroy_vmar = fit::defer([&]() { EXPECT_OK(vmar.destroy()); });
+
+  void *const vmar_ptr = reinterpret_cast<void *>(vmar_addr);
+
+  EXPECT_STATUS(vmo.read(vmar_ptr, 0, 1), ZX_ERR_NOT_FOUND, "vmo read unmapped");
+  EXPECT_STATUS(vmo.write(vmar_ptr, 0, 1), ZX_ERR_NOT_FOUND, "vmo write unmapped");
+
+  // let's assert that read and write would have worked if we back `vmar`.
+
+  zx::vmo buffer_vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &buffer_vmo), "buffer vmo create");
+  uintptr_t vmar_addr2;
+  ASSERT_OK(
+      vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, buffer_vmo, 0, mapped_size, &vmar_addr2));
+  EXPECT_EQ(vmar_addr, vmar_addr2);
+
+  // read and write with same arguments as above is now okay.
+  EXPECT_OK(vmo.read(vmar_ptr, 0, 1), "vmo read mapped");
+  EXPECT_OK(vmo.write(vmar_ptr, 0, 1), "vmo write mapped");
+
+  // but still fails if we reach the end of the region of the vmar that is vmo backed.
+  EXPECT_STATUS(vmo.read(vmar_ptr, 0, mapped_size + 1), ZX_ERR_NOT_FOUND, "vmo read mapped oob");
+  EXPECT_STATUS(vmo.write(vmar_ptr, 0, mapped_size + 1), ZX_ERR_NOT_FOUND, "vmo write mapped oob");
+
+  // fails instead with out of range when we reach the end of the vmo backing our buffer.
+  EXPECT_STATUS(vmo.read(vmar_ptr, 0, vmo_size + 1), ZX_ERR_OUT_OF_RANGE,
+                "vmo read mapped out of range");
+  EXPECT_STATUS(vmo.write(vmar_ptr, 0, vmo_size + 1), ZX_ERR_OUT_OF_RANGE,
+                "vmo write mapped out of range");
 }
 
 TEST(VmoTestCase, MapRead) {

@@ -24,10 +24,15 @@ struct SequentialReadResult {
   zx_ticks_t obs2;
 };
 
-#if defined(__aarch64__)
+#if defined(__ARM_ACLE)
 
+#ifdef __aarch64__
 inline uint64_t get_raw_ticks_arm_vct() { return __arm_rsr64("cntvct_el0"); }
 inline uint64_t get_raw_ticks_arm_pct() { return __arm_rsr64("cntpct_el0"); }
+#else
+inline uint64_t get_raw_ticks_arm_vct() { return __arm_mrrc(15, 1, 14); }
+inline uint64_t get_raw_ticks_arm_pct() { return __arm_mrrc(15, 0, 14); }
+#endif
 
 template <uint64_t (*Get)()>
 inline uint64_t get_raw_ticks_arm_a73() {
@@ -82,7 +87,20 @@ inline T& DataDependentRef(T& ref, std::integral auto dep) {
 // instead of the `ldrd` instruction, which is already guaranteed sufficiently
 // atomic in ARMv8 for an aligned 64-bit value.
 inline zx_ticks_t AtomicLoadRelaxed(const std::atomic<zx_ticks_t>& value_ref) {
+#ifdef __aarch64__
   return value_ref.load(std::memory_order_relaxed);
+#else
+#ifdef __thumb__
+#define LDRD_CONSTRAINT "Q"
+#else
+#define LDRD_CONSTRAINT "m"
+#endif
+  uint64_t value;
+  __asm__("ldrd %[value], %[value_ref]"
+          : [value] "=r"(value)
+          : [value_ref] LDRD_CONSTRAINT(value_ref));
+  return value;
+#endif
 }
 
 // Reads the raw ticks value in between two observations of the given atomic value.

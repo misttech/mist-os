@@ -301,13 +301,13 @@ async fn use_protocol_from_dictionary_not_found() {
 }
 
 #[fuchsia::test]
-async fn use_directory_from_dictionary_not_supported() {
+async fn use_directory_from_dictionary() {
     // Routing a directory into a dictionary isn't supported yet, it should fail.
     let components = vec![
         (
             "root",
             ComponentDeclBuilder::new()
-                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
+                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/foo"))
                 .dictionary_default("parent_dict")
                 .offer(
                     OfferBuilder::dictionary()
@@ -357,7 +357,7 @@ async fn use_directory_from_dictionary_not_supported() {
         CheckUse::Directory {
             path: "/A".parse().unwrap(),
             file: PathBuf::from("hippo"),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Ok,
         },
     )
     .await;
@@ -366,14 +366,14 @@ async fn use_directory_from_dictionary_not_supported() {
         CheckUse::Directory {
             path: "/B".parse().unwrap(),
             file: PathBuf::from("hippo"),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Ok,
         },
     )
     .await;
 }
 
 #[fuchsia::test]
-async fn expose_directory_from_dictionary_not_supported() {
+async fn expose_directory_from_dictionary() {
     // Routing a directory into a dictionary isn't supported yet, it should fail.
     let components = vec![
         (
@@ -415,7 +415,7 @@ async fn expose_directory_from_dictionary_not_supported() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
+                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/foo"))
                 .dictionary_default("child_dict")
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .offer(
@@ -436,7 +436,7 @@ async fn expose_directory_from_dictionary_not_supported() {
         CheckUse::Directory {
             path: "/A".parse().unwrap(),
             file: PathBuf::from("hippo"),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Ok,
         },
     )
     .await;
@@ -445,7 +445,7 @@ async fn expose_directory_from_dictionary_not_supported() {
         CheckUse::Directory {
             path: "/B".parse().unwrap(),
             file: PathBuf::from("hippo"),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Ok,
         },
     )
     .await;
@@ -1361,7 +1361,7 @@ async fn dictionary_from_program() {
             });
         }),
     );
-    test.mock_runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+    test.mock_runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
     // Using "A" from the dictionary should succeed.
     for _ in 0..3 {

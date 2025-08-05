@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 //
 use lazy_static::lazy_static;
-use rand::distributions::Alphanumeric;
+use rand::distr::Alphanumeric;
 use rand::Rng;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -16,9 +16,9 @@ lazy_static! {
         password: vec![],
         radio_cfg: fidl_sme::RadioConfig {
             phy: fidl_common::WlanPhyType::Ofdm,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 1,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
         },
@@ -56,15 +56,15 @@ pub async fn get_ap_sme(generic_sme_proxy: &fidl_sme::GenericSmeProxy) -> fidl_s
 }
 
 pub fn random_string_as_bytes(len: usize) -> Vec<u8> {
-    rand::thread_rng().sample_iter(&Alphanumeric).take(len).collect()
+    rand::rng().sample_iter(&Alphanumeric).take(len).collect()
 }
 
 pub fn random_ssid() -> Vec<u8> {
-    let ssid_len = rand::thread_rng().gen_range(1..=fidl_ieee80211::MAX_SSID_BYTE_LEN as usize);
+    let ssid_len = rand::random_range(1..=fidl_ieee80211::MAX_SSID_BYTE_LEN as usize);
     random_string_as_bytes(ssid_len)
 }
 
 pub fn random_password() -> Vec<u8> {
-    let pw_len = rand::thread_rng().gen_range(8..=63);
+    let pw_len = rand::random_range(8..=63);
     random_string_as_bytes(pw_len)
 }

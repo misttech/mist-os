@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/utf-utils/internal/arm-neon.h>
-#include <lib/utf-utils/internal/generic-simd.h>
-#include <lib/utf-utils/internal/scalar.h>
-#include <lib/utf-utils/internal/x86-avx2.h>
-#include <lib/utf-utils/internal/x86-ssse3.h>
 #include <lib/utf-utils/utf-utils.h>
 
 #include <cstdint>
 #include <cstring>
+
+#include "internal/arm-neon.h"
+#include "internal/generic-simd.h"
+#include "internal/scalar.h"
+#include "internal/x86-avx2.h"
+#include "internal/x86-ssse3.h"
 
 bool utfutils_is_valid_utf8(const char* data, size_t size) {
   // Function multiversioning (if ARM is supported in all compilers) or dynamic dispatch may be

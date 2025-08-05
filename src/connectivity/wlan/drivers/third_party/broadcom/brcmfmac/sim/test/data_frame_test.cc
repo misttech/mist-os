@@ -34,8 +34,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 }  // namespace
 
 // Some default AP and association request values
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 constexpr uint8_t kIes[] = {
@@ -168,7 +168,7 @@ class DataFrameTest : public SimTest {
   struct AssocContext {
     // Information about the BSS we are attempting to associate with. Used to generate the
     // appropriate MLME calls (Join => Auth => Assoc).
-    wlan_common::WlanChannel channel = kDefaultChannel;
+    wlan_ieee80211::WlanChannel channel = kDefaultChannel;
     common::MacAddr bssid = kApBssid;
     fuchsia_wlan_ieee80211::Ssid ssid = kDefaultSsid;
     std::vector<uint8_t> ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));

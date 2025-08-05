@@ -409,10 +409,11 @@ impl GuestManager {
                     if !properties.online.unwrap_or(false) {
                         return Ok(None);
                     }
-                    match properties.device_class {
+                    match properties.port_class {
                         None => Ok(None),
-                        Some(ninterfaces::DeviceClass::Loopback(_)) => Ok(None),
-                        Some(ninterfaces::DeviceClass::Device(net_device)) => Ok(Some(net_device)),
+                        Some(ninterfaces::PortClass::Loopback(_)) => Ok(None),
+                        Some(ninterfaces::PortClass::Device(net_device)) => Ok(Some(net_device)),
+                        Some(_) => Ok(None),
                     }
                 } else {
                     Ok(None)
@@ -420,14 +421,16 @@ impl GuestManager {
             })
             .try_fold(HostNetworkState::default(), |mut host_state, net_device| async move {
                 match net_device {
-                    fidl_fuchsia_hardware_network::DeviceClass::Virtual => {
+                    fidl_fuchsia_hardware_network::PortClass::Virtual => {
                         host_state.num_virtual += 1
                     }
-                    fidl_fuchsia_hardware_network::DeviceClass::Ethernet => {
+                    fidl_fuchsia_hardware_network::PortClass::Ethernet => {
                         host_state.has_ethernet = true
                     }
-                    fidl_fuchsia_hardware_network::DeviceClass::Wlan => host_state.has_wlan = true,
-                    fidl_fuchsia_hardware_network::DeviceClass::Bridge => {
+                    fidl_fuchsia_hardware_network::PortClass::WlanClient => {
+                        host_state.has_wlan = true
+                    }
+                    fidl_fuchsia_hardware_network::PortClass::Bridge => {
                         host_state.has_bridge = true
                     }
                     _ => (),

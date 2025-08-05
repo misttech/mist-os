@@ -17,16 +17,17 @@ use crate::task::net::NetstackDevices;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, DelayedReleaser,
     HrTimerManager, HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads,
-    PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    LockedAndTask, PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
+    UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
-use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{FileHandle, FileOps, FsNode, FsString, Mounts};
+use crate::vfs::{FileHandle, FileOps, FsString, Mounts, NamespaceNode};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{
@@ -43,7 +44,7 @@ use once_cell::sync::OnceCell;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_debug, log_error, log_info, log_warn};
 use starnix_sync::{
-    DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, Mutex, OrderedMutex,
+    FileOpsCore, KernelIpTables, KernelSwapFiles, LockEqualOrBefore, Locked, Mutex, OrderedMutex,
     OrderedRwLock, RwLock,
 };
 use starnix_types::ownership::{TempRef, WeakRef};
@@ -114,10 +115,6 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
-
-    /// Allows the rtnetlink worker to rely on an `ifb0` interface being present instead of faking
-    /// the existence of one itself.
-    pub rtnetlink_assume_ifb0_existence: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -296,7 +293,7 @@ pub struct Kernel {
 
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
-    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
+    pub procfs_device_tree_setup: Vec<fn(&SimpleDirectoryMutator)>,
 
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
@@ -375,7 +372,7 @@ impl Kernel {
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         security_state: security::KernelState,
-        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
+        procfs_device_tree_setup: Vec<fn(&SimpleDirectoryMutator)>,
         time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
@@ -635,13 +632,13 @@ impl Kernel {
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
         dev: DeviceType,
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
-        L: LockBefore<DeviceOpen>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.device_registry.open_device(locked, current_task, node, flags, dev, mode)
     }
@@ -667,14 +664,10 @@ impl Kernel {
     /// call will instantiate the Netlink implementation.
     pub fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
-            let (network_netlink, network_netlink_async_worker) = Netlink::new(
-                InterfacesHandlerImpl(self.weak_self.clone()),
-                netlink::FeatureFlags {
-                    assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
-                },
-            );
-            self.kthreads.spawn(move |_, _| {
-                fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
+            let (network_netlink, network_netlink_async_worker) =
+                Netlink::new(InterfacesHandlerImpl(self.weak_self.clone()));
+            self.kthreads.spawn_async(async move |_: LockedAndTask<'_>| {
+                network_netlink_async_worker.await;
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");
             });
             network_netlink

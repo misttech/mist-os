@@ -46,7 +46,7 @@
 #include <object/resource_dispatcher.h>
 #include <phys/handoff.h>
 #include <platform/crashlog.h>
-#include <platform/ram_mappable_crashlog.h>
+#include <platform/mapped_crashlog.h>
 #include <platform/timer.h>
 #include <platform/uart.h>
 #include <vm/kstack.h>
@@ -84,9 +84,8 @@ size_t ramdisk_size;
 ktl::atomic<int> panic_started;
 ktl::atomic<int> halted;
 
-lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
-                    lazy_init::Destructor::Disabled>
-    ram_mappable_crashlog;
+lazy_init::LazyInit<MappedCrashlog, lazy_init::CheckType::None, lazy_init::Destructor::Disabled>
+    mapped_crashlog;
 
 }  // anonymous namespace
 
@@ -141,7 +140,9 @@ void platform_halt_cpu() {
 
 bool platform_supports_suspend_cpu() { return false; }
 
-zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
   DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);
@@ -336,7 +337,7 @@ static void init_topology(uint level) {
 
 LK_INIT_HOOK(init_topology, init_topology, LK_INIT_LEVEL_VM)
 
-static void allocate_persistent_ram(paddr_t pa, size_t length) {
+static void allocate_persistent_ram(const MappedMemoryRange& range) {
   // Figure out how to divide up our persistent RAM.  Right now there are
   // three potential users:
   //
@@ -359,7 +360,7 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   {
     // start by figuring out how many chunks of RAM we have available to
     // us total.
-    size_t persistent_chunks_available = length / kPersistentRamAllocationGranularity;
+    size_t persistent_chunks_available = range.size_bytes() / kPersistentRamAllocationGranularity;
 
     // If we have not already configured a non-trivial crashlog implementation
     // for the platform, make sure that crashlog gets its minimum allocation, or
@@ -393,25 +394,25 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   // Configure up the crashlog RAM
   if (crashlog_size > 0) {
     dprintf(INFO, "Crashlog configured with %" PRIu64 " bytes\n", crashlog_size);
-    ram_mappable_crashlog.Initialize(pa, crashlog_size);
-    PlatformCrashlog::Bind(ram_mappable_crashlog.Get());
+    mapped_crashlog.Initialize(ktl::span{range.data(), crashlog_size});
+    PlatformCrashlog::Bind(mapped_crashlog.Get());
   }
-  size_t offset = crashlog_size;
+
+  ktl::byte* leftover_base = range.data() + crashlog_size;
 
   // Configure the persistent debuglog RAM (if we have any)
   if (pdlog_size > 0) {
     dprintf(INFO, "Persistent debug logging enabled and configured with %" PRIu64 " bytes\n",
             pdlog_size);
-    persistent_dlog_set_location(paddr_to_physmap(pa + offset), pdlog_size);
-    offset += pdlog_size;
+    persistent_dlog_set_location(leftover_base, pdlog_size);
+    leftover_base += pdlog_size;
   }
 
   // Do _not_ attempt to set the location of the debug trace buffer if this is
   // not a persistent debug trace buffer.  The location of a non-persistent
   // trace buffer would have been already set during (very) early init.
   if constexpr (kJTraceIsPersistent == jtrace::IsPersistent::Yes) {
-    jtrace_set_location(paddr_to_physmap(pa + offset), jtrace_size);
-    offset += jtrace_size;
+    jtrace_set_location(reinterpret_cast<void*>(leftover_base), jtrace_size);
   }
 }
 
@@ -420,10 +421,7 @@ void platform_early_init() {
   dlog_bypass_init();
 
   if (gPhysHandoff->nvram) {
-    const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
-    dprintf(INFO, "NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n", nvram.base,
-            nvram.length);
-    allocate_persistent_ram(nvram.base, nvram.length);
+    allocate_persistent_ram(gPhysHandoff->nvram.value());
   }
 
   // Initialize the PmmChecker now that the cmdline has been parsed.

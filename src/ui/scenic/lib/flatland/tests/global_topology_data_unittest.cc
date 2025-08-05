@@ -27,6 +27,7 @@
 
 using flatland::TransformGraph;
 using flatland::TransformHandle;
+using types::RectangleF;
 
 namespace {
 
@@ -327,9 +328,9 @@ TEST(GlobalTopologyDataTest, HitTest_OneView) {
     uber_struct->local_topology = vectors[0];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref1));
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, clip_region);
     uber_struct->local_hit_regions_map[view_ref1_root_transform] = {
-        {flatland::HitRegion({0, 0, kWidth, kHeight})}};
+        {flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})}};
 
     uber_structs[vectors[0][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -486,15 +487,15 @@ TEST(GlobalTopologyDataTest, HitTest_SemanticVisibility) {
 
   const TransformHandle view_ref1_root_transform = {1, 0};
   const TransformGraph::TopologyVector vectors[] = {{{view_ref1_root_transform, 0}}};  // 1:0
-  const fuchsia::math::RectF semantically_visible_hit_region = {0, 0, 1, 1};
-  const fuchsia::math::RectF semantically_invisible_hit_region = {1, 0, 1, 1};
+  const RectangleF semantically_visible_hit_region({.x = 0, .y = 0, .width = 1, .height = 1});
+  const RectangleF semantically_invisible_hit_region({.x = 1, .y = 0, .width = 1, .height = 1});
 
   {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[0];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref1));
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, clip_region);
     uber_struct->local_hit_regions_map[view_ref1_root_transform] = {
         {flatland::HitRegion(semantically_visible_hit_region,
                              fuchsia::ui::composition::HitTestInteraction::DEFAULT)},
@@ -512,14 +513,14 @@ TEST(GlobalTopologyDataTest, HitTest_SemanticVisibility) {
       auto default_result = hit_tester(view_ref1_koid, {x, y}, false);
       auto semantic_result = hit_tester(view_ref1_koid, {x, y}, true);
 
-      if (utils::RectFContainsPoint(semantically_visible_hit_region, x, y)) {
+      if (semantically_visible_hit_region.Contains(types::Point2F({.x = x, .y = y}))) {
         // In the semantically VISIBLE portion.
         ASSERT_EQ(default_result.hits.size(), 1u);
         EXPECT_EQ(default_result.hits[0], view_ref1_koid);
 
         ASSERT_EQ(semantic_result.hits.size(), 1u);
         EXPECT_EQ(semantic_result.hits[0], view_ref1_koid);
-      } else if (utils::RectFContainsPoint(semantically_invisible_hit_region, x, y)) {
+      } else if (semantically_invisible_hit_region.Contains(types::Point2F({.x = x, .y = y}))) {
         // In the semantically INVISIBLE portion.
         ASSERT_EQ(default_result.hits.size(), 1u);
         EXPECT_EQ(default_result.hits[0], view_ref1_koid);
@@ -567,10 +568,9 @@ TEST(GlobalTopologyDataTest, HitTest_TwoOverlappingViews) {
         std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_parent));
     TransformClipRegion clip_region =
         TransformClipRegion({.x = 0, .y = 0, .width = kParentWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref_parent_root_transform,
-                                                std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref_parent_root_transform, clip_region);
     uber_struct->local_hit_regions_map[view_ref_parent_root_transform] = {
-        flatland::HitRegion({0, 0, kParentWidth, kHeight})};
+        flatland::HitRegion({.x = 0, .y = 0, .width = kParentWidth, .height = kHeight})};
 
     uber_structs[vectors[0][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -673,9 +673,9 @@ TEST(GlobalTopologyDataTest, HitTest_AnonymousView) {
     uber_struct->local_topology = vectors[0];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref1));
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, clip_region);
     uber_struct->local_hit_regions_map[view_ref1_root_transform] = {
-        flatland::HitRegion({0, 0, kWidth, kHeight})};
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[0][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -689,7 +689,7 @@ TEST(GlobalTopologyDataTest, HitTest_AnonymousView) {
     uber_struct->local_topology = vectors[1];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref3));
     uber_struct->local_hit_regions_map[view_ref3_root_transform] = {
-        flatland::HitRegion({0, 0, kWidth, kHeight})};
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
     uber_structs[vectors[2][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
 
@@ -754,7 +754,7 @@ TEST(GlobalTopologyDataTest, HitTest_SandwichTest) {
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref1));
     TransformClipRegion clip_region =
         TransformClipRegion({.x = 0, .y = 0, .width = kParentWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref1_root_transform, clip_region);
     uber_struct->local_hit_regions_map[view_ref1_root_transform] = {
         flatland::HitRegion({0, 0, kParentWidth, kHeight})};
     uber_struct->local_hit_regions_map[{1, 1}] = {flatland::HitRegion({2, 0, 1, kHeight})};
@@ -849,8 +849,9 @@ TEST(GlobalTopologyDataTest, HitTest_StartNodeTest) {
     uber_struct->local_topology = vectors[0];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_A));
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref_A_root_transform, std::move(clip_region));
-    uber_struct->local_hit_regions_map[{1, 0}] = {flatland::HitRegion({0, 0, kWidth, kHeight})};
+    uber_struct->local_clip_regions.try_emplace(view_ref_A_root_transform, clip_region);
+    uber_struct->local_hit_regions_map[{1, 0}] = {
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[0][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -858,7 +859,8 @@ TEST(GlobalTopologyDataTest, HitTest_StartNodeTest) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[1];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_B));
-    uber_struct->local_hit_regions_map[{2, 0}] = {flatland::HitRegion({0, 0, kWidth, kHeight})};
+    uber_struct->local_hit_regions_map[{2, 0}] = {
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[1][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -866,7 +868,8 @@ TEST(GlobalTopologyDataTest, HitTest_StartNodeTest) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[2];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_C));
-    uber_struct->local_hit_regions_map[{3, 0}] = {flatland::HitRegion({0, 0, kWidth, kHeight})};
+    uber_struct->local_hit_regions_map[{3, 0}] = {
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[2][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -874,7 +877,8 @@ TEST(GlobalTopologyDataTest, HitTest_StartNodeTest) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[3];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_D));
-    uber_struct->local_hit_regions_map[{4, 0}] = {flatland::HitRegion({0, 0, kWidth, kHeight})};
+    uber_struct->local_hit_regions_map[{4, 0}] = {
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[3][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -882,7 +886,8 @@ TEST(GlobalTopologyDataTest, HitTest_StartNodeTest) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[4];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_E));
-    uber_struct->local_hit_regions_map[{5, 0}] = {flatland::HitRegion({0, 0, kWidth, kHeight})};
+    uber_struct->local_hit_regions_map[{5, 0}] = {
+        flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight})};
 
     uber_structs[vectors[4][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -970,7 +975,7 @@ TEST(GlobalTopologyDataTest, HitTest_ClippedandRotatedChild) {
         std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_parent));
     TransformClipRegion clip_region =
         TransformClipRegion({.x = 0, .y = 0, .width = kParentWidth, .height = kParentHeight});
-    uber_struct->local_clip_regions[view_ref_parent_root_transform] = std::move(clip_region);
+    uber_struct->local_clip_regions[view_ref_parent_root_transform] = clip_region;
     uber_struct->local_hit_regions_map[view_ref_parent_root_transform] = {
         flatland::HitRegion({0, 0, kParentWidth, kParentHeight})};
 
@@ -1005,7 +1010,7 @@ TEST(GlobalTopologyDataTest, HitTest_ClippedandRotatedChild) {
 
     TransformClipRegion clip_region =
         TransformClipRegion({.x = 0, .y = 0, .width = kChildHeight, .height = kChildWidth});
-    uber_struct->local_clip_regions[view_ref_child_root_transform] = std::move(clip_region);
+    uber_struct->local_clip_regions[view_ref_child_root_transform] = clip_region;
 
     uber_structs[vectors[1][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -1018,17 +1023,17 @@ TEST(GlobalTopologyDataTest, HitTest_ClippedandRotatedChild) {
     for (float y = -10; y <= 2 * static_cast<float>(kParentHeight); y += 0.125f) {
       auto result = hit_tester(view_ref_parent_koid, {x, y}, true);
 
-      if (utils::RectFContainsPoint({.x = kChildOriginX,
-                                     .y = kChildOriginY,
-                                     .width = kChildClippedWidth,
-                                     .height = kChildHeight},
-                                    x, y)) {
+      if (RectangleF({.x = kChildOriginX,
+                      .y = kChildOriginY,
+                      .width = kChildClippedWidth,
+                      .height = kChildHeight})
+              .Contains({.x = x, .y = y})) {
         // There should be two hit regions, child on top.
         EXPECT_EQ(result.hits.size(), 2u) << "x,y: " << x << ", " << y;
         EXPECT_EQ(result.hits[0], view_ref_child_koid);
         EXPECT_EQ(result.hits[1], view_ref_parent_koid);
-      } else if (utils::RectFContainsPoint(
-                     {.x = 0, .y = 0, .width = kParentWidth, .height = kParentHeight}, x, y)) {
+      } else if (RectangleF({.x = 0, .y = 0, .width = kParentWidth, .height = kParentHeight})
+                     .Contains({.x = x, .y = y})) {
         // There should be one hit region, the parent's.
         EXPECT_EQ(result.hits.size(), 1u) << "x,y: " << x << ", " << y;
         EXPECT_EQ(result.hits[0], view_ref_parent_koid);
@@ -1122,9 +1127,9 @@ TEST(GlobalTopologyDataTest, HitTest_NonRelevantClipRegions) {
         std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_parent));
 
     // Set up all clip regions.
-    uber_struct->local_clip_regions[view_ref_parent_root_transform] = std::move(P0_clip);
-    uber_struct->local_clip_regions[{1, 1}] = std::move(P1_clip);
-    uber_struct->local_clip_regions[{1, 2}] = std::move(P2_clip);
+    uber_struct->local_clip_regions[view_ref_parent_root_transform] = P0_clip;
+    uber_struct->local_clip_regions[{1, 1}] = P1_clip;
+    uber_struct->local_clip_regions[{1, 2}] = P2_clip;
 
     // Define maximal hit region on P0.
     uber_struct->local_hit_regions_map[view_ref_parent_root_transform] = {
@@ -1143,7 +1148,7 @@ TEST(GlobalTopologyDataTest, HitTest_NonRelevantClipRegions) {
     uber_struct->local_hit_regions_map[view_ref_child_root_transform] = {
         flatland::HitRegion::Infinite()};
 
-    uber_struct->local_clip_regions[view_ref_child_root_transform] = std::move(C_clip);
+    uber_struct->local_clip_regions[view_ref_child_root_transform] = C_clip;
 
     uber_structs[vectors[1][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
@@ -1160,7 +1165,7 @@ TEST(GlobalTopologyDataTest, HitTest_NonRelevantClipRegions) {
       EXPECT_EQ(result.hits.back(), view_ref_parent_koid);
 
       // If we are in the child, the clip regions of the parent's siblings should not affect it.
-      if (utils::RectFContainsPoint(C_clip.ToFidlRectF(), x, y)) {
+      if (RectangleF::From(C_clip).Contains({.x = x, .y = y})) {
         // There should be two hit regions, child on top.
         ASSERT_EQ(result.hits.size(), 2u);
         EXPECT_EQ(result.hits[0], view_ref_child_koid);
@@ -1238,13 +1243,14 @@ TEST(GlobalTopologyDataTest, PartialScreenViews_HaveCorrectTransforms) {
       {{{5, 0}, 0}}                                 // 5:0
   };
 
-  const flatland::HitRegion kScreenSizeHitRegion = flatland::HitRegion({0, 0, kWidth, kHeight});
+  const flatland::HitRegion kScreenSizeHitRegion =
+      flatland::HitRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
   {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[0];
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref_A));
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(view_ref_A_root_transform, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(view_ref_A_root_transform, clip_region);
     uber_struct->local_hit_regions_map[{1, 0}] = {kScreenSizeHitRegion};
 
     glm::mat3 translation_matrix = glm::mat3();
@@ -1430,7 +1436,7 @@ TEST(GlobalTopologyDataTest, ViewTreeSnapshot) {
     uber_struct->view_ref = std::make_shared<fuchsia::ui::views::ViewRef>(std::move(view_ref1));
     uber_struct->debug_name = "test_instance_1";
     TransformClipRegion clip_region({.x = 0, .y = 0, .width = kWidth, .height = kHeight});
-    uber_struct->local_clip_regions.try_emplace(parent_transform_handle, std::move(clip_region));
+    uber_struct->local_clip_regions.try_emplace(parent_transform_handle, clip_region);
     uber_structs[vectors[0][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
   {

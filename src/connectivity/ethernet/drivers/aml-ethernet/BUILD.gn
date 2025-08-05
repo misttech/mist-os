@@ -32,7 +32,7 @@ fuchsia_cc_driver("aml-ethernet-driver") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/platform-device/cpp",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

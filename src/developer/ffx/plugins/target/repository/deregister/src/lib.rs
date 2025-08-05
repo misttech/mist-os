@@ -257,7 +257,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("some-target".into())
-            .await
             .expect("Setting default target");
 
         let (repo_mgr, _) = setup_fake_repo_manager_server().await;
@@ -290,7 +289,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("some-target".into())
-            .await
             .expect("Setting default target");
 
         let repo_mgr = fake_proxy(move |req| match req {

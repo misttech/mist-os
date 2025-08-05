@@ -34,6 +34,7 @@ source_set("src") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/connectivity/network/drivers/network-device/device:banjo_shims",
     "//src/connectivity/network/drivers/network-device/device:device",
     "//src/connectivity/network/drivers/network-device/mac",
@@ -42,7 +43,6 @@ source_set("src") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/sync:sync-cpp",
-    "//zircon/system/ulib/syslog",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,

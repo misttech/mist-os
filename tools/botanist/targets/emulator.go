@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -195,7 +194,7 @@ func (t *Emulator) SSHClient() (*sshutil.Client, error) {
 }
 
 // Start starts the emulator target.
-func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
+func (t *Emulator) Start(ctx context.Context, args []string, pbPath string, isBootTest bool) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}

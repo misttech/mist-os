@@ -4,11 +4,14 @@
 
 #include "src/performance/lib/trace_converters/chromium_exporter.h"
 
+#include <fstream>
 #include <sstream>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <trace-reader/records.h>
+
+#include "rapidjson/filewritestream.h"
 
 namespace {
 
@@ -19,18 +22,23 @@ TEST(ChromiumExporterTest, ValidUtf8) {
   trace::Record record(trace::Record::Event{1000, trace::ProcessThread(45, 46), "c\342\202at",
                                             "n\301a\205me", std::move(arguments), std::move(data)});
 
-  std::ostringstream out_stream;
-
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    const std::filesystem::path& output = "/tmp/test-trace-valid-utf8.json";
+    tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }
 
-  EXPECT_EQ(out_stream.str(),
+  std::stringstream buffer;
+
+  std::ifstream input("/tmp/test-trace-valid-utf8.json");
+
+  buffer << input.rdbuf();
+
+  EXPECT_EQ(buffer.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":[{\"cat\":\"c\uFFFDat\","
             "\"name\":\"n\uFFFDa\uFFFDme\",\"ts\":1.0,\"pid\":45,\"tid\":46,\"ph\":"
             "\"i\",\"s\":\"g\",\"args\":{\"arg\":\"foo\uFFFD\uFFFD\"}}"
@@ -51,18 +59,23 @@ TEST(ChromiumExporterTest, UnknownLargeBlobEventDropped) {
       sizeof(blob),
   }});
 
-  std::ostringstream out_stream;
-
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    std::string file_name = "/tmp/test-trace-unknow-blob.json";
+    tracing::ChromiumExporter exporter(file_name);
     exporter.ExportRecord(record);
   }
 
-  EXPECT_EQ(out_stream.str(),
+  std::stringstream buffer;
+
+  std::ifstream input("/tmp/test-trace-unknow-blob.json");
+
+  buffer << input.rdbuf();
+
+  EXPECT_EQ(buffer.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":["
             "],\"systemTraceEvents\":{\"type\":\"fuchsia\",\"events\":[]}}");
 }
@@ -76,18 +89,22 @@ TEST(ChromiumExporterTest, UnknownLargeBlobAttachmentDropped) {
       sizeof(blob),
   }});
 
-  std::ostringstream out_stream;
-
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    const std::filesystem::path& output = "/tmp/test-trace-dropped-blob.json";
+    tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }
+  std::stringstream buffer;
 
-  EXPECT_EQ(out_stream.str(),
+  std::ifstream input("/tmp/test-trace-dropped-blob.json");
+
+  buffer << input.rdbuf();
+
+  EXPECT_EQ(buffer.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":["
             "],\"systemTraceEvents\":{\"type\":\"fuchsia\",\"events\":[]}}");
 }
@@ -104,18 +121,23 @@ TEST(ChromiumExporterTest, FidlBlobExported) {
       sizeof(blob),
   }});
 
-  std::ostringstream out_stream;
-
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    const std::filesystem::path& file_name = "/tmp/test-trace-fidl-blob.json";
+    tracing::ChromiumExporter exporter(file_name);
     exporter.ExportRecord(record);
   }
 
-  EXPECT_EQ(out_stream.str(),
+  std::stringstream buffer;
+
+  std::ifstream input("/tmp/test-trace-fidl-blob.json");
+
+  buffer << input.rdbuf();
+
+  EXPECT_EQ(buffer.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":[{\"ph\":\"O\",\"id\":\"\",\"cat\":\"fidl:"
             "blob\",\"name\":\"BlobName\",\"ts\":1.0,\"pid\":45,\"tid\":46,\"blob\":"
             "\"c29tZSB0ZXN0IGJsb2IgZGF0YQA=\"}],\"systemTraceEvents\":{\"type\":\"fuchsia\","
@@ -123,17 +145,21 @@ TEST(ChromiumExporterTest, FidlBlobExported) {
 }
 
 TEST(ChromiumExporterTest, EmptyTrace) {
-  std::ostringstream out_stream;
-
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    const std::filesystem::path& file_name = "/tmp/test-trace-empty-trace.json";
+    tracing::ChromiumExporter exporter(file_name);
   }
 
-  EXPECT_EQ(out_stream.str(),
+  std::stringstream buffer;
+
+  std::ifstream input("/tmp/test-trace-empty-trace.json");
+  buffer << input.rdbuf();
+
+  EXPECT_EQ(buffer.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":["
             "],\"systemTraceEvents\":{\"type\":\"fuchsia\",\"events\":[]}}");
 }
@@ -154,24 +180,29 @@ TEST(ChromiumExporterTest, LastBranchRecords) {
   }
   trace::Record record(trace::Record::Blob{
       .type = TRACE_BLOB_TYPE_LAST_BRANCH,
-      .name = fbl::String("cpu1"),
+      .name = "cpu1",
       .blob = blob.data(),
       .blob_size = blob.size(),
   });
-
-  std::ostringstream out_stream;
 
   // Enclosing the exporter in its own scope ensures that its
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    tracing::ChromiumExporter exporter(out_stream);
+    const std::filesystem::path& output = "/tmp/test-trace-large-branch.json";
+    tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }
 
+  std::stringstream buffer;
+
+  std::ifstream input("/tmp/test-trace-large-branch.json");
+
+  buffer << input.rdbuf();
+
   EXPECT_EQ(
-      out_stream.str(),
+      buffer.str(),
       "{\"displayTimeUnit\":\"ns\",\"traceEvents\":[],\"systemTraceEvents\":{\"type\":"
       "\"fuchsia\",\"events\":[]},\"lastBranch\":{\"records\":[{\"cpu\":1,\"aspace\":4321,"
       "\"event_time\":1234,\"branches\":[{\"from\":0,\"to\":50,\"info\":0},{\"from\":100,\"to\":"

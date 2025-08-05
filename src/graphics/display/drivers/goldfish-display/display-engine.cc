@@ -140,7 +140,7 @@ void DisplayEngine::DisplayEngineCompleteCoordinatorConnection(
   const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
 
   const raw_display_info_t banjo_display_info = {
-      .display_id = display::ToBanjoDisplayId(kPrimaryDisplayId),
+      .display_id = kPrimaryDisplayId.ToBanjo(),
       .preferred_modes_list = &banjo_display_mode,
       .preferred_modes_count = 1,
       .edid_bytes_list = nullptr,
@@ -224,7 +224,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
 zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
     fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
@@ -255,7 +255,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
 zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
                driver_buffer_collection_id.value());
@@ -269,7 +269,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
                                                     uint64_t banjo_driver_buffer_collection_id,
                                                     uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
@@ -328,7 +328,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
     zx::result<display::DriverImageId> import_vmo_result =
         ImportVmoImage(*image_metadata, pixel_format.value(), std::move(vmo), offset);
     if (import_vmo_result.is_ok()) {
-      *out_image_handle = display::ToBanjoDriverImageId(import_vmo_result.value());
+      *out_image_handle = import_vmo_result.value().ToBanjo();
       return ZX_OK;
     }
     return import_vmo_result.error_value();
@@ -343,7 +343,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
   color_buffer->is_linear_format = image_metadata->tiling_type == IMAGE_TILING_TYPE_LINEAR;
   color_buffer->vmo = std::move(vmo);
   const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
-  *out_image_handle = display::ToBanjoDriverImageId(image_id);
+  *out_image_handle = image_id.ToBanjo();
   return ZX_OK;
 }
 
@@ -369,8 +369,8 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
   const display_config_t& display_config = *display_config_ptr;
 
-  const display::DisplayId display_id = display::ToDisplayId(display_config.display_id);
-  if (display_config.layer_count == 0) {
+  const display::DisplayId display_id = display::DisplayId(display_config.display_id);
+  if (display_config.layers_count == 0) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -385,7 +385,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     fdf::warn("Color Correction not supported.");
   }
 
-  const layer_t& layer0 = display_config.layer_list[0];
+  const layer_t& layer0 = display_config.layers_list[0];
   if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
     // Solid color fill layers are not yet supported.
     // TODO(https://fxbug.dev/406525464): add support.
@@ -425,7 +425,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     }
   }
   // If there is more than one layer, the rest need to be merged into the base layer.
-  if (display_config.layer_count > 1) {
+  if (display_config.layers_count > 1) {
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
@@ -531,12 +531,12 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   const display_config_t& display_config = *display_config_ptr;
 
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
+  display::DriverConfigStamp config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
-  if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
-    if (display_config.layer_count) {
-      driver_image_id = display::ToDriverImageId(display_config.layer_list[0].image_handle);
+  if (display::DisplayId(display_config.display_id) == kPrimaryDisplayId) {
+    if (display_config.layers_count) {
+      driver_image_id = display::DriverImageId(display_config.layers_list[0].image_handle);
     }
   }
 
@@ -554,8 +554,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
     return;
   }
 
-  ColorBuffer* color_buffer =
-      reinterpret_cast<ColorBuffer*>(display::ToBanjoDriverImageId(driver_image_id));
+  ColorBuffer* color_buffer = reinterpret_cast<ColorBuffer*>(driver_image_id.ToBanjo());
   ZX_DEBUG_ASSERT(color_buffer != nullptr);
   if (color_buffer->host_color_buffer_id == kInvalidHostColorBufferId) {
     zx::vmo vmo;
@@ -617,7 +616,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
 zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
@@ -704,7 +703,7 @@ zx_status_t DisplayEngine::SetupPrimaryDisplay() {
 
 void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   zx::duration period = zx::sec(1) / primary_display_device_.refresh_rate_hz;
-  zx::time expected_next_flush = primary_display_device_.expected_next_flush + period;
+  zx::time_monotonic expected_next_flush = primary_display_device_.expected_next_flush + period;
 
   if (primary_display_device_.incoming_config.has_value()) {
     zx_status_t status = PresentPrimaryDisplayConfig(*primary_display_device_.incoming_config);
@@ -714,18 +713,19 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   {
     fbl::AutoLock lock(&flush_lock_);
 
-    if (engine_listener_.is_valid()) {
-      zx::time now = async::Now(dispatcher);
-      const uint64_t banjo_display_id = display::ToBanjoDisplayId(kPrimaryDisplayId);
+    if (primary_display_device_.latest_config_stamp != display::kInvalidDriverConfigStamp &&
+        engine_listener_.is_valid()) {
+      zx::time_monotonic now = async::Now(dispatcher);
+      const uint64_t banjo_display_id = kPrimaryDisplayId.ToBanjo();
       const config_stamp_t banjo_config_stamp =
-          display::ToBanjoDriverConfigStamp(primary_display_device_.latest_config_stamp);
+          primary_display_device_.latest_config_stamp.ToBanjo();
       engine_listener_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
     }
   }
 
   // If we've already passed the |expected_next_flush| deadline, skip the
   // Vsync and adjust the deadline to the earliest next available frame.
-  zx::time now = async::Now(dispatcher);
+  zx::time_monotonic now = async::Now(dispatcher);
   if (now > expected_next_flush) {
     expected_next_flush +=
         period * (((now - expected_next_flush + period).get() - 1L) / period.get());

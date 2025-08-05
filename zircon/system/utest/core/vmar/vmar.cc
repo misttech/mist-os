@@ -36,6 +36,7 @@
 
 // Check that these values are consistent.
 static_assert(ZX_VMO_OP_DECOMMIT == ZX_VMAR_OP_DECOMMIT);
+static_assert(ZX_VMO_OP_ZERO == ZX_VMAR_OP_ZERO);
 
 namespace {
 
@@ -2099,6 +2100,62 @@ TEST(Vmar, RangeOpMapRange) {
                              zx_system_get_page_size(), nullptr, 0),
             ZX_OK);
 
+  EXPECT_EQ(zx_vmar_unmap(vmar, map_base, vmo_size), ZX_OK);
+  EXPECT_EQ(zx_vmar_destroy(vmar), ZX_OK);
+  EXPECT_EQ(zx_handle_close(vmar), ZX_OK);
+  EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
+}
+
+// Verify vmar_range_op zero of committed mapped VMO pages.
+TEST(Vmar, RangeOpZero) {
+  zx_handle_t vmo = ZX_HANDLE_INVALID;
+  const size_t vmo_size = zx_system_get_page_size() * 4;
+
+  ASSERT_EQ(zx_vmo_create(vmo_size, 0, &vmo), ZX_OK);
+
+  std::vector<uint8_t> vmo_data(vmo_size);
+  std::fill(vmo_data.begin(), vmo_data.end(), 0x55);
+  ASSERT_EQ(zx_vmo_write(vmo, vmo_data.data(), 0, vmo_size), ZX_OK);
+
+  zx_handle_t vmar = ZX_HANDLE_INVALID;
+  zx_vaddr_t vmar_base = 0;
+
+  ASSERT_EQ(zx_vmar_allocate(zx_vmar_root_self(), ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
+                             vmo_size, &vmar, &vmar_base),
+            ZX_OK);
+
+  zx_vaddr_t map_base = 0;
+
+  ASSERT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, vmo_size, &map_base),
+            ZX_OK);
+
+  // Verify the ZX_VMAR_OP_ZERO op with zx_vmar_op_range.
+
+  // Attempting to zero range uncommitted pages should succeed.
+  ASSERT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_ZERO, map_base, vmo_size, nullptr, 0), ZX_OK);
+
+  // Verify the VMO data is zeroed.
+  ASSERT_EQ(zx_vmo_read(vmo, vmo_data.data(), 0, vmo_size), ZX_OK);
+  for (size_t i = 0; i < vmo_size; i++) {
+    EXPECT_EQ(vmo_data[i], 0);
+  }
+
+  // Misaligned address should fail.
+  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_ZERO, map_base + 1, vmo_size, nullptr, 0),
+            ZX_ERR_INVALID_ARGS);
+
+  EXPECT_EQ(zx_vmar_unmap(vmar, map_base, vmo_size), ZX_OK);
+
+  zx_handle_t vmo_no_write;
+  ASSERT_EQ(zx_handle_duplicate(vmo, ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &vmo_no_write),
+            ZX_OK);
+
+  // Zeroing a read-only mapping should fail.
+  ASSERT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ, 0, vmo_no_write, 0, vmo_size, &map_base), ZX_OK);
+  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_ZERO, map_base, vmo_size, nullptr, 0),
+            ZX_ERR_ACCESS_DENIED);
+
+  // Clean up.
   EXPECT_EQ(zx_vmar_unmap(vmar, map_base, vmo_size), ZX_OK);
   EXPECT_EQ(zx_vmar_destroy(vmar), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmar), ZX_OK);

@@ -108,7 +108,9 @@ void platform_halt_cpu() {
 
 bool platform_supports_suspend_cpu() { return false; }
 
-zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 // TODO(https://fxbug.dev/42180675): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {

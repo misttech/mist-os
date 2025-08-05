@@ -90,9 +90,7 @@ source_set("driver-integration-test-shim") {
     ":driver-integration-test-shim-headers",
     "//src/devices/board/drivers/integration-test",
     "//src/storage/fshost/testing:test-fshost",
-    "//src/storage/fshost/testing:test-fshost-no-watcher",
     "//src/storage/fshost/testing:test-fshost-storage-host",
-    "//src/storage/fshost/testing:test-fshost-storage-host-netboot",
   ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",

@@ -26,6 +26,7 @@ rustc_library("ffx_assembly_args") {
   source_root = "src/args.rs"
 
   deps = [
+    "//src/lib/assembly/cli_args",
     "//src/lib/assembly/images_config",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
@@ -41,9 +42,7 @@ rustc_library("ffx_assembly") {
   sources = [
     "src/lib.rs",
     "src/operations.rs",
-    "src/operations/create_system.rs",
     "src/operations/create_update.rs",
-    "src/operations/product.rs",
     "src/operations/size_check.rs",
     "src/operations/size_check/breakdown.rs",
     "src/operations/size_check/common.rs",
@@ -66,16 +65,12 @@ rustc_library("ffx_assembly") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/assembly/api:assembly_api",
     "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/blob_size",
     "//src/lib/assembly/components",
-    "//src/lib/assembly/config_schema",
     "//src/lib/assembly/container",
-    "//src/lib/assembly/file_relative_path",
-    "//src/lib/assembly/image_assembly_config",
-    "//src/lib/assembly/image_assembly_config_builder",
     "//src/lib/assembly/partitions_config",
-    "//src/lib/assembly/platform_artifacts",
     "//src/lib/assembly/sdk",
     "//src/lib/assembly/subpackage_blobs_package",
     "//src/lib/assembly/tool",
@@ -102,6 +97,7 @@ rustc_library("ffx_assembly") {
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/release_info",
     "//src/lib/utf8_path",
+    "//src/lib/versioning/version-history/rust",
     "//src/storage/blobfs/tools:blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//third_party/rust_crates:camino",

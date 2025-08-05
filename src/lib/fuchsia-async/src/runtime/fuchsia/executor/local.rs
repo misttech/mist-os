@@ -48,10 +48,16 @@ impl Default for LocalExecutor {
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
     pub fn new() -> Self {
-        let inner = Arc::new(Executor::new(
+        Self::new_with_port(zx::Port::create())
+    }
+
+    /// Create a new single-threaded executor running with actual time, with a port.
+    pub fn new_with_port(port: zx::Port) -> Self {
+        let inner = Arc::new(Executor::new_with_port(
             ExecutorTime::RealTime,
             /* is_local */ true,
             /* num_threads */ 1,
+            port,
         ));
         let root_scope = ScopeHandle::root(inner);
         Executor::set_local(root_scope.clone());
@@ -154,6 +160,11 @@ impl TestExecutor {
     /// Create a new executor for testing.
     pub fn new() -> Self {
         Self { local: LocalExecutor::new() }
+    }
+
+    /// Create a new executor for testing from a port.
+    pub fn new_with_port(port: zx::Port) -> Self {
+        Self { local: LocalExecutor::new_with_port(port) }
     }
 
     /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.

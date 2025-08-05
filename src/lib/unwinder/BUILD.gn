@@ -21,6 +21,12 @@ static_library("unwinder") {
     "unwind.h",
   ]
   sources = [
+    "arm_ehabi_module.cc",
+    "arm_ehabi_module.h",
+    "arm_ehabi_parser.cc",
+    "arm_ehabi_parser.h",
+    "arm_ehabi_unwinder.cc",
+    "arm_ehabi_unwinder.h",
     "cfi_module.cc",
     "cfi_parser.cc",
     "cfi_unwinder.cc",
@@ -42,11 +48,13 @@ static_library("unwinder") {
     "unwind.cc",
     "unwinder_base.h",
   ]
-  deps = [ "//sdk/lib/fit" ]
-  friend = [ ":tests" ]
+  deps = [
+    "//sdk/lib/fit",
+    #"//third_party/googletest:gtest_prod",
+  ]
+  friend = [ ":*" ]
 
   if (is_mac) {
-    # TODO(https://fxbug.dev/430278476): Don't build on mac.
     deps += [ "//src/developer/debug/shared:elf_h_on_mac" ]
   } else {
     # UnwindLocal() is only available on ELF systems.
@@ -69,9 +77,27 @@ static_library("unwinder") {
   }
 }
 
+# This test binary is always built in the linux_arm-shared toolchain. linux_arm is the only
+# toolchain that will produce 32 bit binaries with the ARM Exception Handling unwinding ABI.
+if (is_host) {
+  host_test_data("test_so") {
+    sources = [ "test_data/libunwind_info_test_data.targetso" ]
+
+    outputs =
+        [ "$root_out_dir/test_data/unwinder/{{source_name_part}}.targetso" ]
+  }
+} else {
+  resource("test_so") {
+    sources = [ "test_data/libunwind_info_test_data.targetso" ]
+
+    outputs = [ "testdata/{{source_name_part}}.targetso" ]
+  }
+}
+
 test("unwinder_tests_bin") {
   output_name = "unwinder_tests"
   sources = [
+    "arm_ehabi_module_unittest.cc",
     "dwarf_expr_unittest.cc",
     "memory_unittest.cc",
   ]
@@ -82,6 +108,10 @@ test("unwinder_tests_bin") {
     "//third_party/googletest:gtest",
   ]
 
+  if (is_host) {
+    data_deps = [ ":test_so" ]
+  }
+
   if (!is_mac) {
     deps += [ "tests" ]
   }
@@ -91,6 +121,11 @@ test("unwinder_tests_bin") {
 
 fuchsia_unittest_package("unwinder_tests") {
   deps = [ ":unwinder_tests_bin" ]
+
+  # This is a prebuilt test binary that we control ourselves. There won't be a corresponding
+  # unstripped binary for it.
+  disable_elf_binaries_checks = true
+  data_deps = [ ":test_so" ]
 }
 
 group("tests") {

@@ -34,12 +34,12 @@ DirEntry *Dir::InlineDentryArray(Page *page, VnodeF2fs &vnode) {
   return reinterpret_cast<DirEntry *>(base + reserved);
 }
 
-char (*Dir::InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen] {
+char (*Dir::InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode)) [kDentrySlotLen] {
   uint8_t *base = InlineDentryBitmap(page);
   size_t reserved = safemath::checked_cast<uint32_t>(
       (vnode.MaxInlineData() - safemath::CheckMul(vnode.MaxInlineDentry(), kDentrySlotLen))
           .ValueOrDie());
-  return reinterpret_cast<char(*)[kDentrySlotLen]>(base + reserved);
+  return reinterpret_cast<char (*)[kDentrySlotLen]>(base + reserved);
 }
 
 zx::result<DentryInfo> Dir::FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_page) {
@@ -334,9 +334,9 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
     }
 
     DirEntry *de = &InlineDentryArray(ipage.get(), *this)[bit_pos];
-    unsigned char d_type = DT_UNKNOWN;
+    fuchsia_io::DirentType d_type = fuchsia_io::DirentType::kUnknown;
     if (de->file_type < static_cast<uint8_t>(FileType::kFtMax))
-      d_type = types[de->file_type];
+      d_type = fuchsia_io::DirentType{types[de->file_type]};
 
     std::string_view name(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos],
                           LeToCpu(de->name_len));

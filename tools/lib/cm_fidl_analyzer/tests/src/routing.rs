@@ -1384,26 +1384,10 @@ mod tests {
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert!(route_result.error.is_none());
-
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy { moniker: ["c"].try_into().unwrap(), capability: use_decl },
-                RouteSegment::OfferBy { moniker: Moniker::root(), capability: a_offer_decl },
-                RouteSegment::ExposeBy {
-                    moniker: ["b"].try_into().unwrap(),
-                    capability: b_expose_decl
-                },
-                RouteSegment::ExposeBy {
-                    moniker: ["b", "d"].try_into().unwrap(),
-                    capability: d_expose_decl
-                },
-                RouteSegment::DeclareBy {
-                    moniker: ["b", "d"].try_into().unwrap(),
-                    capability: directory_decl,
-                }
-            ]
-        )
+            route_result.source.clone().unwrap().source_moniker().to_string(),
+            String::from("b/d")
+        );
     }
 
     ///  a
@@ -2045,20 +2029,7 @@ mod tests {
                 target_decl: TargetDecl::Use(use_directory_decl.clone()),
                 capability: Some("bar_data".parse().unwrap()),
                 error: None,
-                route: vec![
-                    RouteSegment::UseBy {
-                        moniker: ["b"].try_into().unwrap(),
-                        capability: use_directory_decl,
-                    },
-                    RouteSegment::OfferBy {
-                        moniker: Moniker::root(),
-                        capability: offer_directory_decl,
-                    },
-                    RouteSegment::DeclareBy {
-                        moniker: Moniker::root(),
-                        capability: directory_decl.clone(),
-                    }
-                ],
+                route: vec![],
                 source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Directory(match directory_decl {
                         CapabilityDecl::Directory(decl) => decl,

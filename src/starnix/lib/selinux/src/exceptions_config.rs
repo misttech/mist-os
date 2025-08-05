@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::policy::parser::ByValue;
 use crate::policy::{Policy, TypeId};
 use crate::{KernelClass, ObjectClass};
 
@@ -21,10 +20,7 @@ impl ExceptionsConfig {
     /// each parsed exception definition. If a definition's source or target type/domain are not
     /// defined by the supplied `policy` then the entry is ignored, so that removal/renaming of
     /// policy elements will not break the exceptions configuration.
-    pub(super) fn new(
-        policy: &Policy<ByValue<Vec<u8>>>,
-        exceptions: &[&str],
-    ) -> Result<Self, anyhow::Error> {
+    pub(super) fn new(policy: &Policy, exceptions: &[&str]) -> Result<Self, anyhow::Error> {
         let mut result = Self {
             todo_deny_entries: HashMap::with_capacity(exceptions.len()),
             permissive_entries: HashMap::new(),
@@ -50,11 +46,7 @@ impl ExceptionsConfig {
             .copied()
     }
 
-    fn parse_config_line(
-        &mut self,
-        policy: &Policy<ByValue<Vec<u8>>>,
-        line: &str,
-    ) -> Result<(), anyhow::Error> {
+    fn parse_config_line(&mut self, policy: &Policy, line: &str) -> Result<(), anyhow::Error> {
         let mut parts = line.trim().split_whitespace();
         if let Some(statement) = parts.next() {
             match statement {
@@ -203,7 +195,7 @@ mod tests {
     ];
 
     struct TestData {
-        policy: Arc<Policy<ByValue<Vec<u8>>>>,
+        policy: Arc<Policy>,
         defined_source: TypeId,
         defined_target: TypeId,
         unmatched_type: TypeId,

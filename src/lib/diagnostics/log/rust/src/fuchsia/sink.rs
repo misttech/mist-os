@@ -1,15 +1,14 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::{PublishError, SeverityExt};
+use crate::PublishError;
 use diagnostics_log_encoding::encode::{
-    Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, TestRecord, WriteEventParams,
+    Encoder, EncoderOpts, EncodingError, LogEvent, MutableBuffer, TestRecord, WriteEventParams,
 };
-use diagnostics_log_encoding::{Argument, Metatag, RawSeverity};
+use diagnostics_log_encoding::Metatag;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkSynchronousProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -125,114 +124,6 @@ impl Sink {
             })
         });
     }
-}
-
-#[doc(hidden)]
-pub struct LogEvent<'a> {
-    record: &'a log::Record<'a>,
-    timestamp: zx::BootInstant,
-}
-
-impl<'a> LogEvent<'a> {
-    pub fn new(record: &'a log::Record<'a>) -> Self {
-        Self { record, timestamp: zx::BootInstant::get() }
-    }
-}
-
-impl RecordEvent for LogEvent<'_> {
-    fn raw_severity(&self) -> RawSeverity {
-        self.record.metadata().raw_severity()
-    }
-
-    fn file(&self) -> Option<&str> {
-        self.record.file()
-    }
-
-    fn line(&self) -> Option<u32> {
-        self.record.line()
-    }
-
-    fn target(&self) -> &str {
-        self.record.target()
-    }
-
-    fn timestamp(&self) -> zx::BootInstant {
-        self.timestamp
-    }
-
-    fn write_arguments<B: MutableBuffer>(
-        self,
-        writer: &mut Encoder<B>,
-    ) -> Result<(), EncodingError> {
-        let args = self.record.args();
-        let message =
-            args.as_str().map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(args.to_string()));
-        writer.write_argument(Argument::message(message))?;
-        self.record
-            .key_values()
-            .visit(&mut KeyValuesVisitor(writer))
-            .map_err(EncodingError::other)?;
-        Ok(())
-    }
-}
-
-struct KeyValuesVisitor<'a, B>(&'a mut Encoder<B>);
-
-impl<B: MutableBuffer> log::kv::VisitSource<'_> for KeyValuesVisitor<'_, B> {
-    fn visit_pair(
-        &mut self,
-        key: log::kv::Key<'_>,
-        value: log::kv::Value<'_>,
-    ) -> Result<(), log::kv::Error> {
-        value.visit(ValueVisitor { encoder: self.0, key: key.as_str() })
-    }
-}
-
-struct ValueVisitor<'a, B> {
-    encoder: &'a mut Encoder<B>,
-    key: &'a str,
-}
-
-impl<B: MutableBuffer> log::kv::VisitValue<'_> for ValueVisitor<'_, B> {
-    fn visit_any(&mut self, value: log::kv::Value<'_>) -> Result<(), log::kv::Error> {
-        self.encoder
-            .write_raw_argument(self.key, format!("{value}"))
-            .map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_null(&mut self) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, "null").map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_u64(&mut self, value: u64) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, value).map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_i64(&mut self, value: i64) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, value).map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_f64(&mut self, value: f64) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, value).map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_bool(&mut self, value: bool) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, value).map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    fn visit_str(&mut self, value: &str) -> Result<(), log::kv::Error> {
-        self.encoder.write_raw_argument(self.key, value).map_err(log::kv::Error::boxed)?;
-        Ok(())
-    }
-
-    // TODO(https://fxbug.dev/360919323): when we enable kv_std we must support visit_error and
-    // visit_borrowed_error.
 }
 
 #[cfg(test)]

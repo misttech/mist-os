@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
+#[cfg(detect_lock_cycles)]
+use tracing_mutex::util;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -149,7 +151,7 @@ pub type DirEntryHandle = Arc<DirEntry>;
 
 impl DirEntry {
     #[allow(clippy::let_and_return)]
-    pub fn new(
+    pub fn new_uncached(
         node: FsNodeHandle,
         parent: Option<DirEntryHandle>,
         local_name: FsString,
@@ -171,13 +173,23 @@ impl DirEntry {
             let _l1 = result.children.read();
             let _l2 = result.state.read();
         }
+        result
+    }
+
+    pub fn new(
+        node: FsNodeHandle,
+        parent: Option<DirEntryHandle>,
+        local_name: FsString,
+    ) -> DirEntryHandle {
+        let result = Self::new_uncached(node, parent, local_name);
         result.node.fs().did_create_dir_entry(&result);
         result
     }
 
-    /// Returns a new DirEntry for the given `node` without parent. The entry has no local name.
+    /// Returns a new DirEntry for the given `node` without parent. The entry has no local name and
+    /// is not cached.
     pub fn new_unrooted(node: FsNodeHandle) -> DirEntryHandle {
-        Self::new(node, None, FsString::default())
+        Self::new_uncached(node, None, FsString::default())
     }
 
     /// Returns a new `DirEntry` that is ready marked as having been deleted.
@@ -186,7 +198,7 @@ impl DirEntry {
         parent: Option<DirEntryHandle>,
         local_name: FsString,
     ) -> DirEntryHandle {
-        let entry = DirEntry::new(node, parent, local_name);
+        let entry = DirEntry::new_uncached(node, parent, local_name);
         entry.state.write().is_dead = true;
         entry
     }
@@ -417,7 +429,7 @@ impl DirEntry {
             &MountInfo::detached(),
             name,
             |locked, dir, mount, name| {
-                dir.mknod(
+                dir.create_node(
                     locked,
                     current_task,
                     mount,
@@ -776,6 +788,13 @@ impl DirEntry {
             // from the child list.
             state.new_parent().children.insert(new_basename.into(), Arc::downgrade(&renamed));
 
+            #[cfg(detect_lock_cycles)]
+            unsafe {
+                // Lock ordering is enforced from parent-to-child, and therefore we need to
+                // reset the lock ordering constraints when we reorder the tree nodes.
+                util::reset_dependencies(renamed.children.raw());
+            }
+
             if flags.contains(RenameFlags::EXCHANGE) {
                 // Reparent `replaced` when exchanging.
                 let replaced =
@@ -786,6 +805,13 @@ impl DirEntry {
                     replaced_state.local_name = old_basename.into();
                 }
                 state.old_parent().children.insert(old_basename.into(), Arc::downgrade(replaced));
+
+                #[cfg(detect_lock_cycles)]
+                unsafe {
+                    // Lock ordering is enforced from parent-to-child, and therefore we need to
+                    // reset the lock ordering constraints when we reorder the tree nodes.
+                    util::reset_dependencies(replaced.children.raw());
+                }
             } else {
                 // Remove the renamed child from the old_parent's child list.
                 state.old_parent().children.remove(old_basename);

@@ -404,7 +404,7 @@ type StartRequest = struct {
     // - VHT Operation
     // - Extended Capabilities
     phy fuchsia.wlan.common.WlanPhyType;
-    channel_bandwidth fuchsia.wlan.common.ChannelBandwidth;
+    channel_bandwidth ieee80211.ChannelBandwidth;
 };
 
 // MLME-START.confirm (IEEE Std 802.11-2016, 6.3.11.3)

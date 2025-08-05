@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{CapabilityBound, DirReceiver};
+use cm_types::RelativePath;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc;
@@ -13,11 +14,25 @@ use std::sync::Arc;
 /// Types that implement [`DirConnectable`] let the holder send directory channels
 /// to them.
 pub trait DirConnectable: Send + Sync + Debug {
-    fn send(&self, dir: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()>;
+    // TODO: not all implementers use all parameters in this method. This
+    // suggests the API is wrong and should be revised.
+    fn send(
+        &self,
+        dir: ServerEnd<fio::DirectoryMarker>,
+        subdir: RelativePath,
+        rights: Option<fio::Operations>,
+    ) -> Result<(), ()>;
 }
 
 impl DirConnectable for mpsc::UnboundedSender<ServerEnd<fio::DirectoryMarker>> {
-    fn send(&self, dir: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
+    fn send(
+        &self,
+        dir: ServerEnd<fio::DirectoryMarker>,
+        subdir: RelativePath,
+        rights: Option<fio::Operations>,
+    ) -> Result<(), ()> {
+        assert_eq!(subdir, RelativePath::dot());
+        assert_eq!(rights, None);
         self.unbounded_send(dir).map_err(|_| ())
     }
 }
@@ -50,6 +65,10 @@ impl DirConnector {
         (receiver, this)
     }
 
+    pub fn from_proxy(proxy: fio::DirectoryProxy, subdir: RelativePath, flags: fio::Flags) -> Self {
+        Self::new_sendable(DirectoryProxyForwarder { proxy, subdir, flags })
+    }
+
     pub fn new_sendable(connector: impl DirConnectable + 'static) -> Self {
         Self::new_internal(connector, None)
     }
@@ -61,14 +80,60 @@ impl DirConnector {
         Self { inner: Arc::new(connector), _receiver_task: receiver_task }
     }
 
-    pub fn send(&self, dir: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
-        self.inner.send(dir)
+    pub fn send(
+        &self,
+        dir: ServerEnd<fio::DirectoryMarker>,
+        subdir: RelativePath,
+        rights: Option<fio::Operations>,
+    ) -> Result<(), ()> {
+        self.inner.send(dir, subdir, rights)
     }
 }
 
 impl DirConnectable for DirConnector {
-    fn send(&self, channel: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
-        self.inner.send(channel)
+    fn send(
+        &self,
+        channel: ServerEnd<fio::DirectoryMarker>,
+        subdir: RelativePath,
+        rights: Option<fio::Operations>,
+    ) -> Result<(), ()> {
+        self.inner.send(channel, subdir, rights)
+    }
+}
+
+#[derive(Debug)]
+struct DirectoryProxyForwarder {
+    proxy: fio::DirectoryProxy,
+    subdir: RelativePath,
+    flags: fio::Flags,
+}
+
+impl DirConnectable for DirectoryProxyForwarder {
+    fn send(
+        &self,
+        server_end: ServerEnd<fio::DirectoryMarker>,
+        subdir: RelativePath,
+        rights: Option<fio::Operations>,
+    ) -> Result<(), ()> {
+        let flags = if let Some(rights) = rights {
+            fio::Flags::from_bits(rights.bits()).ok_or(())?
+        } else {
+            self.flags | fio::Flags::PROTOCOL_DIRECTORY
+        };
+        let mut combined_subdir = self.subdir.clone();
+        let success = combined_subdir.extend(subdir);
+        if !success {
+            // The requested path is too long.
+            return Err(());
+        }
+        self.proxy
+            .open(
+                &format!("{}", combined_subdir),
+                flags,
+                &fio::Options::default(),
+                server_end.into_channel(),
+            )
+            .map_err(|_| ())
     }
 }
 
@@ -89,7 +154,7 @@ mod tests {
 
         // Send a channel through the DirConnector.
         let (_ch1, ch2) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        sender.send(ch2).unwrap();
+        sender.send(ch2, RelativePath::dot(), None).unwrap();
 
         // Convert the Sender to a FIDL token.
         let connector: fsandbox::DirConnector = sender.into();
@@ -108,7 +173,7 @@ mod tests {
 
         // Send a channel through the cloned Sender.
         let (_ch1, ch2) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        connector_clone.send(ch2).unwrap();
+        connector_clone.send(ch2, RelativePath::dot(), None).unwrap();
 
         // The Receiver should receive two channels, one from each connector.
         for _ in 0..2 {

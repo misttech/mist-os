@@ -22,7 +22,7 @@ fuchsia_wlan_ieee80211::Ssid Ssid(const void* ssid_data, uint8_t len) {
 }
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+    .channel = {.primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 const fuchsia_wlan_ieee80211::Ssid kApSsid = Ssid("Fuchsia Fake AP", 15);
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kSrcClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});

@@ -62,6 +62,8 @@ use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "std")]
 use std::net;
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 pub use net_types_macros::GenericOverIp;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
@@ -3495,6 +3497,8 @@ ip_generic!(Option<T>);
 ip_generic!(Result<R, E>);
 #[cfg(feature = "std")]
 ip_generic!(Vec<T>);
+#[cfg(feature = "std")]
+ip_generic!(Arc<T>);
 
 impl<'s, NewIp: Ip, T: GenericOverIp<NewIp>> GenericOverIp<NewIp> for &'s T
 where

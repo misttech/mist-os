@@ -40,6 +40,14 @@ pub struct CreateCommand {
     #[argh(option)]
     pub board: Option<String>,
 
+    /// the version of the product to use.
+    #[argh(option)]
+    pub version: Option<String>,
+
+    /// the tuf keys to use.
+    #[argh(option)]
+    pub tuf_keys: Option<Utf8PathBuf>,
+
     /// prepare the assembly inputs, but do not run assembly yet.
     #[argh(switch)]
     pub stage: bool,

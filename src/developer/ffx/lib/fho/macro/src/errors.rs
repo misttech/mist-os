@@ -15,51 +15,57 @@ pub enum ParseError {
     InvalidWithAttr(Span),
     InvalidAttr(Span),
     UnexpectedAttr(String, Span),
+    InvalidTargetAttr(Span, String),
 }
 
 impl ToTokens for ParseError {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             ParseError::DuplicateAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("Duplicate attribute found. Can only have one attribute kind per field");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("Duplicate attribute found. Can only have one attribute kind per field");
+                        }
+                    ),
             ParseError::CommandRequired(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("An ffx tool must have exactly one field denoted with the `#[command]` attribute");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("An ffx tool must have exactly one field denoted with the `#[command]` attribute");
+                        }
+                    ),
             ParseError::OnlyStructsSupported(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[derive(FfxTool)]` can only be applied to structs.");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("`#[derive(FfxTool)]` can only be applied to structs.");
+                        }
+                    ),
             ParseError::OnlyNamedFieldStructsSupported(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[derive(FfxTool)]` does not support unit or tuple structs");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("`#[derive(FfxTool)]` does not support unit or tuple structs");
+                        }
+                    ),
             ParseError::InvalidCheckAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[check()]` attribute contents must be a call expression");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("`#[check()]` attribute contents must be a call expression");
+                        }
+                    ),
             ParseError::InvalidWithAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[with()]` attribute contents must be a call expression");
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("`#[with()]` attribute contents must be a call expression");
+                        }
+                    ),
             ParseError::UnexpectedAttr(name, span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[{}]` unexpected here", #name);
-                }
-            ),
+                        quote_spanned! {*span=>
+                            std::compile_error!("`#[{}]` unexpected here", #name);
+                        }
+                    ),
             ParseError::InvalidAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("Invalid or unknown attribute for FfxTool");
-                }
-            )
+                        quote_spanned! {*span=>
+                            std::compile_error!("Invalid or unknown attribute for FfxTool");
+                        }
+                    ),
+            ParseError::InvalidTargetAttr(span, msg) => tokens.extend(
+                        quote_spanned! {*span =>
+                             std::compile_error!(#msg);
+                         }
+                     ),
         }
     }
 }

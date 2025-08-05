@@ -28,6 +28,7 @@
 #include <ktl/iterator.h>
 #include <lk/init.h>
 #include <object/thread_dispatcher.h>
+#include <vm/fault.h>
 #include <vm/vm_aspace.h>
 
 #include <ktl/enforce.h>
@@ -336,17 +337,31 @@ zx::result<size_t> KTrace::ReadUser(user_out_ptr<void> ptr, uint32_t offset, siz
   // Iterate through each per-CPU buffer and read its contents.
   size_t bytes_read = 0;
   user_out_ptr<ktl::byte> byte_ptr = ptr.reinterpret<ktl::byte>();
+
+  auto copy_fn = [&](uint32_t byte_offset, ktl::span<ktl::byte> src) {
+    // This is safe to do while holding the lock_ because the KTrace lock is a leaf lock that is
+    // not acquired during the course of a page fault.
+    zx_status_t status = ZX_ERR_BAD_STATE;
+    guard.CallUntracked([&]() {
+      // Compute the destination address for this segment.
+      user_out_ptr out_ptr = byte_ptr.byte_offset(bytes_read + byte_offset);
+
+      // Prepare the destination range of this segment to improve efficiency by
+      // coalescing potential page faults into a bulk operation.
+      // TODO(eieio): This could be improved further by restructuring the copy
+      // out operation so that the full destination range can be determined and
+      // soft-faulted in a single operation.
+      Thread::Current::SoftFaultInRange(reinterpret_cast<vaddr_t>(out_ptr.get()),
+                                        VMM_PF_FLAG_USER | VMM_PF_FLAG_WRITE, src.size());
+
+      // Copy the trace data to the user segment.
+      status = out_ptr.copy_array_to_user(src.data(), src.size());
+    });
+
+    return status;
+  };
+
   for (uint32_t i = 0; i < num_buffers_; i++) {
-    auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
-      // This is safe to do while holding the lock_ because the KTrace lock is a leaf lock that is
-      // not acquired during the course of a page fault.
-      zx_status_t status = ZX_ERR_BAD_STATE;
-      guard.CallUntracked([&]() {
-        status =
-            byte_ptr.byte_offset(bytes_read + offset).copy_array_to_user(src.data(), src.size());
-      });
-      return status;
-    };
     const zx::result<size_t> result = percpu_buffers_[i].Read(copy_fn, static_cast<uint32_t>(len));
     if (result.is_error()) {
       DiagsPrintf(INFO, "failed to copy out ktrace data: %d\n", result.status_value());

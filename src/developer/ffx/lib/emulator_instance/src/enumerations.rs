@@ -263,13 +263,6 @@ pub struct VirtualCpu {
     pub count: usize,
 }
 
-/// Holds a single mapping from a host port to the guest.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct PortMapping {
-    pub guest: u16,
-    pub host: Option<u16>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

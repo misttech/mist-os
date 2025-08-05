@@ -175,39 +175,25 @@ config("target") {
 }
 
 config("cap_lints") {
-  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
+  if (rust_rbe_enable && rust_rbe_exec_strategy == "local" &&
+      rust_cap_lints != rust_cap_lints_default) {
     # The local exec strategy tries to see if there's an RBE cache hit before running the command
     # locally. The RBE cache is often populated by infra builders which never have this flag, so we
     # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
     # of the artifact, so it's safe to reuse it.
-    rustflags = [ "--remote-only=--cap-lints=$rust_cap_lints" ]
+    rustflags = [
+      "--remote-only=--cap-lints=$rust_cap_lints_default",
+      "--local-only=--cap-lints=$rust_cap_lints",
+    ]
   } else {
     rustflags = [ "--cap-lints=$rust_cap_lints" ]
   }
 }
 
-config("cap_lints_warn") {
-  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
-    # The local exec strategy tries to see if there's an RBE cache hit before running the command
-    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
-    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
-    # of the artifact, so it's safe to reuse it.
-    rustflags = [ "--remote-only=--cap-lints=warn" ]
-  } else {
-    rustflags = [ "--cap-lints=warn" ]
-  }
-}
-
 config("cap_lints_allow") {
-  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
-    # The local exec strategy tries to see if there's an RBE cache hit before running the command
-    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
-    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
-    # of the artifact, so it's safe to reuse it.
-    rustflags = [ "--remote-only=--cap-lints=allow" ]
-  } else {
-    rustflags = [ "--cap-lints=allow" ]
-  }
+  # This does not change for RBE as this config is used by targets to specify that they
+  # need specific lint handling, and should override the setting from `:cap_lints` above.
+  rustflags = [ "--cap-lints=allow" ]
 }
 
 config("panic_abort") {

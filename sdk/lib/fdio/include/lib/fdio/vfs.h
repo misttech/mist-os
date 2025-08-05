@@ -11,12 +11,6 @@
 
 __BEGIN_CDECLS
 
-// POSIX defines st_blocks to be the number of 512 byte blocks allocated to the file. The "blkcnt"
-// field of vnattr attempts to accomplish this same goal, but by indirecting through VNATTR_BLKSIZE,
-// we reserve the right to change this "block size unit" (which is distinct from "blksize", because
-// POSIX) whenever we want.
-#define VNATTR_BLKSIZE 512
-
 // bits compatible with POSIX stat
 #define V_TYPE_MASK 0170000
 #define V_TYPE_SOCK 0140000
@@ -45,14 +39,6 @@ __BEGIN_CDECLS
 
 #define VTYPE_TO_DTYPE(mode) (((mode) & V_TYPE_MASK) >> 12)
 #define DTYPE_TO_VTYPE(type) (((type) & 15) << 12)
-
-/// The format of directory entries returned by fuchsia.io/Directory.ReadDirents.
-typedef struct vdirent {
-  uint64_t ino;
-  uint8_t size;
-  uint8_t type;
-  char name[0];
-} __PACKED vdirent_t;
 
 __END_CDECLS
 

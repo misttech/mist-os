@@ -48,6 +48,30 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "version"
+        }
+      },
+      "optionality": "optional",
+      "long": "--version",
+      "short": null,
+      "description": "the version of the product to use.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "tuf-keys"
+        }
+      },
+      "optionality": "optional",
+      "long": "--tuf-keys",
+      "short": null,
+      "description": "the tuf keys to use.",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--stage",

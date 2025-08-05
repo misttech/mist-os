@@ -29,8 +29,6 @@ lazy_static! {
 /// table, except that the opaque binary ComponentDecl has been deserialized and validated.
 #[derive(Debug)]
 pub struct ResolvedComponent {
-    /// The url used to resolve this component.
-    pub resolved_url: String,
     /// The package context, from the component resolution context returned by
     /// the resolver.
     pub context_to_resolve_children: Option<ComponentResolutionContext>,
@@ -62,11 +60,9 @@ impl TryFrom<fresolution::Component> for ResolvedComponent {
             },
             None => None,
         };
-        let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
         let context_to_resolve_children = component.resolution_context.map(Into::into);
         let abi_revision = component.abi_revision.map(Into::into);
         Ok(ResolvedComponent {
-            resolved_url,
             context_to_resolve_children,
             decl,
             package: component.package.map(TryInto::try_into).transpose()?,
@@ -80,7 +76,6 @@ impl TryFrom<fresolution::Component> for ResolvedComponent {
 impl From<ResolvedComponent> for fresolution::Component {
     fn from(component: ResolvedComponent) -> Self {
         let ResolvedComponent {
-            resolved_url,
             context_to_resolve_children,
             decl,
             package,
@@ -92,7 +87,7 @@ impl From<ResolvedComponent> for fresolution::Component {
         let decl_vmo = fidl::Vmo::create(decl_bytes.len() as u64).expect("failed to create VMO");
         decl_vmo.write(&decl_bytes, 0).expect("failed to write to VMO");
         fresolution::Component {
-            url: Some(resolved_url),
+            url: None,
             decl: Some(fidl_fuchsia_mem::Data::Buffer(fidl_fuchsia_mem::Buffer {
                 vmo: decl_vmo,
                 size: decl_bytes.len() as u64,
@@ -235,7 +230,7 @@ impl ResolvedAncestorComponent {
         let parent_component = get_parent(component).await?;
         let resolved_parent = parent_component.lock_resolved_state().await?;
         Ok(Self {
-            address: resolved_parent.address(),
+            address: resolved_parent.address().await?,
             context_to_resolve_children: resolved_parent.context_to_resolve_children(),
         })
     }
@@ -250,7 +245,7 @@ impl ResolvedAncestorComponent {
             // or an error getting the next parent, or its resolved state.
             {
                 let resolved_parent = parent_component.lock_resolved_state().await?;
-                let address = resolved_parent.address();
+                let address = resolved_parent.address().await?;
                 // TODO(https://fxbug.dev/42053123): change this test to something more
                 // explicit, that is, return the parent's address and context if
                 // the component address is a packaged component (determined in
@@ -460,7 +455,7 @@ impl ComponentAddress {
     /// `ComponentAddress`, using the provided resolution context. If a resolution context is not
     /// provided, and the URL is a relative URL, the component's parent will be used to create a
     /// context.
-    async fn from<C: ComponentInstanceInterface>(
+    pub async fn from<C: ComponentInstanceInterface>(
         component_url: &cm_types::Url,
         context: Option<ComponentResolutionContext>,
         component: &Arc<C>,
@@ -517,16 +512,23 @@ impl ComponentAddress {
         &self,
         some_resource: Option<&str>,
     ) -> Result<Self, ResolverError> {
-        let mut url = match &self {
-            Self::Absolute { url } => url.clone(),
-            Self::RelativePath { url, .. } => url.clone(),
+        self.clone().consume_with_new_resource(some_resource)
+    }
+
+    pub fn consume_with_new_resource(
+        mut self,
+        some_resource: Option<&str>,
+    ) -> Result<Self, ResolverError> {
+        let url = match &mut self {
+            Self::Absolute { url } => url,
+            Self::RelativePath { url, .. } => url,
         };
         url.set_fragment(some_resource);
-        match &self {
-            Self::Absolute { .. } => Ok(Self::Absolute { url }),
-            Self::RelativePath { context, scheme, .. } => {
+        match self {
+            Self::Absolute { url } => Ok(Self::Absolute { url }),
+            Self::RelativePath { context, scheme, url } => {
                 Self::check_relative_url(&url)?;
-                Ok(Self::RelativePath { url, context: context.clone(), scheme: scheme.clone() })
+                Ok(Self::RelativePath { url, context, scheme })
             }
         }
     }

@@ -72,10 +72,10 @@ struct VmCowRange {
 
   uint64_t end() const { return offset + len; }
   bool is_empty() const { return len == 0; }
-  bool is_page_aligned() const { return IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(len); }
+  bool is_page_aligned() const { return IS_PAGE_ROUNDED(offset) && IS_PAGE_ROUNDED(len); }
   VmCowRange ExpandTillPageAligned() const {
-    const uint64_t start = ROUNDDOWN(offset, PAGE_SIZE);
-    return VmCowRange(start, ROUNDUP(end(), PAGE_SIZE) - start);
+    const uint64_t start = ROUNDDOWN_PAGE_SIZE(offset);
+    return VmCowRange(start, ROUNDUP_PAGE_SIZE(end()) - start);
   }
 
   VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }
@@ -242,7 +242,7 @@ class VmCowPages final : public VmHierarchyBase,
   // both are true should the caller actually borrow at the caller's specific potential borrowing
   // site.  For example, see is_borrowing_in_supplypages_enabled() and
   // is_borrowing_on_mru_enabled().
-  // Aside from the general borrowing in the pmm_physical_page_borrow_config being turned on and
+  // Aside from the general borrowing in the PhysicalPageBorrowingConfig being turned on and
   // off, the ability to borrow is constant over the lifetime of the VmCowPages.
   bool can_borrow_locked() const TA_REQ(lock()) {
     // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
@@ -262,25 +262,12 @@ class VmCowPages final : public VmHierarchyBase,
 
     bool source_is_suitable = page_source_->properties().is_preserving_page_content;
 
-    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
-    // return false.  We could delete this bool without damaging correctness, but we want to
-    // mitigate a call site that maybe fails to check its call-site-specific settings such as
-    // is_borrowing_in_supplypages_enabled().
-    //
-    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
-    // also, but by checking here, we minimize the amount of code that will run when
-    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
-    // with borrowing).
-    bool borrowing_is_generally_acceptable =
-        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
-
     // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
     // these from being compatible AFAICT - we're just avoiding overlap of these two things until
     // later.
     bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
 
-    return source_is_suitable && borrowing_is_generally_acceptable &&
-           !overlapping_with_other_features;
+    return source_is_suitable && !overlapping_with_other_features;
   }
 
   // In addition to whether a VmCowPages is allowed, for correctness reasons, to borrow pages there
@@ -400,9 +387,10 @@ class VmCowPages final : public VmHierarchyBase,
   // case |taken_len| might be populated with a value less than |len|.
   //
   // |taken_len| is always filled with the amount of |len| that has been processed to allow for
-  // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
-  zx_status_t TakePages(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
-                        MultiPageRequest* page_request);
+  // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned. Similarly the
+  // |splice_offset| indicates the base offset in |pages| where the content should be inserted.
+  zx_status_t TakePages(VmCowRange range, uint64_t splice_offset, VmPageSpliceList* pages,
+                        uint64_t* taken_len, MultiPageRequest* page_request);
 
   // See VmObject::SupplyPages
   //
@@ -895,11 +883,6 @@ class VmCowPages final : public VmHierarchyBase,
              ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker, uint64_t lock_order);
 
   ~VmCowPages() override;
-
-  // A private helper that takes pages if this VmCowPages has a parent.
-  zx_status_t TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, DeferredOps& deferred,
-                                        MultiPageRequest* page_request) TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
   friend class LockedParentWalker;

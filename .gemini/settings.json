@@ -2,5 +2,10 @@
   "fileFiltering": {
     "respectGitIgnore": true,
     "enableRecursiveFileSearch": false
-  }
+  },
+  "excludeTools": [
+    "search_file_content"
+  ],
+  "toolDiscoveryCommand": ".gemini/discover_tools.sh",
+  "toolCallCommand": ".gemini/call_tool.sh"
 }

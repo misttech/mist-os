@@ -9,7 +9,6 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use log::{debug, warn};
 use lru_cache::LruCache;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path};
 
@@ -156,7 +155,7 @@ impl AccountKeyList {
             let _ = cache.insert(k, ());
         });
 
-        let val = rand::thread_rng().gen::<u64>();
+        let val = rand::random::<u64>();
         let path = format!("data/test_account_keys{}.json", val);
         Self { keys: cache, path: path::PathBuf::from(path), account_key_count: Default::default() }
     }
@@ -204,7 +203,7 @@ impl AccountKeyList {
             return Ok(vec![0x0]);
         }
 
-        let salt = rand::thread_rng().gen::<u8>();
+        let salt = rand::random::<u8>();
         self.service_data_internal(salt)
     }
 

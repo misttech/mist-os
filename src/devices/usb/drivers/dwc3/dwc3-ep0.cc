@@ -65,6 +65,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
   // Only DataOut state needs TRB read.
   dwc3_trb_t trb = ep0_.state == Ep0::State::DataOut ? ep0_.shared_fifo.Read() : dwc3_trb_t{};
   ep0_.shared_fifo.AdvanceRead();
+  ep0_.transfer_in_progress_ = false;
 
   switch (ep0_.state) {
     case Ep0::State::Setup: {
@@ -83,6 +84,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
         EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, ep0_.buffer->phys(),
                         ep0_.buffer->size());
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::DataOut;
         break;
       }
@@ -145,6 +147,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if (ep_num == kEp0Out) {
         EpStartTransfer(ep0_.out, ep0_.shared_fifo,
                         ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::Status;
       }
       break;
@@ -152,6 +155,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if (ep_num == kEp0In) {
         EpStartTransfer(ep0_.in, ep0_.shared_fifo,
                         ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::Status;
       }
       break;
@@ -172,7 +176,6 @@ void Dwc3::HandleEp0Setup(size_t length) {
       case USB_REQ_SET_CONFIGURATION:
         ResetConfiguration();
         Ep0StartEndpoints();
-        length = 0;
         break;
       default:
         // fall through to the common DoControlCall
@@ -229,6 +232,7 @@ void Dwc3::HandleEp0Setup(size_t length) {
               CacheFlush(ep0_.buffer.get(), 0, read_data.size_bytes());
               EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA,
                               ep0_.buffer->phys(), read_data.size_bytes());
+              ep0_.transfer_in_progress_ = true;
             }
           });
 }

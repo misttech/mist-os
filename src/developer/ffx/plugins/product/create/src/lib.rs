@@ -9,6 +9,7 @@ use assembly::Assembly;
 use assembly_artifact_cache::ArtifactCache;
 use assembly_tool::PlatformToolProvider;
 use camino::Utf8PathBuf;
+use delivery_blob::DeliveryBlobType;
 use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use ffx_product_create_args::CreateCommand;
@@ -86,6 +87,12 @@ struct SanitizedCreateCommand {
     /// The board config to use.
     pub board: String,
 
+    /// The version of the product to use.
+    pub version: Option<String>,
+
+    /// The tuf keys to use.
+    pub tuf_keys: Option<Utf8PathBuf>,
+
     /// What result we want from running `ffx product create`.
     pub result: CreateResult,
 }
@@ -126,7 +133,9 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
             (p, b)
         };
 
-        Ok(Self { platform, product, board, result })
+        let version = cmd.version;
+        let tuf_keys = cmd.tuf_keys;
+        Ok(Self { platform, product, board, version, tuf_keys, result })
     }
 }
 
@@ -149,13 +158,26 @@ async fn sanitized_product_create(
         CreateResult::Out(out) => out,
     };
 
+    let product_name = assembly.product.product.release_info.info.name.clone();
+    let board_name = assembly.board.release_info.info.name.clone();
+    let name = format!("{}.{}", product_name, board_name);
+
+    let version =
+        cmd.version.unwrap_or_else(|| assembly.product.product.release_info.info.version.clone());
+    let update_version_file = tmp_path.join("update_version.txt");
+    std::fs::write(&update_version_file, &version)?;
+
     writer.line(format!("Assembling into {} ...", &out))?;
     let tools = PlatformToolProvider::new(assembly.platform_path.clone());
     let system = Box::pin(assembly.create_system(&tmp_path)).await?;
-    let _ = ProductBundleBuilder::new("my_pb", "testing")
+    let mut builder = ProductBundleBuilder::new(name, version)
         .system(system, Slot::A)
-        .build(Box::new(tools), out)
-        .await?;
+        .update_package(update_version_file, 1);
+
+    if let Some(tuf_keys) = cmd.tuf_keys {
+        builder = builder.repository(DeliveryBlobType::Type1, tuf_keys);
+    }
+    let _ = builder.build(Box::new(tools), out).await?;
     cache.purge()?;
     Ok(())
 }

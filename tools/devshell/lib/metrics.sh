@@ -20,7 +20,7 @@
 # depends on FUCHSIA_DIR being defined correctly.
 
 # Increase the metrics version by 1 when analytics is updated
-_METRICS_VERSION="1"
+_METRICS_VERSION="3"
 _METRICS_ALLOWS_CUSTOM_REPORTING=( "test" )
 # If args match the below, then track capture group 1
 _METRICS_TRACK_REGEX=(
@@ -622,6 +622,7 @@ function track-command-execution {
     --arg args "${args1}" \
     --arg args2 "${args2}" \
     --arg args_truncated "${args_truncated}" \
+    --arg invoker "${FUCHSIA_FX_INVOKER}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "invoke" "${event_params}"
@@ -712,6 +713,7 @@ function track-command-finished {
     --arg args_truncated "${args_truncated}" \
     --arg exit_status "${exit_status}" \
     --arg is_remote "${is_remote}" \
+    --arg invoker "${FUCHSIA_FX_INVOKER}" \
     --argjson timing "${timing}" \
     --argjson start_time_micros "${start_time}" \
     --argjson end_time_micros "${end_time}" \
@@ -771,6 +773,7 @@ function track-build-event {
   local build_dir="$7"
   local is_no_op="$8"
   local is_clean_build="$9"
+  local quiet="${10}"
 
   local args_gn=""
   local args_json=""
@@ -825,6 +828,12 @@ function track-build-event {
     env_flags="${env_flags}-multi"
   fi
 
+  if [[ "${quiet}" == true ]]; then
+    env_flags="${env_flags}+quiet"
+  else
+    env_flags="${env_flags}-quiet"
+  fi
+
   local -i args_json_size=$(wc -c < "${build_dir}"/args.json)
   local -i target_count=0
   if [[ "${is_no_op}" -eq 0 ]]; then
@@ -846,6 +855,7 @@ function track-build-event {
     --argjson is_clean_build "${is_clean_build}" \
     --arg env_flags "${env_flags}" \
     --argjson args_json_size "${args_json_size}" \
+    --arg invoker "${FUCHSIA_FX_INVOKER}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"

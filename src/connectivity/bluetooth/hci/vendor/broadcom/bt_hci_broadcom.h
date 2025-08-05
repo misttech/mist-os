@@ -54,6 +54,7 @@ class BtHciBroadcom final
 
  private:
   static constexpr size_t kMacAddrLen = 6;
+  static constexpr zx::duration kDefaultIdleThreshold = zx::msec(300);
 
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
 
@@ -89,6 +90,15 @@ class BtHciBroadcom final
   fpromise::promise<void, zx_status_t> SetBdaddr(const std::array<uint8_t, kMacAddrLen>& bdaddr);
 
   fpromise::promise<void, zx_status_t> SetDefaultPowerCaps();
+
+  // Enable Low Power Mode
+  // The controller may sleep after host_idle_threshold duration passes with no
+  // outgoing data and device_idle_threshold with no incoming data.
+  // Wake pins can prevent this.
+  fpromise::promise<void, zx_status_t> EnableLowPowerMode(zx::duration host_idle_threshhold,
+                                                          zx::duration device_idle_threshhold);
+
+  fpromise::promise<void, zx_status_t> DisableLowPowerMode();
 
   fpromise::promise<> LogControllerFallbackBdaddr();
 

@@ -110,7 +110,7 @@ bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
 
 bool Vnode::ValidateRights([[maybe_unused]] fuchsia_io::Rights rights) const { return true; }
 
-zx::result<> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
+zx::result<> Vnode::DeprecatedValidateOptions(DeprecatedOptions options) const {
   // The connection should ensure only one of DIRECTORY and NOT_DIRECTORY is set.
   ZX_DEBUG_ASSERT(!((options.flags & fuchsia_io::OpenFlags::kDirectory) &&
                     options.flags & fuchsia_io::OpenFlags::kNotDirectory));
@@ -218,14 +218,14 @@ fio::Abilities Vnode::GetAbilities() const {
 DirentFiller::DirentFiller(void* ptr, size_t len)
     : ptr_(static_cast<char*>(ptr)), pos_(0), len_(len) {}
 
-zx_status_t DirentFiller::Next(std::string_view name, uint8_t type, uint64_t ino) {
-  vdirent_t* de = reinterpret_cast<vdirent_t*>(ptr_ + pos_);
-  size_t sz = sizeof(vdirent_t) + name.length();
+zx_status_t DirentFiller::Next(std::string_view name, fio::DirentType type, uint64_t ino) {
+  fs::DirectoryEntry* de = reinterpret_cast<fs::DirectoryEntry*>(ptr_ + pos_);
+  size_t sz = sizeof(fs::DirectoryEntry) + name.length();
   if (sz > len_ - pos_ || name.length() > NAME_MAX) {
     return ZX_ERR_INVALID_ARGS;
   }
   de->ino = ino;
-  de->size = static_cast<uint8_t>(name.length());
+  de->name_length = static_cast<uint8_t>(name.length());
   de->type = type;
   memcpy(de->name, name.data(), name.length());
   pos_ += sz;

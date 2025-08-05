@@ -113,23 +113,73 @@ impl EnvContext {
     }
 
     async fn invariant_check(&self) -> Result<()> {
+        log::debug!(
+            "Checking connectivity invariant for EnvContext: {}",
+            logging::log_id(&self.context)
+        );
         if self.target_spec.is_none() {
             return Err(unspecified_target());
         }
         let mut device_connection = self.device_connection.lock().await;
-        if device_connection.is_none() {
+        // This is a race condition here. It is possible that the connection
+        // will have been terminated between here and when this function completes even if
+        // `is_terminated` returns `false`, meaning we would end up hitting the timeout in
+        // functions like `connect_remote_control_proxy`.
+        let device_connection_is_terminated =
+            device_connection.as_ref().map(|c| c.is_terminated()).unwrap_or(false);
+        if device_connection_is_terminated {
+            log::warn!(
+                "connection has been interrupted. Attempting to reconnect. Any closed FIDL proxies seen will have been related to this EnvContext's connection having been lost. This is for EnvContext: {}",
+                logging::log_id(&self.context)
+            );
+        }
+        if device_connection.is_none() || device_connection_is_terminated {
             *device_connection =
                 Some(new_device_connection(&self.context, &self.target_spec).await?);
         }
+        log::debug!("Invariant check successful: {}", logging::log_id(&self.context));
         Ok(())
     }
 
+    async fn connect_remote_control_helper(
+        &self,
+    ) -> Result<fidl_fuchsia_developer_remotecontrol::RemoteControlProxy> {
+        const MAX_RECONNECT_ATTEMPTS: u32 = 1;
+        for attempt in 0..=MAX_RECONNECT_ATTEMPTS {
+            self.invariant_check().await?;
+            let t = Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
+            match timeout::timeout(t, self.device_connection.lock().await.as_ref().unwrap().rcs_proxy()).await.map_err(|_| {
+            anyhow::anyhow!("Timed out attempting to get remote control proxy. This happened after verifying that we can connect to the device, so the device has likely disconnected in the interim.")
+                }) {
+                // No timeout here (there are two layers of errors)
+                Ok(res) => return Ok(res?),
+                Err(e) => {
+                    if attempt < MAX_RECONNECT_ATTEMPTS {
+                        log::warn!("{e} Attempting to connect once more");
+                    } else {
+                        log::warn!("{e} Max attempts reached. Giving up and returning error.");
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        // The above will always return eventually.
+        unreachable!();
+    }
+
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
-        self.invariant_check().await?;
-        let proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        log::debug!(
+            "Entering connect_remote_control_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
+        let proxy = self.connect_remote_control_helper().await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
+        log::debug!(
+            "Acquired remote_control_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         Ok(res)
     }
 
@@ -138,10 +188,15 @@ impl EnvContext {
         moniker: String,
         capability_name: String,
     ) -> Result<zx_types::zx_handle_t> {
-        self.invariant_check().await?;
-        let rcs_proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        log::debug!(
+            "Entering connect_device_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
+        let rcs_proxy = self.connect_remote_control_helper().await?;
+        let proxy_timeout =
+            Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
         let proxy = rcs::connect_with_timeout_at::<ControllerMarker>(
-            Duration::from_secs(15),
+            proxy_timeout,
             &moniker,
             &capability_name,
             &rcs_proxy,
@@ -154,6 +209,10 @@ impl EnvContext {
     }
 
     pub async fn target_wait(&self, timeout: u64, offline: bool) -> Result<()> {
+        log::debug!(
+            "Executing target_wait for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         let cmd = ffx_wait_args::WaitOptions { timeout, down: offline };
         let tool = ffx_wait::WaitOperation {
             cmd,

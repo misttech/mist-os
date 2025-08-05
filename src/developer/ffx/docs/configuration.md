@@ -12,6 +12,8 @@ When updating, please add the value in alphabetical order.
 
     | Configuration Value                     | Documentation                      |
     | --------------------------------------- | ---------------------------------- |
+    | `connectivity.direct`                   | Support direct target connections. |
+    |                                         | Defaults to `false`.               |
     | `connectivity.enable_usb`               | Allow ffx to use a USB connection. |
     |                                         | Not supported on mac. Defaults to  |
     |                                         | `false`.                           |
@@ -121,11 +123,6 @@ When updating, please add the value in alphabetical order.
     | `ffx.subtool-search-paths`              | A list of paths to search for non- |
     |                                         | SDK subtool binaries. Defaults to  |
     |                                         | `$BUILD_DIR/host-tools`            |
-    | `ffx.target-list.local-connect`         | Specifies whether to `ffx target   |
-    |                                         | list` should try to connect to the |
-    |                                         | target when doing local discovery. |
-    |                                         | and not in strict mode.            |
-    |                                         | Default: `false`                   |
     | `ffx.ui.mode`                           | Sets the ui mode for ffx and fx    |
     |                                         | options are "text" and "tui",      |
     |                                         | defaults to `text` for plaintext   |

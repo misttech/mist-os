@@ -6,6 +6,7 @@ use super::*;
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker;
+use fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy;
 use fuchsia_component::client::connect_to_protocol;
 use futures::never::Never;
 use futures::prelude::*;
@@ -26,7 +27,11 @@ where
     /// This stream ultimately handles all of the event-handling for the driver,
     /// processing events from both OpenThread, the network interface, and other
     /// relevant sources such as regulatory domain changes.
-    pub fn main_loop_stream(&self) -> impl Stream<Item = Result<(), anyhow::Error>> + Send + '_
+    pub fn main_loop_stream(
+        &self,
+        epskc_receiver: mpsc::Receiver<border_agent::PublishServiceRequest>,
+        publisher: ServiceInstancePublisherProxy,
+    ) -> impl Stream<Item = Result<(), anyhow::Error>> + Send + '_
     where
         OT: AsRef<ot::Instance>,
     {
@@ -264,6 +269,8 @@ where
             }
         };
 
+        let epskc_service = border_agent::manage_epskc_service_publisher(epskc_receiver, publisher);
+
         init_future.into_stream().chain(futures::stream::select_all([
             tasklets_stream.boxed(),
             regulatory_region_stream.boxed(),
@@ -276,6 +283,7 @@ where
             dhcp_v6_pd_state_changed_stream.boxed(),
             scan_watchdog.into_stream().boxed(),
             openthread_cli_inbound_loop.into_stream().boxed(),
+            epskc_service.into_stream().boxed(),
         ]))
     }
 
@@ -306,6 +314,10 @@ where
                 self.on_ot_bbr_multicast_listener_event(event, address);
             },
         ));
+
+        driver_state.ot_instance.border_agent_set_ephemeral_key_callback(Some(move || {
+            self.handle_epskc_state_changed()
+        }));
 
         if let Err(err) = driver_state.set_discovery_proxy_enabled(true) {
             warn!("Unable to start SRP discovery proxy: {:?}", err);

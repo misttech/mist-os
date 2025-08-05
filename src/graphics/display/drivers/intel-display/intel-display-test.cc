@@ -83,8 +83,7 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
-  constexpr uint64_t kBanjoValidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
+  constexpr uint64_t kBanjoValidBufferCollectionId = kValidBufferCollectionId.ToBanjo();
   EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
                                                          token1_endpoints->client.TakeChannel()));
 
@@ -119,8 +118,7 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
   EXPECT_STATUS(display_.DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
                 ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_.DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
@@ -200,8 +198,7 @@ TEST(IntelDisplay, ImportImage) {
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(display.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
@@ -261,8 +258,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                          token_endpoints->client.TakeChannel()));
 
@@ -287,8 +283,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                          token_endpoints->client.TakeChannel()));
 

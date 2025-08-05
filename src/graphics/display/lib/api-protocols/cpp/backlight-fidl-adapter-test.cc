@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fit/result.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
@@ -43,7 +44,7 @@ class BacklightFidlAdapterTest : public ::testing::Test {
     ASSERT_OK(async::PostTask(loop_.dispatcher(), [this]() { fidl_adapter_.reset(); }));
 
     loop_.Shutdown();
-    mock_.CheckAllAccessesReplayed();
+    mock_.CheckAllCallsReplayed();
   }
 
  protected:

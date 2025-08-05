@@ -16,8 +16,8 @@ static constexpr zx::duration kTestDuration = zx::sec(100);
 static constexpr auto kDisassocReason = wlan_ieee80211::ReasonCode::kNotAuthenticated;
 static constexpr auto kDeauthReason = wlan_ieee80211::ReasonCode::kNotAuthenticated;
 static const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
-static constexpr wlan_common::WlanChannel kApChannel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+static constexpr wlan_ieee80211::WlanChannel kApChannel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 static const common::MacAddr kStaMacAddr({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
 
 TEST_F(SimTest, DisassocFromApResultsInDisassocInd) {
@@ -403,11 +403,10 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDeauth) {
   // Make sure final disconnect was successful.
   EXPECT_EQ(ap.GetNumAssociatedClient(), 0U);
 
-  // Disassociated by SME during first connection. Make SME was notified.
-  EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 1U);
+  // Disassociated by SME during first connection. Make sure SME was notified.
+  ASSERT_EQ(client_ifc.stats_.disassoc_results.size(), 1U);
 
-  // Deauth event during second connection. We can tell it was from the
-  // second disconnect because of the reason code.
+  // Deauth event during second connection manifests as a DeauthInd sent to SME.
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
   EXPECT_TRUE(deauth_ind.locally_initiated());

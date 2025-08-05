@@ -173,6 +173,8 @@ class Dispatcher : public async_dispatcher_t,
       return ZX_OK;
     }
 
+    void ScanThreadsForStalls();
+
     uint32_t num_dispatchers() const {
       fbl::AutoLock al(&lock_);
       return num_dispatchers_;
@@ -234,19 +236,24 @@ class Dispatcher : public async_dispatcher_t,
                                                     std::string_view scheduler_role) {
       async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
       config.irq_support = true;
-      if (scheduler_role != kNoSchedulerRole) {
-        config.data = self;
-        // Add a thread wakeup handler.
-        config.prologue = [](async_loop_t* loop, void* data) {
-          ThreadPool* thread_pool = static_cast<ThreadPool*>(data);
-          thread_pool->ThreadWakeupPrologue();
-        };
-      }
+      config.data = self;
+      // Add a thread wakeup handler.
+      config.prologue = [](async_loop_t* loop, void* data) {
+        ThreadPool* thread_pool = static_cast<ThreadPool*>(data);
+        thread_pool->ThreadWakeupPrologue();
+      };
+      config.epilogue = [](async_loop_t* loop, void* data) {
+        ThreadPool* thread_pool = static_cast<ThreadPool*>(data);
+        thread_pool->ThreadWakeupEpilogue();
+      };
       return config;
     }
 
     // Function that runs for every thread wakeup before any handler is called.
     void ThreadWakeupPrologue();
+
+    // Function that runs for every thread wakeup after any handler is called.
+    void ThreadWakeupEpilogue();
 
     std::string scheduler_role_;
 
@@ -261,6 +268,9 @@ class Dispatcher : public async_dispatcher_t,
     // many threads. Technically this can result in a deadlock scenario in a very complex driver
     // host. We need better support for dynamically starting threads as necessary.
     uint32_t max_threads_ __TA_GUARDED(&lock_) = 10;
+    // A unique_ptr to each active thread's task entry time slot, used to tell when we've run
+    // out of un-stalled threads and should spawn another.
+    std::vector<std::atomic_int64_t*> thread_entry_time_slots_ __TA_GUARDED(&lock_);
 
     uint32_t num_dispatchers_ __TA_GUARDED(&lock_) = 0;
 
@@ -863,6 +873,7 @@ class DispatcherCoordinator {
   // Implementation of fdf_env_*.
   static uint32_t GetThreadLimit(std::string_view scheduler_role);
   static zx_status_t SetThreadLimit(std::string_view scheduler_role, uint32_t max_threads);
+  void ScanThreadsForStalls();
 
   // Returns ZX_OK if |dispatcher| was added successfully.
   // Returns ZX_ERR_BAD_STATE if the driver is currently shutting down.
@@ -1025,6 +1036,9 @@ class DispatcherCoordinator {
   uint32_t num_notify_shutdown_threads_ = 0;
   TokenManager token_manager_;
 };
+
+// Returns the currently active dispatcher coordinator
+DispatcherCoordinator& GetDispatcherCoordinator();
 
 }  // namespace driver_runtime
 

@@ -10,7 +10,14 @@
 
 #include <cstdint>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using DriverCaptureImageIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display_engine::wire::ImageId, uint64_t>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -21,18 +28,8 @@ namespace display {
 // API is migrated from Banjo to FIDL.
 //
 // TODO(https://fxbug.dev/42079544): Remove this type when unifying image ID namespaces.
-DEFINE_STRONG_INT(DriverCaptureImageId, uint64_t);
-
-constexpr DriverCaptureImageId ToDriverCaptureImageId(uint64_t banjo_driver_capture_image_id) {
-  return DriverCaptureImageId(banjo_driver_capture_image_id);
-}
-constexpr uint64_t ToBanjoDriverCaptureImageId(DriverCaptureImageId driver_capture_image_id) {
-  return driver_capture_image_id.value();
-}
-constexpr inline fuchsia_hardware_display_engine::wire::ImageId ToFidlDriverCaptureImageId(
-    DriverCaptureImageId driver_capture_image_id) {
-  return {.value = driver_capture_image_id.value()};
-}
+using DriverCaptureImageId =
+    display::internal::IdType<display::internal::DriverCaptureImageIdTraits>;
 
 constexpr DriverCaptureImageId kInvalidDriverCaptureImageId(INVALID_ID);
 

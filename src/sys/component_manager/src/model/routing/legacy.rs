@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDecl, UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl,
 };
+use cm_types::RelativePath;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use log::*;
@@ -226,16 +227,25 @@ fn use_directory_or_storage(
     struct DirectorySender {
         dir_entry: Arc<RouteDirectory>,
         scope: ExecutionScope,
-        flags: fio::Flags,
+        allowed_flags: fio::Flags,
     }
 
     #[async_trait]
     impl DirConnectable for DirectorySender {
-        fn send(&self, server: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
+        fn send(
+            &self,
+            server: ServerEnd<fio::DirectoryMarker>,
+            _subdir: RelativePath,
+            rights: Option<fio::Operations>,
+        ) -> Result<(), ()> {
+            let flags = if let Some(rights) = rights {
+                fio::Flags::from_bits(rights.bits()).ok_or(())?
+            } else {
+                self.allowed_flags | fio::Flags::PROTOCOL_DIRECTORY
+            };
             // Serve this directory on the component's execution scope rather than the namespace
             // execution scope so that requests don't block namespace teardown, but they will block
             // component destruction.
-            let flags = self.flags;
             flags
                 .to_object_request(server)
                 .handle(|object_request| {
@@ -259,7 +269,7 @@ fn use_directory_or_storage(
     // will not carry over the epitaph.
     let scope = target.execution_scope.clone();
     let dir_entry = Arc::new(RouteDirectory { request: request.into(), target: target.as_weak() });
-    DirConnector::new_sendable(DirectorySender { dir_entry, scope, flags }).into()
+    DirConnector::new_sendable(DirectorySender { dir_entry, scope, allowed_flags: flags }).into()
 }
 
 fn use_event_stream(decl: UseEventStreamDecl, target: &Arc<ComponentInstance>) -> Capability {

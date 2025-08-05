@@ -193,7 +193,7 @@ int IdlePowerThread::Run(void* arg) {
         ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE("kernel:sched", "suspend");
 
         if (platform_supports_suspend_cpu()) {
-          zx_status_t status = platform_suspend_cpu();
+          zx_status_t status = platform_suspend_cpu(PlatformAllowDomainPowerDown::Yes);
           DEBUG_ASSERT_MSG(
               status == ZX_OK || status == ZX_ERR_ACCESS_DENIED || status == ZX_ERR_INVALID_ARGS,
               "%d", status);

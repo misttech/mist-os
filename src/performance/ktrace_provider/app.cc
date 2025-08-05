@@ -19,6 +19,8 @@
 
 #include <iterator>
 
+#include <fbl/algorithm.h>
+
 #include "src/performance/ktrace_provider/device_reader.h"
 
 namespace ktrace_provider {
@@ -102,9 +104,10 @@ void ForwardBuffer(std::unique_ptr<DrainContext> drain_context) {
   if (!drain_context) {
     return;
   }
-  trace_context_t* buffer_context = trace_acquire_context();
 
-  if (buffer_context) {
+  const zx::time_monotonic start_time = zx::clock::get_monotonic();
+
+  if (trace_context_t* buffer_context = trace_acquire_context()) {
     auto d = fit::defer([buffer_context]() { trace_release_context(buffer_context); });
 
     // If we have kernel streaming support, instead of reading at an offset, we simply always emit a
@@ -147,6 +150,18 @@ void ForwardBuffer(std::unique_ptr<DrainContext> drain_context) {
       }
     }
   }
+
+  const zx::time_monotonic end_time = zx::clock::get_monotonic();
+  const zx::duration read_out_duration = end_time - start_time;
+
+  // TODO(eieio): Use a profile return value to keep this in sync with profile
+  // changes and use thread runtime for this measurement.
+  const zx::duration profile_capacity = zx::usec(2300);
+  if (read_out_duration > profile_capacity) {
+    FX_LOGS(WARNING) << "Read out exceeded expected worst case execution time: expected="
+                     << profile_capacity.get() << "ns actual=" << read_out_duration.get() << "ns";
+  }
+
   switch (trace_state()) {
     case TRACE_STOPPED:
     case TRACE_STOPPING:
@@ -155,13 +170,19 @@ void ForwardBuffer(std::unique_ptr<DrainContext> drain_context) {
       break;
   }
 
-  zx::duration poll_period = drain_context->poll_period;
-  async::PostDelayedTask(
+  // Align the next read out to a multiple of the poll period to ensure a consistent sampling
+  // interval, independent of scheduling latency.
+  const zx::time now_plus_poll_period = zx::clock::get_monotonic() + drain_context->poll_period;
+  const zx::time_monotonic next_poll_time{static_cast<zx_time_t>(
+      fbl::round_down(static_cast<uint64_t>(now_plus_poll_period.get()),
+                      static_cast<uint64_t>(drain_context->poll_period.get())))};
+
+  async::PostTaskForTime(
       async_get_default_dispatcher(),
       [drain_context = std::move(drain_context)]() mutable {
         ForwardBuffer(std::move(drain_context));
       },
-      poll_period);
+      next_poll_time);
 }
 
 }  // namespace

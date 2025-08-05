@@ -121,6 +121,23 @@ impl Version {
         Self { update_hash, system_image_hash, vbmeta_hash, zbi_hash, build_version, epoch }
     }
 
+    pub fn for_manifest(manifest: &update_package::manifest::OtaManifestV1) -> Self {
+        use update_package::images::AssetType;
+        let [vbmeta_hash, zbi_hash] = [AssetType::Vbmeta, AssetType::Zbi].map(|asset_type| {
+            manifest
+                .images
+                .iter()
+                .find(|image| {
+                    image.image_type == update_package::manifest::ImageType::Asset(asset_type)
+                })
+                .map(|image| image.sha256.to_string())
+                .unwrap_or_default()
+        });
+        let build_version = manifest.build_version.clone();
+        let epoch = manifest.epoch.to_string();
+        Self { vbmeta_hash, zbi_hash, build_version, epoch, ..Self::default() }
+    }
+
     /// Returns the Version for the current running system.
     pub async fn current(
         last_target_version: Option<&Version>,

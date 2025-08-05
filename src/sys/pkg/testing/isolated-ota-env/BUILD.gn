@@ -32,6 +32,7 @@ rustc_library("isolated-ota-env") {
     "//third_party/rust_crates:mock-omaha-server",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:url",
   ]
 
   sources = [ "src/lib.rs" ]

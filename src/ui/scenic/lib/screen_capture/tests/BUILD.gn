@@ -26,6 +26,7 @@ cc_test_executable("unittests") {
 
   deps = [
     "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/ui/scenic/cpp",
     "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/allocation",

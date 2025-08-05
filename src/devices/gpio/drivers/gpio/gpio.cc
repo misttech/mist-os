@@ -6,8 +6,8 @@
 
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 #include <lib/fit/defer.h>
@@ -250,12 +250,6 @@ void GpioDevice::ConnectGpio(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
                                      const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                                      const std::optional<std::string>& node_name) {
-  zx::result<> compat_result = compat_server_.Initialize(incoming, outgoing, node_name, pin_name());
-  if (compat_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize compat server: %s", compat_result.status_string());
-    return compat_result.take_error();
-  }
-
   fuchsia_hardware_gpio::Service::InstanceHandler gpio_handler({
       .device =
           [&](fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
@@ -292,9 +286,10 @@ zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& inco
 
 zx::result<> GpioDevice::AddDevice(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> root_node,
                                    fdf::Logger& logger) {
-  std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_gpio::Service>(pin_name()));
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pin::Service>(pin_name()));
+  std::vector<fuchsia_driver_framework::Offer> offers{
+      fdf::MakeOffer2<fuchsia_hardware_gpio::Service>(pin_name()),
+      fdf::MakeOffer2<fuchsia_hardware_pin::Service>(pin_name()),
+  };
 
   std::vector<fuchsia_driver_framework::NodeProperty> props{
       fdf::MakeProperty(bind_fuchsia::GPIO_PIN, pin_),

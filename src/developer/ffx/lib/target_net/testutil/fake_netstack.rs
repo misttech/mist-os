@@ -104,9 +104,9 @@ impl TcpState {
     }
 
     fn alloc_local_port(&self, domain: fsock::Domain) -> Result<NonZeroU16, fposix::Errno> {
-        let mut rng = rand::rngs::SmallRng::from_entropy();
+        let mut rng = rand::rngs::SmallRng::from_os_rng();
         for _ in 0..10_000 {
-            let port = NonZeroU16::new(rng.gen_range(EPHEMERAL_RANGE)).unwrap();
+            let port = NonZeroU16::new(rng.random_range(EPHEMERAL_RANGE)).unwrap();
             match self.bind_local_port(domain, port) {
                 Ok(()) => return Ok(port),
                 Err(_) => {}

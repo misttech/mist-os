@@ -34,16 +34,16 @@ pub trait SortByU64 {
 /// several buckets, `FuzzyHash::fuzzy_hash` must be called to split the key up into each of the
 /// possible values that it overlaps with.
 pub trait FuzzyHash: Hash + Sized {
-    type Iter: Iterator<Item = u64>;
     /// To support range-based keys, multiple hash values may need to be checked for a given key.
     /// For example, an extent [0..1024) might return extents [0..512), [512..1024), each of which
     /// will have a unique return value for `Self::hash`.  For point-based keys, a single hash
     /// suffices, in which case None is returned and the hash value of `self` should be checked.
     /// Note that in general only a small number of partitions (e.g. 2) should be checked at once.
     /// Debug assertions will fire if too large of a range is checked.
-    fn fuzzy_hash(&self) -> Self::Iter;
+    fn fuzzy_hash(&self) -> impl Iterator<Item = u64>;
 
-    /// Returns whether the type is a range-based key.
+    /// Returns whether the type is a range-based key. Used to prevent use of range-based keys as
+    /// a point query (see [`crate::lsm_tree::merge::Query::Point`]).
     fn is_range_key(&self) -> bool {
         false
     }
@@ -294,22 +294,6 @@ pub trait LayerKey: Clone {
     }
 }
 
-/// See `Layer::len`.
-pub enum ItemCount {
-    Precise(usize),
-    Estimate(usize),
-}
-
-impl std::ops::Deref for ItemCount {
-    type Target = usize;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Precise(size) => size,
-            Self::Estimate(size) => size,
-        }
-    }
-}
-
 /// Layer is a trait that all layers need to implement (mutable and immutable).
 #[async_trait]
 pub trait Layer<K, V>: Send + Sync {
@@ -328,11 +312,8 @@ pub trait Layer<K, V>: Send + Sync {
     async fn seek(&self, bound: std::ops::Bound<&K>)
         -> Result<BoxedLayerIterator<'_, K, V>, Error>;
 
-    /// Returns the number of items in the layer file, or an estimate if not known.
-    /// Old persistent layer formats did not keep track of how many entries they have, hence the
-    /// estimate.  If this is wrong, bloom filter sizing might be off, but that won't affect
-    /// correctness, and will wash out with future compactions anyways.
-    fn estimated_len(&self) -> ItemCount;
+    /// Returns the number of items in the layer file.
+    fn len(&self) -> usize;
 
     /// Returns whether the layer *might* contain records relevant to `key`.  Note that this can
     /// return true even if the layer has no records relevant to `key`, but it will never return

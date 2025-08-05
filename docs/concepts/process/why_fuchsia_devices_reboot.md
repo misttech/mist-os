@@ -68,8 +68,12 @@ and is hardware dependent.
 
 ### User request
 
-A user or a component acting on behalf of a user, such as SL4F or RCS,
-determines a reboot is necessary.
+The end user of the device explicitly requested a reboot of the device.
+
+### Developer request
+
+The developer initiated the reboot, typically via a shell command or similar
+interface, including within an automated test.
 
 ### System update
 
@@ -145,6 +149,7 @@ Hardware watchdog timeout    | `HARDWARE_WATCHDOG_TIMEOUT`  | `HardwareWatchdogT
 Software watchdog timeout    | `SOFTWARE_WATCHDOG_TIMEOUT`  | `SoftwareWatchdogTimeout`  | `fuchsia-sw-watchdog-timeout`
 Brief power loss             | `BRIEF POWER LOSS`           | `BriefPowerLoss`           | `fuchsia-brief-power-loss`
 User request                 | `USER_REQUEST`               | `UserRequest`              | N/A\*
+Developer request            | `DEVELOPER_REQUEST`          | `DeveloperRequest`         | N/A\*
 System update                | `SYSTEM_UPDATE`              | `SystemUpdate`             | N/A\*
 Retry system update          | `RETRY_SYSTEM_UPDATE`        | `RetrySystemUpdate`        | `fuchsia-retry-system-update`
 ZBI swap                     | `ZBI_SWAP`                   | `ZbiSwap`                  | N/A\*

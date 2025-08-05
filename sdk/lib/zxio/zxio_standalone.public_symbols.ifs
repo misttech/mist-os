@@ -26,7 +26,6 @@ Symbols:
   - { Name: zxio_fault_catching_disabled, Type: Func, Weak: true }
   - { Name: zxio_flags_get, Type: Func }
   - { Name: zxio_flags_set, Type: Func }
-  - { Name: zxio_get_posix_mode, Type: Func }
   - { Name: zxio_get_read_buffer_available, Type: Func }
   - { Name: zxio_get_window_size, Type: Func }
   - { Name: zxio_getpeername, Type: Func }

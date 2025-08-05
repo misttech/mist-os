@@ -453,7 +453,7 @@ async fn write_data_file(
     filename: &str,
     payload: zx::Vmo,
 ) -> Result<(), Error> {
-    if !config.ramdisk_image && !config.netboot {
+    if !config.ramdisk_image {
         return Err(anyhow!(
             "Can't WriteDataFile from a non-recovery build;
             ramdisk_image must be set."
@@ -740,8 +740,8 @@ async fn init_system_partition_table(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
 ) -> Result<(), zx::Status> {
-    if !config.netboot {
-        log::error!("init_system_partition_table only supported in netboot mode.");
+    if !config.ramdisk_image {
+        log::error!("init_system_partition_table only supported in ramdisk-image mode.");
         return Err(zx::Status::NOT_SUPPORTED);
     }
     if !config.storage_host {

@@ -155,6 +155,11 @@ impl RoamEvent {
     pub fn new_roam_now() -> Self {
         Self { time: fasync::MonotonicInstant::now() }
     }
+
+    #[cfg(test)]
+    pub fn new(time: fasync::MonotonicInstant) -> Self {
+        Self { time }
+    }
 }
 
 impl Timestamped for RoamEvent {

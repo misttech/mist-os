@@ -583,6 +583,7 @@
     }
   },
   {
+    "api_area": "Kernel",
     "atom_files": [
       {
         "dest": "fidl/zx/overview.fidl",
@@ -616,6 +617,7 @@
     }
   },
   {
+    "api_area": "Unknown",
     "atom_files": [
       {
         "dest": "fidl/fuchsia.unknown/unknown.fidl",
@@ -641,6 +643,7 @@
     }
   },
   {
+    "api_area": "Storage",
     "atom_files": [
       {
         "dest": "fidl/fuchsia.io/directory.fidl",
@@ -695,6 +698,7 @@
     }
   },
   {
+    "api_area": "Unknown",
     "atom_files": [
       {
         "dest": "fidl/fuchsia.hardware.pty/pty.fidl",
@@ -804,6 +808,7 @@
     }
   },
   {
+    "api_area": "Driver SDK",
     "atom_files": [
       {
         "dest": "bind/fuchsia.serial/fuchsia.serial.bind",

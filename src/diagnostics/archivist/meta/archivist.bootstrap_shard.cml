@@ -42,7 +42,6 @@
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
             ],

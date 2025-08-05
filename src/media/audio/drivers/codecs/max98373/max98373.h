@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>
@@ -20,6 +19,7 @@
 #include <fbl/mutex.h>
 
 #include "ddktl/suspend-txn.h"
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace audio {
 

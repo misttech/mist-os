@@ -72,7 +72,7 @@ struct TestDisplayInfo {
 // static
 TestDisplayInfo TestDisplayInfo::From(
     const fuchsia_hardware_display::wire::Info& fidl_display_info) {
-  const display::DisplayId display_id = display::ToDisplayId(fidl_display_info.id);
+  const display::DisplayId display_id = display::DisplayId(fidl_display_info.id);
   ZX_ASSERT(display_id != display::kInvalidDisplayId);
 
   ZX_ASSERT(!fidl_display_info.modes.empty());
@@ -124,7 +124,7 @@ class TestClientState {
   void OnDisplaysChanged(std::span<const fuchsia_hardware_display::wire::Info> added_displays,
                          std::span<const display::DisplayId> removed_display_ids);
   void OnClientOwnershipChange(bool has_ownership);
-  void OnVsync(display::DisplayId display_id, zx::time timestamp,
+  void OnVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                display::ConfigStamp applied_config_stamp, display::VsyncAckCookie vsync_ack_cookie);
 
  private:
@@ -192,7 +192,7 @@ void TestClientState::OnClientOwnershipChange(bool has_ownership) {
   has_display_ownership_ = has_ownership;
 }
 
-void TestClientState::OnVsync(display::DisplayId display_id, zx::time timestamp,
+void TestClientState::OnVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                               display::ConfigStamp applied_config_stamp,
                               display::VsyncAckCookie vsync_ack_cookie) {
   std::lock_guard lock(mutex_);
@@ -266,7 +266,8 @@ class TestFidlClient {
       display::BufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token);
   zx::result<> ImportImage(const display::ImageMetadata& image_metadata,
-                           display::BufferId image_buffer_id, display::ImageId image_id);
+                           display::BufferCollectionId buffer_collection_id, uint32_t buffer_index,
+                           display::ImageId image_id);
   zx::result<> ImportEvent(zx::event event, display::EventId event_id);
   zx::result<> SetBufferCollectionConstraints(display::BufferCollectionId buffer_collection_id,
                                               display::ImageBufferUsage image_buffer_usage);
@@ -442,7 +443,7 @@ zx::result<> TestFidlClient::SetVirtconMode(
 zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::EventId fidl_event_id = display::ToFidlEventId(event_id);
+  const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
   fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->ImportEvent(std::move(event), fidl_event_id);
@@ -470,21 +471,21 @@ zx::result<display::LayerId> TestFidlClient::CreateLayer() {
     return zx::error(fidl_value.error_value());
   }
 
-  return zx::ok(display::ToLayerId(fidl_value.value()->layer_id));
+  return zx::ok(display::LayerId(fidl_value.value()->layer_id));
 }
 
 zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_metadata,
-                                         display::BufferId image_buffer_id,
-                                         display::ImageId image_id) {
+                                         display::BufferCollectionId buffer_collection_id,
+                                         uint32_t buffer_index, display::ImageId image_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::BufferId fidl_image_buffer_id =
-      display::ToFidlBufferId(image_buffer_id);
-  const fuchsia_hardware_display::wire::ImageId fidl_image_id = display::ToFidlImageId(image_id);
+  const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
+      buffer_collection_id.ToFidl();
+  const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
 
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_status =
-      coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_image_buffer_id,
-                                            fidl_image_id);
+      coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_buffer_collection_id,
+                                            buffer_index, fidl_image_id);
   if (!fidl_status.ok()) {
     fdf::error("ImportImage() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
@@ -508,13 +509,12 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
   fidl_layer_ids.reserve(layer_configs.size());
   for (const LayerConfig& layer_config : layer_configs) {
     ZX_ASSERT(layer_config.layer_id != display::kInvalidLayerId);
-    const fuchsia_hardware_display::wire::LayerId fidl_layer_id =
-        display::ToFidlLayerId(layer_config.layer_id);
+    const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_config.layer_id.ToFidl();
     fidl_layer_ids.push_back(fidl_layer_id);
   }
 
   const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetDisplayLayers(
-      display::ToFidlDisplayId(display_id),
+      display_id.ToFidl(),
       fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layer_ids));
   if (!fidl_status.ok()) {
     fdf::error("SetDisplayLayers() failed: {}", fidl_status.status_string());
@@ -527,7 +527,7 @@ zx::result<> TestFidlClient::SetLayerPrimaryConfig(display::LayerId layer_id,
                                                    const display::ImageMetadata& image_metadata) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
   const fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
       image_metadata.ToFidl();
 
@@ -544,9 +544,9 @@ zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::I
                                            display::EventId event_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
-  const fuchsia_hardware_display::wire::ImageId fidl_image_id = display::ToFidlImageId(image_id);
-  const fuchsia_hardware_display::wire::EventId fidl_event_id = display::ToFidlEventId(event_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
+  const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
+  const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_event_id);
@@ -561,11 +561,18 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
                                            const display::Color& fallback_color) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
   const fuchsia_hardware_display_types::wire::Color fidl_fallback_color = fallback_color.ToFidl();
+  const display::ImageMetadata fullscreen_metadata = state_.FullscreenImageMetadata();
+  const fuchsia_math::wire::RectU display_destination = {
+      .x = 0,
+      .y = 0,
+      .width = static_cast<uint32_t>(fullscreen_metadata.width()),
+      .height = static_cast<uint32_t>(fullscreen_metadata.height()),
+  };
 
-  const fidl::OneWayStatus fidl_status =
-      coordinator_fidl_client_->SetLayerColorConfig(fidl_layer_id, fidl_fallback_color);
+  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerColorConfig(
+      fidl_layer_id, fidl_fallback_color, display_destination);
   if (!fidl_status.ok()) {
     fdf::error("SetLayerColorConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
@@ -597,8 +604,7 @@ zx::result<display::ConfigCheckResult> TestFidlClient::CheckConfig() {
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp =
-      display::ToFidlConfigStamp(config_stamp);
+  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp = config_stamp.ToFidl();
   fidl::Arena arena;
   fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request request =
       fidl::WireRequest<fuchsia_hardware_display::Coordinator::ApplyConfig3>::Builder(arena)
@@ -617,7 +623,7 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   const fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie =
-      display::ToFidlVsyncAckCookie(vsync_ack_cookie);
+      vsync_ack_cookie.ToFidl();
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->AcknowledgeVsync(fidl_vsync_ack_cookie.value);
   if (!fidl_status.ok()) {
@@ -791,7 +797,7 @@ zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>&
       fidl_value = fidl_status.value();
-  return zx::ok(display::ToConfigStamp(fidl_value.stamp));
+  return zx::ok(display::ConfigStamp(fidl_value.stamp));
 }
 
 std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerConfig() {
@@ -811,7 +817,7 @@ zx::result<> TestFidlClient::ImportBufferCollection(
     display::BufferCollectionId buffer_collection_id,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token) {
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
-      display::ToFidlBufferCollectionId(buffer_collection_id);
+      buffer_collection_id.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection> fidl_status =
       coordinator_fidl_client_->ImportBufferCollection(fidl_buffer_collection_id,
@@ -834,9 +840,9 @@ zx::result<> TestFidlClient::SetBufferCollectionConstraints(
     display::BufferCollectionId buffer_collection_id,
     display::ImageBufferUsage image_buffer_usage) {
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
-      display::ToFidlBufferCollectionId(buffer_collection_id);
+      buffer_collection_id.ToFidl();
   const fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage =
-      display::ToFidlImageBufferUsage(image_buffer_usage);
+      image_buffer_usage.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::SetBufferCollectionConstraints>
       fidl_status = coordinator_fidl_client_->SetBufferCollectionConstraints(
@@ -1018,9 +1024,9 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     return import_buffer_collection_result.take_error();
   }
 
-  const display::ImageBufferUsage image_buffer_usage = {
+  const display::ImageBufferUsage image_buffer_usage({
       .tiling_type = image_metadata.tiling_type(),
-  };
+  });
   zx::result<> set_buffer_constraints_result =
       SetBufferCollectionConstraints(buffer_collection_id, image_buffer_usage);
   if (set_buffer_constraints_result.is_error()) {
@@ -1060,11 +1066,8 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   const display::ImageId image_id = next_imported_image_id_;
   ++next_imported_image_id_;
 
-  const display::BufferId image_buffer_id{
-      .buffer_collection_id = buffer_collection_id,
-      .buffer_index = 0,
-  };
-  zx::result<> import_image_result = ImportImage(image_metadata, image_buffer_id, image_id);
+  zx::result<> import_image_result =
+      ImportImage(image_metadata, buffer_collection_id, /*buffer_index=*/0, image_id);
   if (import_image_result.is_error()) {
     // ImportImage() has already logged the error.
     return import_image_result.take_error();
@@ -1608,10 +1611,9 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
   // of a misbehaving display engine driver. Consider whether it's suitable to
   // disconnect the driver, rather than working around the error.
-  const config_stamp_t invalid_banjo_config_stamp =
-      display::ToBanjoDriverConfigStamp(virtcon_initial_driver_config_stamp);
+  const config_stamp_t invalid_banjo_config_stamp = virtcon_initial_driver_config_stamp.ToBanjo();
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
+      primary_client->state().display_id().ToBanjo(), 0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   ASSERT_EQ(1u, primary_client->state().vsync_count());
@@ -1816,7 +1818,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1834,7 +1836,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1931,7 +1933,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1950,7 +1952,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
     // This check can have a false positive pass, due to using a hard-coded
     // timeout.
     {
-      zx::time deadline = zx::deadline_after(zx::sec(1));
+      zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
       PollUntilOnLoop([&]() {
         if (zx::clock::get_monotonic() >= deadline)
           return true;
@@ -1995,16 +1997,16 @@ TEST_F(IntegrationTest, CreateColorLayer) {
   EXPECT_OK(client->CreateFullscreenColorLayer(kFuchsiaBgra));
 }
 
-TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
+TEST_F(IntegrationTest, ImportImageWithInvalidImageIdFails) {
   std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   constexpr display::ImageId image_id = display::kInvalidImageId;
   constexpr display::BufferCollectionId buffer_collection_id(0xffeeeedd);
 
-  zx::result<> import_image_result = client->ImportImage(
-      client->state().FullscreenImageMetadata(),
-      display::BufferId{.buffer_collection_id = buffer_collection_id, .buffer_index = 0}, image_id);
+  zx::result<> import_image_result =
+      client->ImportImage(client->state().FullscreenImageMetadata(), buffer_collection_id,
+                          /*buffer_index=*/0, image_id);
   EXPECT_NE(ZX_OK, import_image_result.status_value()) << import_image_result.status_string();
 }
 
@@ -2014,10 +2016,9 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 
   constexpr display::BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
   constexpr display::ImageId image_id(1);
-  zx::result<> import_image_result = client->ImportImage(
-      client->state().FullscreenImageMetadata(),
-      display::BufferId{.buffer_collection_id = kNonExistentCollectionId, .buffer_index = 0},
-      image_id);
+  zx::result<> import_image_result =
+      client->ImportImage(client->state().FullscreenImageMetadata(), kNonExistentCollectionId,
+                          /*buffer_index=*/0, image_id);
   EXPECT_NE(ZX_OK, import_image_result.status_value()) << import_image_result.status_string();
 }
 
@@ -2573,7 +2574,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // TODO(https://fxbug.dev/388885807): This check can have a false positive
   // pass, due to using a hard-coded timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;

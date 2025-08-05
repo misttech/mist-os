@@ -31,6 +31,9 @@ pub struct ZbiBuilder {
     // A ramdisk to add to the ZBI.
     ramdisk: Option<Utf8PathBuf>,
 
+    // A non-bootable ZBI image containing extra items to be added.
+    zbi_extra_items: Option<Utf8PathBuf>,
+
     // A devicetree binary to add to the ZBI
     devicetree: Option<Utf8PathBuf>,
 
@@ -52,6 +55,7 @@ impl ZbiBuilder {
             cmdline: Vec::default(),
             board_driver_arguments: None,
             ramdisk: None,
+            zbi_extra_items: None,
             devicetree: None,
             compression: None,
             output_manifest: None,
@@ -107,6 +111,11 @@ impl ZbiBuilder {
     /// Add a ramdisk to the ZBI.
     pub fn add_ramdisk(&mut self, source: impl Into<Utf8PathBuf>) {
         self.ramdisk = Some(source.into());
+    }
+
+    /// Extend the ZBI with the items in the provided ZBI..
+    pub fn add_zbi_extra_items(&mut self, source: impl Into<Utf8PathBuf>) {
+        self.zbi_extra_items = Some(source.into());
     }
 
     /// Add a devicetree binary to the ZBI.
@@ -233,6 +242,12 @@ impl ZbiBuilder {
         // Add the kernel itself, first, to make a bootable ZBI.
         args.push("--type=container".to_string());
         args.push(kernel.to_string());
+
+        // Add the extra items next.
+        if let Some(zbi_extra_items) = &self.zbi_extra_items {
+            args.push("--type=container".to_string());
+            args.push(zbi_extra_items.to_string())
+        }
 
         // Then, add the kernel cmdline args.
         args.push("--type=cmdline".to_string());
@@ -387,6 +402,34 @@ mod tests {
             [
                 "--type=container",
                 "path/to/kernel",
+                "--type=cmdline",
+                "--files",
+                "bootfs",
+                "--type=image_args",
+                "--entry=bootargs",
+                "--output",
+                "output",
+            ]
+        );
+    }
+
+    #[test]
+    fn zbi_args_with_kernel_with_zbi_extra_items() {
+        let tools = FakeToolProvider::default();
+        let zbi_tool = tools.get_tool("zbi").unwrap();
+        let mut builder = ZbiBuilder::new(zbi_tool);
+        builder.set_kernel("path/to/kernel");
+        builder.add_zbi_extra_items("path/to/zbi_with_extra_items");
+        let args = builder
+            .build_zbi_args("bootfs", Some("bootargs"), None::<String>, None::<String>, "output")
+            .unwrap();
+        assert_eq!(
+            args,
+            [
+                "--type=container",
+                "path/to/kernel",
+                "--type=container",
+                "path/to/zbi_with_extra_items",
                 "--type=cmdline",
                 "--files",
                 "bootfs",

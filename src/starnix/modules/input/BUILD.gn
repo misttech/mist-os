@@ -32,6 +32,8 @@ rustc_library("input") {
     "hwasan",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
@@ -41,11 +43,9 @@ rustc_library("input") {
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
-    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/trace/rust:trace",
     "//src/starnix/kernel:starnix_core",

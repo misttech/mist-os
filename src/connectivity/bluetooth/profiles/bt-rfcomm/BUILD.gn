@@ -27,7 +27,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:slab",
@@ -38,6 +37,7 @@ rustc_binary("bin") {
     "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:assert_matches",
   ]
 

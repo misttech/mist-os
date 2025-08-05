@@ -34,6 +34,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "Linux-other_dimension:bar_tests.json",
             "host_x64/bar.sh",
@@ -98,6 +99,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "Linux-other_dimension:foo_tests.json",
             "host_x64/botanist",

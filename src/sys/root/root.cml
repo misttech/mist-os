@@ -65,7 +65,6 @@
                 "fuchsia.fshost.InlineCrypto",
                 "fuchsia.fshost.Mbr",
                 "fuchsia.fshost.Nand",
-                "fuchsia.fshost.Netboot",
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
                 "fuchsia.fshost.StarnixVolumeName",

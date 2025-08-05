@@ -334,19 +334,15 @@ impl SocketAddress {
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             SocketAddress::Unspecified => AF_UNSPEC.to_ne_bytes().to_vec(),
-            SocketAddress::Unix(name) => {
-                if !name.is_empty() {
+            SocketAddress::Unix(name) => match name.first() {
+                None => AF_UNIX.to_ne_bytes().to_vec(),
+                Some(&b'\0') => [&AF_UNIX.to_ne_bytes(), name.as_bytes()].concat(),
+                Some(_) => {
                     let template = sockaddr_un::default();
                     let path_length = std::cmp::min(template.sun_path.len() - 1, name.len());
-                    let mut bytes = vec![0u8; SA_FAMILY_SIZE + path_length + 1];
-                    bytes[..SA_FAMILY_SIZE].copy_from_slice(&AF_UNIX.to_ne_bytes());
-                    bytes[SA_FAMILY_SIZE..(SA_FAMILY_SIZE + path_length)]
-                        .copy_from_slice(&name[..path_length]);
-                    bytes
-                } else {
-                    AF_UNIX.to_ne_bytes().to_vec()
+                    [&AF_UNIX.to_ne_bytes(), &name[..path_length], &[b'\0']].concat()
                 }
-            }
+            },
             SocketAddress::Vsock(port) => {
                 let mut bytes = vec![0u8; std::mem::size_of::<sockaddr_vm>()];
                 let vm_addr =

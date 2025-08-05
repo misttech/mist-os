@@ -6,7 +6,6 @@
 #include <fuchsia/wlan/stats/cpp/fidl.h>
 #include <zircon/errors.h>
 
-#include <wifi/wifi-config.h>
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
@@ -17,14 +16,15 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 
 namespace wlan_ieee80211 = wlan_ieee80211;
 
 // Some default AP and association request values
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
@@ -184,7 +184,7 @@ class ConnectTest : public SimTest {
   };
 
   struct AssocRespInfo {
-    wlan_common::WlanChannel channel;
+    wlan_ieee80211::WlanChannel channel;
     common::MacAddr src;
     common::MacAddr dst;
     wlan_ieee80211::StatusCode status;
@@ -798,7 +798,7 @@ TEST_F(ConnectTest, NoAps) {
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
   context_.ssid = {'T', 'e', 's', 't', 'A', 'P'};
   context_.tx_info.channel = {
-      .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+      .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -873,8 +873,8 @@ TEST_F(ConnectTest, WrongIds) {
   // Create our device instance
   Init();
 
-  constexpr wlan_common::WlanChannel kWrongChannel = {
-      .primary = 8, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+  constexpr wlan_ieee80211::WlanChannel kWrongChannel = {
+      .primary = 8, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
   ASSERT_NE(kDefaultChannel.primary, kWrongChannel.primary);
   const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
                                                    ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
@@ -949,7 +949,7 @@ TEST_F(ConnectTest, ApIgnoredRequest) {
 }
 
 // Verify that if an AP refuses an association request we return a temporary refusal.  The driver
-// will also send a BRCMF_C_DISASSOC to clear AP state each time when refused.
+// will also send a BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to clear AP state each time when refused.
 TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
   // Create our device instance
   Init();
@@ -984,7 +984,7 @@ TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
 }
 
 // Verify that if an AP refuses an association request we return a failure.  The driver will also
-// send a BRCMF_C_DISASSOC to clear AP state each time when refused.
+// send a BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to clear AP state each time when refused.
 TEST_F(ConnectTest, ApRefusedRequest) {
   // Create our device instance
   Init();

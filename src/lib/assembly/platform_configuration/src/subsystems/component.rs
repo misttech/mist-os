@@ -10,7 +10,7 @@ use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConf
 use assembly_config_schema::product_config::ComponentPolicyConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
-use component_manager_config::{compile, Args};
+use component_manager_config::{compile, Args, InjectedBundle, InjectedUse, InjectedUseProtocol};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -93,6 +93,32 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
         )?;
 
         input.push(health_checks_source);
+
+        if !heapdump_config.monikers.is_empty() {
+            let injected_bundle = InjectedBundle {
+                components: heapdump_config
+                    .monikers
+                    .iter()
+                    .map(|m| m.parse())
+                    .collect::<Result<_, _>>()
+                    .context("Invalid moniker in Heapdump configuration")?,
+                r#use: Some(vec![InjectedUse::Protocol(InjectedUseProtocol {
+                    source_name: "fuchsia.memory.heapdump.process.Registry".parse().unwrap(),
+                    target_path: "/svc/fuchsia.memory.heapdump.process.Registry".parse().unwrap(),
+                })]),
+            };
+            let heapdump_monikers_source = write_config(
+                "heapdump_monikers.json",
+                serde_json::json!(
+                {
+                    "inject": [
+                        injected_bundle,
+                    ],
+                }
+                ),
+            )?;
+            input.push(heapdump_monikers_source);
+        }
 
         // Collect the platform policies based on build-type.
         match (context.build_type, config.development_support.include_sl4f) {

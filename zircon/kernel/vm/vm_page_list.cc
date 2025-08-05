@@ -474,8 +474,8 @@ void VmPageList::ReturnIntervalSlot(uint64_t offset) {
 }
 
 zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t end_offset) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(start_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(end_offset));
   DEBUG_ASSERT(end_offset > start_offset);
   // Change the end_offset to an inclusive offset for convenience.
   end_offset -= PAGE_SIZE;
@@ -675,8 +675,8 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
                                                 VmPageOrMarker::IntervalDirtyState dirty_state,
                                                 uint64_t awaiting_clean_len,
                                                 bool replace_existing_slot) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(start_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(end_offset));
   DEBUG_ASSERT(start_offset < end_offset);
   DEBUG_ASSERT(!replace_existing_slot || end_offset == start_offset + PAGE_SIZE);
   // If replace_existing_slot is true, then we might have the slot in an empty node, which is not
@@ -903,10 +903,10 @@ vm_page_t* VmPageList::ReplacePageWithZeroInterval(uint64_t offset,
 zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_t old_end_offset,
                                               uint64_t new_start_offset, uint64_t new_end_offset,
                                               VmPageOrMarker::IntervalDirtyState new_dirty_state) {
-  DEBUG_ASSERT(old_start_offset == UINT64_MAX || IS_PAGE_ALIGNED(old_start_offset));
-  DEBUG_ASSERT(old_end_offset == UINT64_MAX || IS_PAGE_ALIGNED(old_end_offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(new_start_offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(new_end_offset));
+  DEBUG_ASSERT(old_start_offset == UINT64_MAX || IS_PAGE_ROUNDED(old_start_offset));
+  DEBUG_ASSERT(old_end_offset == UINT64_MAX || IS_PAGE_ROUNDED(old_end_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(new_start_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(new_end_offset));
   // We only support dirty or untracked zero intervals.
   DEBUG_ASSERT(new_dirty_state == VmPageOrMarker::IntervalDirtyState::Dirty ||
                new_dirty_state == VmPageOrMarker::IntervalDirtyState::Untracked);
@@ -1078,8 +1078,8 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
 }
 
 zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(interval_start));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(interval_start));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   if (len == 0) {
     return ZX_OK;
   }
@@ -1128,8 +1128,8 @@ zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len)
 }
 
 zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(interval_end));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(interval_end));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   if (len == 0) {
     return ZX_OK;
   }
@@ -1169,10 +1169,9 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   return ZX_OK;
 }
 
-zx_status_t VmPageList::TakePages(VmPageSpliceList* splice) {
-  splice->InitializeSkew(list_skew_);
+zx_status_t VmPageList::TakePages(uint64_t offset, VmPageSpliceList* splice) {
+  splice->InitializeSkew(offset, list_skew_);
 
-  uint64_t offset = splice->offset_;
   const uint64_t end = offset + splice->length_;
 
   zx_status_t result =
@@ -1197,17 +1196,19 @@ VmPageSpliceList::~VmPageSpliceList() {
 }
 
 // static
-zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t length, list_node* pages,
                                                  VmPageSpliceList* splice) {
   // TODO(https://fxbug.dev/42170136): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
-  splice->Initialize(offset, length);
+  splice->Initialize(length);
+  uint64_t offset = 0;
   while (vm_page_t* page = list_remove_head_type(pages, vm_page_t, queue_node)) {
-    zx_status_t status = splice->Append(VmPageOrMarker::Page(page));
+    zx_status_t status = splice->Insert(offset, VmPageOrMarker::Page(page));
     if (status != ZX_OK) {
       return status;
     }
+    offset += PAGE_SIZE;
   }
   splice->Finalize();
   return ZX_OK;
@@ -1215,8 +1216,7 @@ zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t lengt
 
 void VmPageSpliceList::FreeAllPages() {
   // Free any pages owned by the splice list.
-  while (!IsProcessed()) {
-    VmPageOrMarker page = Pop();
+  page_list_.RemoveAllContent([](VmPageOrMarker&& page) {
     if (page.IsPage()) {
       pmm_free_page(page.ReleasePage());
     } else if (page.IsReference()) {
@@ -1224,16 +1224,17 @@ void VmPageSpliceList::FreeAllPages() {
       DEBUG_ASSERT(compression);
       compression->Free(page.ReleaseReference());
     }
-  }
+  });
+  state_ = State::Processed;
 }
 
-zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
-  ASSERT(pos_ < length_);
+zx_status_t VmPageSpliceList::Insert(uint64_t offset, VmPageOrMarker content) {
+  ASSERT(offset < length_);
   ASSERT(IsInitialized());
   ASSERT(!content.IsInterval());
 
   auto [slot, interval] =
-      page_list_.LookupOrAllocate(pos_, VmPageList::IntervalHandling::NoIntervals);
+      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
   if (!slot) {
     // If the allocation failed, we need to free content.
     if (content.IsPage()) {
@@ -1248,7 +1249,6 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
     return ZX_ERR_NO_MEMORY;
   }
   *slot = ktl::move(content);
-  pos_ += PAGE_SIZE;
   return ZX_OK;
 }
 

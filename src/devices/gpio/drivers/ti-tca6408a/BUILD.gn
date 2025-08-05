@@ -32,7 +32,7 @@ source_set("common") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/metadata/cpp",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//zircon/system/ulib/zx",
   ]
 }

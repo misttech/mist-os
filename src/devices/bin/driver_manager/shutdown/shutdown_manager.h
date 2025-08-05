@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 
+#include <fidl/fuchsia.diagnostics/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <fidl/fuchsia.system.state/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -151,6 +152,7 @@ class ShutdownManager : public fidl::WireServer<fuchsia_process_lifecycle::Lifec
 
   async_dispatcher_t* dispatcher_;
   zx::resource mexec_resource_, power_resource_;
+  fidl::ClientEnd<fuchsia_diagnostics::LogFlusher> log_flush_;
   // Tracks if we received a stop signal from the fuchsia_process_lifecycle::Lifecycle channel.
   bool lifecycle_stop_ = false;
 };

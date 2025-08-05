@@ -62,7 +62,7 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
 
   uint32_t GetNextUniqueId();
 
-  bool is_match(std::string_view node_name);
+  bool is_match(const fdf_devicetree::Node& node);
 
   std::map<fdf_devicetree::Phandle, ClockController> clock_controllers_;
   std::unique_ptr<fdf_devicetree::PropertyParser> clock_parser_;

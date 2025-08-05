@@ -184,7 +184,7 @@ class KTraceTests {
     ktl::array<ktl::byte, 397> bytes;
     static_assert(bytes.size() % 8 != 0);
     constexpr size_t unpadded_record_size = sizeof(uint64_t) + (words.size() * 8) + bytes.size();
-    constexpr uint64_t padded_record_size = ALIGN(unpadded_record_size, 8);
+    constexpr uint64_t padded_record_size = ROUNDUP(unpadded_record_size, 8);
     constexpr uint64_t fxt_header =
         fxt::MakeHeader(fxt::RecordType::kBlob, fxt::WordSize::FromBytes(unpadded_record_size));
 

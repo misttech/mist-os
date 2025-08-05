@@ -15,12 +15,12 @@
 #include <lib/stdcompat/string_view.h>
 #include <lib/zx/result.h>
 #include <lib/zxio/ops.h>
-#include <lib/zxio/posix_mode.h>
 #include <lib/zxio/types.h>
 #include <poll.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -82,6 +82,81 @@ static_assert(O_APPEND == static_cast<uint64_t>(fio::Flags::kFileAppend));
 constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::OpenFlags::kCreate |
                                        fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kTruncate |
                                        fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
+
+/// Approximate a set of POSIX mode bits (type + permissions) for the given node based on its
+/// reported |protocols| and |abilities|. Only the user bits are reported for the permission.
+///
+/// This is only used in the case where a node does not support POSIX attributes.
+constexpr uint32_t approximate_posix_mode(zxio_node_protocols_t protocols,
+                                          zxio_abilities_t abilities) {
+  uint32_t mode = 0;
+
+  // Determine the POSIX mode type based on the node's |protocols|. POSIX mode bits only allow one
+  // type to be specified, so we find the closest approximation for the given |protocols|.
+  if (protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
+    mode = S_IFDIR;
+  } else if (protocols & ZXIO_NODE_PROTOCOL_FILE) {
+    mode = S_IFREG;
+  } else if (protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
+    // There is no good analogue for FIDL services in POSIX so we just report them as regular files.
+    mode = S_IFREG;
+  } else if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+    mode = S_IFLNK;
+  }
+
+  // Determine the POSIX mode permissions based on the node's |abilities|. This is not always
+  // correct as permissions on Fuchsia are a connection-based property, not a node property.
+  if (mode & S_IFDIR) {
+    if (abilities & ZXIO_OPERATION_ENUMERATE) {
+      mode |= S_IRUSR;
+    }
+    if (abilities & ZXIO_OPERATION_MODIFY_DIRECTORY) {
+      mode |= S_IWUSR;
+    }
+    if (abilities & ZXIO_OPERATION_TRAVERSE) {
+      mode |= S_IXUSR;
+    }
+  } else {
+    if (abilities & ZXIO_OPERATION_READ_BYTES) {
+      mode |= S_IRUSR;
+    }
+    if (abilities & ZXIO_OPERATION_WRITE_BYTES) {
+      mode |= S_IWUSR;
+    }
+    if (abilities & ZXIO_OPERATION_EXECUTE) {
+      mode |= S_IXUSR;
+    }
+  }
+
+  return mode;
+}
+
+// Test mapping of protocols to POSIX mode type.
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_CONNECTOR, {}) == S_IFREG);
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_FILE, {}) == S_IFREG);
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY, {}) == S_IFDIR);
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY | ZXIO_NODE_PROTOCOL_FILE, {}) ==
+              S_IFDIR);
+
+// Test mapping of permissions for regular files.
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_FILE, ZXIO_OPERATION_READ_BYTES) ==
+              (S_IFREG | S_IRUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_FILE, ZXIO_OPERATION_WRITE_BYTES) ==
+              (S_IFREG | S_IWUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_FILE, ZXIO_OPERATION_EXECUTE) ==
+              (S_IFREG | S_IXUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_FILE, ZXIO_OPERATION_ALL) ==
+              (S_IFREG | S_IRWXU));
+
+// Test mapping of permissions for directories files.
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_OPERATION_ENUMERATE) ==
+              (S_IFDIR | S_IRUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY,
+                                     ZXIO_OPERATION_MODIFY_DIRECTORY) == (S_IFDIR | S_IWUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_OPERATION_TRAVERSE) ==
+              (S_IFDIR | S_IXUSR));
+static_assert(approximate_posix_mode(ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_OPERATION_ALL) ==
+              (S_IFDIR | S_IRWXU));
 
 }  // namespace
 
@@ -448,19 +523,21 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
                                      .link_count = true,
                                      .modification_time = true,
                                      .change_time = true,
+                                     .mode = true,
                                  }};
-  // TODO(https://fxbug.dev/324111518): Migrate to GetAttributes and remove `zxio_get_posix_mode`.
   const zx_status_t status = io->get_attr(&attr);
   if (status != ZX_OK) {
     return status;
   }
 
   memset(s, 0, sizeof(struct stat));
-  s->st_mode = zxio_get_posix_mode(attr.protocols, attr.abilities);
+  // If the filesystem doesn't support POSIX attributes, we report an approximated set of type and
+  // permission bits for the mode field.
+  s->st_mode = attr.has.mode ? attr.mode : approximate_posix_mode(attr.protocols, attr.abilities);
   s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
   s->st_size = static_cast<off_t>(attr.content_size);
-  s->st_blksize = VNATTR_BLKSIZE;
-  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / VNATTR_BLKSIZE;
+  s->st_blksize = DEV_BSIZE;
+  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / DEV_BSIZE;
   s->st_nlink = attr.link_count;
   // `attr.change_time` will be reported as 0 if the underlying filesystem does not support it. In
   // that case, fake ctime with modification time.

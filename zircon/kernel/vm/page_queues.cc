@@ -445,8 +445,11 @@ void PageQueues::EnableAging() {
     panic("Mismatched disable/enable pair");
   }
 
-  // Return the aging token, allowing the aging thread to proceed if it was waiting.
+  // Return the aging token and possibly notify the LRU thread, allowing the MRU and LRU threads to
+  // proceed if they had been waiting.
   aging_token_.Signal();
+  MaybeTriggerLruProcessing();
+
 #if DEBUG_ASSERT_IMPLEMENTED
   Guard<SpinLock, IrqSave> guard{&list_lock_};
   if (debug_compressor_) {
@@ -763,12 +766,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
-
-  // Calculate a worst case iterations for processing any given isolate list.
-  ActiveInactiveCounts active_inactive = GetActiveInactiveCounts();
-  const uint64_t max_isolate_iterations =
-      active_inactive.active + active_inactive.inactive + kNumReclaim;
+                           PhysicalPageBorrowingConfig::Get().is_borrowing_on_mru_enabled();
 
   // In order to safely resume iteration where we left off between lock drops we need to make use of
   // the isolate_cursor_, which requires holding the isolate_cursor_lock_.
@@ -784,14 +782,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
     // Count work done separately to all iterations so we can periodically drop the lock and process
     // the deferred_list.
     uint64_t work_done = 0;
-    // Separately count iterations for debug purposes.
-    uint64_t loop_iterations = 0;
     while (current) {
-      if (loop_iterations++ == max_isolate_iterations) {
-        KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max isolate loop iterations %" PRIu64 "\n",
-                    __FUNCTION__, max_isolate_iterations);
-      }
-
       vm_page_t* page = current;
       current = list_next_type(list, &current->queue_node, vm_page_t, queue_node);
       PageQueue page_queue =
@@ -880,7 +871,7 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
+                           PhysicalPageBorrowingConfig::Get().is_borrowing_on_mru_enabled();
 
   VM_KTRACE_DURATION(2, "ProcessLruQueue");
   while (true) {
@@ -1147,18 +1138,28 @@ void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint6
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
-  // The common case is that the |page| being moved was previously placed into the anonymous queue.
-  // If the zero fork queue is reclaimable, then most likely so is the anonymous queue, and so this
-  // move would be a no-op. As this case is common it is worth doing this quick check to
-  // short-circuit.
-  if (zero_fork_is_reclaimable_ &&
+void PageQueues::MoveAnonymousToAnonymousZeroFork(vm_page_t* page) {
+  // First perform a common case short-circuit where the page is already in the anonymous queue and
+  // both the anonymous and zero fork queues are the same reclaimable queue. In this case the page
+  // is already in the correct queue, and nothing needs to be done.
+  if (zero_fork_is_reclaimable_ && anonymous_is_reclaimable_ &&
       queue_is_reclaim(static_cast<PageQueue>(
           page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
     return;
   }
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
+    // First check if the page is presently in whatever counts as the anonymous queue. If it isn't,
+    // then we don't move it.
+    PageQueue queue =
+        static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+    if (anonymous_is_reclaimable_ && !queue_is_reclaim(queue)) {
+      return;
+    }
+    if (!anonymous_is_reclaimable_ && queue != PageQueueAnonymous) {
+      return;
+    }
+    // In the anonymous queue, move to whatever counts as the anonymous zero fork queue.
     MoveToQueueLockedList(
         page, zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork);
 #if DEBUG_ASSERT_IMPLEMENTED

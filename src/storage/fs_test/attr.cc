@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <lib/fdio/vfs.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -152,7 +152,7 @@ TEST_P(AttrTest, StatReturnsCorrectBlockSize) {
   struct stat buf;
   ASSERT_EQ(fstat(fd, &buf), 0);
   ASSERT_GT(buf.st_blksize, 0) << "blksize should be greater than zero";
-  ASSERT_EQ(buf.st_blksize % VNATTR_BLKSIZE, 0) << "blksize should be a multiple of VNATTR_BLKSIZE";
+  ASSERT_EQ(buf.st_blksize % DEV_BSIZE, 0) << "blksize should be a multiple of DEV_BSIZE";
   ASSERT_EQ(buf.st_blocks, 0) << "Number of allocated blocks should be zero";
 
   char data = {'a'};
@@ -160,7 +160,7 @@ TEST_P(AttrTest, StatReturnsCorrectBlockSize) {
   ASSERT_EQ(fsync(fd), 0);
   ASSERT_EQ(fstat(fd, &buf), 0);
   ASSERT_GT(buf.st_blksize, 0) << "blksize should be greater than zero";
-  ASSERT_EQ(buf.st_blksize % VNATTR_BLKSIZE, 0) << "blksize should be a multiple of VNATTR_BLKSIZE";
+  ASSERT_EQ(buf.st_blksize % DEV_BSIZE, 0) << "blksize should be a multiple of DEV_BSIZE";
   ASSERT_GT(buf.st_blocks, 0) << "Number of allocated blocks should greater than zero";
   ASSERT_EQ(close(fd), 0);
 

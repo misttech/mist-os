@@ -7,7 +7,6 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -35,17 +34,6 @@ using namespace fuchsia_driver_framework;
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
-
-constexpr uint32_t device_id = kOtDeviceNrf52840;
-
-static const std::vector<fpbus::Metadata> kNrf52840RadioMetadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_PRIVATE),
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&device_id),
-                                 reinterpret_cast<const uint8_t*>(&device_id) + sizeof(device_id)),
-    }},
-};
 
 const std::vector<fdf::BindRule2> kSpiRules = std::vector{
     fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_spi::SERVICE,
@@ -89,7 +77,6 @@ zx_status_t Sherlock::OtRadioInit() {
   dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   dev.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_SHERLOCK;
   dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OT_RADIO;
-  dev.metadata() = kNrf52840RadioMetadata;
 
   std::vector<fdf::ParentSpec2> parents = {
       fdf::ParentSpec2{{kSpiRules, kSpiProperties}},

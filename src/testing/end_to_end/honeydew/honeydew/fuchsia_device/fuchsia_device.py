@@ -123,6 +123,15 @@ class FuchsiaDevice(abc.ABC):
             Firmware version of the device.
         """
 
+    @properties.DynamicProperty
+    @abc.abstractmethod
+    def last_reboot_reason(self) -> str:
+        """Returns the last reboot reason of the device.
+
+        Returns:
+            Last reboot reason of the device.
+        """
+
     # List all the transports
     @properties.Transport
     @abc.abstractmethod

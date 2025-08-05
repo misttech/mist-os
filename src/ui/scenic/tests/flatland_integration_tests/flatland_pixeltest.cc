@@ -5,6 +5,7 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -13,7 +14,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
@@ -317,14 +317,12 @@ class ParameterizedSRGBPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(RgbPixelFormats, ParameterizedSRGBPixelTest,
                          zxtest::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
-                                        fuchsia::images2::PixelFormat::R8G8B8A8
-// TODO(https://fxbug.dev/351833287): Enable test on X86 once goldfish supports R5G6B5.
-#if defined(__aarch64__)
-                                        ,
-                                        fuchsia::images2::PixelFormat::R5G6B5
-#endif
+                                        fuchsia::images2::PixelFormat::R8G8B8A8));
 
-                                        ));
+INSTANTIATE_TEST_SUITE_P(ExoticRgbPixelFormats, ParameterizedSRGBPixelTest,
+                         zxtest::Values(fuchsia::images2::PixelFormat::A2B10G10R10,
+                                        fuchsia::images2::PixelFormat::R8,
+                                        fuchsia::images2::PixelFormat::R5G6B5));
 
 TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -342,6 +340,8 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   uint32_t bytes_per_pixel = 4;
   if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
     bytes_per_pixel = 2;
+  } else if (GetParam() == fuchsia::images2::PixelFormat::R8) {
+    bytes_per_pixel = 1;
   }
 
   // Use the local token to allocate a protected buffer.
@@ -362,6 +362,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   EXPECT_EQ(ZX_OK, status);
 
   utils::Pixel color = utils::kBlue;
+  uint8_t color_channel = color.blue;
   vmo_base += info.buffers()[0].vmo_usable_start();
 
   for (uint32_t i = 0; i < num_pixels * bytes_per_pixel; i += bytes_per_pixel) {
@@ -369,6 +370,15 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
       uint16_t color16 = static_cast<uint16_t>(((color.red >> 3) << 11) |
                                                ((color.green >> 2) << 5) | (color.blue >> 3));
       *reinterpret_cast<uint16_t*>(&vmo_base[i]) = color16;
+    } else if (GetParam() == fuchsia::images2::PixelFormat::A2B10G10R10) {
+      uint16_t alpha = static_cast<uint16_t>(color.alpha) >> 6;
+      uint16_t blue = static_cast<uint16_t>(color.blue << 2);
+      uint16_t green = static_cast<uint16_t>(color.green << 2);
+      uint16_t red = static_cast<uint16_t>(color.red << 2);
+      uint32_t color32 = (alpha << 30) | (blue << 20) | (green << 10) | red;
+      *reinterpret_cast<uint32_t*>(&vmo_base[i]) = color32;
+    } else if (GetParam() == fuchsia::images2::PixelFormat::R8) {
+      *reinterpret_cast<uint8_t*>(&vmo_base[i]) = color_channel;
     } else {
       // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the blue
       // and the red channel respectively.
@@ -410,6 +420,8 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
       ss_format = fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW;
       break;
     case fuchsia::images2::PixelFormat::R8G8B8A8:
+    case fuchsia::images2::PixelFormat::A2B10G10R10:
+    case fuchsia::images2::PixelFormat::R8:
       ss_format = fuchsia::ui::composition::ScreenshotFormat::RGBA_RAW;
       break;
     case fuchsia::images2::PixelFormat::R5G6B5:
@@ -424,8 +436,12 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 
   if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
     color.alpha = 0xff;
+  } else if (GetParam() == fuchsia::images2::PixelFormat::R8) {
+    color.alpha = 0xff;
+    color.red = color_channel;
+    color.green = 0;
+    color.blue = 0;
   }
-
   EXPECT_EQ(histogram[color], num_pixels);
 }
 

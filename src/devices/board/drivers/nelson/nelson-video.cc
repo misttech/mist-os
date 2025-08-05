@@ -42,7 +42,7 @@ static const std::vector<fpbus::Mmio> nelson_video_mmios{
     }},
     {{
         .base = S905D3_AOBUS_BASE,
-        .length = S905D3_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
     {{
         .base = S905D3_DMC_BASE,

@@ -11,11 +11,6 @@ use std::str::FromStr;
 #[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "product")]
 pub struct ProductArgs {
-    /// the platform artifacts directory.
-    /// this is needed in order to retrieve the assembly binary.
-    #[argh(option)]
-    pub platform: Utf8PathBuf,
-
     /// the product configuration directory.
     #[argh(option)]
     pub product: Utf8PathBuf,
@@ -58,6 +53,10 @@ pub struct ProductArgs {
     /// path to a file specifying developer-level overrides for assembly.
     #[argh(option)]
     pub developer_overrides: Option<Utf8PathBuf>,
+
+    /// flag stating whether the example AIB should be included.
+    #[argh(option)]
+    pub include_example_aib_for_tests: Option<bool>,
 }
 
 impl ProductArgs {
@@ -65,8 +64,6 @@ impl ProductArgs {
     pub fn to_vec(&self) -> Vec<String> {
         let mut args = vec![
             "product".to_string(),
-            "--platform".to_string(),
-            self.platform.to_string(),
             "--product".to_string(),
             self.product.to_string(),
             "--board-info".to_string(),
@@ -99,6 +96,10 @@ impl ProductArgs {
             args.push(path.to_string());
         }
 
+        if ffx_config::get::<bool, _>("assembly_example_enabled").unwrap_or_default() {
+            args.push("--include-example-aib-for-tests".to_string());
+            args.push(true.to_string());
+        }
         args
     }
 }
@@ -153,7 +154,7 @@ impl From<ProductArgs> for ProductAssemblyOutputs {
         image_assembly_config.push("image_assembly_config.json");
 
         ProductAssemblyOutputs {
-            platform: args.platform,
+            platform: args.input_bundles_dir,
             outdir: args.outdir,
             gendir: args.gendir,
             image_assembly_config,

@@ -16,6 +16,8 @@ rustc_library("gpu") {
     "lib.rs",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     ":gfxstream_stubs",
     "//src/starnix/kernel:starnix_core",

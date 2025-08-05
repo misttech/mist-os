@@ -259,7 +259,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Set the queried location to the given Value.
-    pub async fn set(&self, value: Value) -> Result<()> {
+    pub fn set(&self, value: Value) -> Result<()> {
         log::debug!("Setting config value");
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env()?;
@@ -272,24 +272,24 @@ impl<'a> ConfigQuery<'a> {
         log::debug!("Config set got write guard");
         write_guard.set(key, level, value)?;
         log::debug!("Config set performed");
-        write_guard.save().await?;
+        write_guard.save()?;
         log::debug!("Config set saved");
         Ok(())
     }
 
     /// Remove the value at the queried location.
-    pub async fn remove(&self) -> Result<()> {
+    pub fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let env = self.get_env()?;
         let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         write_guard.remove(key, level)?;
-        write_guard.save().await
+        write_guard.save()
     }
 
     /// Add this value at the queried location as an array item, converting the location to an array
     /// if necessary.
-    pub async fn add(&self, value: Value) -> Result<()> {
+    pub fn add(&self, value: Value) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env()?;
         env.populate_defaults(&level)?;
@@ -311,7 +311,7 @@ impl<'a> ConfigQuery<'a> {
             write_guard.set(key, level, value)?
         };
 
-        write_guard.save().await
+        write_guard.save()
     }
 }
 

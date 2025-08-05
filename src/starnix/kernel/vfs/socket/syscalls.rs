@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::attachments::SetSockOptProgramResult;
 use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt};
 use crate::security;
 use crate::syscalls::time::TimeSpecPtr;
@@ -15,9 +16,6 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
-use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef};
-use starnix_uapi::user_value::UserValue;
-
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::time::duration_from_timespec;
@@ -27,7 +25,10 @@ use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{
+    ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef, UserAddress, UserRef,
+};
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, socklen_t, uapi, MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD,
@@ -909,21 +910,43 @@ pub fn sys_getsockopt(
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
 
-    let optlen = current_task.read_object(user_optlen)?;
-    let optval = current_task.read_memory_to_vec(user_optval, optlen as usize)?;
+    let optlen = current_task.read_object(user_optlen)? as usize;
+    let optval_buffer_len = optlen;
+    let mut optval = current_task.read_memory_to_vec(user_optval, optlen as usize)?;
 
-    let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
-        current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval)?
+    let result = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
+        current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval.clone())
     } else {
-        socket.getsockopt(locked, current_task, level, optname, optlen)?
+        socket.getsockopt(locked, current_task, level, optname, optlen as u32)
     };
 
-    let actual_optlen = opt_value.len() as socklen_t;
-    if optlen < actual_optlen {
-        return error!(EINVAL);
-    }
-    current_task.write_memory(user_optval, &opt_value)?;
-    current_task.write_object(user_optlen, &actual_optlen)?;
+    // Even if `getsockopt()` above returned an error we still need to run
+    // the eBPF program - it may handle the error.
+    let (optlen, error) = match result {
+        Ok(new_optval) if new_optval.len() > optval.len() => (optlen, Some(errno!(EINVAL))),
+        Ok(new_optval) => {
+            // Copy the returned value to the buffer, but don't truncate it yet
+            // - this will allow to use the whole buffer in the eBPF program.
+            optval[..new_optval.len()].copy_from_slice(&new_optval);
+            (new_optval.len(), None)
+        }
+        Err(e) => (optlen, Some(e)),
+    };
+
+    let root_cgroup = current_task.kernel().ebpf_state.attachments.root_cgroup();
+    let (optval, optlen) = root_cgroup.run_getsockopt_prog(
+        locked.cast_locked(),
+        current_task,
+        level,
+        optname,
+        optval,
+        optlen,
+        error,
+    )?;
+
+    assert!(optlen <= optval_buffer_len);
+    current_task.write_memory(user_optval, &optval[..optlen])?;
+    current_task.write_object(user_optlen, &(optlen as u32))?;
 
     Ok(())
 }
@@ -941,15 +964,30 @@ pub fn sys_setsockopt(
     let socket = Socket::get_from_file(&file)?;
 
     let user_opt = UserBuffer { address: user_optval, length: optlen as usize };
+
+    // Run eBPF program if any.
+    let root_cgroup = current_task.kernel().ebpf_state.attachments.root_cgroup();
+    let optval = match root_cgroup.run_setsockopt_prog(
+        locked.cast_locked(),
+        current_task,
+        level,
+        optname,
+        user_opt.into(),
+    ) {
+        SetSockOptProgramResult::Allow(value) => value,
+        SetSockOptProgramResult::Fail(errno) => return Err(errno),
+        SetSockOptProgramResult::Bypass => return Ok(()), // The option was handled by eBPF.
+    };
+
     if socket.domain.is_inet() && IpTables::can_handle_setsockopt(level, optname) {
         current_task.kernel().iptables.write(locked).setsockopt(
             current_task,
             socket,
             optname,
-            user_opt,
+            optval,
         )
     } else {
-        socket.setsockopt(locked, current_task, level, optname, user_opt)
+        socket.setsockopt(locked, current_task, level, optname, optval)
     }
 }
 

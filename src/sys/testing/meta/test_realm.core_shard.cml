@@ -188,7 +188,6 @@
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.composition.Screenshot",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
             to: "#testing",
@@ -646,9 +645,13 @@
             to: "#testing",
         },
 
-        // TODO(https://fxbug.dev/42163671): Remove once e2e is better supported.
+        // Needed by network-conformance tests.
         {
-            protocol: [ "fuchsia.net.interfaces.State" ],
+            protocol: [
+                "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
+            ],
             from: "#network",
             to: "#testing",
         },
@@ -730,7 +733,6 @@
             dictionary: "tee_session",
             from: "#tee_manager",
             to: "#testing",
-            availability: "optional",
             source_availability: "unknown",
         },
     ],

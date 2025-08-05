@@ -152,9 +152,9 @@ Error CfiUnwinder::GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out) {
   uint64_t module_address = module_it->first;
   auto& module_info = module_it->second;
 
-  if (!module_info.binary && module_info.module.binary_memory) {
+  if (module_info.module.binary_memory) {
     module_info.binary = std::make_unique<CfiModule>(module_info.module.binary_memory,
-                                                     module_address, module_info.module);
+                                                     module_address, module_info.module.mode);
     // Loading the main binary file should always contain either an eh_frame section or a
     // debug_frame section.
     if (auto err = module_info.binary->Load(); err.has_err()) {
@@ -162,9 +162,9 @@ Error CfiUnwinder::GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out) {
     }
   }
 
-  if (!module_info.debug_info && module_info.module.debug_info_memory) {
+  if (module_info.module.debug_info_memory) {
     module_info.debug_info = std::make_unique<CfiModule>(module_info.module.debug_info_memory,
-                                                         module_address, module_info.module);
+                                                         module_address, module_info.module.mode);
     // A split debug info file may contain neither eh_frame nor debug_frame sections, it is not an
     // error if this fails to load.
     if (auto err = module_info.debug_info->Load(); err.has_err()) {

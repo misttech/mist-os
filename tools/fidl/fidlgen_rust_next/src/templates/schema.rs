@@ -58,7 +58,7 @@ impl<'a> SchemaTemplate<'a> {
         TableTemplate::new(table, self.context)
     }
 
-    fn union(&self, union: &'a Union) -> UnionTemplate<'a> {
+    fn union_(&self, union: &'a Union) -> UnionTemplate<'a> {
         UnionTemplate::new(union, self.context)
     }
 }

@@ -44,7 +44,6 @@ fuchsia::sysmem2::BufferUsage get_cpu_usage_read() {
 using allocation::BufferCollectionUsage;
 using allocation::ImageMetadata;
 using fuchsia::ui::composition::Orientation;
-using fuchsia_ui_composition::BlendMode;
 using fuchsia_ui_composition::ImageFlip;
 
 // TODO(https://fxbug.dev/42129956): Move common functions to testing::WithParamInterface instead of
@@ -1627,7 +1626,7 @@ VK_TEST_F(VulkanRendererTest, SolidColorTest) {
   // Create the image meta data for the solid color renderable.
   ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
                                          .multiply_color = {1.f, 0.4f, 0.f, 1.f},
-                                         .blend_mode = BlendMode::kSrcOver};
+                                         .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1697,7 +1696,7 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
   // Create the image meta data for the solid color renderable.
   ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
                                          .multiply_color = {1, 0, 0, 1},
-                                         .blend_mode = BlendMode::kSrcOver};
+                                         .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1779,12 +1778,12 @@ VK_TEST_F(VulkanRendererTest, MultipleSolidColorTest) {
   // Create the image meta data for the solid color renderable - red.
   ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
                                          .multiply_color = {1, 0, 0, 1},
-                                         .blend_mode = BlendMode::kSrcOver};
+                                         .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Create the image meta data for the other solid color renderable - blue.
   ImageMetadata renderable_image_data_2 = {.identifier = allocation::kInvalidImageId,
                                            .multiply_color = {0, 0, 1, 1},
-                                           .blend_mode = BlendMode::kSrcOver};
+                                           .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1862,7 +1861,7 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
   // Create the image meta data for the solid color renderable - green.
   ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
                                          .multiply_color = {0, 1, 0, 1},
-                                         .blend_mode = BlendMode::kSrcOver};
+                                         .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Create the image meta data for the image backed renderable - red.
   ImageMetadata renderable_image_data_2 = {.collection_id = collection_id,
@@ -1978,7 +1977,7 @@ VK_TEST_F(VulkanRendererTest, TransparencyTest) {
                                        .vmo_index = 1,
                                        .width = 1,
                                        .height = 1,
-                                       .blend_mode = BlendMode::kSrcOver};
+                                       .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Import all the images.
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
@@ -2096,7 +2095,7 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
                                       .width = 1,
                                       .height = 1,
                                       .multiply_color = {1, 0, 0, 1},
-                                      .blend_mode = BlendMode::kSrcOver};
+                                      .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Create the texture that will go on the transparent renderable.
   ImageMetadata transparent_texture = {.collection_id = collection_id,
@@ -2105,7 +2104,7 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
                                        .width = 1,
                                        .height = 1,
                                        .multiply_color = {0, 1, 0, 0.5},
-                                       .blend_mode = BlendMode::kSrcOver};
+                                       .blend_mode = BlendMode::kPremultipliedAlpha()};
 
   // Import all the images.
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
@@ -2510,7 +2509,7 @@ VK_TEST_F(VulkanRendererTest, ReadbackTest) {
   // Create the image metadata for the solid color renderable.
   ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
                                          .multiply_color = {1.f, 0.4f, 0.f, 1.f},
-                                         .blend_mode = BlendMode::kSrcOver};
+                                         .blend_mode = BlendMode::kPremultipliedAlpha()};
   ImageRect renderable(glm::vec2(0, 0), glm::vec2(kTargetWidth, kTargetHeight));
 
   // Render the renderable to the render target.

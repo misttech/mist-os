@@ -17,8 +17,6 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_FWIL_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_FWIL_H_
 
-#include <wifi/wifi-config.h>
-
 #include "core.h"
 #include "fwil_types.h"
 

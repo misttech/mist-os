@@ -14,7 +14,7 @@ namespace vm_unittest {
 zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inout_ptr<void>* ptr) {
   ASSERT(aspace->is_user());
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -121,7 +121,7 @@ uint32_t test_rand(uint32_t seed) { return (seed = seed * 1664525 + 1013904223);
 void fill_region(uintptr_t seed, void* _ptr, size_t len) {
   uint32_t* ptr = (uint32_t*)_ptr;
 
-  ASSERT(IS_ALIGNED((uintptr_t)ptr, 4));
+  ASSERT(IS_ROUNDED((uintptr_t)ptr, 4));
 
   uint32_t val = (uint32_t)seed;
   val ^= (uint32_t)(seed >> 32);
@@ -136,7 +136,7 @@ void fill_region(uintptr_t seed, void* _ptr, size_t len) {
 void fill_region_user(uintptr_t seed, user_inout_ptr<void> _ptr, size_t len) {
   user_inout_ptr<uint32_t> ptr = _ptr.reinterpret<uint32_t>();
 
-  ASSERT(IS_ALIGNED(ptr.get(), 4));
+  ASSERT(IS_ROUNDED(ptr.get(), 4));
 
   uint32_t val = (uint32_t)seed;
   val ^= (uint32_t)(seed >> 32);
@@ -152,7 +152,7 @@ void fill_region_user(uintptr_t seed, user_inout_ptr<void> _ptr, size_t len) {
 bool test_region(uintptr_t seed, void* _ptr, size_t len) {
   uint32_t* ptr = (uint32_t*)_ptr;
 
-  ASSERT(IS_ALIGNED((uintptr_t)ptr, 4));
+  ASSERT(IS_ROUNDED((uintptr_t)ptr, 4));
 
   uint32_t val = (uint32_t)seed;
   val ^= (uint32_t)(seed >> 32);
@@ -172,7 +172,7 @@ bool test_region(uintptr_t seed, void* _ptr, size_t len) {
 bool test_region_user(uintptr_t seed, user_inout_ptr<void> _ptr, size_t len) {
   user_inout_ptr<uint32_t> ptr = _ptr.reinterpret<uint32_t>();
 
-  ASSERT(IS_ALIGNED(ptr.get(), 4));
+  ASSERT(IS_ROUNDED(ptr.get(), 4));
 
   uint32_t val = (uint32_t)seed;
   val ^= (uint32_t)(seed >> 32);

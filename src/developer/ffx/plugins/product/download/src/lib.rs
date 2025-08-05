@@ -22,7 +22,7 @@ use std::io::{stdin, stdout};
 use std::path::Path;
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct PbDownloadTool {
     #[command]
     cmd: DownloadCommand,
@@ -315,7 +315,6 @@ mod test {
             .query(PRODUCT_BUNDLE_INDEX_KEY)
             .level(Some(ConfigLevel::User))
             .set(path.to_str().unwrap().into())
-            .await
             .unwrap();
 
         env

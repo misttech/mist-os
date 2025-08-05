@@ -34,6 +34,7 @@
 #include "debug.h"
 #include "fwil.h"
 #include "proto.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 /*
  * maximum length of firmware signal data between

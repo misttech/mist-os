@@ -9,13 +9,18 @@
             to: "#system-update",
         },
         {
-            protocol: "fuchsia.pkg.PackageResolver-ota",
+            protocol: [
+                "fuchsia.pkg.internal.OtaDownloader",
+                "fuchsia.pkg.PackageResolver-ota",
+            ],
             from: "#pkg-resolver",
             to: "#system-update",
         },
         {
             protocol: [
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.space.Manager",
             ],
@@ -36,12 +41,11 @@
             to: "#system-update",
         },
         {
-            directory: "system",
-            from: "parent",
-            to: "#system-update",
-        },
-        {
-            directory: "build-info",
+            directory: [
+                "blob",
+                "build-info",
+                "system",
+            ],
             from: "parent",
             to: "#system-update",
         },

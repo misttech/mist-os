@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use std::hash::Hash;
 use std::ops::Add;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "fuchsia"))]
 use indexmap::map::Iter;
 
 /// Describes the performance statistics of a cache implementation.
@@ -137,8 +137,7 @@ impl<A: Hash + Eq, R> FifoCache<A, R> {
     }
 
     /// Returns an iterator over the cache elements, for use by tests.
-    #[cfg(test)]
-    #[allow(dead_code)] // Only used by `access_vector_cache.rs` tests when built for Fuchsia.
+    #[cfg(all(test, target_os = "fuchsia"))]
     pub fn iter(&self) -> Iter<'_, A, R> {
         self.cache.iter()
     }

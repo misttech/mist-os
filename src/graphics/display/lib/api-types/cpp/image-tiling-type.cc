@@ -6,7 +6,17 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
+#include <type_traits>
+
 namespace display {
+
+static_assert(std::is_standard_layout_v<ImageTilingType>);
+static_assert(std::is_trivially_assignable_v<ImageTilingType, ImageTilingType>);
+static_assert(std::is_trivially_copyable_v<ImageTilingType>);
+static_assert(std::is_trivially_copy_constructible_v<ImageTilingType>);
+static_assert(std::is_trivially_destructible_v<ImageTilingType>);
+static_assert(std::is_trivially_move_assignable_v<ImageTilingType>);
+static_assert(std::is_trivially_move_constructible_v<ImageTilingType>);
 
 // Ensure that the Banjo constants match the FIDL constants.
 static_assert(ImageTilingType::kLinear.ToBanjo() == IMAGE_TILING_TYPE_LINEAR);

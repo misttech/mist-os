@@ -157,7 +157,6 @@ impl TryFrom<fhardware_network::PortClass> for PortClass {
 #[derive(Derivative, ValidFidlTable)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
 #[fidl_table_src(fnet_interfaces::Properties)]
-#[fidl_table_strict(device_class)]
 pub struct Properties<I: FieldInterests> {
     /// An opaque identifier for the interface. Its value will not be reused
     /// even if the device is removed and subsequently re-added. Immutable.

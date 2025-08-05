@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 /// Sub-sub tool for `emu stop`
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct EmuStopTool {
     #[command]
     cmd: StopCommand,
@@ -141,7 +141,6 @@ mod tests {
             .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(temp_path))
-            .await
             .expect("setting instance dir config");
 
         let emu_instances = EmulatorInstances::new(temp_path.clone());
@@ -178,7 +177,6 @@ mod tests {
             .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(temp_path))
-            .await
             .expect("setting instance dir config");
         let emu_instances = EmulatorInstances::new(temp_path.clone());
         let cmd = StopCommand::default();
@@ -206,7 +204,6 @@ mod tests {
             .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(temp_path))
-            .await
             .expect("setting instance dir config");
         let emu_instances = EmulatorInstances::new(temp_path.clone());
         let cmd = StopCommand { all: true, ..Default::default() };
@@ -230,7 +227,6 @@ mod tests {
             .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(env.isolate_root.path()))
-            .await
             .expect("setting instance dir config");
         let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
         let mut cmd = StopCommand::default();

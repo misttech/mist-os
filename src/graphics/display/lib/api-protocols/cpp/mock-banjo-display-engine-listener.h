@@ -29,7 +29,7 @@ class MockBanjoDisplayEngineListener
       fit::function<void(const raw_display_info_t* banjo_raw_display_info)>;
   using OnDisplayRemovedChecker = fit::function<void(uint64_t banjo_display_id)>;
   using OnDisplayVsyncChecker =
-      fit::function<void(uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+      fit::function<void(uint64_t banjo_display_id, zx_instant_mono_t banjo_timestamp,
                          const config_stamp_t* banjo_config_stamp)>;
   using OnCaptureCompleteChecker = fit::function<void()>;
 
@@ -56,7 +56,8 @@ class MockBanjoDisplayEngineListener
   // fuchsia.hardware.display.controller/DisplayEngineListener:
   void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_raw_display_info);
   void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                           zx_instant_mono_t banjo_timestamp,
                                            const config_stamp_t* banjo_config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
 

@@ -42,18 +42,17 @@ use starnix_uapi::{
     gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, uapi, uid_t, AT_EMPTY_PATH,
     AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
     CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS,
-    CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ,
-    PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER,
-    PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME,
-    PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER,
-    PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
-    PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
-    PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    SCHED_RESET_ON_FORK, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
-    SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
-    SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT,
-    SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1,
-    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
+    CLONE_VFORK, NGROUPS_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
+    PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE,
+    PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS,
+    PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS,
+    PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP,
+    PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH,
+    PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, SCHED_RESET_ON_FORK, SECCOMP_FILTER_FLAG_LOG,
+    SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC,
+    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES,
+    SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
+    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 use static_assertions::const_assert;
 use std::cmp;
@@ -241,7 +240,7 @@ pub fn sys_execveat(
         )?
     };
 
-    let path = &current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = &current_task.read_path(user_path)?;
 
     log_trace!(argv:?, environ:?, flags:?; "execveat({dir_fd}, {path})");
 
@@ -382,8 +381,8 @@ fn get_task_if_owner_or_has_capabilities(
     capabilities: Capabilities,
 ) -> Result<WeakRef<Task>, Errno> {
     let weak = current_task.get_task(pid);
-    let task_creds = Task::from_weak(&weak)?.creds();
-    let current_creds = current_task.creds();
+    let task_creds = Task::from_weak(&weak)?.real_creds();
+    let current_creds = current_task.current_creds();
     if task_creds.euid != current_creds.euid {
         security::check_task_capable(current_task, capabilities)?;
     }
@@ -448,8 +447,8 @@ impl CurrentTask {
     /// setpriority(2), more ambiguous language at sched_setscheduler(2), and no
     /// particular specification at sched_setparam(2).
     fn is_euid_friendly_with(&self, target_task: &Task) -> bool {
-        let self_creds = self.creds();
-        let target_task_creds = target_task.creds();
+        let self_creds = self.current_creds();
+        let target_task_creds = target_task.real_creds();
         self_creds.euid == target_task_creds.uid || self_creds.euid == target_task_creds.euid
     }
 }
@@ -458,16 +457,16 @@ impl CurrentTask {
 // CAP_SETUID capability bypasses these checks and allows setting any uid to any integer. Likewise
 // for gids.
 fn new_uid_allowed(current_task: &CurrentTask, uid: uid_t) -> bool {
-    uid == current_task.creds().uid
-        || uid == current_task.creds().euid
-        || uid == current_task.creds().saved_uid
+    uid == current_task.current_creds().uid
+        || uid == current_task.current_creds().euid
+        || uid == current_task.current_creds().saved_uid
         || security::is_task_capable_noaudit(current_task, CAP_SETUID)
 }
 
 fn new_gid_allowed(current_task: &CurrentTask, gid: gid_t) -> bool {
-    gid == current_task.creds().gid
-        || gid == current_task.creds().egid
-        || gid == current_task.creds().saved_gid
+    gid == current_task.current_creds().gid
+        || gid == current_task.current_creds().egid
+        || gid == current_task.current_creds().saved_gid
         || security::is_task_capable_noaudit(current_task, CAP_SETGID)
 }
 
@@ -475,14 +474,14 @@ pub fn sys_getuid(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<uid_t, Errno> {
-    Ok(current_task.creds().uid)
+    Ok(current_task.current_creds().uid)
 }
 
 pub fn sys_getgid(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<gid_t, Errno> {
-    Ok(current_task.creds().gid)
+    Ok(current_task.current_creds().gid)
 }
 
 pub fn sys_setuid(
@@ -490,7 +489,7 @@ pub fn sys_setuid(
     current_task: &CurrentTask,
     uid: uid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     if uid == gid_t::MAX {
         return error!(EINVAL);
     }
@@ -515,7 +514,7 @@ pub fn sys_setgid(
     current_task: &CurrentTask,
     gid: gid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     if gid == gid_t::MAX {
         return error!(EINVAL);
     }
@@ -536,14 +535,14 @@ pub fn sys_geteuid(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<uid_t, Errno> {
-    Ok(current_task.creds().euid)
+    Ok(current_task.current_creds().euid)
 }
 
 pub fn sys_getegid(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<gid_t, Errno> {
-    Ok(current_task.creds().egid)
+    Ok(current_task.current_creds().egid)
 }
 
 pub fn sys_setfsuid(
@@ -551,7 +550,7 @@ pub fn sys_setfsuid(
     current_task: &CurrentTask,
     fsuid: uid_t,
 ) -> Result<uid_t, Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let prev = creds.copy_user_credentials();
     if fsuid != u32::MAX && new_uid_allowed(&current_task, fsuid) {
         creds.fsuid = fsuid;
@@ -567,7 +566,7 @@ pub fn sys_setfsgid(
     current_task: &CurrentTask,
     fsgid: gid_t,
 ) -> Result<gid_t, Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let prev = creds.copy_user_credentials();
     let prev_fsgid = creds.fsgid;
 
@@ -587,7 +586,7 @@ pub fn sys_getresuid(
     euid_addr: UserRef<uid_t>,
     suid_addr: UserRef<uid_t>,
 ) -> Result<(), Errno> {
-    let creds = current_task.creds();
+    let creds = current_task.current_creds();
     current_task.write_object(ruid_addr, &creds.uid)?;
     current_task.write_object(euid_addr, &creds.euid)?;
     current_task.write_object(suid_addr, &creds.saved_uid)?;
@@ -601,7 +600,7 @@ pub fn sys_getresgid(
     egid_addr: UserRef<gid_t>,
     sgid_addr: UserRef<gid_t>,
 ) -> Result<(), Errno> {
-    let creds = current_task.creds();
+    let creds = current_task.current_creds();
     current_task.write_object(rgid_addr, &creds.gid)?;
     current_task.write_object(egid_addr, &creds.egid)?;
     current_task.write_object(sgid_addr, &creds.saved_gid)?;
@@ -614,7 +613,7 @@ pub fn sys_setreuid(
     ruid: uid_t,
     euid: uid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) {
         return error!(EPERM);
@@ -646,7 +645,7 @@ pub fn sys_setregid(
     rgid: gid_t,
     egid: gid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) {
         return error!(EPERM);
@@ -677,7 +676,7 @@ pub fn sys_setresuid(
     euid: uid_t,
     suid: uid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) || !allowed(suid) {
         return error!(EPERM);
@@ -706,7 +705,7 @@ pub fn sys_setresgid(
     egid: gid_t,
     sgid: gid_t,
 ) -> Result<(), Errno> {
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) || !allowed(sgid) {
         return error!(EPERM);
@@ -1098,13 +1097,13 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_GET_KEEPCAPS => {
-            Ok(current_task.creds().securebits.contains(SecureBits::KEEP_CAPS).into())
+            Ok(current_task.current_creds().securebits.contains(SecureBits::KEEP_CAPS).into())
         }
         PR_SET_KEEPCAPS => {
             if arg2 != 0 && arg2 != 1 {
                 return error!(EINVAL);
             }
-            let mut creds = current_task.creds();
+            let mut creds = current_task.current_creds();
             creds.securebits.set(SecureBits::KEEP_CAPS, arg2 != 0);
             current_task.set_creds(creds);
             Ok(().into())
@@ -1158,12 +1157,12 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_GET_SECUREBITS => {
-            let value = current_task.creds().securebits.bits();
+            let value = current_task.current_creds().securebits.bits();
             Ok(value.into())
         }
         PR_SET_SECUREBITS => {
             // TODO(security): This does not yet respect locked flags.
-            let mut creds = current_task.creds();
+            let mut creds = current_task.current_creds();
             security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
@@ -1175,11 +1174,12 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_CAPBSET_READ => {
-            let has_cap = current_task.creds().cap_bounding.contains(Capabilities::try_from(arg2)?);
+            let has_cap =
+                current_task.current_creds().cap_bounding.contains(Capabilities::try_from(arg2)?);
             Ok(has_cap.into())
         }
         PR_CAPBSET_DROP => {
-            let mut creds = current_task.creds();
+            let mut creds = current_task.current_creds();
             security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             creds.cap_bounding.remove(Capabilities::try_from(arg2)?);
@@ -1197,7 +1197,7 @@ pub fn sys_prctl(
             // error if the capability_arg is invalid.
             match operation {
                 PR_CAP_AMBIENT_RAISE => {
-                    let mut creds = current_task.creds();
+                    let mut creds = current_task.current_creds();
                     if !(creds.cap_permitted.contains(capability_arg)
                         && creds.cap_inheritable.contains(capability_arg))
                     {
@@ -1214,13 +1214,13 @@ pub fn sys_prctl(
                     Ok(().into())
                 }
                 PR_CAP_AMBIENT_LOWER => {
-                    let mut creds = current_task.creds();
+                    let mut creds = current_task.current_creds();
                     creds.cap_ambient.remove(capability_arg);
                     current_task.set_creds(creds);
                     Ok(().into())
                 }
                 PR_CAP_AMBIENT_IS_SET => {
-                    let has_cap = current_task.creds().cap_ambient.contains(capability_arg);
+                    let has_cap = current_task.current_creds().cap_ambient.contains(capability_arg);
                     Ok(has_cap.into())
                 }
                 PR_CAP_AMBIENT_CLEAR_ALL => {
@@ -1228,7 +1228,7 @@ pub fn sys_prctl(
                         return error!(EINVAL);
                     }
 
-                    let mut creds = current_task.creds();
+                    let mut creds = current_task.current_creds();
                     creds.cap_ambient = Capabilities::empty();
                     current_task.set_creds(creds);
                     Ok(().into())
@@ -1376,8 +1376,8 @@ where
     // * the same `uid`, `euid`, `saved_uid`, `gid`, `egid`, `saved_gid` as the target.
     // * the CAP_SYS_RESOURCE
     if current_task.get_pid() != target_task.get_pid() {
-        let current_creds = current_task.creds();
-        let target_creds = target_task.creds();
+        let current_creds = current_task.current_creds();
+        let target_creds = target_task.real_creds();
         if current_creds.uid != target_creds.uid
             || current_creds.euid != target_creds.euid
             || current_creds.saved_uid != target_creds.saved_uid
@@ -1466,7 +1466,7 @@ pub fn sys_capget(
     let target_task = Task::from_weak(&weak)?;
 
     let (permitted, effective, inheritable) = {
-        let creds = &target_task.creds();
+        let creds = &target_task.real_creds();
         (creds.cap_permitted, creds.cap_effective, creds.cap_inheritable)
     };
 
@@ -1545,7 +1545,7 @@ pub fn sys_capset(
     };
 
     // Permission checks. Copied out of TLPI section 39.7.
-    let mut creds = target_task.creds();
+    let mut creds = target_task.real_creds();
     {
         log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
         if !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable) {
@@ -1647,7 +1647,7 @@ pub fn sys_setgroups(
         return error!(EINVAL);
     }
     let groups = current_task.read_objects_to_vec::<gid_t>(groups_addr.into(), size)?;
-    let mut creds = current_task.creds();
+    let mut creds = current_task.current_creds();
     if !creds.is_superuser() {
         return error!(EPERM);
     }
@@ -1665,7 +1665,7 @@ pub fn sys_getgroups(
     if size > NGROUPS_MAX as usize {
         return error!(EINVAL);
     }
-    let creds = current_task.creds();
+    let creds = current_task.current_creds();
     if size != 0 {
         if size < creds.groups.len() {
             return error!(EINVAL);
@@ -1830,7 +1830,7 @@ pub fn sys_swapon(
 
     track_stub!(TODO("https://fxbug.dev/322893905"), "swapon validate flags");
 
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
 
     let node = file.node();
@@ -1872,7 +1872,7 @@ pub fn sys_swapoff(
 ) -> Result<(), Errno> {
     security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
 
     let mut swap_files = current_task.kernel().swap_files.lock(locked);
@@ -2402,7 +2402,7 @@ mod tests {
         // Test for root.
         current_task.set_creds(Credentials::root());
         sys_setuid(locked, &current_task, 42).expect("setuid");
-        let mut creds = current_task.creds();
+        let mut creds = current_task.current_creds();
         assert_eq!(creds.euid, 42);
         assert_eq!(creds.uid, 42);
         assert_eq!(creds.saved_uid, 42);
@@ -2416,32 +2416,32 @@ mod tests {
         assert_eq!(sys_setuid(locked, &current_task, 43), error!(EPERM));
 
         sys_setuid(locked, &current_task, 42).expect("setuid");
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         assert_eq!(creds.euid, 42);
         assert_eq!(creds.uid, 42);
         assert_eq!(creds.saved_uid, 42);
 
         // Change uid and saved_uid, and check that one can set the euid to these.
-        let mut creds = current_task.creds();
+        let mut creds = current_task.current_creds();
         creds.uid = 41;
         creds.euid = 42;
         creds.saved_uid = 43;
         current_task.set_creds(creds);
 
         sys_setuid(locked, &current_task, 41).expect("setuid");
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         assert_eq!(creds.euid, 41);
         assert_eq!(creds.uid, 41);
         assert_eq!(creds.saved_uid, 43);
 
-        let mut creds = current_task.creds();
+        let mut creds = current_task.current_creds();
         creds.uid = 41;
         creds.euid = 42;
         creds.saved_uid = 43;
         current_task.set_creds(creds);
 
         sys_setuid(locked, &current_task, 43).expect("setuid");
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         assert_eq!(creds.euid, 43);
         assert_eq!(creds.uid, 41);
         assert_eq!(creds.saved_uid, 43);

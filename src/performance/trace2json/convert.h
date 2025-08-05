@@ -10,8 +10,6 @@
 struct ConvertSettings {
   std::string input_file_name;
   std::string output_file_name;
-  bool compressed_input = false;
-  bool compressed_output = false;
 };
 
 bool ConvertTrace(ConvertSettings);

@@ -48,7 +48,6 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
   ]
@@ -56,11 +55,10 @@ source_set("common") {
 
 fuchsia_cc_driver("spi-driver") {
   output_name = "spi"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
+  deps = [
+    ":common",
+    "//src/devices/lib/driver:driver_runtime",
   ]
-  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("spi") {

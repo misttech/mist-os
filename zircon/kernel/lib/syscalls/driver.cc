@@ -361,7 +361,7 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   // is large enough for all current usage of bti_pin, but protects against the case of an
   // arbitrarily large array being allocated on the heap.
   constexpr size_t kMaxAddrs = (PAGE_SIZE * 64) / sizeof(dev_vaddr_t);
-  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(size) || addrs_count > kMaxAddrs) {
+  if (!IS_PAGE_ROUNDED(offset) || !IS_PAGE_ROUNDED(size) || addrs_count > kMaxAddrs) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -563,8 +563,9 @@ zx_status_t sys_interrupt_create(zx_handle_t src_obj, uint32_t src_num, uint32_t
                                  zx_handle_t* out_handle) {
   LTRACEF("options 0x%x\n", options);
 
-  // resource not required for virtual interrupts
-  if (!(options & ZX_INTERRUPT_VIRTUAL)) {
+  // The IRQ resource is required for all non-virtual interrupts, and virtual
+  // interrupts which are configured as wake vectors.
+  if (!(options & ZX_INTERRUPT_VIRTUAL) || (options & ZX_INTERRUPT_WAKE_VECTOR)) {
     zx_status_t status;
     if ((status = validate_resource_irq(src_obj, src_num)) != ZX_OK) {
       return status;

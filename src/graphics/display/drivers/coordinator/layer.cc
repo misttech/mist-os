@@ -25,11 +25,10 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
@@ -40,7 +39,7 @@ static_assert(WaitingImageList::kMaxSize ==
                   fuchsia_hardware_display::wire::kMaxWaitingImagesPerLayer,
               "Violation of fuchsia.hardware.display.Coordinator API contract.");
 
-Layer::Layer(Controller* controller, display::DriverLayerId id)
+Layer::Layer(Controller* controller, display::LayerId id)
     : IdMappable(id), controller_(*controller) {
   ZX_DEBUG_ASSERT(controller != nullptr);
 
@@ -55,14 +54,12 @@ Layer::Layer(Controller* controller, display::DriverLayerId id)
 
 Layer::~Layer() {
   ZX_DEBUG_ASSERT(!in_use());
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   waiting_images_.RemoveAllImages();
 }
 
-fbl::Mutex* Layer::mtx() const { return controller_.mtx(); }
-
 bool Layer::ResolveDraftLayerProperties() {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 
   // If the layer's image configuration changed, get rid of any current images
   if (draft_image_config_gen_ != applied_image_config_gen_) {
@@ -80,7 +77,7 @@ bool Layer::ResolveDraftLayerProperties() {
 }
 
 bool Layer::ResolveDraftImage(FenceCollection* fences, display::ConfigStamp stamp) {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 
   if (draft_image_ != nullptr) {
     auto wait_fence = fences->GetFence(draft_image_wait_event_id_);
@@ -120,7 +117,7 @@ void Layer::ApplyChanges() {
   }
 
   if (applied_image_ != nullptr) {
-    applied_layer_config_.image_handle = ToBanjoDriverImageId(applied_image_->driver_id());
+    applied_layer_config_.image_handle = applied_image_->driver_id().ToBanjo();
   } else {
     applied_layer_config_.image_handle = INVALID_DISPLAY_ID;
   }
@@ -136,7 +133,7 @@ void Layer::DiscardChanges() {
 }
 
 bool Layer::CleanUpAllImages() {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 
   RetireDraftImage();
 
@@ -166,7 +163,7 @@ std::optional<display::ConfigStamp> Layer::GetCurrentClientConfigStamp() const {
 }
 
 bool Layer::ActivateLatestReadyImage() {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 
   fbl::RefPtr<Image> newest_ready_image = waiting_images_.PopNewestReadyImage();
   if (!newest_ready_image) {
@@ -176,7 +173,7 @@ bool Layer::ActivateLatestReadyImage() {
                                                 applied_image_->latest_client_config_stamp()));
 
   applied_image_ = std::move(newest_ready_image);
-  applied_layer_config_.image_handle = ToBanjoDriverImageId(applied_image_->driver_id());
+  applied_layer_config_.image_handle = applied_image_->driver_id().ToBanjo();
 
   // TODO(costan): `applied_layer_config_` is updated without updating
   // `draft_layer_config_differs_from_applied_`. Is it guaranteed that the
@@ -238,7 +235,8 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
   draft_layer_config_differs_from_applied_ = true;
 }
 
-void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
+void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
+                           fuchsia_math::wire::RectU display_destination) {
   // Increase the size of the static array when large color formats are introduced
   static_assert(decltype(color.bytes)::size() == sizeof(draft_layer_config_.fallback_color.bytes));
 
@@ -250,7 +248,7 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
   draft_layer_config_.image_metadata = {.dimensions = {.width = 0, .height = 0},
                                         .tiling_type = IMAGE_TILING_TYPE_LINEAR};
   draft_layer_config_.image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
-  draft_layer_config_.display_destination = {.x = 0, .y = 0, .width = 0, .height = 0};
+  draft_layer_config_.display_destination = display::Rectangle::From(display_destination).ToBanjo();
 
   draft_layer_config_differs_from_applied_ = true;
 
@@ -263,19 +261,19 @@ void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id) {
 }
 
 bool Layer::MarkFenceReady(FenceReference* fence) {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   return waiting_images_.MarkFenceReady(fence);
 }
 
 bool Layer::HasWaitingImages() const {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   return waiting_images_.size() > 0;
 }
 
 void Layer::RetireDraftImage() { draft_image_ = nullptr; }
 
 void Layer::RetireWaitingImage(const Image& image) {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   waiting_images_.RemoveImage(image);
 }
 

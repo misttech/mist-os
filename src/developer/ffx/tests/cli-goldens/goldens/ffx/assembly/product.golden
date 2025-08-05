@@ -53,7 +53,7 @@
           "arg_name": "gendir"
         }
       },
-      "optionality": "optional",
+      "optionality": "required",
       "long": "--gendir",
       "short": null,
       "description": "the directory to write generated intermediate files to.",
@@ -125,6 +125,18 @@
       "long": "--developer-overrides",
       "short": null,
       "description": "path to a file specifying developer-level overrides for assembly.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "include-example-aib-for-tests"
+        }
+      },
+      "optionality": "optional",
+      "long": "--include-example-aib-for-tests",
+      "short": null,
+      "description": "flag stating whether the example AIB should be included.",
       "hidden": false
     }
   ],

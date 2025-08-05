@@ -460,10 +460,10 @@ pub fn sys_timer_create(
     };
 
     let mut checked_signal_event: Option<SignalEvent> = None;
-    let thread_group = current_task.thread_group().read();
+    let thread_group = current_task.thread_group();
     if let Some(user_event) = user_event {
         let signal_event: SignalEvent = user_event.try_into()?;
-        if !signal_event.is_valid(&thread_group) {
+        if !signal_event.is_valid(&thread_group.read()) {
             return error!(EINVAL);
         }
         checked_signal_event = Some(signal_event);
@@ -509,8 +509,7 @@ pub fn sys_timer_delete(
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<(), Errno> {
-    let timers = &current_task.thread_group().read().timers;
-    timers.delete(current_task, id)
+    current_task.thread_group().timers.delete(current_task, id)
 }
 
 pub fn sys_timer_gettime(
@@ -519,7 +518,7 @@ pub fn sys_timer_gettime(
     id: TimerId,
     curr_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
-    let timers = &current_task.thread_group().read().timers;
+    let timers = &current_task.thread_group().timers;
     current_task.write_multi_arch_object(curr_value, timers.get_time(id)?)?;
     Ok(())
 }
@@ -529,8 +528,7 @@ pub fn sys_timer_getoverrun(
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<i32, Errno> {
-    let timers = &current_task.thread_group().read().timers;
-    timers.get_overrun(id)
+    current_task.thread_group().timers.get_overrun(id)
 }
 
 pub fn sys_timer_settime(
@@ -552,8 +550,8 @@ pub fn sys_timer_settime(
         current_task.write_multi_arch_object(user_old_value, Default::default())?;
     }
 
-    let timers = &current_task.thread_group().read().timers;
-    let old_value = timers.set_time(current_task, id, flags, new_value)?;
+    let old_value =
+        current_task.thread_group().timers.set_time(current_task, id, flags, new_value)?;
 
     if !user_old_value.is_null() {
         current_task.write_multi_arch_object(user_old_value, old_value)?;

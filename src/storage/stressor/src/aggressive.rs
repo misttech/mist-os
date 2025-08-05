@@ -10,7 +10,7 @@
 use fidl_fuchsia_io as fio;
 use fuchsia_async::MonotonicInstant;
 use fuchsia_sync::Mutex;
-use rand::distributions::WeightedIndex;
+use rand::distr::weighted::WeightedIndex;
 use rand::prelude::*;
 use std::fs::File;
 use std::io::ErrorKind;
@@ -30,13 +30,13 @@ impl Inner {
     /// Returns the next file to use, avoiding the most recent DIRENT_CACHE_LIMIT
     /// files returned but shuffling the remainder.
     pub fn next_file_num(&mut self) -> u64 {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         if self.file_counter == 0 {
             log::info!("File counter looped.");
         }
         self.file_map.swap(
             self.file_counter,
-            (self.file_counter + rng.gen_range(0..(NUM_FILES - DIRENT_CACHE_LIMIT))) % NUM_FILES,
+            (self.file_counter + rng.random_range(0..(NUM_FILES - DIRENT_CACHE_LIMIT))) % NUM_FILES,
         );
         let ret = self.file_map[self.file_counter];
         self.file_counter = (self.file_counter + 1) % NUM_FILES;
@@ -176,9 +176,9 @@ impl Stressor {
             READ => match File::options().read(true).write(false).open(&path) {
                 Ok(f) => {
                     let file_len = f.metadata().unwrap().len();
-                    let read_len = rng.gen_range(0..128 * 1024u64);
+                    let read_len = rng.random_range(0..128 * 1024u64);
                     let end = file_len.saturating_sub(read_len);
-                    let offset = rng.gen_range(0..end + 1);
+                    let offset = rng.random_range(0..end + 1);
                     buf.resize(read_len as usize, 0);
                     f.read_at(buf, offset).unwrap();
                 }
@@ -193,7 +193,7 @@ impl Stressor {
                 match File::options().create(true).read(true).write(true).open(&path) {
                     Ok(f) => {
                         let file_len = f.metadata().unwrap().len();
-                        buf.resize(rng.gen_range(0..128 * 1024), 1);
+                        buf.resize(rng.random_range(0..128 * 1024), 1);
                         match f.write_at(&buf, file_len) {
                             Ok(bytes) => {
                                 self.bytes_stored.fetch_add(bytes as u64, Ordering::Relaxed);
@@ -247,7 +247,7 @@ impl Stressor {
 
     /// Worker thread function.
     fn worker(&self) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut buf = Vec::new();
         loop {
             self.work_unit(&mut rng, &mut buf);
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn stressor() {
         let stressor = Stressor::new("", 10);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut buf = Vec::new();
         stressor.work_unit(&mut rng, &mut buf);
         assert_eq!(stressor.op_stats.lock().iter().sum::<u64>(), 1);

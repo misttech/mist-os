@@ -207,6 +207,9 @@ the component framework for safekeeping.
 
 ### Stateless protocols
 
+> **Note:** Protocols need to be marked as `@discoverable` to support escrowing.
+  This allows components to reconnect to channels after waking from idle.
+
 Some FIDL connections don't carry state. Every request functions identically
 whether they are sent on the same connection or over separate connections.
 You may follow these steps for those connections:

@@ -15,7 +15,7 @@ use crate::vfs::buffers::{
 use crate::vfs::fs_registry::FsRegistry;
 use crate::vfs::{
     default_fcntl, default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, CacheMode,
-    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileHandle, FileObject, FileObjectState, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked};
@@ -396,7 +396,7 @@ pub fn new_pipe(
         .get::<FsRegistry>()
         .create(locked, current_task, "pipefs".into(), FileSystemOptions::default())
         .ok_or_else(|| errno!(EINVAL))??;
-    let mut info = FsNodeInfo::new(mode!(IFIFO, 0o600), current_task.as_fscred());
+    let mut info = FsNodeInfo::new(mode!(IFIFO, 0o600), current_task.current_fscred());
     info.blksize = ATOMIC_IO_BYTES.into();
     let node = fs.create_node_and_allocate_node_id(SpecialNode, info);
     let pipe = node.fifo(current_task);
@@ -468,9 +468,9 @@ impl FileOps for PipeFileObject {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.on_close(file.flags());

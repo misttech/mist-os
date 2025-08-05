@@ -18,12 +18,14 @@ rustc_binary("assembly_config") {
     "src/main.rs",
     "src/partitions_config.rs",
     "src/product_config.rs",
+    "src/product_input_bundle.rs",
   ]
   output_name = "assembly_config"
   deps = [
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/assembly/product_input_bundle",
     "//src/lib/assembly/release_info",
     "//src/lib/assembly/util",
     "//src/sys/pkg/lib/fuchsia-pkg",

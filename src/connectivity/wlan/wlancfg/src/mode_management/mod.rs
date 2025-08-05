@@ -404,30 +404,30 @@ mod tests {
 
     #[fuchsia::test]
     fn test_failure_equality() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         assert_eq!(
-            IfaceFailure::CanceledScan { iface_id: rng.gen::<u16>() },
-            IfaceFailure::CanceledScan { iface_id: rng.gen::<u16>() }
+            IfaceFailure::CanceledScan { iface_id: rng.random() },
+            IfaceFailure::CanceledScan { iface_id: rng.random() }
         );
         assert_eq!(
-            IfaceFailure::FailedScan { iface_id: rng.gen::<u16>() },
-            IfaceFailure::FailedScan { iface_id: rng.gen::<u16>() }
+            IfaceFailure::FailedScan { iface_id: rng.random() },
+            IfaceFailure::FailedScan { iface_id: rng.random() }
         );
         assert_eq!(
-            IfaceFailure::EmptyScanResults { iface_id: rng.gen::<u16>() },
-            IfaceFailure::EmptyScanResults { iface_id: rng.gen::<u16>() }
+            IfaceFailure::EmptyScanResults { iface_id: rng.random() },
+            IfaceFailure::EmptyScanResults { iface_id: rng.random() }
         );
         assert_eq!(
-            IfaceFailure::ApStartFailure { iface_id: rng.gen::<u16>() },
-            IfaceFailure::ApStartFailure { iface_id: rng.gen::<u16>() }
+            IfaceFailure::ApStartFailure { iface_id: rng.random() },
+            IfaceFailure::ApStartFailure { iface_id: rng.random() }
         );
         assert_eq!(
-            IfaceFailure::ConnectionFailure { iface_id: rng.gen::<u16>() },
-            IfaceFailure::ConnectionFailure { iface_id: rng.gen::<u16>() }
+            IfaceFailure::ConnectionFailure { iface_id: rng.random() },
+            IfaceFailure::ConnectionFailure { iface_id: rng.random() }
         );
         assert_eq!(
-            IfaceFailure::Timeout { iface_id: rng.gen::<u16>(), source: TimeoutSource::Scan },
-            IfaceFailure::Timeout { iface_id: rng.gen::<u16>(), source: TimeoutSource::ApStart }
+            IfaceFailure::Timeout { iface_id: rng.random(), source: TimeoutSource::Scan },
+            IfaceFailure::Timeout { iface_id: rng.random(), source: TimeoutSource::ApStart }
         );
     }
 }

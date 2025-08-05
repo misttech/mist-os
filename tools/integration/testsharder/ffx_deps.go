@@ -20,7 +20,7 @@ func AddFFXDeps(s *Shard, buildDir string, tools build.Tools) error {
 	if s.Env.TargetsEmulator() {
 		subtools = append(subtools, "emu")
 	}
-	platform, err := testBotPlatform(s.HostCPU())
+	platform, err := testBotPlatform(s.HostCPU)
 	if err != nil {
 		return err
 	}

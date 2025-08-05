@@ -43,13 +43,13 @@ impl EventSynthesizer {
 
     /// Spawns a synthesis task for the requested `events`. Resulting events will be sent on the
     /// `sender` channel.
-    pub async fn spawn_synthesis(
+    pub fn spawn_synthesis(
         &self,
         sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         events: HashMap<Name, Vec<EventDispatcherScope>>,
         scope: &TaskGroup,
     ) {
-        SynthesisTask::new(&self, sender, events).spawn(scope).await
+        SynthesisTask::new(&self, sender, events).spawn(scope)
     }
 }
 
@@ -92,7 +92,7 @@ impl SynthesisTask {
 
     /// Spawns a task that will synthesize all events that were requested when creating the
     /// `SynthesisTask`
-    pub async fn spawn(self, scope: &TaskGroup) {
+    pub fn spawn(self, scope: &TaskGroup) {
         if self.event_infos.is_empty() {
             return;
         }

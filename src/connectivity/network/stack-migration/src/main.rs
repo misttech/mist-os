@@ -19,7 +19,7 @@ use {
     fidl_fuchsia_power_internal as fpower,
 };
 
-const DEFAULT_NETSTACK: NetstackVersion = NetstackVersion::Netstack2;
+const DEFAULT_NETSTACK: NetstackVersion = NetstackVersion::Netstack3;
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
 enum NetstackVersion {
@@ -999,15 +999,13 @@ mod tests {
         };
 
         validate_versions(&migration, DEFAULT_NETSTACK);
+        // There should only be a collaborative reboot request if the new
+        // version differs from the default version.
         let cr_req = &migration.collaborative_reboot.scheduler.req;
-        match (mechanism, set_version) {
-            (_, NetstackVersion::Netstack3) => {
-                assert_eq!(
-                    Ok(false),
-                    cr_req.as_ref().expect("there should be a request").is_closed()
-                )
-            }
-            _ => assert_eq!(cr_req, &None),
+        if set_version != DEFAULT_NETSTACK {
+            assert_eq!(Ok(false), cr_req.as_ref().expect("there should be a request").is_closed());
+        } else {
+            assert_eq!(cr_req, &None);
         }
 
         // Check that the setting was properly persisted.
@@ -1081,11 +1079,11 @@ mod tests {
         assert_matches!(migration.persisted.rollback, Some(rollback::Persisted::Success));
     }
 
-    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack2), true)]
-    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack3), false)]
+    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack2), false)]
+    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack3), true)]
     #[test_case(SetMechanism::User, None, false)]
-    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack2), true)]
-    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack3), false)]
+    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack2), false)]
+    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack3), true)]
     #[test_case(SetMechanism::Automated, None, true)]
     #[fuchsia::test]
     async fn cancel_collaborative_reboot(
@@ -1098,13 +1096,13 @@ mod tests {
             FakeCollaborativeReboot::default(),
         );
 
-        // Start of by updating the automated setting to Netstack3; this ensures
-        // their is a pending request to cancel.
+        // Start of by updating the automated setting to Netstack2; this ensures
+        // there is a pending request to cancel.
         let (serve, control, _) = serve_migration(migration);
         let fut = async move {
             control
                 .set_automated_netstack_version(Some(&fnet_migration::VersionSetting {
-                    version: fnet_migration::NetstackVersion::Netstack3,
+                    version: fnet_migration::NetstackVersion::Netstack2,
                 }))
                 .await
                 .expect("set automated netstack version");

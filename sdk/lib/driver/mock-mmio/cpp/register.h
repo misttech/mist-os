@@ -8,6 +8,7 @@
 #include <lib/mmio/mmio.h>
 
 #include <memory>
+#include <vector>
 
 namespace mock_mmio {
 

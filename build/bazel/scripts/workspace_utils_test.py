@@ -817,7 +817,7 @@ package(
 # From GN target: //bundles/assembly:eng.platform_artifacts(//build/toolchain/fuchsia:x64)
 filegroup(
     name = "eng.bazel_inputs",
-    srcs = glob(["_files/obj/bundles/assembly/eng/platform_artifacts/**"], exclude_directories=1),
+    srcs = glob(["_files/obj/bundles/assembly/eng/platform_artifacts/**"], exclude_directories=1, allow_empty=True),
 )
 alias(
     name = "eng.bazel_inputs.directory",

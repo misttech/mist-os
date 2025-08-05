@@ -16,7 +16,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
@@ -36,6 +35,7 @@
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "src/devices/lib/acpi/mock/mock-acpi.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 

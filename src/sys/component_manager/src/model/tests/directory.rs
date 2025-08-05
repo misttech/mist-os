@@ -78,8 +78,8 @@ async fn starting_directory_using_target_component_does_not_start_source() {
 
     // Start `b` and get a hold of the directory connection.
     b.ensure_started(&StartReason::Debug).await.unwrap();
-    test.mock_runner.wait_for_url("test:///b_resolved").await;
-    let namespace = test.mock_runner.get_namespace("test:///b_resolved").unwrap();
+    test.mock_runner.wait_for_url("test:///b").await;
+    let namespace = test.mock_runner.get_namespace("test:///b").unwrap();
 
     {
         let namespace = namespace.lock().await;
@@ -161,15 +161,15 @@ async fn open_requests_go_to_the_same_directory_connection() {
     let mock_data = Arc::new(MockDir(open_tx));
     let mut out_dir = OutDir::new();
     out_dir.add_entry("/data".parse().unwrap(), mock_data.clone());
-    test.mock_runner.add_host_fn("test:///c_resolved", out_dir.host_fn());
+    test.mock_runner.add_host_fn("test:///c", out_dir.host_fn());
 
     let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
     let c = test.model.root().find_and_maybe_resolve(&"c".parse().unwrap()).await.unwrap();
 
     b.ensure_started(&StartReason::Debug).await.unwrap();
-    test.mock_runner.wait_for_url("test:///b_resolved").await;
+    test.mock_runner.wait_for_url("test:///b").await;
     {
-        let namespace = test.mock_runner.get_namespace("test:///b_resolved").unwrap();
+        let namespace = test.mock_runner.get_namespace("test:///b").unwrap();
         let mut namespace = namespace.lock().await;
         let client_end = namespace.remove(&"/data".parse().unwrap()).unwrap();
         let dir = client_end.into_proxy();
@@ -186,7 +186,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
     ActionsManager::register(b.clone(), DestroyAction::new()).await.unwrap();
 
     // `c` should only get one open call after we drain any requests.
-    test.mock_runner.wait_for_url("test:///c_resolved").await;
+    test.mock_runner.wait_for_url("test:///c").await;
     c.stop().await.unwrap();
     open_rx.try_next().unwrap();
     open_rx.try_next().unwrap_err();

@@ -25,7 +25,7 @@ use netstack3_base::{
     IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
     IpDeviceAddr, IpExt, Marks, RngContext, TokenBucket, TxMetadataBindingsTypes,
 };
-use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
+use netstack3_filter::{DynTransportSerializer, DynamicTransportSerializer, FilterIpExt};
 use packet::{
     BufferMut, InnerPacketBuilder as _, PacketBuilder as _, ParsablePacket as _, ParseBuffer,
     PartialSerializer, Serializer, TruncateDirection, TruncatingSerializer,
@@ -61,8 +61,8 @@ use crate::internal::device::{
 use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta};
 use crate::internal::path_mtu::PmtuHandler;
 use crate::internal::socket::{
-    DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketHandler, OptionDelegationMarker,
-    RouteResolutionOptions, SendOptions,
+    DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketArgs, IpSocketHandler,
+    OptionDelegationMarker, RouteResolutionOptions, SendOptions,
 };
 
 /// The IP packet hop limit for all NDP packets.
@@ -1178,7 +1178,14 @@ where
     macro_rules! send {
         ($message:expr, $code:expr) => {{
             // TODO(https://fxbug.dev/42177356): Send through ICMPv6 send path.
-            IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
+            let mut ser = IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
+                dst_ip.get(),
+                $code,
+                $message,
+            )
+            .wrap_body(body);
+            match IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
                 core_ctx,
                 bindings_ctx,
                 SendIpPacketMeta {
@@ -1191,15 +1198,16 @@ where
                     mtu: Mtu::no_limit(),
                     dscp_and_ecn: DscpAndEcn::default(),
                 },
-                IcmpPacketBuilder::<Ipv6, _>::new(
-                    src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
-                    dst_ip.get(),
-                    $code,
-                    $message,
-                )
-                .wrap_body(body),
-            )
-            .map_err(|s| s.into_inner())
+                DynTransportSerializer::new(&mut ser),
+            ) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e
+                    .map_serializer(|s| {
+                        // Get rid of the borrow to the serializer.
+                        let _: DynTransportSerializer<'_, _> = s;
+                    })
+                    .map_serializer(|()| ser.into_inner())),
+            }
         }};
     }
 
@@ -1556,7 +1564,11 @@ fn receive_ndp_packet<
             // TODO(https://fxbug.dev/42052173): Control whether or not we should
             // update the default hop limit.
             if let Some(hop_limit) = ra.current_hop_limit() {
-                trace!("receive_ndp_packet: NDP RA: updating device's hop limit to {:?} for router: {:?}", ra.current_hop_limit(), src_ip);
+                trace!(
+                    "receive_ndp_packet: NDP RA: updating device's hop limit to {:?} for router: {:?}",
+                    ra.current_hop_limit(),
+                    src_ip
+                );
                 IpDeviceHandler::set_default_hop_limit(core_ctx, &device_id, hop_limit);
             }
 
@@ -1805,16 +1817,22 @@ impl<
                             );
                         }
                         Err(AddrIsMappedError {}) => {
-                            trace!("IpTransportContext<Ipv6>::receive_ip_packet: Received echo request with an ipv4-mapped-ipv6 destination address");
+                            trace!(
+                                "IpTransportContext<Ipv6>::receive_ip_packet: Received echo request with an ipv4-mapped-ipv6 destination address"
+                            );
                         }
                     }
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address"
+                    );
                 }
             }
             Icmpv6Packet::EchoReply(echo_reply) => {
                 CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx).echo_reply.increment();
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message"
+                );
                 let parse_metadata = echo_reply.parse_metadata();
                 buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
@@ -1835,7 +1853,9 @@ impl<
                 CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx)
                     .packet_too_big
                     .increment();
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message"
+                );
                 let new_mtu = if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
                     // of this `packet` (which is an IP address on this node) to
@@ -1938,8 +1958,7 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     I: IpExt + FilterIpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     BC: TxMetadataBindingsTypes,
-    S: TransportPacketSerializer<I>,
-    S::Buffer: BufferMut,
+    S: DynamicTransportSerializer<I>,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
     O: SendOptions<I> + RouteResolutionOptions<I>,
 {
@@ -1955,13 +1974,15 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     .then_some(EitherDeviceId::Strong(device));
 
     core_ctx
-        .send_oneshot_ip_packet(
+        .send_oneshot_ip_packet_with_dyn_serializer(
             bindings_ctx,
-            egress_device,
-            IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
-            original_src_ip,
-            I::ICMP_IP_PROTO,
-            ip_options,
+            IpSocketArgs {
+                device: egress_device,
+                local_ip: IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
+                remote_ip: original_src_ip,
+                proto: I::ICMP_IP_PROTO,
+                options: ip_options,
+            },
             tx_metadata,
             |src_ip| get_body_from_src_ip(src_ip.into()),
         )
@@ -2817,13 +2838,15 @@ fn send_icmpv4_error_message<
             let _ = try_send_error!(
                 core_ctx,
                 bindings_ctx,
-                core_ctx.send_oneshot_ip_packet(
+                core_ctx.send_oneshot_ip_packet_with_dyn_serializer(
                     bindings_ctx,
-                    device.map(EitherDeviceId::Strong),
-                    None,
-                    original_src_ip,
-                    Ipv4Proto::Icmp,
-                    &WithMarks(marks),
+                    IpSocketArgs {
+                        device: device.map(EitherDeviceId::Strong),
+                        local_ip: None,
+                        remote_ip: original_src_ip,
+                        proto: Ipv4Proto::Icmp,
+                        options: &WithMarks(marks),
+                    },
                     tx_metadata,
                     |local_ip| {
                         IcmpPacketBuilder::<Ipv4, _>::new(
@@ -2919,13 +2942,15 @@ fn send_icmpv6_error_message<
             let _ = try_send_error!(
                 core_ctx,
                 bindings_ctx,
-                core_ctx.send_oneshot_ip_packet(
+                core_ctx.send_oneshot_ip_packet_with_dyn_serializer(
                     bindings_ctx,
-                    device.map(EitherDeviceId::Strong),
-                    None,
-                    original_src_ip,
-                    Ipv6Proto::Icmpv6,
-                    &Icmpv6ErrorOptions(marks),
+                    IpSocketArgs {
+                        device: device.map(EitherDeviceId::Strong),
+                        local_ip: None,
+                        remote_ip: original_src_ip,
+                        proto: Ipv6Proto::Icmpv6,
+                        options: &Icmpv6ErrorOptions(marks),
+                    },
                     tx_metadata,
                     |local_ip| {
                         let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
@@ -3159,6 +3184,7 @@ mod tests {
         FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
     use netstack3_base::{CtxPair, Uninstantiable};
+    use netstack3_filter::TransportPacketSerializer;
     use packet::{Buf, EmptyBuf};
     use packet_formats::icmp::mld::MldPacket;
     use packet_formats::ip::IpProto;
@@ -3583,23 +3609,12 @@ mod tests {
         fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-            options: &O,
+            args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
         where
             O: RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.new_ip_socket(
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                options,
-            )
+            self.ip_socket_ctx.new_ip_socket(bindings_ctx, args)
         }
 
         fn send_ip_packet<S, O>(

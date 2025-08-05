@@ -25,6 +25,7 @@
 #include <linux/futex.h>
 
 #include "src/lib/files/file.h"
+#include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -74,6 +75,18 @@ void *setup_sigaltstack(size_t size) {
   return altstack;
 }
 
+std::string GetBinaryPath(std::string_view binary_name) {
+  std::string test_binary = "/data/tests/" + std::string(binary_name);
+  if (!files::IsFile(test_binary)) {
+    // We're running on host
+    char self_path[PATH_MAX];
+    realpath("/proc/self/exe", self_path);
+
+    test_binary = files::JoinPath(files::GetDirectoryName(self_path), std::string(binary_name));
+  }
+  return test_binary;
+}
+
 TEST(SignalHandling, NestedSigpipe) {
   // Validate that we can handle a nested signal
   // (such as SIGPIPE, when inside another signal handler,
@@ -90,7 +103,7 @@ TEST(SignalHandling, NestedSigpipe) {
     struct sigaction sa;
     sa.sa_handler = [](int signum) {
       ASSERT_EQ(signum, SIGQUIT);
-      char data;
+      char data = 'a';
       ssize_t bytes_written = write(pipefd[1], &data, 1);
       ASSERT_EQ(bytes_written, -1);
       ASSERT_EQ(errno, EPIPE);
@@ -703,6 +716,57 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
 
     ASSERT_EQ(0, sigaction(SIGSEGV, &sa, NULL));
     raise(SIGUSR1);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+// Checks the effect of `exec` on signal handlers. Custom signal dispositions should be reset to the
+// default, while ignored signals should remain ignored. Signal action flags and masks should be
+// cleared.
+TEST(SignalHandling, SigactionResetByExec) {
+  test_helper::ForkHelper helper;
+
+  sigset_t mask;
+  ASSERT_THAT(sigemptyset(&mask), SyscallSucceeds());
+  ASSERT_THAT(sigaddset(&mask, SIGINT), SyscallSucceeds());
+
+  struct sigaction custom = {};
+  custom.sa_handler = [](int) {};
+  custom.sa_flags = SA_ONSTACK;
+  custom.sa_mask = mask;
+
+  struct sigaction ignore = {};
+  ignore.sa_handler = SIG_IGN;
+  ignore.sa_flags = SA_ONSTACK;
+  ignore.sa_mask = mask;
+
+  struct sigaction dfl = {};
+  dfl.sa_handler = SIG_DFL;
+  dfl.sa_flags = SA_ONSTACK;
+  dfl.sa_mask = mask;
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_THAT(sigaction(SIGUSR1, &custom, NULL), SyscallSucceeds());
+    ASSERT_THAT(sigaction(SIGUSR2, &ignore, NULL), SyscallSucceeds());
+    ASSERT_THAT(sigaction(SIGCONT, &dfl, NULL), SyscallSucceeds());
+
+    std::string binary_name = "signal_handling_test_exec_child";
+    std::string binary_path = GetBinaryPath(binary_name);
+
+    std::string sigusr1 = std::to_string(SIGUSR1);
+    std::string sig_dfl = "default";
+
+    std::string sigusr2 = std::to_string(SIGUSR2);
+    std::string sig_ign = "ignore";
+
+    std::string sigcont = std::to_string(SIGCONT);
+
+    char *const argv[] = {binary_name.data(), sigusr1.data(), sig_dfl.data(), sigusr2.data(),
+                          sig_ign.data(),     sigcont.data(), sig_dfl.data(), nullptr};
+
+    SAFE_SYSCALL(execve(binary_path.data(), argv, nullptr));
+    _exit(EXIT_FAILURE);
   });
 
   EXPECT_TRUE(helper.WaitForChildren());

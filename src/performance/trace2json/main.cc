@@ -17,43 +17,20 @@ namespace {
 const char kHelp[] = "help";
 const char kInputFile[] = "input-file";
 const char kOutputFile[] = "output-file";
-const char kCompressedInput[] = "compressed-input";
-const char kCompressedOutput[] = "compressed-output";
 
 std::set<std::string> kKnownOptions = {
-    kHelp, kInputFile, kOutputFile, kCompressedInput, kCompressedOutput,
+    kHelp,
+    kInputFile,
+    kOutputFile,
 };
-
-bool ParseBooleanOption(const fxl::CommandLine& command_line, const char* arg_name,
-                        bool* out_value) {
-  if (command_line.HasOption(std::string_view(arg_name))) {
-    std::string arg_value;
-    command_line.GetOptionValue(std::string_view(arg_name), &arg_value);
-    if (arg_value == "" || arg_value == "true") {
-      *out_value = true;
-    } else if (arg_value == "false") {
-      *out_value = false;
-    } else {
-      FX_LOGS(ERROR) << "Bad value for --" << arg_name << ", pass true or false";
-      return false;
-    }
-  }
-  return true;
-}
 
 void PrintHelpMessage() {
   std::map<std::string, std::string> options = {
       {"help", "Print this help message."},
-      {"input-file=[]",
-       "Read trace from the specified file. If no file is specified, the input "
-       "is read from stdin."},
+      {"input-file=[]", "Read trace from the specified file."},
       {"output-file=[]",
        "Write the converted trace to the specified file. If no file is "
        "specified, the output is written to stdout."},
-      {"compressed-input=[false]", "If true, the input is first gzip-decompressed."},
-      {"compressed-output=[false]",
-       "If true, the output is gzip-compressed. Writing compressed output to "
-       "stdout is not supported, so output-file must be specified."},
   };
 
   std::cerr
@@ -106,17 +83,13 @@ int main(int argc, char** argv) {
   ConvertSettings settings;
   if (command_line.HasOption(kInputFile)) {
     command_line.GetOptionValue(kInputFile, &settings.input_file_name);
+  } else {
+    FX_LOGS(WARNING) << "Reading from stdin is no longer supported, please pass --" << kInputFile;
+    PrintHelpMessage();
+    return 1;
   }
   if (command_line.HasOption(kOutputFile)) {
     command_line.GetOptionValue(kOutputFile, &settings.output_file_name);
-  }
-  if (!ParseBooleanOption(command_line, kCompressedInput, &settings.compressed_input)) {
-    PrintHelpMessage();
-    return 1;
-  }
-  if (!ParseBooleanOption(command_line, kCompressedOutput, &settings.compressed_output)) {
-    PrintHelpMessage();
-    return 1;
   }
 
   if (!ConvertTrace(settings)) {

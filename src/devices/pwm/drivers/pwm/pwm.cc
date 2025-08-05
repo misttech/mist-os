@@ -68,15 +68,6 @@ zx::result<> PwmChannel::Init(const std::shared_ptr<fdf::Namespace>& incoming,
     }
   }
 
-  {
-    zx::result result =
-        compat_server_.Initialize(incoming, outgoing, std::nullopt, child_node_name);
-    if (result.is_error()) {
-      fdf::error("Failed to initialize compat server: {}", result);
-      return result.take_error();
-    }
-  }
-
   zx::result connector = devfs_connector_.Bind(dispatcher_);
   if (connector.is_error()) {
     fdf::error("Failed to bind devfs connector: {}", connector);
@@ -88,8 +79,9 @@ zx::result<> PwmChannel::Init(const std::shared_ptr<fdf::Namespace>& incoming,
        .class_name{kClassName},
        .connector_supports{fuchsia_device_fs::ConnectionType::kController}}};
 
-  std::vector offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pwm::Service>(child_node_name));
+  auto offers = std::vector{
+      fdf::MakeOffer2<fuchsia_hardware_pwm::Service>(child_node_name),
+  };
 
   std::vector properties = {fdf::MakeProperty2(bind_fuchsia::PWM_ID, id_)};
 

@@ -24,9 +24,9 @@ use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
-use parser::{ByRef, ByValue, ParseStrategy};
+use parser::PolicyCursor;
 use std::fmt::{Debug, Display, LowerHex};
-use std::marker::PhantomData;
+
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -248,29 +248,12 @@ impl IoctlAccessDecision {
 /// ```rust,ignore
 /// let (unvalidated_policy, _) = parse_policy_by_value(binary_policy.clone())?;
 /// ```
-///
-/// If the caller does not need to retain both the parsed output and the binary policy, then
-/// [`parse_policy_by_reference`] should be used instead.
 pub fn parse_policy_by_value(
     binary_policy: Vec<u8>,
-) -> Result<(Unvalidated<ByValue<Vec<u8>>>, Vec<u8>), anyhow::Error> {
+) -> Result<(Unvalidated, Vec<u8>), anyhow::Error> {
     let (parsed_policy, binary_policy) =
-        ParsedPolicy::parse(ByValue::new(binary_policy)).context("parsing policy")?;
+        ParsedPolicy::parse(PolicyCursor::new(binary_policy)).context("parsing policy")?;
     Ok((Unvalidated(parsed_policy), binary_policy))
-}
-
-/// Parses `binary_policy` by reference; that is, constructs parser output structures that contain
-/// _references_ to data in `binary_policy`. This function returns `unvalidated_parser_output` on
-/// success, or an error if parsing failed.
-///
-/// If the caller does needs to retain both the parsed output and the binary policy, then
-/// [`parse_policy_by_value`] should be used instead.
-pub fn parse_policy_by_reference<'a>(
-    binary_policy: &'a [u8],
-) -> Result<Unvalidated<ByRef<&'a [u8]>>, anyhow::Error> {
-    let (parsed_policy, _) =
-        ParsedPolicy::parse(ByRef::new(binary_policy)).context("parsing policy")?;
-    Ok(Unvalidated(parsed_policy))
 }
 
 /// Information on a Class. This struct is used for sharing Class information outside this crate.
@@ -282,9 +265,9 @@ pub struct ClassInfo<'a> {
 }
 
 #[derive(Debug)]
-pub struct Policy<PS: ParseStrategy>(PolicyIndex<PS>);
+pub struct Policy(PolicyIndex);
 
-impl<PS: ParseStrategy> Policy<PS> {
+impl Policy {
     /// The policy version stored in the underlying binary policy.
     pub fn policy_version(&self) -> u32 {
         self.0.parsed_policy().policy_version()
@@ -301,7 +284,7 @@ impl<PS: ParseStrategy> Policy<PS> {
             .parsed_policy()
             .conditional_booleans()
             .iter()
-            .map(|boolean| (PS::deref_slice(&boolean.data), PS::deref(&boolean.metadata).active()))
+            .map(|boolean| (boolean.data.as_slice(), boolean.metadata.active()))
             .collect()
     }
 
@@ -513,7 +496,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     }
 }
 
-impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
+impl AccessVectorComputer for Policy {
     fn access_vector_from_permissions<
         P: sc::ClassPermission + Into<sc::KernelPermission> + Clone + 'static,
     >(
@@ -536,7 +519,7 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for Policy<PS> {
+impl Validate for Policy {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -545,10 +528,10 @@ impl<PS: ParseStrategy> Validate for Policy<PS> {
 }
 
 /// A [`Policy`] that has been successfully parsed, but not validated.
-pub struct Unvalidated<PS: ParseStrategy>(ParsedPolicy<PS>);
+pub struct Unvalidated(ParsedPolicy);
 
-impl<PS: ParseStrategy> Unvalidated<PS> {
-    pub fn validate(self) -> Result<Policy<PS>, anyhow::Error> {
+impl Unvalidated {
+    pub fn validate(self) -> Result<Policy, anyhow::Error> {
         Validate::validate(&self.0).context("validating parsed policy")?;
         let index = PolicyIndex::new(self.0).context("building index")?;
         Ok(Policy(index))
@@ -573,25 +556,25 @@ pub trait AccessVectorComputer {
 }
 
 /// A data structure that can be parsed as a part of a binary policy.
-pub trait Parse<PS: ParseStrategy>: Sized {
+pub trait Parse: Sized {
     /// The type of error that may be returned from `parse()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
 
     /// Parses a `Self` from `bytes`, returning the `Self` and trailing bytes, or an error if
     /// bytes corresponding to a `Self` are malformed.
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error>;
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error>;
 }
 
 /// Parse a data as a slice of inner data structures from a prefix of a [`ByteSlice`].
-pub(super) trait ParseSlice<PS: ParseStrategy>: Sized {
+pub(super) trait ParseSlice: Sized {
     /// The type of error that may be returned from `parse()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
 
     /// Parses a `Self` as `count` of internal itemsfrom `bytes`, returning the `Self` and trailing
     /// bytes, or an error if bytes corresponding to a `Self` are malformed.
-    fn parse_slice(bytes: PS, count: usize) -> Result<(Self, PS), Self::Error>;
+    fn parse_slice(bytes: PolicyCursor, count: usize) -> Result<(Self, PolicyCursor), Self::Error>;
 }
 
 /// Validate a parsed data structure.
@@ -677,19 +660,18 @@ impl<B: SplitByteSlice, T: Counted + FromBytes + KnownLayout + Immutable> Counte
 /// A length-encoded array that contains metadata in `M` and a slice of data items internally
 /// managed by `D`.
 #[derive(Clone, Debug, PartialEq)]
-struct Array<PS, M, D> {
+struct Array<M, D> {
     metadata: M,
     data: D,
-    _marker: PhantomData<PS>,
 }
 
-impl<PS: ParseStrategy, M: Counted + Parse<PS>, D: ParseSlice<PS>> Parse<PS> for Array<PS, M, D> {
+impl<M: Counted + Parse, D: ParseSlice> Parse for Array<M, D> {
     /// [`Array`] abstracts over two types (`M` and `D`) that may have different [`Parse::Error`]
     /// types. Unify error return type via [`anyhow::Error`].
     type Error = anyhow::Error;
 
     /// Parses [`Array`] by parsing *and validating* `metadata`, `data`, and `self`.
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = M::parse(tail).map_err(Into::<anyhow::Error>::into)?;
@@ -697,26 +679,23 @@ impl<PS: ParseStrategy, M: Counted + Parse<PS>, D: ParseSlice<PS>> Parse<PS> for
         let (data, tail) =
             D::parse_slice(tail, metadata.count() as usize).map_err(Into::<anyhow::Error>::into)?;
 
-        let array = Self { metadata, data, _marker: PhantomData };
+        let array = Self { metadata, data };
 
         Ok((array, tail))
     }
 }
 
-impl<
-        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
-        PS: ParseStrategy<Output<T> = T>,
-    > Parse<PS> for T
-{
+impl<T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> Parse for T {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) = PS::parse::<T>(bytes).ok_or(ParseError::MissingData {
-            type_name: std::any::type_name::<T>(),
-            type_size: std::mem::size_of::<T>(),
-            num_bytes,
-        })?;
+        let (data, tail) =
+            PolicyCursor::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
+                type_name: std::any::type_name::<T>(),
+                type_size: std::mem::size_of::<T>(),
+                num_bytes,
+            })?;
 
         Ok((data, tail))
     }
@@ -726,42 +705,39 @@ impl<
 /// macro should be used in contexts where using a general [`Array`] implementation may introduce
 /// conflicting implementations on account of general [`Array`] type parameters.
 macro_rules! array_type {
-    ($type_name:ident, $parse_strategy:ident, $metadata_type:ty, $data_type:ty, $metadata_type_name:expr, $data_type_name:expr) => {
+    ($type_name:ident, $metadata_type:ty, $data_type:ty, $metadata_type_name:expr, $data_type_name:expr) => {
         #[doc = "An [`Array`] with [`"]
         #[doc = $metadata_type_name]
         #[doc = "`] metadata and [`"]
         #[doc = $data_type_name]
         #[doc = "`] data items."]
         #[derive(Debug, PartialEq)]
-        pub(super) struct $type_name<$parse_strategy: crate::policy::parser::ParseStrategy>(
-            crate::policy::Array<PS, $metadata_type, $data_type>,
-        );
+        pub(super) struct $type_name(crate::policy::Array<$metadata_type, $data_type>);
 
-        impl<PS: crate::policy::parser::ParseStrategy> std::ops::Deref for $type_name<PS> {
-            type Target = crate::policy::Array<PS, $metadata_type, $data_type>;
+        impl std::ops::Deref for $type_name {
+            type Target = crate::policy::Array<$metadata_type, $data_type>;
 
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
         }
 
-        impl<PS: crate::policy::parser::ParseStrategy> crate::policy::Parse<PS> for $type_name<PS>
+        impl crate::policy::Parse for $type_name
         where
-            crate::policy::Array<PS, $metadata_type, $data_type>: crate::policy::Parse<PS>,
+            crate::policy::Array<$metadata_type, $data_type>: crate::policy::Parse,
         {
-            type Error = <Array<PS, $metadata_type, $data_type> as crate::policy::Parse<PS>>::Error;
+            type Error = <Array<$metadata_type, $data_type> as crate::policy::Parse>::Error;
 
-            fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
-                let (array, tail) = Array::<PS, $metadata_type, $data_type>::parse(bytes)?;
+            fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
+                let (array, tail) = Array::<$metadata_type, $data_type>::parse(bytes)?;
                 Ok((Self(array), tail))
             }
         }
     };
 
-    ($type_name:ident, $parse_strategy:ident, $metadata_type:ty, $data_type:ty) => {
+    ($type_name:ident, $metadata_type:ty, $data_type:ty) => {
         array_type!(
             $type_name,
-            $parse_strategy,
             $metadata_type,
             $data_type,
             stringify!($metadata_type),
@@ -774,14 +750,14 @@ pub(super) use array_type;
 
 macro_rules! array_type_validate_deref_both {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
-                let metadata = PS::deref(&self.metadata);
+                let metadata = &self.metadata;
                 metadata.validate()?;
 
-                let data = PS::deref_slice(&self.data);
+                let data = &self.data;
                 data.validate()?;
 
                 Self::validate_array(metadata, data).map_err(Into::<anyhow::Error>::into)
@@ -794,14 +770,14 @@ pub(super) use array_type_validate_deref_both;
 
 macro_rules! array_type_validate_deref_data {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
                 let metadata = &self.metadata;
                 metadata.validate()?;
 
-                let data = PS::deref_slice(&self.data);
+                let data = &self.data;
                 data.validate()?;
 
                 Self::validate_array(metadata, data)
@@ -814,11 +790,11 @@ pub(super) use array_type_validate_deref_data;
 
 macro_rules! array_type_validate_deref_metadata_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
-                let metadata = PS::deref(&self.metadata);
+                let metadata = &self.metadata;
                 metadata.validate()?;
 
                 let data = &self.data;
@@ -834,7 +810,7 @@ pub(super) use array_type_validate_deref_metadata_data_vec;
 
 macro_rules! array_type_validate_deref_none_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -852,57 +828,13 @@ macro_rules! array_type_validate_deref_none_data_vec {
 
 pub(super) use array_type_validate_deref_none_data_vec;
 
-impl<
-        B: Debug + SplitByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
-    > Parse<ByRef<B>> for Ref<B, T>
-{
-    type Error = anyhow::Error;
-
-    fn parse(bytes: ByRef<B>) -> Result<(Self, ByRef<B>), Self::Error> {
-        let num_bytes = bytes.len();
-        let (data, tail) = ByRef::<B>::parse::<T>(bytes).ok_or(ParseError::MissingData {
-            type_name: std::any::type_name::<T>(),
-            type_size: std::mem::size_of::<T>(),
-            num_bytes,
-        })?;
-
-        Ok((data, tail))
-    }
-}
-
-impl<
-        B: Debug + SplitByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
-    > ParseSlice<ByRef<B>> for Ref<B, [T]>
-{
-    /// [`Ref`] may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error return
-    /// type via [`anyhow::Error`].
-    type Error = anyhow::Error;
-
-    /// Parses [`Ref`] by consuming it as an unaligned prefix as a slice, then validating the slice
-    /// via `Ref::deref`.
-    fn parse_slice(bytes: ByRef<B>, count: usize) -> Result<(Self, ByRef<B>), Self::Error> {
-        let num_bytes = bytes.len();
-        let (data, tail) =
-            ByRef::<B>::parse_slice::<T>(bytes, count).ok_or(ParseError::MissingSliceData {
-                type_name: std::any::type_name::<T>(),
-                type_size: std::mem::size_of::<T>(),
-                num_items: count,
-                num_bytes,
-            })?;
-
-        Ok((data, tail))
-    }
-}
-
-impl<PS: ParseStrategy, T: Parse<PS>> ParseSlice<PS> for Vec<T> {
+impl<T: Parse> ParseSlice for Vec<T> {
     /// `Vec<T>` may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error
     /// return type via [`anyhow::Error`].
     type Error = anyhow::Error;
 
     /// Parses `Vec<T>` by parsing individual `T` instances, then validating them.
-    fn parse_slice(bytes: PS, count: usize) -> Result<(Self, PS), Self::Error> {
+    fn parse_slice(bytes: PolicyCursor, count: usize) -> Result<(Self, PolicyCursor), Self::Error> {
         let mut slice = Vec::with_capacity(count);
         let mut tail = bytes;
 
@@ -940,7 +872,7 @@ pub(super) mod tests {
     use super::*;
 
     use crate::policy::metadata::HandleUnknown;
-    use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
+    use crate::policy::{parse_policy_by_value, SecurityContext};
     use crate::{FileClass, InitialSid, KernelClass};
 
     use serde::Deserialize;
@@ -953,8 +885,8 @@ pub(super) mod tests {
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
     /// If either of `target_class` or `permission` cannot be resolved in the policy.
-    fn is_explicitly_allowed<PS: ParseStrategy>(
-        policy: &Policy<PS>,
+    fn is_explicitly_allowed(
+        policy: &Policy,
         source_type: TypeId,
         target_type: TypeId,
         target_class: &str,
@@ -1058,13 +990,6 @@ pub(super) mod tests {
 
             // Returned policy bytes must be identical to input policy bytes.
             assert_eq!(policy_bytes, returned_policy_bytes);
-
-            // Test parse-by-reference.
-            let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-            let policy = policy.validate().expect("validate policy");
-
-            assert_eq!(expectations.expected_policy_version, policy.policy_version());
-            assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
         }
     }
 
@@ -1098,8 +1023,9 @@ pub(super) mod tests {
     fn explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1113,8 +1039,9 @@ pub(super) mod tests {
     fn no_explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/no_allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1128,8 +1055,9 @@ pub(super) mod tests {
     fn explicit_allow_type_attr() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1144,8 +1072,9 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_t_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1160,8 +1089,9 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1176,8 +1106,9 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1190,8 +1121,9 @@ pub(super) mod tests {
     #[test]
     fn compute_explicitly_allowed_multiple_attributes() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1218,8 +1150,9 @@ pub(super) mod tests {
     fn compute_access_decision_with_constraints() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1254,8 +1187,9 @@ pub(super) mod tests {
     #[test]
     fn compute_ioctl_access_decision_explicitly_allowed() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1317,8 +1251,9 @@ pub(super) mod tests {
     fn compute_ioctl_access_decision_unmatched() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
 
@@ -1346,8 +1281,9 @@ pub(super) mod tests {
     fn compute_create_context_minimal() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1369,8 +1305,9 @@ pub(super) mod tests {
     fn new_security_context_minimal() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1389,8 +1326,9 @@ pub(super) mod tests {
     fn compute_create_context_class_defaults() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/class_defaults_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1412,8 +1350,9 @@ pub(super) mod tests {
     fn new_security_context_class_defaults() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/class_defaults_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1435,8 +1374,9 @@ pub(super) mod tests {
     fn compute_create_context_role_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/role_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1458,8 +1398,9 @@ pub(super) mod tests {
     fn new_security_context_role_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/role_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1484,8 +1425,9 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1505,8 +1447,9 @@ pub(super) mod tests {
     fn compute_create_context_type_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/type_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1528,8 +1471,9 @@ pub(super) mod tests {
     fn new_security_context_type_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/type_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1551,8 +1495,9 @@ pub(super) mod tests {
     fn compute_create_context_range_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/range_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy
@@ -1574,8 +1519,9 @@ pub(super) mod tests {
     fn new_security_context_range_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/range_transition_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let source = policy

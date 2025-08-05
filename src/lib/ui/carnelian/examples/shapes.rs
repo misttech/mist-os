@@ -19,7 +19,6 @@ use carnelian::{
 use euclid::default::Vector2D;
 use euclid::{point2, size2, vec2};
 use fuchsia_trace::duration;
-use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use std::mem;
 use zx::Event;
@@ -95,8 +94,7 @@ struct TouchHandler {
 }
 
 fn random_color_element() -> u8 {
-    let mut rng = thread_rng();
-    let e: u8 = rng.gen_range(0..128);
+    let e: u8 = rand::random_range(0..128);
     e + 128
 }
 
@@ -111,8 +109,7 @@ fn random_color() -> Color {
 
 impl TouchHandler {
     pub fn new(shapes: &HashMap<ShapeType, Raster>, scene: &mut Scene) -> Self {
-        let mut rng = thread_rng();
-        let shape_type = match rng.gen_range(0..ShapeType::LastShapeType as usize) {
+        let shape_type = match rand::random_range(0..ShapeType::LastShapeType as usize) {
             0 => ShapeType::Rectangle,
             1 => ShapeType::RoundedRectangle,
             2 => ShapeType::Hexagon,

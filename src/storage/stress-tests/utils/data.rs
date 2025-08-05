@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
 use rand::Rng;
 use std::cmp::min;
 
@@ -30,16 +30,16 @@ fn generate_compressible_data_bytes(rng: &mut SmallRng, size_bytes: u64) -> Vec<
     let mut ptr = 0;
     while ptr < size_bytes {
         // A run is 10..1024 bytes long
-        let mut run_length = rng.gen_range(10..1024);
+        let mut run_length = rng.random_range(10..1024);
 
         // In case the run goes past the file size
         run_length = min(run_length, size_bytes - ptr);
 
         // Decide whether this run should be compressible or not.
         // This results in files that compress reasonably well (target 50% size reduction).
-        if rng.gen_bool(0.5) {
+        if rng.random_bool(0.5) {
             // Choose a byte for this run.
-            let choice = byte_choices.choose(rng).unwrap();
+            let choice = byte_choices.iter().choose(rng).unwrap();
 
             // Generate a run of compressible data.
             for _ in 0..run_length {
@@ -48,7 +48,7 @@ fn generate_compressible_data_bytes(rng: &mut SmallRng, size_bytes: u64) -> Vec<
         } else {
             // Generate a run of random data.
             for _ in 0..run_length {
-                bytes.push(rng.gen());
+                bytes.push(rng.random());
             }
         }
 
@@ -66,7 +66,7 @@ fn generate_compressible_data_bytes(rng: &mut SmallRng, size_bytes: u64) -> Vec<
 fn generate_uncompressible_data_bytes(rng: &mut SmallRng, size_bytes: u64) -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::with_capacity(size_bytes as usize);
     for _ in 0..size_bytes {
-        bytes.push(rng.gen());
+        bytes.push(rng.random());
     }
     bytes
 }
@@ -100,7 +100,7 @@ impl FileFactory {
     pub fn generate_bytes(&mut self) -> Vec<u8> {
         let size_bytes = match self.uncompressed_size {
             UncompressedSize::Exact(size_bytes) => size_bytes,
-            UncompressedSize::InRange(min, max) => self.rng.gen_range(min..max),
+            UncompressedSize::InRange(min, max) => self.rng.random_range(min..max),
         };
 
         match self.compressibility {

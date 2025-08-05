@@ -866,7 +866,7 @@ impl Data<Logs> {
     }
 
     /// Returns an iterator over the payload keys as strings with the format "key=value".
-    pub fn payload_keys_strings(&self) -> Box<dyn Iterator<Item = String> + '_> {
+    pub fn payload_keys_strings(&self) -> Box<dyn Iterator<Item = String> + Send + '_> {
         let maybe_iter = self.payload_keys().map(|p| {
             Box::new(p.properties.iter().filter_map(|property| match property {
                 LogsProperty::String(LogsField::Tag, _tag) => None,

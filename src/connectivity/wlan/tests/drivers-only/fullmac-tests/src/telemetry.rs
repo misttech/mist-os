@@ -4,7 +4,6 @@
 use crate::FullmacDriverFixture;
 use drivers_only_common::sme_helpers;
 use fullmac_helpers::config::FullmacDriverConfig;
-use rand::Rng;
 use wlan_common::assert_variant;
 use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
@@ -16,12 +15,12 @@ async fn test_get_iface_stats() {
     let telemetry_fut = telemetry_proxy.get_iface_stats();
 
     let driver_connection_stats = fidl_stats::ConnectionStats {
-        connection_id: Some(rand::thread_rng().gen()),
-        rx_unicast_total: Some(rand::thread_rng().gen()),
-        rx_unicast_drop: Some(rand::thread_rng().gen()),
-        rx_multicast: Some(rand::thread_rng().gen()),
-        tx_total: Some(rand::thread_rng().gen()),
-        tx_drop: Some(rand::thread_rng().gen()),
+        connection_id: Some(rand::random()),
+        rx_unicast_total: Some(rand::random()),
+        rx_unicast_drop: Some(rand::random()),
+        rx_multicast: Some(rand::random()),
+        tx_total: Some(rand::random()),
+        tx_drop: Some(rand::random()),
         ..Default::default()
     };
     let driver_iface_stats = fidl_stats::IfaceStats {
@@ -63,43 +62,43 @@ async fn test_get_iface_histogram_stats() {
             hist_scope: fidl_stats::HistScope::PerAntenna,
             antenna_id: Some(Box::new(fidl_stats::AntennaId {
                 freq: fidl_stats::AntennaFreq::Antenna2G,
-                index: rand::thread_rng().gen(),
+                index: rand::random(),
             })),
             noise_floor_samples: vec![fidl_stats::HistBucket {
-                bucket_index: rand::thread_rng().gen(),
-                num_samples: rand::thread_rng().gen(),
+                bucket_index: rand::random(),
+                num_samples: rand::random(),
             }],
-            invalid_samples: rand::thread_rng().gen(),
+            invalid_samples: rand::random(),
         }]),
         rssi_histograms: Some(vec![fidl_stats::RssiHistogram {
             hist_scope: fidl_stats::HistScope::Station,
             antenna_id: None,
             rssi_samples: vec![fidl_stats::HistBucket {
-                bucket_index: rand::thread_rng().gen(),
-                num_samples: rand::thread_rng().gen(),
+                bucket_index: rand::random(),
+                num_samples: rand::random(),
             }],
-            invalid_samples: rand::thread_rng().gen(),
+            invalid_samples: rand::random(),
         }]),
         rx_rate_index_histograms: Some(vec![fidl_stats::RxRateIndexHistogram {
             hist_scope: fidl_stats::HistScope::PerAntenna,
             antenna_id: Some(Box::new(fidl_stats::AntennaId {
                 freq: fidl_stats::AntennaFreq::Antenna5G,
-                index: rand::thread_rng().gen(),
+                index: rand::random(),
             })),
             rx_rate_index_samples: vec![fidl_stats::HistBucket {
-                bucket_index: rand::thread_rng().gen(),
-                num_samples: rand::thread_rng().gen(),
+                bucket_index: rand::random(),
+                num_samples: rand::random(),
             }],
-            invalid_samples: rand::thread_rng().gen(),
+            invalid_samples: rand::random(),
         }]),
         snr_histograms: Some(vec![fidl_stats::SnrHistogram {
             hist_scope: fidl_stats::HistScope::Station,
             antenna_id: None,
             snr_samples: vec![fidl_stats::HistBucket {
-                bucket_index: rand::thread_rng().gen(),
-                num_samples: rand::thread_rng().gen(),
+                bucket_index: rand::random(),
+                num_samples: rand::random(),
             }],
-            invalid_samples: rand::thread_rng().gen(),
+            invalid_samples: rand::random(),
         }]),
         ..Default::default()
     };

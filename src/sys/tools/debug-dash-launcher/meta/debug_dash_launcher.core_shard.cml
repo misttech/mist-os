@@ -22,6 +22,11 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.dash.Launcher",
+            from: "#debug-dash-launcher",
+            to: "self/toolbox",
+        },
+        {
             config: "fuchsia.debug.ToolsPkgUrl",
             from: "self",
             to: "#debug-dash-launcher",

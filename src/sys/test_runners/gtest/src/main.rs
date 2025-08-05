@@ -7,7 +7,6 @@ mod test_server;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use log::{info, warn};
-use rand::Rng;
 use std::fs;
 use std::path::Path;
 use test_runners_lib::elf;
@@ -100,8 +99,7 @@ async fn start_runner(
 }
 
 fn get_new_test_server() -> TestServer {
-    let mut rng = rand::thread_rng();
-    let test_data_name = format!("{}", rng.gen::<u64>());
+    let test_data_name = format!("{}", rand::random::<u64>());
     let test_data_dir_parent = "/data/test_data".to_owned();
     let test_data_path = format!("{}/{}", test_data_dir_parent, test_data_name);
 

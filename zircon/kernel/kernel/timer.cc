@@ -90,6 +90,18 @@ zx_instant_mono_t current_mono_time(void) { return gTicksToTime.Scale(current_mo
 
 zx_instant_boot_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
+InstantMonoAndBootTime current_mono_and_boot_time() {
+  CurrentTicksObservation observation = timer_current_mono_and_boot_ticks();
+  return {.mono_time = gTicksToTime.Scale(observation.mono_now),
+          .boot_time = gTicksToTime.Scale(observation.boot_now)};
+}
+
+InstantMonoTimeAndBootTicks current_mono_time_and_boot_ticks() {
+  CurrentTicksObservation observation = timer_current_mono_and_boot_ticks();
+  return {.mono_time = gTicksToTime.Scale(observation.mono_now),
+          .boot_ticks = observation.boot_now};
+}
+
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
 ktl::optional<zx_ticks_t> TimerQueue::ConvertMonotonicTimeToRawTicks(zx_instant_mono_t mono) {

@@ -6,10 +6,11 @@ use starnix_core::device::DeviceOps;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps,
+    NamespaceNode,
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -24,13 +25,11 @@ pub struct TouchPowerPolicyDevice {
 }
 
 impl TouchPowerPolicyDevice {
-    pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
-        Arc::new(TouchPowerPolicyDevice {
-            touch_power_file: TouchPowerPolicyFile::new(touch_standby_sender),
-        })
+    pub fn new(touch_standby_sender: Sender<bool>) -> Self {
+        TouchPowerPolicyDevice { touch_power_file: TouchPowerPolicyFile::new(touch_standby_sender) }
     }
 
-    pub fn register<L>(self: Arc<Self>, locked: &mut Locked<L>, system_task: &CurrentTask)
+    pub fn register<L>(self, locked: &mut Locked<L>, system_task: &CurrentTask)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -47,7 +46,7 @@ impl TouchPowerPolicyDevice {
             .expect("can register touch_standby device");
     }
 
-    pub fn start_relay(self: &Arc<Self>, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
+    pub fn start_relay(&self, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
             let mut prev_enabled = true;
@@ -61,7 +60,7 @@ impl TouchPowerPolicyDevice {
         });
     }
 
-    fn notify_standby_state_changed(self: &Arc<Self>, touch_enabled: bool) {
+    fn notify_standby_state_changed(&self, touch_enabled: bool) {
         // TODO(b/341142285): notify input pipeline that touch_standby state has changed
         log_info!("touch enabled: {:?}", touch_enabled);
     }
@@ -70,10 +69,10 @@ impl TouchPowerPolicyDevice {
 impl DeviceOps for TouchPowerPolicyDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let touch_policy_file = self.touch_power_file.clone();
@@ -94,6 +93,8 @@ impl TouchPowerPolicyFile {
     }
 }
 
+/// `TouchPowerPolicyFile` doesn't implement the `close` method.
+impl CloseFreeSafe for TouchPowerPolicyFile {}
 impl FileOps for TouchPowerPolicyFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();

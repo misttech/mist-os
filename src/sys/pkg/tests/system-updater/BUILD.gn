@@ -14,8 +14,10 @@ rustc_test("driver") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+    "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//sdk/fidl/fuchsia.pkg.internal:fuchsia.pkg.internal_rust",
     "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
@@ -25,13 +27,16 @@ rustc_test("driver") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
     "//src/sys/pkg/lib/fuchsia-hash",
+    "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/metrics:cobalt_sw_delivery_registry_rustlib",
     "//src/sys/pkg/lib/update-package",
+    "//src/sys/pkg/testing/blobfs-ramdisk",
     "//src/sys/pkg/testing/mock-metrics",
     "//src/sys/pkg/testing/mock-paver",
     "//src/sys/pkg/testing/mock-reboot",
@@ -76,7 +81,10 @@ fuchsia_component("system-updater-test") {
 
 fuchsia_test_package("system-updater-integration-tests") {
   test_components = [ ":system-updater-test" ]
-  deps = [ "//src/sys/pkg/bin/system-updater:isolated-v2" ]
+  deps = [
+    "//src/storage/testing:storage_driver_test_realm",
+    "//src/sys/pkg/bin/system-updater:isolated-v2",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

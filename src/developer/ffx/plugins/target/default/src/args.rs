@@ -10,12 +10,26 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "default",
-    description = "Manage the default target",
+    description = "View the default target",
     example = "For one-off overrides for the default use `--target` option:
+    $ ffx --target <target name> <subcommand>
 
-    $ ffx --target <target name> <subcommand>",
-    note = "Manages the default configured target for all operations. In
-`ffx target list` the default target is designated by a `*` next to the name."
+Set the default target in-tree with `fx set-device`:
+    $ fx set-device <target name>
+
+Set the default target out-of-tree with the `$FUCHSIA_NODENAME` environment variable:
+    $ export FUCHSIA_NODENAME=<target name>
+
+Unset the default target in-tree with `fx unset-device`:
+    $ fx unset-device
+
+Unset the default target out-of-tree with the `$FUCHSIA_NODENAME` environment variable:
+    $ unset FUCHSIA_NODENAME
+
+Verify the correct default target setting with `ffx target default get`:
+    $ ffx target default get",
+    note = "Views the default configured target used for all operations.
+In `ffx target list` the default target is designated by a `*` next to the name."
 )]
 pub struct TargetDefaultCommand {
     #[argh(subcommand)]
@@ -26,8 +40,6 @@ pub struct TargetDefaultCommand {
 #[argh(subcommand)]
 pub enum SubCommand {
     Get(TargetDefaultGetCommand),
-    Set(TargetDefaultSetCommand),
-    Unset(TargetDefaultUnsetCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -40,36 +52,3 @@ $FUCHSIA_NODENAME, and $FUCHSIA_DEVICE_ADDR.
 Returns an empty string if no default is configured."
 )]
 pub struct TargetDefaultGetCommand {}
-
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(
-    subcommand,
-    name = "set",
-    description = "Set the default target",
-    example = "To set the default target:
-
-   $ ffx target default set <target name>",
-    note = "Sets the default target in 'User Configuration' scope.
-
-After setting the default target, `ffx target list` will mark the default
-with a `*` in the output list."
-)]
-pub struct TargetDefaultSetCommand {
-    #[argh(positional)]
-    /// the target's specifier
-    pub nodename: String,
-}
-
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(
-    subcommand,
-    name = "unset",
-    description = "Clears the configured default target",
-    example = "To clear the default target:
-
-    $ ffx target default unset",
-    note = "Unsets the default target on all configuration levels. Returns a
-warning if it's already unset. Returns an error if it's not possible to clear
-it."
-)]
-pub struct TargetDefaultUnsetCommand {}

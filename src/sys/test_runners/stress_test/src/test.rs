@@ -16,7 +16,7 @@ use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use futures::FutureExt;
 use log::{debug, info};
 use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
+use rand::seq::{IndexedMutRandom, IndexedRandom};
 use rand::{Rng, SeedableRng};
 use std::str::FromStr;
 use std::time::Duration;
@@ -191,7 +191,7 @@ impl StressTest {
         let rng = if let Some(seed) = get_and_parse::<u64>("seed", &dictionary) {
             SmallRng::seed_from_u64(seed)
         } else {
-            SmallRng::from_entropy()
+            SmallRng::from_os_rng()
         };
 
         let num_retries = get_and_parse::<u64>("num_retries", &dictionary).unwrap_or(0);
@@ -243,7 +243,7 @@ impl StressTest {
                 // Pick a action, actor and seed to run next
                 let action = actions.choose(&mut self.rng).unwrap();
                 let actor = instances.choose_mut(&mut self.rng).unwrap();
-                let seed = self.rng.gen::<u64>();
+                let seed = self.rng.random::<u64>();
                 debug!("[action:{}][actor:{}][seed:{}]", action, actor.name, seed);
 
                 // This will block if the actor is currently performing an operation

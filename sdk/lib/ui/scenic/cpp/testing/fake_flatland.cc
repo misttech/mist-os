@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/testing/fake_flatland.h>
 #include <lib/ui/scenic/cpp/testing/fake_flatland_types.h>
 #include <zircon/assert.h>
@@ -76,7 +76,7 @@ void FakeFlatland::FireOnFramePresentedEvent(
 }
 
 void FakeFlatland::NotImplemented_(const std::string& name) {
-  FX_LOGF(ERROR, nullptr, "FakeFlatland does not implement %s", name.c_str());
+  FX_LOGS(ERROR) << "FakeFlatland does not implement " << name;
 }
 
 void FakeFlatland::RegisterBufferCollection(
@@ -176,13 +176,13 @@ void FakeFlatland::CreateView2(
 
 void FakeFlatland::CreateTransform(fuchsia::ui::composition::TransformId transform_id) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateTransform: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::CreateTransform: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
   if (pending_graph_.transform_map.count(transform_id.value) != 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateTransform: TransformId %lu is already in use.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::CreateTransform: TransformId " << transform_id.value
+                   << " is already in use.";
     ReportBadOperationError();
     return;
   }
@@ -208,15 +208,15 @@ void FakeFlatland::CreateTransform(fuchsia::ui::composition::TransformId transfo
 void FakeFlatland::SetTranslation(fuchsia::ui::composition::TransformId transform_id,
                                   fuchsia::math::Vec translation) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -229,29 +229,29 @@ void FakeFlatland::SetTranslation(fuchsia::ui::composition::TransformId transfor
 void FakeFlatland::SetScale(fuchsia::ui::composition::TransformId transform_id,
                             fuchsia::math::VecF scale) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetScale: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetScale: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetScale: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetScale: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
 
   if (scale.x == 0.f || scale.y == 0.f) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetScale failed, zero values not allowed (%f, %f).",
-            scale.x, scale.y);
+    FX_LOGS(ERROR) << "FakeFlatland::SetScale failed, zero values not allowed (" << scale.x << ", "
+                   << scale.y << ").";
     ReportBadOperationError();
     return;
   }
 
   if (isinf(scale.x) || isinf(scale.y) || isnan(scale.x) || isnan(scale.y)) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetScale failed, invalid scale values (%f, %f).",
-            scale.x, scale.y);
+    FX_LOGS(ERROR) << "FakeFlatland::SetScale failed, invalid scale values (" << scale.x << ", "
+                   << scale.y << ").";
     ReportBadOperationError();
     return;
   }
@@ -264,15 +264,15 @@ void FakeFlatland::SetScale(fuchsia::ui::composition::TransformId transform_id,
 void FakeFlatland::SetOrientation(fuchsia::ui::composition::TransformId transform_id,
                                   fuchsia::ui::composition::Orientation orientation) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetOrientation: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetOrientation: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetOrientation: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetOrientation: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -284,21 +284,21 @@ void FakeFlatland::SetOrientation(fuchsia::ui::composition::TransformId transfor
 
 void FakeFlatland::SetOpacity(fuchsia::ui::composition::TransformId transform_id, float value) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetOpacity: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetOpacity: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetOpacity: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetOpacity: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
 
   if (value < 0.f || value > 1.f) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetOpacity: Invalid opacity value.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetOpacity: Invalid opacity value.";
     ReportBadOperationError();
     return;
   }
@@ -311,15 +311,15 @@ void FakeFlatland::SetOpacity(fuchsia::ui::composition::TransformId transform_id
 void FakeFlatland::SetClipBoundary(fuchsia::ui::composition::TransformId transform_id,
                                    std::unique_ptr<fuchsia::math::Rect> bounds) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetClipBoundary: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetClipBoundary: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetClipBoundary: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetClipBoundary: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -336,15 +336,15 @@ void FakeFlatland::SetClipBoundary(fuchsia::ui::composition::TransformId transfo
 
 void FakeFlatland::SetImageOpacity(fuchsia::ui::composition::ContentId image_id, float opacity) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageOpacity: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageOpacity: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageOpacity: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageOpacity: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -353,8 +353,8 @@ void FakeFlatland::SetImageOpacity(fuchsia::ui::composition::ContentId image_id,
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageOpacity: ContentId %lu is not an Image.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageOpacity: ContentId " << image_id.value
+                   << " is not an Image.";
     ReportBadOperationError();
     return;
   }
@@ -365,43 +365,40 @@ void FakeFlatland::SetImageOpacity(fuchsia::ui::composition::ContentId image_id,
 void FakeFlatland::AddChild(fuchsia::ui::composition::TransformId parent_transform_id,
                             fuchsia::ui::composition::TransformId child_transform_id) {
   if (parent_transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::AddChild: Parent TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Parent TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
   if (child_transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::AddChild: Child TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Child TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_parent = pending_graph_.transform_map.find(parent_transform_id.value);
   if (found_parent == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::AddChild: Parent TransformId %lu does not exist.",
-            parent_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Parent TransformId " << parent_transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
   auto found_child = pending_graph_.transform_map.find(child_transform_id.value);
   if (found_child == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::AddChild: Child TransformId %lu does not exist.",
-            child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Child TransformId " << child_transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
   auto found_child_old_parent = parents_map_.find(child_transform_id.value);
   if (found_child_old_parent == parents_map_.end()) {
-    FX_LOGF(ERROR, nullptr,
-            "FakeFlatland::AddChild: Internal error - Child TransformId %lu is not in parents_map.",
-            child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Internal error - Child TransformId "
+                   << child_transform_id.value << " is not in parents_map.";
     ReportBadOperationError();
     return;
   }
   if (found_child_old_parent->second.second.expired()) {
-    FX_LOGF(
-        ERROR, nullptr,
-        "FakeFlatland::AddChild: Internal error - Child TransformId %lu is expired in parents_map.",
-        child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::AddChild: Internal error - Child TransformId "
+                   << child_transform_id.value << " is expired in parents_map.";
     ReportBadOperationError();
     return;
   }
@@ -420,54 +417,49 @@ void FakeFlatland::AddChild(fuchsia::ui::composition::TransformId parent_transfo
 void FakeFlatland::RemoveChild(fuchsia::ui::composition::TransformId parent_transform_id,
                                fuchsia::ui::composition::TransformId child_transform_id) {
   if (parent_transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::RemoveChild: Parent TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Parent TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
   if (child_transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::RemoveChild: Child TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Child TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_child = pending_graph_.transform_map.find(child_transform_id.value);
   if (found_child == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::RemoveChild: Child TransformId %lu does not exist.",
-            child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Child TransformId " << child_transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
 
   auto found_parent = pending_graph_.transform_map.find(parent_transform_id.value);
   if (found_parent == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::RemoveChild: Parent TransformId %lu does not exist.",
-            parent_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Parent TransformId " << parent_transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
 
   auto found_child_parent = parents_map_.find(child_transform_id.value);
   if (found_child_parent == parents_map_.end()) {
-    FX_LOGF(
-        ERROR, nullptr,
-        "FakeFlatland::RemoveChild: Internal error - Child TransformId %lu is not in parents_map.",
-        child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Internal error - Child TransformId "
+                   << child_transform_id.value << " is not in parents_map.";
     ReportBadOperationError();
     return;
   }
   if (found_child_parent->second.second.expired()) {
-    FX_LOGF(
-        ERROR, nullptr,
-        "FakeFlatland::RemoveChild: Internal error - Child TransformId %lu is expired in parents_map.",
-        child_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Internal error - Child TransformId "
+                   << child_transform_id.value << " is expired in parents_map.";
     ReportBadOperationError();
     return;
   }
   if (found_child_parent->second.first.lock() != found_parent->second) {
-    FX_LOGF(
-        ERROR, nullptr,
-        "FakeFlatland::RemoveChild: Internal error - Child TransformId %lu is not a child of Parent TransformId %lu.",
-        child_transform_id.value, parent_transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::RemoveChild: Internal error - Child TransformId "
+                   << child_transform_id.value << " is not a child of Parent TransformId "
+                   << parent_transform_id.value << ".";
     ReportBadOperationError();
     return;
   }
@@ -483,15 +475,15 @@ void FakeFlatland::RemoveChild(fuchsia::ui::composition::TransformId parent_tran
 void FakeFlatland::SetContent(fuchsia::ui::composition::TransformId transform_id,
                               fuchsia::ui::composition::ContentId content_id) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetContent: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetContent: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetContent: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetContent: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -505,8 +497,8 @@ void FakeFlatland::SetContent(fuchsia::ui::composition::TransformId transform_id
 
   auto found_content = pending_graph_.content_map.find(content_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetContent: ContentId %lu does not exist.",
-            content_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetContent: ContentId " << content_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -518,15 +510,15 @@ void FakeFlatland::SetContent(fuchsia::ui::composition::TransformId transform_id
 
 void FakeFlatland::SetRootTransform(fuchsia::ui::composition::TransformId transform_id) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetRootTransform: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetRootTransform: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_new_root = pending_graph_.transform_map.find(transform_id.value);
   if (found_new_root == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetRootTransform: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetRootTransform: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -540,13 +532,13 @@ void FakeFlatland::CreateViewport(
     fuchsia::ui::composition::ViewportProperties properties,
     fidl::InterfaceRequest<fuchsia::ui::composition::ChildViewWatcher> child_view_watcher) {
   if (viewport_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateViewport: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::CreateViewport: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
   if (pending_graph_.content_map.count(viewport_id.value) != 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateViewport: ContentId %lu is already in use.",
-            viewport_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::CreateViewport: ContentId " << viewport_id.value
+                   << " is already in use.";
     ReportBadOperationError();
     return;
   }
@@ -578,13 +570,13 @@ void FakeFlatland::CreateImage(fuchsia::ui::composition::ContentId image_id,
                                uint32_t vmo_index,
                                fuchsia::ui::composition::ImageProperties properties) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateImage: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::CreateImage: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
   if (pending_graph_.content_map.count(image_id.value) != 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::CreateImage: ContentId %lu is already in use.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::CreateImage: ContentId " << image_id.value
+                   << " is already in use.";
     ReportBadOperationError();
     return;
   }
@@ -607,15 +599,15 @@ void FakeFlatland::CreateImage(fuchsia::ui::composition::ContentId image_id,
 void FakeFlatland::SetImageSampleRegion(fuchsia::ui::composition::ContentId image_id,
                                         fuchsia::math::RectF rect) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageSampleRegion: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageSampleRegion: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageSampleRegion: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageSampleRegion: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -624,8 +616,8 @@ void FakeFlatland::SetImageSampleRegion(fuchsia::ui::composition::ContentId imag
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageSampleRegion: ContentId %lu is not an Image.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageSampleRegion: ContentId " << image_id.value
+                   << " is not an Image.";
     ReportBadOperationError();
     return;
   }
@@ -636,15 +628,15 @@ void FakeFlatland::SetImageSampleRegion(fuchsia::ui::composition::ContentId imag
 void FakeFlatland::SetImageDestinationSize(fuchsia::ui::composition::ContentId image_id,
                                            fuchsia::math::SizeU size) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageDestinationSize: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageDestinationSize: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -653,8 +645,8 @@ void FakeFlatland::SetImageDestinationSize(fuchsia::ui::composition::ContentId i
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId %lu is not an Image.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageDestinationSize: ContentId " << image_id.value
+                   << " is not an Image.";
     ReportBadOperationError();
     return;
   }
@@ -665,15 +657,15 @@ void FakeFlatland::SetImageDestinationSize(fuchsia::ui::composition::ContentId i
 void FakeFlatland::SetImageBlendingFunction(fuchsia::ui::composition::ContentId image_id,
                                             fuchsia::ui::composition::BlendMode blend_mode) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageBlendingFunction: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageBlendingFunction: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageBlendingFunction: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageBlendingFunction: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -682,8 +674,8 @@ void FakeFlatland::SetImageBlendingFunction(fuchsia::ui::composition::ContentId 
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId %lu is not an Image.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageDestinationSize: ContentId " << image_id.value
+                   << " is not an Image.";
     ReportBadOperationError();
     return;
   }
@@ -694,15 +686,15 @@ void FakeFlatland::SetImageBlendingFunction(fuchsia::ui::composition::ContentId 
 void FakeFlatland::SetImageFlip(fuchsia::ui::composition::ContentId image_id,
                                 fuchsia::ui::composition::ImageFlip flip) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageFlip: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageFlip: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageFlip: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageFlip: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -711,8 +703,8 @@ void FakeFlatland::SetImageFlip(fuchsia::ui::composition::ContentId image_id,
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId %lu is not an Image.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetImageDestinationSize: ContentId " << image_id.value
+                   << " is not an Image.";
     ReportBadOperationError();
     return;
   }
@@ -723,15 +715,15 @@ void FakeFlatland::SetImageFlip(fuchsia::ui::composition::ContentId image_id,
 void FakeFlatland::SetViewportProperties(fuchsia::ui::composition::ContentId viewport_id,
                                          fuchsia::ui::composition::ViewportProperties properties) {
   if (viewport_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetViewportProperties: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetViewportProperties: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(viewport_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetViewportProperties: ContentId %lu does not exist.",
-            viewport_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetViewportProperties: ContentId " << viewport_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -740,9 +732,8 @@ void FakeFlatland::SetViewportProperties(fuchsia::ui::composition::ContentId vie
   ZX_ASSERT(content);
   FakeViewport* viewport = std::get_if<FakeViewport>(content.get());
   if (viewport == nullptr) {
-    FX_LOGF(ERROR, nullptr,
-            "FakeFlatland::SetViewportProperties: ContentId %lu is not an Viewport.",
-            viewport_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetViewportProperties: ContentId " << viewport_id.value
+                   << " is not an Viewport.";
     ReportBadOperationError();
     return;
   }
@@ -752,23 +743,22 @@ void FakeFlatland::SetViewportProperties(fuchsia::ui::composition::ContentId vie
 
 void FakeFlatland::ReleaseTransform(fuchsia::ui::composition::TransformId transform_id) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseTransform: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseTransform: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   size_t erased = pending_graph_.transform_map.erase(transform_id.value);
   if (erased == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseTransform: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseTransform: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
   }
 
   size_t parents_erased = parents_map_.erase(transform_id.value);
   if (parents_erased == 0) {
-    FX_LOGF(ERROR, nullptr,
-            "FakeFlatland::ReleaseTransform: TransformId %lu does not exist in parents_map.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseTransform: TransformId " << transform_id.value
+                   << " does not exist in parents_map.";
     ReportBadOperationError();
   }
 }
@@ -776,15 +766,15 @@ void FakeFlatland::ReleaseTransform(fuchsia::ui::composition::TransformId transf
 void FakeFlatland::ReleaseViewport(fuchsia::ui::composition::ContentId viewport_id,
                                    ReleaseViewportCallback callback) {
   if (viewport_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseViewport: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseViewport: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(viewport_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseViewport: ContentId %lu does not exist.",
-            viewport_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseViewport: ContentId " << viewport_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -793,8 +783,8 @@ void FakeFlatland::ReleaseViewport(fuchsia::ui::composition::ContentId viewport_
   ZX_ASSERT(content);
   FakeViewport* viewport = std::get_if<FakeViewport>(content.get());
   if (viewport == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseViewport: ContentId %lu is not an Viewport.",
-            viewport_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseViewport: ContentId " << viewport_id.value
+                   << " is not an Viewport.";
     ReportBadOperationError();
     return;
   }
@@ -804,15 +794,15 @@ void FakeFlatland::ReleaseViewport(fuchsia::ui::composition::ContentId viewport_
 
 void FakeFlatland::ReleaseImage(fuchsia::ui::composition::ContentId image_id) {
   if (image_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseImage: ContentId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseImage: ContentId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_content = pending_graph_.content_map.find(image_id.value);
   if (found_content == pending_graph_.content_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseImage: ContentId %lu does not exist.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseImage: ContentId " << image_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -821,8 +811,8 @@ void FakeFlatland::ReleaseImage(fuchsia::ui::composition::ContentId image_id) {
   ZX_ASSERT(content);
   FakeImage* image = std::get_if<FakeImage>(content.get());
   if (image == nullptr) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::ReleaseImage: ContentId %lu is not an Viewport.",
-            image_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::ReleaseImage: ContentId " << image_id.value
+                   << " is not an Viewport.";
     ReportBadOperationError();
     return;
   }
@@ -833,15 +823,15 @@ void FakeFlatland::ReleaseImage(fuchsia::ui::composition::ContentId image_id) {
 void FakeFlatland::SetHitRegions(fuchsia::ui::composition::TransformId transform_id,
                                  std::vector<fuchsia::ui::composition::HitRegion> regions) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -854,15 +844,15 @@ void FakeFlatland::SetHitRegions(fuchsia::ui::composition::TransformId transform
 void FakeFlatland::SetInfiniteHitRegion(fuchsia::ui::composition::TransformId transform_id,
                                         fuchsia::ui::composition::HitTestInteraction hit_test) {
   if (transform_id.value == 0) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId 0 is invalid.");
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId 0 is invalid.";
     ReportBadOperationError();
     return;
   }
 
   auto found_transform = pending_graph_.transform_map.find(transform_id.value);
   if (found_transform == pending_graph_.transform_map.end()) {
-    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId %lu does not exist.",
-            transform_id.value);
+    FX_LOGS(ERROR) << "FakeFlatland::SetTranslation: TransformId " << transform_id.value
+                   << " does not exist.";
     ReportBadOperationError();
     return;
   }
@@ -902,8 +892,7 @@ FakeFlatland::ParentViewportWatcher::ParentViewportWatcher(ParentViewportWatcher
 FakeFlatland::ParentViewportWatcher::~ParentViewportWatcher() = default;
 
 void FakeFlatland::ParentViewportWatcher::NotImplemented_(const std::string& name) {
-  FX_LOGF(ERROR, nullptr, "FakeFlatland::ParentViewportWatcher does not implement %s",
-          name.c_str());
+  FX_LOGS(ERROR) << "FakeFlatland::ParentViewportWatcher does not implement " << name;
 }
 
 void FakeFlatland::ParentViewportWatcher::GetLayout(GetLayoutCallback callback) {
@@ -929,7 +918,7 @@ FakeFlatland::ChildViewWatcher::ChildViewWatcher(ChildViewWatcher&& other) noexc
 FakeFlatland::ChildViewWatcher::~ChildViewWatcher() = default;
 
 void FakeFlatland::ChildViewWatcher::NotImplemented_(const std::string& name) {
-  FX_LOGF(ERROR, nullptr, "FakeFlatland::ChildViewWatcher does not implement %s", name.c_str());
+  FX_LOGS(ERROR) << "FakeFlatland::ChildViewWatcher does not implement " << name;
 }
 
 void FakeFlatland::ChildViewWatcher::GetStatus(GetStatusCallback callback) {

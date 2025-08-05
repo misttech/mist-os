@@ -199,6 +199,10 @@
 // object by the compiler.
 #if __has_cpp_attribute(no_unique_address)
 #define __NO_UNIQUE_ADDRESS [[no_unique_address]]
+#elif __has_cpp_attribute(msvc::no_unique_address)
+// msvc targets, as used by efi, have a different attribute name, even when
+// targeting C++20.
+#define __NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
 #else
 #define __NO_UNIQUE_ADDRESS
 #endif

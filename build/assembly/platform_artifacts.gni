@@ -99,14 +99,20 @@ template("platform_artifacts") {
     cmc_tool_target = "//tools/cmc($host_toolchain)"
     cmc_tool_path = get_label_info(cmc_tool_target, "root_out_dir") + "/cmc"
 
+    assembly_tool_target = "//build/assembly/tools/assembly($host_toolchain)"
+    assembly_tool_path =
+        get_label_info(assembly_tool_target, "root_out_dir") + "/assembly"
+
     # Add all the platform host tools.
     deps += [
+      assembly_tool_target,
       blobfs_tool_target,
       cmc_tool_target,
       fvm_tool_target,
       zbi_tool_target,
     ]
     inputs = [
+      assembly_tool_path,
       blobfs_tool_path,
       fvm_tool_path,
       zbi_tool_path,
@@ -114,6 +120,7 @@ template("platform_artifacts") {
     ]
     args += [
       "--tools",
+      rebase_path(assembly_tool_path, root_build_dir),
       rebase_path(blobfs_tool_path, root_build_dir),
       rebase_path(fvm_tool_path, root_build_dir),
       rebase_path(zbi_tool_path, root_build_dir),

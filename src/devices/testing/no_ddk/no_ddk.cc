@@ -41,12 +41,6 @@ __EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t 
                                   uint32_t out_perf_state) {}
 
 __EXPORT
-zx_status_t device_add_metadata(zx_device_t* device, uint32_t type, const void* data,
-                                size_t length) {
-  return ZX_OK;
-}
-
-__EXPORT
 zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, void* protocol) {
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -54,11 +48,6 @@ zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, vo
 __EXPORT
 zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-__EXPORT
-zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -119,11 +108,6 @@ zx_handle_t get_smc_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT
 zx_handle_t get_power_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
-
-__EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
 
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,

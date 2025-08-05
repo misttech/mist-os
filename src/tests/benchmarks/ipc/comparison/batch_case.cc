@@ -51,7 +51,7 @@ class BatchReceiver : public fidl::WireServer<test_ipc::BatchSender> {
 
   void Send(::test_ipc::wire::BatchSenderSendRequest* request,
             SendCompleter::Sync& completer) override {
-    *received_ += request->messages.count();
+    *received_ += request->messages.size();
     completer.Reply();
   }
 

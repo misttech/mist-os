@@ -254,7 +254,7 @@ constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
     return false;
   }
 
-  if (!IS_PAGE_ALIGNED(base) || !IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(base) || !IS_PAGE_ROUNDED(size)) {
     return false;
   }
 
@@ -364,7 +364,7 @@ class Riscv64ArchVmAspace::ConsistencyManager {
   void FlushEntry(vaddr_t va, bool terminal) {
     LTRACEF("va %#lx, asid %#x, terminal %u\n", va, aspace_.asid_, terminal);
 
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(va));
     DEBUG_ASSERT(aspace_.IsValidVaddr(va));
 
     if (full_flush_) {
@@ -763,8 +763,8 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
 
     // if we're at an unaligned address, and not trying to map a block larger than 1GB,
     // recurse one more level of the page table tree
-    const bool level_valigned = IS_ALIGNED(cursor.vaddr_rel(), block_size);
-    const bool level_paligned = IS_ALIGNED(cursor.paddr(), block_size);
+    const bool level_valigned = IS_ROUNDED(cursor.vaddr_rel(), block_size);
+    const bool level_paligned = IS_ROUNDED(cursor.paddr(), block_size);
     if (!level_valigned || !level_paligned || cursor.PageRemaining() < block_size || (level > 2)) {
       paddr_t page_table_paddr = 0;
       volatile pte_t* next_page_table = nullptr;
@@ -1083,9 +1083,9 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   }
 
   // paddr and vaddr must be aligned.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
-  if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(paddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(paddr));
+  if (!IS_PAGE_ROUNDED(vaddr) || !IS_PAGE_ROUNDED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1129,8 +1129,8 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     return ZX_ERR_OUT_OF_RANGE;
   }
   for (size_t i = 0; i < count; ++i) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(phys[i]));
-    if (!IS_PAGE_ALIGNED(phys[i])) {
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(phys[i]));
+    if (!IS_PAGE_ROUNDED(phys[i])) {
       return ZX_ERR_INVALID_ARGS;
     }
   }
@@ -1140,8 +1140,8 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
   }
 
   // vaddr must be aligned.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1193,8 +1193,8 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOpt
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1214,7 +1214,7 @@ zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_f
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1255,7 +1255,7 @@ zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
-  if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1276,7 +1276,7 @@ zx_status_t Riscv64ArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
-  if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -1318,8 +1318,8 @@ zx_status_t Riscv64ArchVmAspace::Init() {
 
   // Validate that the base + size is valid and doesn't wrap.
   DEBUG_ASSERT(size_ > 0 || IsUnified());
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(base_));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(base_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size_));
   [[maybe_unused]] uintptr_t unused;
   DEBUG_ASSERT(!add_overflow(base_, size_ - 1, &unused));
 
@@ -1652,7 +1652,7 @@ Riscv64ArchVmAspace::~Riscv64ArchVmAspace() {
 vaddr_t Riscv64ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size_t size,
                                       uint mmu_flags) {
   canary_.Assert();
-  return PAGE_ALIGN(base);
+  return ROUNDUP_PAGE_SIZE(base);
 }
 
 void Riscv64ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {

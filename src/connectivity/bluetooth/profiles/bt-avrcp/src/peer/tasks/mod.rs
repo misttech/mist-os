@@ -11,7 +11,6 @@ use futures::stream::{SelectAll, StreamExt, TryStreamExt};
 use log::{error, info, trace, warn};
 use notification_stream::NotificationStream;
 use packet_encoding::{Decodable, Encodable};
-use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -259,10 +258,10 @@ fn handle_notification(
 /// The control channel should be in `Connecting` state before spawning this task.
 /// TODO(https://fxbug.dev/42166696): Refactor logic into RemotePeer to avoid multiple lock accesses.
 async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnectionType) {
-    let random_delay: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(
-        rand::thread_rng()
-            .gen_range(MIN_CONNECTION_EST_TIME.into_nanos()..MAX_CONNECTION_EST_TIME.into_nanos()),
-    );
+    let random_delay: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_nanos(rand::random_range(
+            MIN_CONNECTION_EST_TIME.into_nanos()..MAX_CONNECTION_EST_TIME.into_nanos(),
+        ));
     trace!("AVRCP waiting {:?} millis before establishing connection", random_delay.into_millis());
     fuchsia_async::Timer::new(random_delay.after_now()).await;
 

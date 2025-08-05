@@ -17,17 +17,13 @@
 namespace netsvc {
 namespace {
 
-size_t NETBOOT_IMAGE_PREFIX_LEN() { return strlen(NETBOOT_IMAGE_PREFIX); }
 size_t NETBOOT_FILENAME_PREFIX_LEN() { return strlen(NETBOOT_FILENAME_PREFIX); }
 
 }  // namespace
 
 FileApi::FileApi(bool is_zedboot, std::unique_ptr<NetCopyInterface> netcp,
-                 fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo, PaverInterface& paver)
-    : is_zedboot_(is_zedboot),
-      sysinfo_(std::move(sysinfo)),
-      netcp_(std::move(netcp)),
-      paver_(paver) {
+                 fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo)
+    : is_zedboot_(is_zedboot), sysinfo_(std::move(sysinfo)), netcp_(std::move(netcp)) {
   if (!sysinfo_) {
     zx::result client_end = component::Connect<fuchsia_sysinfo::SysInfo>();
     if (client_end.is_ok()) {
@@ -37,17 +33,6 @@ FileApi::FileApi(bool is_zedboot, std::unique_ptr<NetCopyInterface> netcp,
 }
 
 ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
-  // Make sure all in-progress paving operations have completed
-  std::shared_future fut = paver_.exit_code();
-  if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
-    return TFTP_ERR_SHOULD_WAIT;
-  }
-  zx_status_t exit_code = fut.get();
-  if (exit_code != ZX_OK) {
-    fprintf(stderr, "paver exited with error: %s\n", zx_status_get_string(exit_code));
-    return TFTP_ERR_IO;
-  }
-
   is_write_ = false;
   strlcpy(filename_, filename, sizeof(filename_));
   netboot_file_ = nullptr;
@@ -66,17 +51,6 @@ ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
 }
 
 tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration timeout) {
-  // Make sure all in-progress paving operations have completed
-  std::shared_future fut = paver_.exit_code();
-  if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
-    return TFTP_ERR_SHOULD_WAIT;
-  }
-  zx_status_t exit_code = fut.get();
-  if (exit_code != ZX_OK) {
-    fprintf(stderr, "paver exited with error: %s\n", zx_status_get_string(exit_code));
-    return TFTP_ERR_IO;
-  }
-
   is_write_ = true;
   strlcpy(filename_, filename, sizeof(filename_));
 
@@ -90,13 +64,6 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
     printf("netsvc: Running board name validation\n");
     type_ = NetfileType::kBoardInfo;
     return TFTP_NO_ERROR;
-  } else if (is_zedboot_ && !strncmp(filename_, NETBOOT_IMAGE_PREFIX, NETBOOT_IMAGE_PREFIX_LEN())) {
-    type_ = NetfileType::kPaver;
-    tftp_status status = paver_.OpenWrite(filename_, size, timeout);
-    if (status != TFTP_NO_ERROR) {
-      filename_[0] = '\0';
-    }
-    return status;
   } else {
     type_ = NetfileType::kNetCopy;
     if (netcp_->Open(filename_, O_WRONLY, nullptr) == 0) {
@@ -148,9 +115,6 @@ tftp_status FileApi::Write(const void* data, size_t* length, off_t offset) {
       nb_file->offset = offset + *length;
       return TFTP_NO_ERROR;
     }
-    case NetfileType::kPaver:
-      return paver_.Write(data, length, offset);
-
     case NetfileType::kBoardInfo: {
       zx::result status = CheckBoardName(sysinfo_, reinterpret_cast<const char*>(data), *length);
       if (status.is_error()) {
@@ -184,8 +148,6 @@ tftp_status FileApi::Write(const void* data, size_t* length, off_t offset) {
 void FileApi::Close() {
   if (type_ == NetfileType::kNetCopy) {
     netcp_->Close();
-  } else if (type_ == NetfileType::kPaver) {
-    paver_.Close();
   }
   type_ = NetfileType::kUnknown;
 }
@@ -195,9 +157,6 @@ void FileApi::Abort() {
     switch (type_) {
       case NetfileType::kNetCopy:
         netcp_->AbortWrite();
-        break;
-      case NetfileType::kPaver:
-        paver_.Abort();
         break;
       default:
         break;

@@ -12,6 +12,7 @@ source_set("debugcommands") {
   deps = [
     "//zircon/kernel/lib/boot-options:boot-options-cli",
     "//zircon/kernel/lib/console",
+    "//zircon/kernel/lib/thread-stack",
     "//zircon/kernel/lib/unittest",
     "//zircon/system/ulib/zircon-internal",
   ]

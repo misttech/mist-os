@@ -4,7 +4,7 @@
 
 #include "buffer.h"
 
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
 namespace network {
@@ -118,7 +118,7 @@ zx::result<size_t> Buffer::CopyFrom(Buffer& other) {
   auto part_me = parts_me.begin();
   for (auto part_o = parts_other.begin(); part_o != parts_other.end();) {
     if (part_me == parts_me.end()) {
-      FX_LOG(ERROR, "tun", "Buffer: not enough space on rx buffer");
+      FX_LOGST(ERROR, "tun") << "Buffer: not enough space on rx buffer";
       return zx::error(ZX_ERR_INTERNAL);
     }
 
@@ -130,8 +130,7 @@ zx::result<size_t> Buffer::CopyFrom(Buffer& other) {
         VmoStore::Copy(*other.vmo_store_, part_o->region.vmo, part_o->region.offset + offset_other,
                        *vmo_store_, part_me->region.vmo, part_me->region.offset + offset_me, wr);
     if (status != ZX_OK) {
-      FX_LOGF(ERROR, "tun", "Buffer: failed to copy between buffers: %s",
-              zx_status_get_string(status));
+      FX_PLOGST(ERROR, "tun", status) << "Buffer: failed to copy between buffers";
       return zx::error(status);
     }
 

@@ -1324,7 +1324,7 @@ void Flatland::CreateImage(ContentId image_id,
   metadata.vmo_index = vmo_index;
   metadata.width = properties.size()->width();
   metadata.height = properties.size()->height();
-  metadata.blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
+  metadata.blend_mode = BlendMode::kReplace();
 
   for (uint32_t i = 0; i < buffer_collection_importers_.size(); i++) {
     auto& importer = buffer_collection_importers_[i];
@@ -1355,8 +1355,11 @@ void Flatland::CreateImage(ContentId image_id,
   image_metadatas_[handle] = metadata;
 
   // Set the default sample region of the image to be the full image.
-  SetImageSampleRegion(image_id, {0, 0, static_cast<float>(properties.size()->width()),
-                                  static_cast<float>(properties.size()->height())});
+  SetImageSampleRegion(
+      image_id, types::RectangleF({.x = 0,
+                                   .y = 0,
+                                   .width = static_cast<float>(properties.size()->width()),
+                                   .height = static_cast<float>(properties.size()->height())}));
 
   // Set the default destination region of the image to be the full image.
   SetImageDestinationSize(image_id, properties.size().value());
@@ -1369,10 +1372,10 @@ void Flatland::CreateImage(ContentId image_id,
 
 void Flatland::SetImageSampleRegion(SetImageSampleRegionRequest& request,
                                     SetImageSampleRegionCompleter::Sync& completer) {
-  SetImageSampleRegion(request.image_id(), request.rect());
+  SetImageSampleRegion(request.image_id(), types::RectangleF::From(request.rect()));
 }
 
-void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect) {
+void Flatland::SetImageSampleRegion(ContentId image_id, types::RectangleF rect) {
   if ((image_id.value()) == kInvalidId) {
     error_reporter_->ERROR() << "SetImageSampleRegion called with content id 0";
     CloseConnection(FlatlandError::kBadOperation);
@@ -1397,8 +1400,8 @@ void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect
   // The provided sample region needs to be within the bounds of the image.
   {
     const auto& metadata = image_kv->second;
-    const auto image_width = static_cast<float>(metadata.width);
-    const auto image_height = static_cast<float>(metadata.height);
+    const float image_width = static_cast<float>(metadata.width);
+    const float image_height = static_cast<float>(metadata.height);
     // This clamping is required in cases where (x+width>image_width) or (y+height>image_height)
     // by a small epsilon. The downstream code expects these numbers to be within the
     // (image_width, image_height) limits, so we only clamp the positive differences. The root
@@ -1406,19 +1409,24 @@ void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect
     // floats within pixel space.
     // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use
     // uints instead.
-    ClampIfNear(&rect.width(), rect.x() + rect.width() - image_width);
-    ClampIfNear(&rect.height(), rect.y() + rect.height() - image_height);
-    if (rect.x() < 0.f || rect.width() < 0.f || (rect.x() + rect.width()) > image_width ||
-        rect.y() < 0.f || rect.height() < 0.f || (rect.y() + rect.height()) > image_height) {
-      error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect
+    float clamped_width = rect.width();
+    float clamped_height = rect.height();
+    ClampIfNear(&clamped_width, rect.x() + clamped_width - image_width);
+    ClampIfNear(&clamped_height, rect.y() + clamped_height - image_height);
+    if (rect.x() < 0.f || clamped_width < 0.f || (rect.x() + clamped_width) > image_width ||
+        rect.y() < 0.f || clamped_height < 0.f || (rect.y() + clamped_height) > image_height) {
+      error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect.x() << "," << rect.y() << ","
+                               << clamped_width << "," << clamped_height
                                << " out of bounds for image (" << image_width << ", "
                                << image_height << ")";
       CloseConnection(FlatlandError::kBadOperation);
       return;
     }
+    rect = ImageSampleRegion(
+        {.x = rect.x(), .y = rect.y(), .width = clamped_width, .height = clamped_height});
   }
 
-  image_sample_regions_[content_kv->second] = fidl::NaturalToHLCPP(rect);
+  image_sample_regions_[content_kv->second] = rect;
 }
 
 void Flatland::SetImageDestinationSize(SetImageDestinationSizeRequest& request,
@@ -1455,11 +1463,10 @@ void Flatland::SetImageDestinationSize(ContentId image_id, fuchsia_math::SizeU s
 
 void Flatland::SetImageBlendingFunction(SetImageBlendingFunctionRequest& request,
                                         SetImageBlendingFunctionCompleter::Sync& completer) {
-  SetImageBlendingFunction(request.image_id(), request.blend_mode());
+  SetImageBlendingFunction(request.image_id(), BlendMode::From(request.blend_mode()));
 }
 
-void Flatland::SetImageBlendingFunction(ContentId image_identifier,
-                                        fuchsia_ui_composition::BlendMode blend_mode) {
+void Flatland::SetImageBlendingFunction(ContentId image_identifier, BlendMode blend_mode) {
   const uint64_t image_id = image_identifier.value();
 
   if (image_id == kInvalidId) {
@@ -1540,7 +1547,7 @@ void Flatland::CreateFilledRect(ContentId rect_identifier) {
   // allocation::kInvalidImageId is overloaded in the renderer to signal that a
   // default 1x1 white texture should be applied to this rectangle.
   metadata.identifier = allocation::kInvalidImageId;
-  metadata.blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
+  metadata.blend_mode = BlendMode::kReplace();
 
   // Now that we've successfully been able to import the image into the importers,
   // we can now create a handle for it in the transform graph, and add the metadata
@@ -1597,8 +1604,8 @@ void Flatland::SetSolidFill(ContentId rect_identifier, fuchsia_ui_composition::C
                        << "  rgba=" << color.red() << "," << color.green() << "," << color.blue()
                        << "," << color.alpha() << "  size=" << size.width() << "x" << size.height();
 
-  image_kv->second.blend_mode = color.alpha() < 1.f ? fuchsia_ui_composition::BlendMode::kSrcOver
-                                                    : fuchsia_ui_composition::BlendMode::kSrc;
+  image_kv->second.blend_mode =
+      color.alpha() < 1.f ? BlendMode::kPremultipliedAlpha() : BlendMode::kReplace();
   image_kv->second.collection_id = allocation::kInvalidId;
   image_kv->second.identifier = allocation::kInvalidImageId;
   image_kv->second.multiply_color = {color.red(), color.green(), color.blue(), color.alpha()};
@@ -1727,8 +1734,9 @@ void Flatland::SetHitRegions(TransformId transform_identifier,
 
   // Reformat into internal type.
   std::vector<flatland::HitRegion> list;
+  list.reserve(regions.size());
   for (auto& region : regions) {
-    list.emplace_back(fidl::NaturalToHLCPP(region.region()),
+    list.emplace_back(types::RectangleF::From(region.region()),
                       fidl::NaturalToHLCPP(region.hit_test()));
   }
   hit_regions_[transform_kv->second] = list;

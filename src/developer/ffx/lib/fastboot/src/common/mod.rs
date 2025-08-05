@@ -38,6 +38,7 @@ pub trait Partition {
 }
 
 pub trait Product<P> {
+    fn name(&self) -> &String;
     fn bootloader_partitions(&self) -> &Vec<P>;
     fn partitions(&self) -> &Vec<P>;
     fn oem_files(&self) -> &Vec<OemFile>;
@@ -170,6 +171,14 @@ async fn flash_partition_sparse<F: FastbootInterface>(
         std::env::temp_dir().as_path(),
         max_download_size,
     )?;
+
+    messenger
+        .send(Event::Upload(UploadProgress::OnReady {
+            partition: name.to_owned(),
+            files: sparse_files.len().try_into()?,
+        }))
+        .await?;
+
     for tmp_file_path in sparse_files {
         let tmp_file_name = tmp_file_path.to_str().unwrap();
         do_flash(name, messenger, fastboot_interface, tmp_file_name, timeout).await?;
@@ -262,6 +271,13 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
                     max_download_size,
                 )?;
 
+                messenger
+                    .send(Event::Upload(UploadProgress::OnReady {
+                        partition: name.to_owned(),
+                        files: sparse_files.len().try_into()?,
+                    }))
+                    .await?;
+
                 for tmp_file_path in sparse_files {
                     let tmp_file_name = tmp_file_path.to_str().unwrap();
                     do_flash(name, &messenger, fastboot_interface, tmp_file_name, timeout).await?;
@@ -281,6 +297,9 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
             }
         }
     } else {
+        messenger
+            .send(Event::Upload(UploadProgress::OnReady { partition: name.to_owned(), files: 1 }))
+            .await?;
         do_flash(name, &messenger, fastboot_interface, &file_to_upload, timeout).await?;
     }
     messenger
@@ -450,6 +469,12 @@ where
     P: Product<Part>,
     T: FastbootInterface,
 {
+    messenger
+        .send(Event::FlashProduct {
+            product_name: product.name().clone(),
+            partition_count: product.bootloader_partitions().len() + product.partitions().len(),
+        })
+        .await?;
     flash_bootloader(messenger, file_resolver, product, fastboot_interface, &cmd).await?;
     flash_product(messenger, file_resolver, product, fastboot_interface, &cmd).await
 }

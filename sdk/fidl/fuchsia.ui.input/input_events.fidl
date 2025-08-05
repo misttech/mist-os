@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.ui.input;
 
+using zx;
+
 @available(deprecated=13)
 type KeyboardEventPhase = flexible enum {
     /// When key is pressed down.
@@ -179,4 +181,24 @@ type InputEvent = strict union {
     2: keyboard KeyboardEvent;
     @available(deprecated=10, note="Instead, use fuchsia.ui.views.ViewRefFocused")
     3: focus FocusEvent;
+};
+
+/// Information about a device that issues touch event streams.
+@available(added=28)
+type TouchDeviceInfo = table {
+    /// An identifier for the touch device that issues touch events.
+    /// Required.
+    1: id uint32;
+};
+
+@available(added=28)
+type TouchButton = flexible enum {
+    PALM = 1;
+};
+
+@available(added=28)
+type TouchButtonsEvent = table {
+    1: event_time zx.InstantMono;
+    2: device_info TouchDeviceInfo;
+    3: pressed_buttons vector<TouchButton>;
 };

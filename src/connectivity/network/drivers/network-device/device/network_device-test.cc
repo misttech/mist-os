@@ -7,13 +7,13 @@
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
-#include <lib/syslog/global.h>
 
 #include <future>
 #include <iomanip>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/syslog/cpp/log_settings.h>
 
 #include "device_interface.h"
 #include "log.h"
@@ -117,12 +117,9 @@ class NetworkDeviceTest : public ::testing::Test {
     ASSERT_OK(port_dispatcher.status_value());
     port_dispatcher_ = std::move(port_dispatcher.value());
 
-    fx_logger_config_t log_cfg = {
-        .min_severity = FX_LOG_TRACE,
-        .tags = nullptr,
-        .num_tags = 0,
-    };
-    fx_log_reconfigure(&log_cfg);
+    fuchsia_logging::LogSettingsBuilder()
+        .WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
+        .BuildAndInitialize();
   }
 
   void TearDown() override { DiscardDeviceSync(); }
@@ -3256,12 +3253,9 @@ TEST_F(NetworkDeviceTest, TooManySessions) {
 class NetworkDeviceStressTest : public NetworkDeviceTest {
   void SetUp() override {
     NetworkDeviceTest::SetUp();
-    fx_logger_config_t log_cfg = {
-        .min_severity = FX_LOG_INFO,
-        .tags = nullptr,
-        .num_tags = 0,
-    };
-    fx_log_reconfigure(&log_cfg);
+    fuchsia_logging::LogSettingsBuilder()
+        .WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
+        .BuildAndInitialize();
   }
 };
 

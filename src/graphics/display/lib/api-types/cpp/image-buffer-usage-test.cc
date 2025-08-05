@@ -15,15 +15,15 @@ namespace display {
 
 namespace {
 
-constexpr ImageBufferUsage kDisplayUsage = {
+constexpr ImageBufferUsage kDisplayUsage({
     .tiling_type = ImageTilingType::kLinear,
-};
-constexpr ImageBufferUsage kDisplayUsage2 = {
+});
+constexpr ImageBufferUsage kDisplayUsage2({
     .tiling_type = ImageTilingType::kLinear,
-};
-constexpr ImageBufferUsage kCaptureUsage = {
+});
+constexpr ImageBufferUsage kCaptureUsage({
     .tiling_type = ImageTilingType::kCapture,
-};
+});
 
 TEST(ImageBufferUsageTest, EqualityIsReflexive) {
   EXPECT_EQ(kDisplayUsage, kDisplayUsage);
@@ -47,9 +47,8 @@ TEST(ImageBufferUsageTest, FromFidlImageBufferUsage) {
           .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
       };
 
-  static constexpr ImageBufferUsage image_buffer_usage =
-      ToImageBufferUsage(fidl_image_buffer_usage);
-  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type);
+  static constexpr ImageBufferUsage image_buffer_usage(fidl_image_buffer_usage);
+  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type());
 }
 
 TEST(ImageBufferUsageTest, FromBanjoImageBufferUsage) {
@@ -57,32 +56,30 @@ TEST(ImageBufferUsageTest, FromBanjoImageBufferUsage) {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
 
-  static constexpr ImageBufferUsage image_buffer_usage =
-      ToImageBufferUsage(banjo_image_buffer_usage);
-  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type);
+  static constexpr ImageBufferUsage image_buffer_usage(banjo_image_buffer_usage);
+  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type());
 }
 
 TEST(ImageBufferUsageTest, ToFidlImageBufferUsage) {
   static constexpr fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage =
-      ToFidlImageBufferUsage(kCaptureUsage);
+      kCaptureUsage.ToFidl();
   EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
             fidl_image_buffer_usage.tiling_type);
 }
 
 TEST(ImageBufferUsageTest, ToBanjoImageBufferUsage) {
-  static constexpr image_buffer_usage_t banjo_image_buffer_usage =
-      ToBanjoImageBufferUsage(kCaptureUsage);
+  static constexpr image_buffer_usage_t banjo_image_buffer_usage = kCaptureUsage.ToBanjo();
   EXPECT_EQ(IMAGE_TILING_TYPE_CAPTURE, banjo_image_buffer_usage.tiling_type);
 }
 
 TEST(ImageBufferUsageTest, FidlDisplayIdConversionRoundtrip) {
-  EXPECT_EQ(kDisplayUsage, ToImageBufferUsage(ToFidlImageBufferUsage(kDisplayUsage)));
-  EXPECT_EQ(kCaptureUsage, ToImageBufferUsage(ToFidlImageBufferUsage(kCaptureUsage)));
+  EXPECT_EQ(kDisplayUsage, ImageBufferUsage(kDisplayUsage.ToFidl()));
+  EXPECT_EQ(kCaptureUsage, ImageBufferUsage(kCaptureUsage.ToFidl()));
 }
 
 TEST(ImageBufferUsageTest, BanjoConversionRoundtrip) {
-  EXPECT_EQ(kDisplayUsage, ToImageBufferUsage(ToBanjoImageBufferUsage(kDisplayUsage)));
-  EXPECT_EQ(kCaptureUsage, ToImageBufferUsage(ToBanjoImageBufferUsage(kCaptureUsage)));
+  EXPECT_EQ(kDisplayUsage, ImageBufferUsage(kDisplayUsage.ToBanjo()));
+  EXPECT_EQ(kCaptureUsage, ImageBufferUsage(kCaptureUsage.ToBanjo()));
 }
 
 }  // namespace

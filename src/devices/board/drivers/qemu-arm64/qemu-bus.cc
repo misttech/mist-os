@@ -55,30 +55,22 @@ zx_status_t QemuArm64::Start() {
 }
 
 zx_status_t QemuArm64::Create(void* ctx, zx_device_t* parent) {
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to platform bus: %s", zx_status_get_string(status));
-    return status;
+  zx::result client = DdkConnectRuntimeProtocol<fpbus::Service::PlatformBus>(parent);
+  if (client.is_error()) {
+    return client.status_value();
   }
 
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<QemuArm64>(&ac, parent, std::move(endpoints->client));
+  auto board = fbl::make_unique_checked<QemuArm64>(&ac, parent, std::move(client.value()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  if ((status = board->DdkAdd("qemu-bus", DEVICE_ADD_NON_BINDABLE)) != ZX_OK) {
+  if (zx_status_t status = board->DdkAdd("qemu-bus", DEVICE_ADD_NON_BINDABLE); status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed %d", __func__, status);
     return status;
   }
 
-  if ((status = board->Start()) != ZX_OK) {
+  if (zx_status_t status = board->Start(); status != ZX_OK) {
     return status;
   }
 

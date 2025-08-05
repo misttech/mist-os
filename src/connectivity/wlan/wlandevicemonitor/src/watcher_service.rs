@@ -241,7 +241,7 @@ mod tests {
     async fn reaper_can_handle_many_active_watchers() {
         let (helper, future) = setup();
         let mut future = pin!(future);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         assert_eq!(0, helper.service.inner.lock().watchers.len());
 
         // Add lots of watchers and randomly remove some at uneven intervals.
@@ -259,8 +259,8 @@ mod tests {
             assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
 
             // Remove some of the watchers every ~100 iterations
-            if rng.gen_bool(0.01) {
-                active_clients.retain(|_| rng.gen_bool(0.9));
+            if rng.random_bool(0.01) {
+                active_clients.retain(|_| rng.random_bool(0.9));
 
                 if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
                     panic!("future returned an error (1): {e:?}");

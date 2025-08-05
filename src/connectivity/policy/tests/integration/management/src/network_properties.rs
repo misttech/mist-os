@@ -5,10 +5,11 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use fuchsia_async::{DurationExt as _, Task};
+use fuchsia_async::DurationExt as _;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _};
+use log::info;
 use net_declare::fidl_ip_v6;
 use netcfg::NetworkTokenExt;
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
@@ -23,6 +24,22 @@ use std::collections::HashSet;
 use std::pin::pin;
 use std::sync::Arc;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_policy_properties as fnp_properties};
+
+trait TakeNetwork {
+    fn take_network(self) -> Option<fnp_properties::NetworkToken>;
+}
+
+impl TakeNetwork for fnp_properties::NetworksWatchDefaultResponse {
+    fn take_network(self) -> Option<fidl_fuchsia_net_policy_properties::NetworkToken> {
+        match self {
+            fnp_properties::NetworksWatchDefaultResponse::Network(network_token) => {
+                Some(network_token)
+            }
+            fnp_properties::NetworksWatchDefaultResponse::NoDefaultNetwork(_) => None,
+            _ => None,
+        }
+    }
+}
 
 fn network_update(
     network_id: u64,
@@ -40,8 +57,8 @@ fn marks(mark_1: Option<u32>, mark_2: Option<u32>) -> fnet::Marks {
 }
 
 fn expect_sequence(
-    actual: &[Vec<fnp_properties::PropertyUpdate>],
-    expected: &[fnp_properties::PropertyUpdate],
+    actual: &[Option<Vec<fnp_properties::PropertyUpdate>>],
+    expected: &[Option<fnp_properties::PropertyUpdate>],
 ) {
     let mut actual = actual.iter().peekable();
     let expected = expected.iter();
@@ -50,22 +67,30 @@ fn expect_sequence(
         let next = actual.next();
         match next {
             None => panic!("Missing property. Next expected property is: {expect:?}"),
-            Some(value) => {
-                if !value.contains(expect) {
-                    panic!("Found out of sequence entry (expected: {expect:?}, found: {value:?}");
+            Some(value) => match (value, expect) {
+                (Some(v), Some(e)) => {
+                    if !v.contains(e) {
+                        panic!("Found out of sequence entry (expected: {e:?}, found: {v:?}");
+                    }
                 }
-            }
+                (None, None) => {}
+                _ => panic!("Found out of sequence entry (expected: {expect:?}, found: {value:?}"),
+            },
         }
 
         loop {
             let peek = actual.peek();
             match peek {
                 None => break,
-                Some(value) => {
-                    if !value.contains(expect) {
-                        break;
+                Some(value) => match (value, expect) {
+                    (Some(v), Some(e)) => {
+                        if !v.contains(e) {
+                            break;
+                        }
                     }
-                }
+                    (None, None) => {}
+                    _ => break,
+                },
             }
             let _ = actual.next();
         }
@@ -91,13 +116,18 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                 let (mut shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
 
                 let last_updates = Arc::new(Mutex::new(Vec::new()));
-                Task::spawn({
+                let background = {
                     let networks = realm
                         .connect_to_protocol::<fnp_properties::NetworksMarker>()
                         .expect("couldn't connect to fuchsia.net.policy.properties/Networks");
                     let last_updates = last_updates.clone();
                     async move {
-                        let mut network = networks.watch_default().await.expect("couldn't watch");
+                        let mut network = networks
+                            .watch_default()
+                            .await
+                            .expect("failed to fetch default network")
+                            .take_network()
+                            .expect("the first return from watch default should never fail");
                         let watch_default = |networks: &fnp_properties::NetworksProxy| {
                             networks.watch_default().fuse()
                         };
@@ -125,22 +155,61 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                         loop {
                             futures::select! {
                                 new_network = next_network => {
-                                    network = new_network.expect("bad new network");
-                                    next_network = watch_default(&networks);
-                                }
-                                property_update = watch_for_updates => {
-                                    watch_for_updates = watch_update(&networks, &network);
-                                    if let Ok(Ok(update)) = property_update {
-                                        for part in &update {
-                                            if let PropertyUpdate::SocketMarks(marks) = part {
-                                                if *marks != last_marks {
-                                                    last_marks = marks.clone();
+                                    match new_network
+                                            .expect("failed to fetch default network")
+                                            .take_network() {
+                                        Some(net) => {
+                                            info!("Observed new network");
+                                            network = net;
+                                        },
+                                        None => {
+                                            info!("Default network was lost via WatchDefault");
+                                            {
+                                                let mut updates = last_updates.lock().await;
+                                                if updates.last() != Some(&None) {
+                                                    updates.push(None);
                                                     tx.send(()).await.expect("Can't send update");
                                                 }
                                             }
                                         }
-                                        last_updates.lock().await.push(update);
                                     }
+                                    next_network = watch_default(&networks);
+                                }
+                                property_update = watch_for_updates => {
+                                    match property_update {
+                                        Ok(Ok(update)) => {
+                                            for part in &update.clone() {
+                                                if let PropertyUpdate::SocketMarks(marks) = part {
+                                                    if *marks != last_marks {
+                                                        info!(
+                                                            "Updating last_updates: {:?}", update
+                                                        );
+                                                        last_marks = marks.clone();
+                                                        last_updates
+                                                            .lock()
+                                                            .await
+                                                            .push(Some(update.clone()));
+                                                        tx
+                                                            .send(())
+                                                            .await
+                                                            .expect("Can't send update");
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Ok(Err(fnp_properties::WatchError::DefaultNetworkLost)) => {
+                                            info!("Default network was lost via WatchUpdate");
+                                            {
+                                                let mut updates = last_updates.lock().await;
+                                                if updates.last() != Some(&None) {
+                                                    updates.push(None);
+                                                    tx.send(()).await.expect("Can't send update");
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                    watch_for_updates = watch_update(&networks, &network);
                                 }
                                 _ = shutdown_rx.next() => {
                                     return;
@@ -148,79 +217,104 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                             }
                         }
                     }
-                })
-                .detach();
+                };
 
-                let default_network = realm
-                    .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()
-                    .expect("couldn't connect to fuchsia.net.policy.properties/DefaultNetwork");
+                let test = async move {
+                    let default_network = realm
+                        .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()
+                        .expect("couldn't connect to fuchsia.net.policy.properties/DefaultNetwork");
 
-                default_network
-                    .update(&network_update(1, marks(Some(1), None)))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
+                    default_network
+                        .update(&network_update(1, marks(Some(1), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
 
-                // Verify that a second call to update will fail.
-                #[derive(Debug, thiserror::Error)]
-                enum UpdateErrType {
-                    #[error("Error while connecting {0}")]
-                    Connect(#[from] anyhow::Error),
-                    #[error("Error while calling update {0}")]
-                    UpdateError(#[from] fidl::Error),
-                    #[error("Protocol error: {0:?}")]
-                    ProtocolError(fnp_properties::UpdateDefaultNetworkError),
-                }
-                let do_update_again =
-                    async |realm: &netemul::TestRealm<'_>| -> Result<(), UpdateErrType> {
-                        let default_network2 =
-                            realm.connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()?;
-                        default_network2
-                            .update(&network_update(2, marks(Some(2), None)))
-                            .await?
-                            .map_err(UpdateErrType::ProtocolError)?;
+                    // Verify that a second call to update will fail.
+                    #[derive(Debug, thiserror::Error)]
+                    enum UpdateErrType {
+                        #[error("Error while connecting {0}")]
+                        Connect(#[from] anyhow::Error),
+                        #[error("Error while calling update {0}")]
+                        UpdateError(#[from] fidl::Error),
+                        #[error("Protocol error: {0:?}")]
+                        ProtocolError(fnp_properties::UpdateDefaultNetworkError),
+                    }
+                    let do_update_again =
+                        async |realm: &netemul::TestRealm<'_>| -> Result<(), UpdateErrType> {
+                            let default_network2 = realm
+                                .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()?;
+                            default_network2
+                                .update(&network_update(2, marks(Some(2), None)))
+                                .await?
+                                .map_err(UpdateErrType::ProtocolError)?;
 
-                        Ok(())
-                    };
-                assert_matches!(
-                    do_update_again(&realm).await,
-                    Err(UpdateErrType::UpdateError(fidl::Error::ClientChannelClosed {
-                        status: zx::Status::CONNECTION_ABORTED,
-                        protocol_name: _,
-                        epitaph: _,
-                    }))
-                );
+                            Ok(())
+                        };
+                    assert_matches!(
+                        do_update_again(&realm).await,
+                        Err(UpdateErrType::UpdateError(fidl::Error::ClientChannelClosed {
+                            status: zx::Status::CONNECTION_ABORTED,
+                            protocol_name: _,
+                            epitaph: _,
+                        }))
+                    );
 
-                let _ = rx.next().await;
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&network_update(1, marks(Some(2), Some(10))))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&network_update(1, marks(Some(2), Some(10))))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&network_update(1, marks(Some(4), None)))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&network_update(1, marks(Some(4), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                let updates = last_updates.lock().await.clone();
-                expect_sequence(
-                    &updates,
-                    &vec![
-                        PropertyUpdate::SocketMarks(marks(Some(1), None)),
-                        PropertyUpdate::SocketMarks(marks(Some(2), Some(10))),
-                        PropertyUpdate::SocketMarks(marks(Some(4), None)),
-                    ],
-                );
+                    default_network
+                        .update(&Default::default())
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                shutdown_tx.send(()).await.expect("couldn't trigger clean shutdown");
+                    default_network
+                        .update(&network_update(1, marks(Some(8), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
+
+                    let updates = last_updates.lock().await.clone();
+                    expect_sequence(
+                        &updates,
+                        &vec![
+                            Some(PropertyUpdate::SocketMarks(marks(Some(1), None))),
+                            Some(PropertyUpdate::SocketMarks(marks(Some(2), Some(10)))),
+                            Some(PropertyUpdate::SocketMarks(marks(Some(4), None))),
+                            // None update represents the empty default_network.update call
+                            None,
+                            Some(PropertyUpdate::SocketMarks(marks(Some(8), None))),
+                        ],
+                    );
+
+                    shutdown_tx.send(()).await.expect("couldn't trigger clean shutdown");
+                };
+
+                // N.B. Waiting for both futures to complete ensures that both
+                // the test and the background task clean themselves up, closing
+                // all open FIDL channels before shutting down the realm.
+                futures::future::join(background, test).await;
             }
             .boxed_local()
         },
@@ -305,8 +399,12 @@ async fn test_track_dns_changes<N: Netstack, M: Manager>(name: &str) -> Result<(
                         M::MANAGEMENT_AGENT.get_component_name(),
                     )
                     .expect("failed to connect to Networks");
-                let network =
-                    networks.watch_default().await.expect("failed to fetch default network");
+                let network = networks
+                    .watch_default()
+                    .await
+                    .expect("failed to fetch default network")
+                    .take_network()
+                    .expect("the first return from watch default should never fail");
                 let watch_update =
                     |networks: &fnp_properties::NetworksProxy,
                      network: &fnp_properties::NetworkToken| {

@@ -42,7 +42,7 @@ static const std::vector<fpbus::Mmio> sherlock_video_mmios{
     }},
     {{
         .base = T931_AOBUS_BASE,
-        .length = T931_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
     {{
         .base = T931_DMC_BASE,

@@ -109,20 +109,6 @@ __EXPORT void device_suspend_reply(zx_device_t* device, zx_status_t status, uint
   device->RecordSuspendReply(status);
 }
 
-__EXPORT void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_power_state,
-                                  uint32_t out_perf_state) {
-  std::lock_guard guard(libdriver_lock);
-  if (!device) {
-    zxlogf(ERROR, "Error: %s passed a null device\n", __func__);
-    return;
-  }
-  if (device->IsRootParent()) {
-    zxlogf(ERROR, "Error: Mock parent device does not support %s\n", __func__);
-    return;
-  }
-  device->RecordResumeReply(status);
-}
-
 // These functions TODO(will be) supported by devices created as root parents:
 __EXPORT
 zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, void* protocol) {
@@ -143,24 +129,10 @@ __EXPORT zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* con
 }
 
 __EXPORT
-zx_status_t device_add_metadata(zx_device_t* device, uint32_t type, const void* data,
-                                size_t length) {
-  std::lock_guard guard(libdriver_lock);
-  device->SetMetadata(type, data, length);
-  return ZX_OK;
-}
-
-__EXPORT
 zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual) {
   std::lock_guard guard(libdriver_lock);
   return device->GetMetadata(type, buf, buflen, actual);
-}
-
-__EXPORT
-zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size) {
-  std::lock_guard guard(libdriver_lock);
-  return device->GetMetadataSize(type, out_size);
 }
 
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* device, const char* name,
@@ -189,15 +161,6 @@ __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* hand
   return ZX_OK;
 }
 
-__EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request) {
-  std::lock_guard guard(libdriver_lock);
-  if (!device) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->ConnectToFidlProtocol(service_name, protocol_name, zx::channel(request));
-}
-
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* service_name,
@@ -209,16 +172,6 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
   }
   return device->ConnectToFidlProtocol(service_name, protocol_name, zx::channel(request),
                                        fragment_name);
-}
-
-__EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request) {
-  std::lock_guard guard(libdriver_lock);
-  if (!device) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->ConnectToRuntimeProtocol(service_name, protocol_name, fdf::Channel(request));
 }
 
 __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device,

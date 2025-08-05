@@ -5,13 +5,13 @@
 use fidl::endpoints::SynchronousProxy;
 use futures_util::StreamExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled};
-use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer,
+    fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileObjectState, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps,
+    FsStr, InputBuffer, OutputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -23,11 +23,12 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, gid_t, ino_t, statfs, uid_t, usb_functionfs_event,
-    usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_ENABLE,
+    usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_DISABLE,
+    usb_functionfs_event_type_FUNCTIONFS_ENABLE, usb_functionfs_event_type_FUNCTIONFS_UNBIND,
 };
 use std::collections::VecDeque;
 use std::ops::Deref;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use zerocopy::IntoBytes;
 use {fidl_fuchsia_hardware_adb as fadb, fuchsia_async as fasync};
 
@@ -76,18 +77,53 @@ async fn handle_adb(
     message_counter: Option<zx::Counter>,
     read_commands: async_channel::Receiver<ReadCommand>,
     write_commands: async_channel::Receiver<WriteCommand>,
+    state: Arc<Mutex<FunctionFsState>>,
 ) {
     /// Handle all of the events coming from the ADB device.
+    ///
+    /// adbd expects to receive events FUNCTIONFS_BIND, FUNCTIONFS_ENABLE, FUNCTION_DISABLE, and
+    /// FUNCTIONFS_UNBIND in that order. If it receives these events out of order or does not
+    /// receive some of the adb events, it may behave unexpectedly. In particular, please reference
+    /// the `StartMonitor` function in `UsbFfsConnection` of `adb/daemon/usb.cpp`.
+    ///
+    /// This module sends a FUNCTIONFS_BIND event as soon as it is called because `handle_adb` is
+    /// called after we've successfully bound to the driver. When the driver is ready to take input
+    /// it will send an `OnStatusChanged{ ONLINE }` event, which is when this module sends the
+    /// FUNCTIONFS_ENABLE event to indicate that adbd should start processing data.
+    ///
+    /// When the driver sends an `OnStatusChanged{}` event, meaning that it's not online anymore.
+    /// The module will send a FUNCTIONFS_DISABLE event to stop processing data. When the stream
+    /// closes, we've unbound from the driver, and the module sends a FUNCTIONFS_UNBIND event.
     async fn handle_events(
         mut stream: fadb::UsbAdbImpl_EventStream,
         message_counter: &Option<zx::Counter>,
+        state: Arc<Mutex<FunctionFsState>>,
     ) {
-        while let Some(_next) = stream.next().await {
+        let queue_event = |event| {
+            let mut state_locked = state.lock();
+            state_locked
+                .event_queue
+                .push_back(usb_functionfs_event { type_: event as u8, ..Default::default() });
+            state_locked.waiters.notify_fd_events(FdEvents::POLLIN);
+        };
+
+        queue_event(usb_functionfs_event_type_FUNCTIONFS_BIND);
+
+        while let Some(Ok(fadb::UsbAdbImpl_Event::OnStatusChanged { status })) = stream.next().await
+        {
+            queue_event(if status == fadb::StatusFlags::ONLINE {
+                usb_functionfs_event_type_FUNCTIONFS_ENABLE
+            } else {
+                usb_functionfs_event_type_FUNCTIONFS_DISABLE
+            });
+
             // We can simply clear this after getting a response because we care about
             // reads. Allow new FIDL messages to come through and only go to sleep if
             // we have an outstanding read.
             message_counter.as_ref().map(mark_proxy_message_handled);
         }
+
+        queue_event(usb_functionfs_event_type_FUNCTIONFS_UNBIND);
     }
 
     /// Consumes a stream of instants and decrements `message_counter` after
@@ -191,7 +227,7 @@ async fn handle_adb(
     }
 
     let (timeouts_sender, timeouts_receiver) = async_channel::unbounded();
-    let event_future = handle_events(proxy.take_event_stream(), &message_counter);
+    let event_future = handle_events(proxy.take_event_stream(), &message_counter, state);
     let write_commands_future =
         handle_write_commands(&proxy, timeouts_sender.clone(), write_commands);
     let read_commands_future = handle_read_commands(&proxy, timeouts_sender, read_commands);
@@ -282,6 +318,8 @@ struct FunctionFsState {
     // FunctionFs events that indicate the connection state, to be read through
     // the control endpoint.
     event_queue: VecDeque<usb_functionfs_event>,
+
+    waiters: WaitQueue,
 }
 
 pub enum AdbProxyMode {
@@ -329,29 +367,12 @@ fn connect_to_device(
         .start_adb(server_end, zx::MonotonicInstant::INFINITE)
         .map_err(|_| errno!(EINVAL))?
         .map_err(|_| errno!(EINVAL))?;
-
-    loop {
-        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } =
-            match adb_proxy.wait_for_event(zx::MonotonicInstant::INFINITE) {
-                Ok(event) => event,
-                Err(e) => {
-                    log_error!(e:?; "adb proxy failed to wait for event");
-                    return error!(EINVAL);
-                }
-            };
-        // Don't decrement the counter here, since the first adb read call will decrement the
-        // counter for this message, keeping the container alive until the read call can be made.
-
-        if status == fadb::StatusFlags::ONLINE {
-            break;
-        }
-    }
     return Ok((device_proxy, adb_proxy, message_counter));
 }
 
 #[derive(Default)]
 struct FunctionFsRootDir {
-    state: Mutex<FunctionFsState>,
+    state: Arc<Mutex<FunctionFsState>>,
 }
 
 impl FunctionFsRootDir {
@@ -373,37 +394,37 @@ impl FunctionFsRootDir {
         let (write_command_sender, write_command_receiver) = async_channel::unbounded();
         state.adb_write_channel = Some(write_command_sender);
 
+        state.event_queue.clear();
+
+        let state_copy = Arc::clone(&self.state);
         // Spawn our future that will handle all of the ADB messages.
         kernel.kthreads.spawn_future(async move {
             let adb_proxy = fadb::UsbAdbImpl_Proxy::new(fidl::AsyncChannel::from_channel(
                 adb_proxy.into_channel(),
             ));
-            handle_adb(adb_proxy, message_counter, read_command_receiver, write_command_receiver)
-                .await
+            handle_adb(
+                adb_proxy,
+                message_counter,
+                read_command_receiver,
+                write_command_receiver,
+                state_copy,
+            )
+            .await
         });
 
         state.has_input_output_endpoints = true;
-
-        // Currently FunctionFS assumes the device is always online.
-        track_stub!(TODO("https://fxbug.dev/329699340"), "FunctionFS correctly handles USB events");
-
-        state.event_queue.push_back(usb_functionfs_event {
-            type_: usb_functionfs_event_type_FUNCTIONFS_BIND as u8,
-            ..Default::default()
-        });
-        state.event_queue.push_back(usb_functionfs_event {
-            type_: usb_functionfs_event_type_FUNCTIONFS_ENABLE as u8,
-            ..Default::default()
-        });
         Ok(())
     }
 
-    fn from_file(file: &FileObject) -> &Self {
-        file.fs
-            .root()
+    fn from_fs(fs: &FileSystem) -> &Self {
+        fs.root()
             .node
             .downcast_ops::<FunctionFsRootDir>()
             .expect("failed to downcast functionfs root dir")
+    }
+
+    fn from_file(file: &FileObject) -> &Self {
+        Self::from_fs(&file.fs)
     }
 
     fn on_control_opened(&self) {
@@ -416,16 +437,15 @@ impl FunctionFsRootDir {
         state.num_control_file_objects -= 1;
         if state.num_control_file_objects == 0 {
             // When all control endpoints are closed, the filesystem resets to its initial state.
-            state.has_input_output_endpoints = false;
-            state.adb_read_channel = None;
-            state.adb_write_channel = None;
-            state.event_queue.clear();
-
             if let Some(device_proxy) = state.device_proxy.as_ref() {
                 let _ = device_proxy
                     .stop_adb(zx::MonotonicInstant::INFINITE)
                     .map_err(|_| errno!(EINVAL));
             }
+
+            state.has_input_output_endpoints = false;
+            state.adb_read_channel = None;
+            state.adb_write_channel = None;
         }
     }
 
@@ -551,12 +571,12 @@ impl FileOps for FunctionFsControlEndpoint {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
-        let rootdir = FunctionFsRootDir::from_file(file);
+        let rootdir = FunctionFsRootDir::from_fs(&file.fs);
         rootdir.on_control_closed();
     }
 
@@ -606,6 +626,20 @@ impl FileOps for FunctionFsControlEndpoint {
         rootdir.create_endpoints(current_task.kernel().deref())?;
 
         Ok(data.drain())
+    }
+
+    fn wait_async(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        let rootdir = FunctionFsRootDir::from_file(file);
+        let state = rootdir.state.lock();
+        Some(state.waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(

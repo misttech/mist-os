@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dist/renamed_binary.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("driver") {
@@ -46,19 +45,13 @@ fuchsia_test_component("pkgctl_integration_test-component") {
   test_type = "system"
 }
 
-renamed_binary("pkgctl-binary") {
-  dest = "bin/pkgctl"
-  source = "$root_out_dir/multi_universal_tool"
-  source_deps = [ "//src/sys/pkg/bin/multi-universal-tool" ]
-}
-
 fuchsia_test_package("pkgctl-integration-tests") {
   test_components = [ ":pkgctl_integration_test-component" ]
   deps = [
-    ":pkgctl-binary",
     "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
     "//src/connectivity/policy/http-client:component",
+    "//src/sys/pkg/bin/pkgctl:pkgctl-binary",
   ]
 }
 

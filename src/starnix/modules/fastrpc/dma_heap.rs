@@ -7,10 +7,10 @@ use starnix_core::device::DeviceOps;
 use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{default_ioctl, FdFlags, FdNumber, FileObject, FileOps, FsNode};
+use starnix_core::vfs::{default_ioctl, FdFlags, FdNumber, FileObject, FileOps, NamespaceNode};
 use starnix_core::{fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless};
 use starnix_logging::log_debug;
-use starnix_sync::{DeviceOpen, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -92,10 +92,10 @@ impl<A: Alloc> Clone for DmaHeapDevice<A> {
 impl<A: Alloc> DeviceOps for DmaHeapDevice<A> {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(DmaHeapFile::new(self.allocator.clone())))

@@ -16,9 +16,6 @@ use crate::vfs::buffers::{
 use crate::vfs::socket::SocketShutdownFlags;
 use crate::vfs::{default_ioctl, DowncastedFile, FileHandle, FileObject, FsNodeHandle};
 use byteorder::{ByteOrder as _, NativeEndian};
-use starnix_uapi::user_address::ArchSpecific;
-use starnix_uapi::{arch_struct_with_union, AF_INET};
-
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::address::{AddressAttribute, AddressMessage};
@@ -34,12 +31,13 @@ use starnix_uapi::auth::{CAP_NET_ADMIN, CAP_NET_RAW};
 use starnix_uapi::errors::{Errno, ErrnoCode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::union::struct_with_union_into_bytes;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    arch_union_wrapper, c_char, errno, error, uapi, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
-    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNAME, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS,
-    SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+    arch_struct_with_union, arch_union_wrapper, c_char, errno, error, uapi, AF_INET, SIOCGIFADDR,
+    SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNAME, SIOCGIFNETMASK,
+    SIOCSIFADDR, SIOCSIFFLAGS, SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL,
+    SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
 use std::collections::VecDeque;
@@ -48,7 +46,7 @@ use std::mem::size_of;
 use std::net::IpAddr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use zerocopy::{FromBytes as _, IntoBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 
@@ -295,7 +293,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
-        _user_opt: UserBuffer,
+        _optval: SockOptValue,
     ) -> Result<(), Errno> {
         error!(ENOPROTOOPT)
     }
@@ -454,6 +452,100 @@ fn create_socket_ops(
     }
 }
 
+#[derive(Debug)]
+pub enum SockOptValue {
+    Value(Vec<u8>),
+    User(UserBuffer),
+}
+
+impl From<Vec<u8>> for SockOptValue {
+    fn from(buffer: Vec<u8>) -> Self {
+        Self::Value(buffer)
+    }
+}
+
+impl From<UserBuffer> for SockOptValue {
+    fn from(buffer: UserBuffer) -> Self {
+        Self::User(buffer)
+    }
+}
+
+impl SockOptValue {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Value(buffer) => buffer.len(),
+            Self::User(user_buffer) => user_buffer.length,
+        }
+    }
+
+    pub fn read<T: FromBytes>(&self, current_task: &CurrentTask) -> Result<T, Errno> {
+        match self {
+            Self::Value(buffer) => {
+                T::read_from_prefix(&buffer).map_err(|_| errno!(EINVAL)).map(|(v, _)| v)
+            }
+            Self::User(user_buffer) => {
+                current_task.read_object::<T>(user_buffer.clone().try_into()?)
+            }
+        }
+    }
+
+    pub fn read_bytes(
+        &self,
+        current_task: &CurrentTask,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, Errno> {
+        match self {
+            Self::Value(buffer) => {
+                let bytes = std::cmp::min(max_bytes, buffer.len());
+                Ok(buffer[..bytes].to_owned())
+            }
+            Self::User(user_buffer) => {
+                let bytes = std::cmp::min(max_bytes, user_buffer.length);
+                current_task
+                    .read_buffer(&UserBuffer { address: user_buffer.address, length: bytes })
+            }
+        }
+    }
+
+    pub fn to_vec(self, current_task: &CurrentTask) -> Result<Vec<u8>, Errno> {
+        match self {
+            Self::Value(buffer) => Ok(buffer),
+            Self::User(user_buffer) => current_task.read_buffer(&user_buffer),
+        }
+    }
+}
+
+// Trait used to provide `read_from_sockopt_value` for `MappingMultiArchUserRef`.
+pub trait ReadFromSockOptValue {
+    type Result;
+    fn read_from_sockopt_value(
+        current_task: &CurrentTask,
+        buffer: &SockOptValue,
+    ) -> Result<Self::Result, Errno>;
+}
+
+impl<T, T64, T32> ReadFromSockOptValue for MappingMultiArchUserRef<T, T64, T32>
+where
+    T64: FromBytes + TryInto<T>,
+    T32: FromBytes + TryInto<T>,
+{
+    type Result = T;
+    fn read_from_sockopt_value(
+        current_task: &CurrentTask,
+        buffer: &SockOptValue,
+    ) -> Result<T, Errno> {
+        match buffer {
+            SockOptValue::Value(buffer) => {
+                Self::read_from_prefix(current_task, &buffer).map_err(|_| errno!(EINVAL))
+            }
+            SockOptValue::User(user_buffer) => {
+                let user_ref = Self::new_with_ref(current_task, user_buffer.clone())?;
+                current_task.read_multi_arch_object(user_ref)
+            }
+        }
+    }
+}
+
 impl Socket {
     /// Creates a new unbound socket.
     ///
@@ -549,33 +641,29 @@ impl Socket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let locked = locked.cast_locked::<FileOpsCore>();
         let read_timeval = || {
-            let timeval_ref = TimeValPtr::new_with_ref(current_task, user_opt)?;
-            let duration =
-                duration_from_timeval(current_task.read_multi_arch_object(timeval_ref)?)?;
+            let timeval = TimeValPtr::read_from_sockopt_value(current_task, &optval)?;
+            let duration = duration_from_timeval(timeval)?;
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
         security::check_socket_setsockopt_access(current_task, self, level, optname)?;
-        match level {
-            SOL_SOCKET => match optname {
-                SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
-                SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
-                // When the feature isn't enabled, we use the local state to store
-                // the mark, otherwise the default branch will let netstack handle
-                // the mark.
-                SO_MARK if !current_task.task.kernel().features.netstack_mark => {
-                    self.state.lock().mark = current_task.read_object(user_opt.try_into()?)?;
-                }
-                _ => self.ops.setsockopt(locked, self, current_task, level, optname, user_opt)?,
-            },
-            _ => self.ops.setsockopt(locked, self, current_task, level, optname, user_opt)?,
+        match (level, optname) {
+            (SOL_SOCKET, SO_RCVTIMEO) => self.state.lock().receive_timeout = read_timeval()?,
+            (SOL_SOCKET, SO_SNDTIMEO) => self.state.lock().send_timeout = read_timeval()?,
+            // When the feature isn't enabled, we use the local state to store
+            // the mark, otherwise the default branch will let netstack handle
+            // the mark.
+            (SOL_SOCKET, SO_MARK) if !current_task.task.kernel().features.netstack_mark => {
+                self.state.lock().mark = optval.read(current_task)?
+            }
+            _ => self.ops.setsockopt(locked, self, current_task, level, optname, optval)?,
         }
         Ok(())
     }
@@ -924,11 +1012,7 @@ impl Socket {
                 // Remove the first IPv4 address on the requested interface.
                 let Some(addr) = address_msgs.into_iter().next() else {
                     // There's nothing to do if there are no addresses on the interface.
-                    // TODO(https://fxbug.dev/387998791): We should actually return an error here,
-                    // but a workaround for us not supporting blackhole devices means that we need
-                    // to allow this to succeed as a no-op instead. Once the workaround is removed
-                    // this should be an EADDRNOTAVAIL.
-                    return Ok(SUCCESS);
+                    return error!(EADDRNOTAVAIL, "no addresses to remove");
                 };
 
                 let resp = send_netlink_msg_and_wait_response(
@@ -1087,7 +1171,7 @@ impl Socket {
         let max_connections =
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);
-        let credentials = current_task.as_ucred();
+        let credentials = current_task.current_ucred();
         self.ops.listen(locked.cast_locked::<FileOpsCore>(), self, backlog, credentials)
     }
 
@@ -1471,7 +1555,9 @@ mod tests {
         let opt_ref = UserRef::<u32>::new(user_address);
         current_task.write_object(opt_ref, &passcred).unwrap();
         let opt_buf = UserBuffer { address: user_address, length: opt_size };
-        rec_dgram.setsockopt(locked, &current_task, SOL_SOCKET, SO_PASSCRED, opt_buf).unwrap();
+        rec_dgram
+            .setsockopt(locked, &current_task, SOL_SOCKET, SO_PASSCRED, opt_buf.into())
+            .unwrap();
 
         rec_dgram
             .bind(locked, &current_task, bind_address)

@@ -253,7 +253,7 @@ open protocol NodeController {
     flexible -> OnBind(resource table {
         /// Provides a token representing this node which can be exchanged with the
         /// driver framework to discern additional information about this node.
-        @available(added=NEXT)
+        @available(added=28)
         1: node_token zx.Handle:EVENT;
     });
 };
@@ -290,7 +290,7 @@ type NodeError = flexible enum {
     UNSUPPORTED_ARGS = 12;
 
     /// The Node contains multiple properties with the same key.
-    @available(added=NEXT)
+    @available(added=28)
     DUPLICATE_PROPERTY_KEYS = 13;
 };
 

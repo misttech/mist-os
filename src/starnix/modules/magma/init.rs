@@ -5,8 +5,8 @@
 use crate::MagmaFile;
 use starnix_core::device::DeviceOps;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_core::vfs::{FileOps, NamespaceNode};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -19,13 +19,19 @@ struct MagmaDeviceBuilder {
 impl DeviceOps for MagmaDeviceBuilder {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        MagmaFile::new_file(current_task, id, node, flags, self.supported_vendors.clone())
+        MagmaFile::new_file(
+            current_task,
+            id,
+            &node.entry.node,
+            flags,
+            self.supported_vendors.clone(),
+        )
     }
 }
 

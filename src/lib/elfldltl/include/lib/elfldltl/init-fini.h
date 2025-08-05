@@ -29,7 +29,7 @@ using InitFiniFunction = void();
 //
 // The CallInit and CallFini methods directly call each function in order, for
 // immediate in-process uses.
-template <class Elf, class AbiTraits = LocalAbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Addr, Elf> AbiTraits = LocalAbiTraits>
 struct InitFiniInfo {
  public:
   using Addr = typename Elf::Addr;

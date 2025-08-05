@@ -21,6 +21,9 @@ namespace display {
 //
 // Instances are guaranteed to represent images whose dimensions are supported
 // by the display stack. See `Dimensions` for details on validity guarantees.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class ImageMetadata {
  private:
   // Enables creating instances using the designated initializer syntax.

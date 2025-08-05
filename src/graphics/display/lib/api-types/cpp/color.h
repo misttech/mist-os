@@ -25,6 +25,9 @@ namespace display {
 //
 // Instances are guaranteed to represent color constants whose pixel formats are
 // supported by the display stack.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class Color {
  private:
   // Enables creating instances using the designated initializer syntax.

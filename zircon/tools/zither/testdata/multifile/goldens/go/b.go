@@ -11,5 +11,5 @@ package multifile
 const B1 A = AMember
 
 type B2 struct {
-	A A
+	A A `json:"a"`
 }

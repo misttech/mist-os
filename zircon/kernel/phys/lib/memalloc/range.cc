@@ -60,6 +60,10 @@ std::string_view ToString(Type type) {
       return "vDSO"sv;
     case Type::kUserboot:
       return "userboot"sv;
+    case Type::kBootMachineStack:
+      return "boot machine stack"sv;
+    case Type::kBootShadowCallStack:
+      return "boot shadow call stack"sv;
     case Type::kTrampolineStagingKernel:
       return "trampoline staging kernel image"sv;
     case Type::kTrampolineStagingDataZbi:

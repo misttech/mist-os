@@ -3,15 +3,30 @@
 // found in the LICENSE file.
 
 use crate::errors::BuildError;
-use crate::{
-    MetaContents, MetaPackageError, Package, PackageBuildManifest, PackageManifest, SubpackageEntry,
-};
+use crate::{MetaContents, MetaPackage, MetaPackageError, PackageBuildManifest, PackageManifest};
+use anyhow::Result;
 use fuchsia_merkle::{Hash, MerkleTree};
+use fuchsia_url::RelativePackageUrl;
 use std::collections::{btree_map, BTreeMap};
 use std::io::{Seek, SeekFrom};
 use std::path::PathBuf;
 use std::{fs, io};
 use tempfile::NamedTempFile;
+use version_history::AbiRevision;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BlobEntry {
+    pub(crate) source_path: PathBuf,
+    pub(crate) hash: Hash,
+    pub(crate) size: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SubpackageEntry {
+    pub name: RelativePackageUrl,
+    pub merkle: Hash,
+    pub package_manifest_path: PathBuf,
+}
 
 pub(crate) fn build(
     creation_manifest: &PackageBuildManifest,
@@ -19,6 +34,7 @@ pub(crate) fn build(
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
+    abi_revision: AbiRevision,
 ) -> Result<PackageManifest, BuildError> {
     build_with_file_system(
         creation_manifest,
@@ -26,6 +42,7 @@ pub(crate) fn build(
         published_name,
         subpackages,
         repository,
+        abi_revision,
         &ActualFileSystem {},
     )
 }
@@ -59,6 +76,7 @@ pub(crate) fn build_with_file_system<'a>(
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
+    abi_revision: AbiRevision,
     file_system: &'a impl FileSystem<'a>,
 ) -> Result<PackageManifest, BuildError> {
     let meta_far_path = meta_far_path.into();
@@ -68,22 +86,22 @@ pub(crate) fn build_with_file_system<'a>(
         return Err(BuildError::MetaPackage(MetaPackageError::MetaPackageMissing));
     };
 
-    let mut package_builder =
-        Package::builder(published_name.parse().map_err(BuildError::PackageName)?);
-
-    for SubpackageEntry { name, merkle, package_manifest_path } in subpackages.into_iter() {
-        package_builder.add_subpackage(name, merkle, package_manifest_path);
-    }
+    let meta_package = MetaPackage::from_name_and_variant_zero(
+        published_name.parse().map_err(BuildError::PackageName)?,
+    );
+    let mut blobs: BTreeMap<String, BlobEntry> = BTreeMap::new();
 
     let external_content_infos =
         get_external_content_infos(creation_manifest.external_contents(), file_system)?;
 
     for (path, info) in external_content_infos.iter() {
-        package_builder.add_entry(
+        blobs.insert(
             path.to_string(),
-            info.hash,
-            PathBuf::from(info.source_path),
-            info.size,
+            BlobEntry {
+                source_path: PathBuf::from(info.source_path),
+                size: info.size,
+                hash: info.hash,
+            },
         );
     }
 
@@ -141,10 +159,13 @@ pub(crate) fn build_with_file_system<'a>(
     }
 
     // Add the meta-far as an entry to the package.
-    package_builder.add_entry("meta/".to_string(), meta_far_merkle, meta_far_path, meta_far_size);
+    blobs.insert(
+        "meta/".to_string(),
+        BlobEntry { source_path: meta_far_path, size: meta_far_size, hash: meta_far_merkle },
+    );
 
-    let package = package_builder.build()?;
-    let package_manifest = PackageManifest::from_package(package, repository)?;
+    let package_manifest =
+        PackageManifest::from_parts(meta_package, repository, blobs, subpackages, abi_revision)?;
     Ok(package_manifest)
 }
 
@@ -187,8 +208,11 @@ mod test_build_with_file_system {
     use std::collections::{HashMap, HashSet};
     use std::fs::File;
     use tempfile::TempDir;
+    use version_history::AbiRevision;
 
     const GENERATED_FAR_CONTENTS: [&str; 2] = ["meta/contents", "meta/package"];
+
+    const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0xabcdef);
 
     struct FakeFileSystem {
         content_map: HashMap<String, Vec<u8>>,
@@ -210,10 +234,10 @@ mod test_build_with_file_system {
                     meta_package.serialize(&mut v).unwrap();
                     content_map.insert(host_path.to_string(), v);
                 } else {
-                    let file_size = rng.gen_range(0..6000);
+                    let file_size = rng.random_range(0..6000);
                     content_map.insert(
                         host_path.to_string(),
-                        rng.sample_iter(&rand::distributions::Standard).take(file_size).collect(),
+                        rng.sample_iter(&rand::distr::StandardUniform).take(file_size).collect(),
                     );
                 }
             }
@@ -267,6 +291,7 @@ mod test_build_with_file_system {
             "published-name",
             vec![],
             None,
+            FAKE_ABI_REVISION,
             &file_system,
         )
         .unwrap();
@@ -312,6 +337,7 @@ mod test_build_with_file_system {
             "published-name",
             vec![],
             None,
+            FAKE_ABI_REVISION,
             &file_system,
         );
         assert_matches!(
@@ -346,6 +372,7 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
+                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -384,6 +411,7 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
+                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -415,6 +443,7 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
+                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -450,6 +479,8 @@ mod test_build {
     use std::io::Write;
     use tempfile::TempDir;
 
+    const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0xabcdef);
+
     // Creates a temporary directory, then for each host path in the `PackageBuildManifest`'s
     // external contents and far contents maps creates a file in the temporary directory with path
     // "${TEMP_DIR}/${HOST_PATH}" and random size and contents. Returns a new `PackageBuildManifest`
@@ -475,9 +506,9 @@ mod test_build {
                         MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
                     meta_package.serialize(f).unwrap();
                 } else {
-                    let file_size = rng.gen_range(0..6000);
+                    let file_size = rng.random_range(0..6000);
                     f.write_all(
-                        rng.sample_iter(&rand::distributions::Standard)
+                        rng.sample_iter(&rand::distr::StandardUniform)
                             .take(file_size)
                             .collect::<Vec<u8>>()
                             .as_slice(),
@@ -533,6 +564,7 @@ mod test_build {
                 "published-name",
                 vec![],
                 None,
+                FAKE_ABI_REVISION,
             )
                 .unwrap();
             let mut reader =

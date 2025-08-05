@@ -12,7 +12,7 @@ use crate::{
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use futures::{FutureExt as _, StreamExt as _};
-use libc::S_IRUSR;
+use libc::{S_IFREG, S_IRUSR};
 use zx::Vmo;
 use zx_status::Status;
 
@@ -223,7 +223,7 @@ async fn get_attr_read_only() {
     assert_get_attr!(
         proxy,
         fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR,
+            mode: S_IFREG | S_IRUSR,
             id: fio::INO_UNKNOWN,
             content_size: 7,
             storage_size: 7,
@@ -247,7 +247,7 @@ async fn get_attr_read_only_with_inode() {
     assert_get_attr!(
         proxy,
         fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR,
+            mode: S_IFREG | S_IRUSR,
             id: INODE, // Custom inode was specified for this file.
             content_size: content_len,
             storage_size: content_len,

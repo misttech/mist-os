@@ -20,10 +20,10 @@ use starnix_core::device::mem::DevNull;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
 use starnix_core::vfs::pseudo::simple_file::{
     parse_unsigned_file, BytesFile, BytesFileOps, SimpleFileNode,
 };
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
@@ -129,7 +129,9 @@ impl SeLinuxFs {
 
         let kernel = current_task.kernel();
         let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, SeLinuxFs, options)?;
-        let mut dir = StaticDirectoryBuilder::new(&fs);
+        let root = SimpleDirectory::new();
+        fs.create_root(fs.allocate_ino(), root.clone());
+        let dir = SimpleDirectoryMutator::new(fs.clone(), root);
 
         // Read-only files & directories, exposing SELinux internal state.
         dir.subdir("avc", 0o555, |dir| {
@@ -207,16 +209,14 @@ impl SeLinuxFs {
         // Read/write files allowing values to be queried or changed.
         dir.entry("booleans", BooleansDirectory::new(security_server.clone()), mode!(IFDIR, 0o555));
         // TODO(b/297313229): Get mode from the container.
-        dir.entry("enforce", EnforceApi::new_node(security_server.clone()), mode!(IFREG, 0o644));
+        dir.entry("enforce", EnforceApi::new_node(security_server), mode!(IFREG, 0o644));
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
         let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
         info.rdev = DeviceType::NULL;
         let null_fs_node = fs.create_node_and_allocate_node_id(null_ops, info);
-        dir.node("null", null_fs_node.clone());
-
-        dir.build_root();
+        dir.node("null".into(), null_fs_node.clone());
 
         // Initialize selinux kernel state to store a copy of "/sys/fs/selinux/null" for use in
         // hooks that redirect file descriptors to null. This has the side-effect of applying the
@@ -808,7 +808,7 @@ impl FsNodeOps for BooleansDirectory {
             profile_duration!("selinuxfs.booleans.lookup");
             Ok(node.fs().create_node_and_allocate_node_id(
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
-                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.as_fscred()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.current_fscred()),
             ))
         } else {
             error!(ENOENT)
@@ -950,22 +950,24 @@ impl FsNodeOps for ClassDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         profile_duration!("selinuxfs.class.lookup");
-        let fs = node.fs();
-        let mut dir = StaticDirectoryBuilder::new(&fs);
-        dir.set_mode(mode!(IFDIR, 0o555));
         let id: u32 = self
             .security_server
             .class_id_by_name(&name.to_string())
             .map_err(|_| errno!(EINVAL))?
             .into();
-        let index_bytes = format!("{}", id).into_bytes();
-        dir.entry("index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
-        dir.entry(
-            "perms",
-            PermsDirectory::new(self.security_server.clone(), name.to_string()),
-            mode!(IFDIR, 0o555),
-        );
-        Ok(dir.build())
+
+        let fs = node.fs();
+        let dir = SimpleDirectory::new();
+        dir.edit(&fs, |dir| {
+            let index_bytes = format!("{}", id).into_bytes();
+            dir.entry("index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
+            dir.entry(
+                "perms",
+                PermsDirectory::new(self.security_server.clone(), name.to_string()),
+                mode!(IFDIR, 0o555),
+            );
+        });
+        Ok(dir.into_node(&fs, 0o555))
     }
 }
 
@@ -1025,7 +1027,7 @@ impl FsNodeOps for PermsDirectory {
 
         Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
-            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.current_fscred()),
         ))
     }
 }

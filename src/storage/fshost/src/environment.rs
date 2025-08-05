@@ -5,6 +5,7 @@
 mod fvm_container;
 mod fxfs_container;
 mod publisher;
+use fuchsia_component::client::connect::connect_to_named_protocol_at_dir_root;
 pub use fvm_container::FvmContainer;
 pub use fxfs_container::FxfsContainer;
 pub use publisher::{DevicePublisher, SinglePublisher};
@@ -27,7 +28,7 @@ use device_watcher::{recursive_wait, recursive_wait_and_open};
 use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
-use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
+use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker, VolumeProxy};
 use fs_management::filesystem::{
     BlockConnector, ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
 };
@@ -52,6 +53,11 @@ pub enum ServeFilesystemStatus {
     FormatRequired,
 }
 
+pub struct PartitionInfo {
+    pub label: String,
+    pub type_guid: [u8; 16],
+}
+
 /// Environment is a trait that performs actions when a device is matched.
 /// Nb: matcher.rs depend on this interface being used in order to mock tests.
 #[async_trait]
@@ -59,12 +65,15 @@ pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
-    /// Binds an instance of the GPT component to the given device.
-    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Binds an instance of the GPT component to the given device. Returns a list of the names of
+    /// the child partitions.
+    async fn launch_and_enumerate_gpt_component(
+        &mut self,
+        device: &mut dyn Device,
+    ) -> Result<(Filesystem, Vec<PartitionInfo>), Error>;
 
-    /// Binds an instance of the GPT component to the given device. This is intended for devices
-    /// that are not the system GPT.
-    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Registers a GPT filesystem as the system GPT.
+    fn register_system_gpt(&mut self, gpt: Filesystem) -> Result<(), Error>;
 
     /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
     /// before the manager is bound and it will get routed once bound.
@@ -701,64 +710,62 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+    async fn launch_and_enumerate_gpt_component(
+        &mut self,
+        device: &mut dyn Device,
+    ) -> Result<(Filesystem, Vec<PartitionInfo>), Error> {
+        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(fs_management::Gpt::dynamic_child()),
+        );
+        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
+        let exposed_dir = serving.exposed_dir();
+        let partitions_dir = fuchsia_fs::directory::open_directory(
+            &exposed_dir,
+            fpartitions::PartitionServiceMarker::SERVICE_NAME,
+            fuchsia_fs::PERM_READABLE,
+        )
+        .await
+        .context("Failed to open partitions dir")?;
+        let entries = fuchsia_fs::directory::readdir(&partitions_dir).await?;
+        let mut partitions = Vec::new();
+        for entry in entries {
+            let endpoint_name = format!("{}/volume", entry.name);
+            let proxy = connect_to_named_protocol_at_dir_root::<VolumeProxy>(
+                &partitions_dir,
+                &endpoint_name,
+            )?;
+            let (raw_status, label) = proxy.get_name().await?;
+            zx::Status::ok(raw_status)?;
+            let (raw_status, type_guid) = proxy.get_type_guid().await?;
+            zx::Status::ok(raw_status)?;
+            if let (Some(label), Some(type_guid)) = (label, type_guid) {
+                partitions.push(PartitionInfo { label, type_guid: type_guid.value });
+            }
+        }
+        self.watcher
+            .add_source(Box::new(DirSource::new(
+                partitions_dir,
+                filesystem.get_component_moniker().unwrap(),
+                crate::device::Parent::SystemPartitionTable,
+            )))
+            .await
+            .context("Failed to watch gpt partitions dir")?;
+        Ok((Filesystem::ServingGpt(serving), partitions))
+    }
+
+    fn register_system_gpt(&mut self, mut gpt: Filesystem) -> Result<(), Error> {
         if self.gpt.is_serving() {
             // If we want to support multiple GPT devices, we'll need to change Environment to
             // separate the system GPT and other GPTs.
             bail!("GPT already bound");
         }
-        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
-            device.block_connector()?,
-            Box::new(fs_management::Gpt::dynamic_child()),
-        );
-        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
         let queue = self.gpt.queue().unwrap();
-        let exposed_dir = serving.exposed_dir();
+        let exposed_dir = gpt.exposed_dir()?;
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
-        let partitions_dir = fuchsia_fs::directory::open_directory(
-            &exposed_dir,
-            fpartitions::PartitionServiceMarker::SERVICE_NAME,
-            fuchsia_fs::PERM_READABLE,
-        )
-        .await
-        .context("Failed to open partitions dir")?;
-        self.watcher
-            .add_source(Box::new(DirSource::new(
-                partitions_dir,
-                filesystem.get_component_moniker().unwrap(),
-                crate::device::Parent::SystemPartitionTable,
-            )))
-            .await
-            .context("Failed to watch gpt partitions dir")?;
-        self.gpt = Filesystem::ServingGpt(serving);
-        Ok(())
-    }
-
-    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
-            device.block_connector()?,
-            Box::new(fs_management::Gpt::dynamic_child()),
-        );
-        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
-        let exposed_dir = serving.exposed_dir();
-        let partitions_dir = fuchsia_fs::directory::open_directory(
-            &exposed_dir,
-            fpartitions::PartitionServiceMarker::SERVICE_NAME,
-            fuchsia_fs::PERM_READABLE,
-        )
-        .await
-        .context("Failed to open partitions dir")?;
-        self.watcher
-            .add_source(Box::new(DirSource::new(
-                partitions_dir,
-                filesystem.get_component_moniker().unwrap(),
-                crate::device::Parent::SystemPartitionTable,
-            )))
-            .await
-            .context("Failed to watch gpt partitions dir")?;
-        self.other_filesystems.push(Filesystem::ServingGpt(serving));
+        self.gpt = gpt;
         Ok(())
     }
 

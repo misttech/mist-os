@@ -158,26 +158,19 @@ zx_status_t NandDevice::Bind(fuchsia_hardware_nand::wire::RamNandInfo& info) {
     zxlogf(INFO, "fail-after: %lu", fail_after_);
   }
 
-  return DdkAdd(ddk::DeviceAddArgs(device_name->data()).set_str_props(props));
-}
-
-void NandDevice::DdkInit(ddk::InitTxn txn) {
+  auto args = ddk::DeviceAddArgs(device_name->data()).set_str_props(props);
   if (export_nand_config_) {
-    zx_status_t status = DdkAddMetadata(DEVICE_METADATA_PRIVATE, &*export_nand_config_,
-                                        sizeof(*export_nand_config_));
-    if (status != ZX_OK) {
-      return txn.Reply(status);
-    }
+    std::vector<uint8_t> metadata(sizeof(export_nand_config_.value()));
+    memcpy(metadata.data(), &export_nand_config_.value(), sizeof(export_nand_config_.value()));
+    args.add_metadata(DEVICE_METADATA_PRIVATE, std::move(metadata));
   }
   if (export_partition_map_) {
-    zx_status_t status = DdkAddMetadata(DEVICE_METADATA_PARTITION_MAP, export_partition_map_.data(),
-                                        export_partition_map_.size());
-    if (status != ZX_OK) {
-      return txn.Reply(status);
-    }
+    std::vector<uint8_t> metadata(export_partition_map_.size());
+    memcpy(metadata.data(), export_partition_map_.data(), export_partition_map_.size());
+    args.add_metadata(DEVICE_METADATA_PARTITION_MAP, std::move(metadata));
   }
 
-  return txn.Reply(ZX_OK);
+  return DdkAdd(std::move(args));
 }
 
 zx::result<NandDevice::DeviceNameType> NandDevice::Init(zx::vmo vmo) {

@@ -490,7 +490,7 @@ zx::result<> FakeDisplay::SetBufferCollectionConstraints(
       buffer_collection_it->second;
 
   BufferCollectionUsage buffer_collection_usage =
-      (image_buffer_usage.tiling_type == display::ImageTilingType::kCapture)
+      (image_buffer_usage.tiling_type() == display::ImageTilingType::kCapture)
           ? BufferCollectionUsage::kCapture
           : BufferCollectionUsage::kPrimaryLayer;
 
@@ -810,7 +810,7 @@ void FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  zx::time vsync_timestamp = zx::clock::get_monotonic();
+  zx::time_monotonic vsync_timestamp = zx::clock::get_monotonic();
 
   display::DriverConfigStamp vsync_config_stamp;
   {

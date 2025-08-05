@@ -32,25 +32,25 @@ const ktl::array kernel_regions = {
     KernelRegion{
         .name = "kernel_code",
         .base = (vaddr_t)__code_start,
-        .size = ROUNDUP((uintptr_t)__code_end - (uintptr_t)__code_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__code_end - (uintptr_t)__code_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE,
     },
     KernelRegion{
         .name = "kernel_rodata",
         .base = (vaddr_t)__rodata_start,
-        .size = ROUNDUP((uintptr_t)__rodata_end - (uintptr_t)__rodata_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__rodata_end - (uintptr_t)__rodata_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     KernelRegion{
         .name = "kernel_relro",
         .base = (vaddr_t)__relro_start,
-        .size = ROUNDUP((uintptr_t)__relro_end - (uintptr_t)__relro_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__relro_end - (uintptr_t)__relro_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     KernelRegion{
         .name = "kernel_data_bss",
         .base = (vaddr_t)__data_start,
-        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__data_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)_end - (uintptr_t)__data_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
     },
 };
@@ -757,29 +757,23 @@ static bool vmaspace_merge_mapping_test() {
           // Validate sizes to ensure any expected merging happened.
           for (int j = 0; j < 3; j++) {
             if (test.mappings[j].vmo) {
-              EXPECT_EQ(mappings[j]->size_locking(), expected_size[j]);
-              if (expected_size[j] == 0) {
-                EXPECT_EQ(nullptr, mappings[j]->vmo().get());
-              } else {
-                EXPECT_EQ(mappings[j]->vmo().get(), test.mappings[j].vmo.get());
+              Guard<CriticalMutex> guard{vmar->lock()};
+              VmMapping* map = vmar->FindMappingLocked(test.mappings[j].vmar_offset + vmar->base());
+              ASSERT_NONNULL(map);
+              AssertHeld(map->lock_ref());
+              if (expected_size[j] != 0) {
+                EXPECT_EQ(map->size_locked(), expected_size[j]);
+                EXPECT_EQ(map->base_locked(), vmar->base_locked() + test.mappings[j].vmar_offset);
               }
-              EXPECT_EQ(mappings[j]->base_locking(),
-                        vmar->base_locking() + test.mappings[j].vmar_offset);
             }
           }
         }
 
         // Destroy any mappings and VMARs.
         for (int i = 0; i < 3; i++) {
-          if (mappings[i]) {
-            if (merge_result[i] == MERGES_LEFT) {
-              EXPECT_EQ(mappings[i]->Destroy(), ZX_ERR_BAD_STATE);
-            } else {
-              EXPECT_EQ(mappings[i]->Destroy(), ZX_OK);
-            }
-          }
-          if (vmars[i]) {
-            EXPECT_OK(vmars[i]->Destroy());
+          if (test.mappings[i].vmo) {
+            EXPECT_OK(vmar->Unmap(vmar->base() + test.mappings[i].vmar_offset, PAGE_SIZE,
+                                  VmAddressRegionOpChildren::Yes));
           }
         }
       }
@@ -1425,7 +1419,8 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Unmap from the right end of the mapping.
   auto old_base = mapping->base_locking();
-  status = mapping->Unmap(mapping->base_locking() + mapping->size_locking() - PAGE_SIZE, PAGE_SIZE);
+  status =
+      mapping->DebugUnmap(mapping->base_locking() + mapping->size_locking() - PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(7ul * PAGE_SIZE, mapping->size_locking());
@@ -1434,7 +1429,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
               make_private_attribution_counts(7ul * PAGE_SIZE, 0));
 
   // Unmap from the center of the mapping.
-  status = mapping->Unmap(mapping->base_locking() + 4 * PAGE_SIZE, PAGE_SIZE);
+  status = mapping->DebugUnmap(mapping->base_locking() + 4 * PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(4ul * PAGE_SIZE, mapping->size_locking());
@@ -1443,7 +1438,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
               make_private_attribution_counts(4ul * PAGE_SIZE, 0));
 
   // Unmap from the left end of the mapping.
-  status = mapping->Unmap(mapping->base_locking(), PAGE_SIZE);
+  status = mapping->DebugUnmap(mapping->base_locking(), PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_NE(old_base, mapping->base_locking());
   EXPECT_EQ(3ul * PAGE_SIZE, mapping->size_locking());

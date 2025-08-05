@@ -68,7 +68,7 @@ where
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::snake(member.name)? %}
+            {% let member_name = filters::escape_snake(member.name) %}
             ::fidl_next::Encode::encode(self.{{ member_name }}, encoder, {{ member_name }})?;
         {% endfor %}
         Ok(())
@@ -98,7 +98,7 @@ where
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::snake(member.name)? %}
+            {% let member_name = filters::escape_snake(member.name) %}
             ::fidl_next::EncodeRef::encode_ref(&self.{{ member_name }}, encoder, {{ member_name }})?;
         {% endfor %}
         Ok(())
@@ -174,7 +174,7 @@ impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
     fn from_wire(wire: {{ wire_name }}{{ de }}) -> Self {
         Self {
             {% for member in strct.members %}
-                {% let member_name = filters::snake(member.name)? %}
+                {% let member_name = filters::escape_snake(member.name) %}
                 {{ member_name }}: ::fidl_next::FromWire::from_wire(wire.{{ member_name }}),
             {% endfor %}
         }
@@ -187,7 +187,7 @@ impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
     fn from_wire_ref(wire: &{{ wire_name }}{{ de }}) -> Self {
         Self {
             {% for member in strct.members %}
-                {% let member_name = filters::snake(member.name)? %}
+                {% let member_name = filters::escape_snake(member.name) %}
                 {{ member_name }}: ::fidl_next::FromWireRef::from_wire_ref(&wire.{{ member_name }}),
             {% endfor %}
         }
@@ -247,7 +247,7 @@ where
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::snake(member.name)? %}
+            {% let member_name = filters::escape_snake(member.name) %}
             ::fidl_next::Decode::decode({{ member_name }}.as_mut(), decoder)?;
             {# type check #}
             {% match member.ty.kind %}

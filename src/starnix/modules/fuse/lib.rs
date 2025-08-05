@@ -12,22 +12,23 @@ use starnix_core::vfs::buffers::{
     Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback,
 };
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig,
     CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
-    FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, WeakFileHandle, XattrOp,
+    FallocMode, FdNumber, FileObject, FileObjectState, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    NamespaceNode, PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize,
+    WeakFileHandle, XattrOp,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    AtomicMonotonicInstant, DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard,
-    RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
+    AtomicMonotonicInstant, FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_types::time::{duration_from_timespec, time_from_timespec, NANOS_PER_SECOND};
@@ -96,10 +97,10 @@ struct DevFuse {
 }
 
 pub fn open_fuse_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     let connection = fuse_connections(current_task.kernel()).new_connection(current_task);
@@ -121,9 +122,9 @@ impl FileOps for DevFuse {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.connection.lock().disconnect();
@@ -366,7 +367,7 @@ impl FuseConnections {
     fn new_connection(&self, current_task: &CurrentTask) -> Arc<FuseConnection> {
         let connection = Arc::new(FuseConnection {
             id: self.next_identifier.next(),
-            creds: current_task.as_fscred(),
+            creds: current_task.current_fscred(),
             state: Default::default(),
         });
         self.connections.lock().push(Arc::downgrade(&connection));
@@ -467,25 +468,26 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
             return error!(ENOENT);
         };
         let fs = node.fs();
-        let mut dir = StaticDirectoryBuilder::new(&fs);
-        dir.set_mode(mode!(IFDIR, 0o500));
-        dir.dir_creds(connection.creds);
-        dir.node(
-            "abort",
-            fs.create_node_and_allocate_node_id(
-                AbortFile::new_node(connection.clone()),
-                FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
-            ),
-        );
-        dir.node(
-            "waiting",
-            fs.create_node_and_allocate_node_id(
-                WaitingFile::new_node(connection.clone()),
-                FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
-            ),
-        );
+        let dir = SimpleDirectory::new();
+        dir.edit(&fs, |dir| {
+            dir.node(
+                "abort".into(),
+                fs.create_node_and_allocate_node_id(
+                    AbortFile::new_node(connection.clone()),
+                    FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
+                ),
+            );
+            dir.node(
+                "waiting".into(),
+                fs.create_node_and_allocate_node_id(
+                    WaitingFile::new_node(connection.clone()),
+                    FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
+                ),
+            );
+        });
 
-        Ok(dir.build())
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o500), connection.creds);
+        Ok(fs.create_node_and_allocate_node_id(dir, info))
     }
 }
 
@@ -762,12 +764,12 @@ impl FuseFileObject {
 
 impl FileOps for FuseFileObject {
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
-        let node = Self::get_fuse_node(file);
+        let node = FuseNode::from_node(file.node());
         let is_dir = file.node().is_dir();
         {
             let mut connection = self.connection.lock();
@@ -2186,7 +2188,7 @@ impl FuseKernelMessage {
         nodeid: u64,
         operation: FuseOperation,
     ) -> Result<Self, Errno> {
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         Ok(Self {
             header: uapi::fuse_in_header {
                 len: u32::try_from(std::mem::size_of::<uapi::fuse_in_header>() + operation.len())

@@ -111,7 +111,7 @@ pub async fn restart() {
 
     proxy
         .perform_reboot(&RebootOptions {
-            reasons: Some(vec![RebootReason2::UserRequest]),
+            reasons: Some(vec![RebootReason2::DeveloperRequest]),
             ..Default::default()
         })
         .await

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <threads.h>
 
 #include <memory>
@@ -19,6 +18,7 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "src/devices/lib/acpi/client.h"
 
 namespace i2c_hid {

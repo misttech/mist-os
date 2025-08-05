@@ -343,7 +343,7 @@ TEST_F(NetStreamSocketsTest, ShutdownReset) {
 
   // Send data from the client(). The server should now very likely be in SHUT_RD and respond with
   // RST.
-  char c;
+  char c = 'a';
   ASSERT_EQ(write(client().get(), &c, sizeof(c)), ssize_t(sizeof(c))) << strerror(errno);
 
   // Wait for the client to receive the RST and for the state to propagate through its fdio.

@@ -101,6 +101,9 @@ _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "Feedback": custom_types.FidlEndpoint(
         "/core/feedback", "fuchsia.feedback.DataProvider"
     ),
+    "LastRebootInfo": custom_types.FidlEndpoint(
+        "/core/feedback", "fuchsia.feedback.LastRebootInfoProvider"
+    ),
     "ProductInfo": custom_types.FidlEndpoint(
         "/core/hwinfo", "fuchsia.hwinfo.Product"
     ),
@@ -285,6 +288,18 @@ class FuchsiaDeviceImpl(
             Firmware version of the device.
         """
         return self._build_info["version"]
+
+    @properties.DynamicProperty
+    def last_reboot_reason(self) -> str:
+        """Returns the last reboot reason of the device.
+
+        Returns:
+            Last reboot reason of the device. Empty string if it doesn't exist.
+        """
+        reason = self._last_reboot_info["reason"]
+        if reason is None:
+            return ""
+        return f_feedback.RebootReason(reason).name
 
     # List all transports
     @properties.Transport
@@ -969,7 +984,7 @@ class FuchsiaDeviceImpl(
         """
 
         try:
-            self.starnix
+            _LOGGER.info("%s is a starnix device", self.starnix)
             return True
         except errors.NotSupportedError:
             return False
@@ -1048,6 +1063,30 @@ class FuchsiaDeviceImpl(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
+    @property
+    def _last_reboot_info(self) -> f_feedback.LastReboot:
+        """Gets the last reboot reason from a device.
+
+        Returns:
+            The last reboot info dictionary.
+
+        Raises:
+            FuchsiaControllerError: On FIDL communication failure or on
+              data transfer verification failure.
+        """
+        try:
+            proxy = f_feedback.LastRebootInfoProviderClient(
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["LastRebootInfo"]
+                )
+            )
+            resp = asyncio.run(proxy.get())
+            return resp.last_reboot
+        except fcp.ZxStatus as status:
+            raise fc_errors.FuchsiaControllerError(
+                "_last_reboot_info() failed"
+            ) from status
+
     # List all private methods
     def _send_log_command(
         self, tag: str, message: str, level: custom_types.LEVEL
@@ -1062,6 +1101,9 @@ class FuchsiaDeviceImpl(
         Raises:
             FuchsiaControllerError: On FIDL communication failure.
         """
+        _LOGGER.debug(
+            f"Attempting to log to device {self.device_name}: {tag}, message: {message}, level: {level}",
+        )
         try:
             rcs_proxy = fd_remotecontrol.RemoteControlClient(
                 self.fuchsia_controller.ctx.connect_remote_control_proxy()
@@ -1089,8 +1131,12 @@ class FuchsiaDeviceImpl(
                 )
             )
             asyncio.run(
-                power_proxy.reboot(
-                    reason=fhp_statecontrol.RebootReason.USER_REQUEST
+                power_proxy.perform_reboot(
+                    options=fhp_statecontrol.RebootOptions(
+                        reasons=[
+                            fhp_statecontrol.RebootReason2.DEVELOPER_REQUEST
+                        ],
+                    ),
                 )
             )
         except fcp.ZxStatus as status:

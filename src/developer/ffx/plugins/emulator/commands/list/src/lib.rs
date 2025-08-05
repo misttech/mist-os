@@ -61,7 +61,7 @@ impl<T: Instances> TryFromEnvWith for WithInstances<T> {
 
 /// Sub-sub tool for `emu list`
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct EmuListTool<T: Instances> {
     #[command]
     cmd: ListCommand,

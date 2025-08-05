@@ -14,7 +14,3 @@ trackers: {
     component_id: 1436363
   }
 }
-
-presubmits: {
-  auto_reviewers: "cphoenix@google.com"
-}

@@ -12,12 +12,12 @@ use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventHandle;
 use wlan_common::{ie, TimeUnit};
 use zerocopy::SplitByteSlice;
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync};
 
 pub trait ChannelActions {
     fn switch_channel(
         &mut self,
-        new_main_channel: fidl_common::WlanChannel,
+        new_main_channel: fidl_ieee80211::WlanChannel,
     ) -> impl Future<Output = Result<(), zx::Status>>;
     fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventHandle;
     fn disable_scanning(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
@@ -34,7 +34,7 @@ pub struct ChannelActionHandle<'a, D> {
 impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
     async fn switch_channel(
         &mut self,
-        new_main_channel: fidl_common::WlanChannel,
+        new_main_channel: fidl_ieee80211::WlanChannel,
     ) -> Result<(), zx::Status> {
         self.ctx.device.set_channel(new_main_channel).await
     }
@@ -60,7 +60,7 @@ impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
 pub struct ChannelState {
     // The current main channel configured in the driver. If None, the driver may
     // be set to any channel.
-    main_channel: Option<fidl_common::WlanChannel>,
+    main_channel: Option<fidl_ieee80211::WlanChannel>,
     pending_channel_switch: Option<(ChannelSwitch, EventHandle)>,
     beacon_interval: Option<TimeUnit>,
     last_beacon_timestamp: Option<fasync::MonotonicInstant>,
@@ -73,11 +73,11 @@ pub struct BoundChannelState<'a, T> {
 
 impl ChannelState {
     #[cfg(test)]
-    pub fn new_with_main_channel(main_channel: fidl_common::WlanChannel) -> Self {
+    pub fn new_with_main_channel(main_channel: fidl_ieee80211::WlanChannel) -> Self {
         Self { main_channel: Some(main_channel), ..Default::default() }
     }
 
-    pub fn get_main_channel(&self) -> Option<fidl_common::WlanChannel> {
+    pub fn get_main_channel(&self) -> Option<fidl_ieee80211::WlanChannel> {
         self.main_channel
     }
 
@@ -115,7 +115,7 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
     /// Immediately set a new main channel in the device.
     pub async fn set_main_channel(
         &mut self,
-        new_main_channel: fidl_common::WlanChannel,
+        new_main_channel: fidl_ieee80211::WlanChannel,
     ) -> Result<(), zx::Status> {
         self.channel_state.pending_channel_switch.take();
         let result = self.actions.switch_channel(new_main_channel).await;
@@ -240,7 +240,7 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
 #[derive(Debug, PartialEq)]
 pub struct ChannelSwitch {
     pub channel_switch_count: u8,
-    pub new_channel: fidl_common::WlanChannel,
+    pub new_channel: fidl_ieee80211::WlanChannel,
     pub pause_transmission: bool,
     pub new_operating_class: Option<u8>,
     // TODO(https://fxbug.dev/42180124): Support transmit power envelope.
@@ -336,7 +336,11 @@ impl<B: SplitByteSlice> ChannelSwitchBuilder<B> {
 
         ChannelSwitchResult::ChannelSwitch(ChannelSwitch {
             channel_switch_count: channel_switch_count,
-            new_channel: fidl_common::WlanChannel { primary: new_channel_number, cbw, secondary80 },
+            new_channel: fidl_ieee80211::WlanChannel {
+                primary: new_channel_number,
+                cbw,
+                secondary80,
+            },
             pause_transmission,
             new_operating_class,
             new_transmit_power_envelope_specified: self.transmit_power_envelope.is_some(),
@@ -439,9 +443,9 @@ mod tests {
     ) {
         let channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             pause_transmission: false,
@@ -467,9 +471,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             pause_transmission,
@@ -494,9 +498,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             pause_transmission,
@@ -515,9 +519,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw40,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                 secondary80: 0,
             },
             pause_transmission: false,
@@ -537,9 +541,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80,
                 secondary80: 0,
             },
             pause_transmission: false,
@@ -559,9 +563,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw160,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw160,
                 secondary80: 0,
             },
             pause_transmission: false,
@@ -581,9 +585,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80P80,
                 secondary80: NEW_CHANNEL + 100,
             },
             pause_transmission: false,
@@ -609,9 +613,9 @@ mod tests {
             assert_variant!(builder.build(), ChannelSwitchResult::ChannelSwitch(cs) => cs);
         let expected_channel_switch = ChannelSwitch {
             channel_switch_count: COUNT,
-            new_channel: fidl_common::WlanChannel {
+            new_channel: fidl_ieee80211::WlanChannel {
                 primary: NEW_CHANNEL,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             pause_transmission,
@@ -648,7 +652,7 @@ mod tests {
 
     #[derive(Debug, Copy, Clone)]
     enum ChannelAction {
-        SwitchChannel(fidl_common::WlanChannel),
+        SwitchChannel(fidl_ieee80211::WlanChannel),
         Timeout(EventId, fasync::MonotonicInstant),
         DisableScanning,
         EnableScanning,
@@ -659,7 +663,7 @@ mod tests {
     impl ChannelActions for &mut MockChannelActions {
         async fn switch_channel(
             &mut self,
-            new_main_channel: fidl_common::WlanChannel,
+            new_main_channel: fidl_ieee80211::WlanChannel,
         ) -> Result<(), zx::Status> {
             self.actions.push(ChannelAction::SwitchChannel(new_main_channel));
             Ok(())

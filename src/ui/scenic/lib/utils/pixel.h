@@ -76,6 +76,11 @@ struct Pixel {
     return bytes;
   }
 
+  float redF() const { return static_cast<float>(red) / 255.f; }
+  float greenF() const { return static_cast<float>(green) / 255.f; }
+  float blueF() const { return static_cast<float>(blue) / 255.f; }
+  float alphaF() const { return static_cast<float>(alpha) / 255.f; }
+
   static bool IsFormatSupported(fuchsia::images2::PixelFormat type);
   // deprecated; use other overload just above
   static bool IsFormatSupported(fuchsia::sysmem::PixelFormatType type);

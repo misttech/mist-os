@@ -2,17 +2,18 @@
 
 You are a software engineer on Fuchsia, which is an open-source operating system
 designed to be simple, secure, updatable, and performant. You work on the
-Fuchsia codebase and should follow these instructions.
+Fuchsia codebase and must follow these instructions.
 
 The main way to interact with a fuchsia device is via `fx` and `ffx` commands.
 
-To run a build, run `fx build -q`. Make sure to use the `-q` option to make the
-output smaller. The Fuchsia platform uses the GN and Bazel build systems. You
-must not generate Cargo.toml, CMakeLists.txt, or Makefile build files.
+To run a build, run `fx --invoker=gemini build -q`. Make sure to use the `-q`
+option to make the output smaller. The Fuchsia platform uses the GN and Bazel
+build systems. You must not generate Cargo.toml, CMakeLists.txt, or Makefile
+build files.
 
-To run a test, run `fx test <name of test>`. You can list available tests with
-`fx test --dry`. You can get JSON output by adding the arguments `--logpath -`.
-Run `fx test --help` for more information.
+To run a test, run `fx --invoker=gemini test <name of test>`. You can list
+available tests with `fx test --dry`. You can get JSON output by adding the
+arguments `--logpath -`. Run `fx test --help` for more information.
 
 When running tests after a failure, try not to re-run all the tests, but rather
 just re-run the tests that previously failed.
@@ -207,13 +208,54 @@ Once you've collected this additional evidence, you should begin to ask the
 If you already know the timestamps you're interested in, use your text
 search tool to read only those regions of the file.
 
+# Jiri usage guidelines
+
+## Working with `jiri` and Manifests
+
+The Fuchsia project is composed of multiple git repositories managed by the
+tool `jiri`. The relationship between these repositories is defined in manifest
+files.
+
+### Filesystem Layout
+
+The `jiri` filesystem is organized as follows:
+
+* `[root]`: The root directory of the jiri checkout.
+* `[root]/.jiri_root`: Contains jiri metadata, including the `jiri` binary itself.
+* `[root]/.jiri_manifest`: Contains the main jiri manifest.
+* `[root]/[project]`: The root directory of a project (a git repository).
+
+### Manifests
+
+Manifest files are XML files that define the projects, packages, and hooks for
+a `jiri` checkout. Manifests can import other manifests. The main manifest is
+`.jiri_manifest`.
+
+A `<project>` tag in a manifest defines a git repository to be synced. The
+`name` attribute is the project's name, and the `path` attribute specifies
+where the project will be located relative to the jiri root.
+
+### Useful `jiri` commands.
+
+*  **Editing Manifests**: To edit a jiri manifest, to change a revision of a
+   project, you can run:
+   *  **Command:** `jiri edit -project=<project-name>=<revision> <path/to/manifest>`
+
+*  **Testing Manifest Changes Locally**: To test local changes to one or more
+   jiri manifest `<project>` tags without committing them, you can run:
+   *  **Command:** `jiri update -local-manifest-project=<project> -local-manifest-project=<another-project>`
+
+*  **Search across jiri projects**: To perform a grep search across all
+   jiri projects you can run:
+  *  **Command:** `jiri grep <text>`: Search across projects.
+
 # Git usage guidelines
 
 ## Working with Git in a Multi-repo Environment
 
-The Fuchsia project is composed of multiple git repositories (e.g., `//`
-and `//vendor/google`). When performing Git operations, it is crucial to
-run commands within the correct repository context.
+The Fuchsia project is composed of multiple git repositories managed by `jiri`
+(e.g., `//` and `//vendor/google`). When performing Git operations, it is
+crucial to run commands within the correct repository context.
 
 **Workflow for Each Git Task:**
 

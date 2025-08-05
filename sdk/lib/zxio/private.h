@@ -82,8 +82,6 @@ zx_status_t RemoteWritev(const fidl::UnownedClientEnd<fuchsia_io::Writable>& cli
                          const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                          size_t* out_actual);
 
-uint32_t zxio_node_protocols_to_posix_type(zxio_node_protocols_t protocols);
-
 bool zxio_is_valid(const zxio_t* io);
 
 zx_status_t zxio_dir_init(zxio_storage_t* storage, fidl::ClientEnd<fuchsia_io::Directory> client);

@@ -10,7 +10,6 @@ mod errors;
 mod meta_contents;
 mod meta_package;
 mod meta_subpackages;
-mod package;
 mod package_archive;
 mod package_build_manifest;
 mod package_builder;
@@ -45,4 +44,4 @@ pub use crate::subpackages_build_manifest::{
 pub use fuchsia_url::errors::PackagePathSegmentError;
 pub use path_to_string::PathToStringExt;
 
-pub(crate) use crate::package::{BlobEntry, Package, SubpackageEntry};
+pub(crate) use crate::build::{BlobEntry, SubpackageEntry};

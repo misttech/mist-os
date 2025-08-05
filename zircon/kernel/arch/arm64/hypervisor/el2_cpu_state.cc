@@ -39,8 +39,8 @@ void UnmapAll(ArchVmAspace& aspace) {
 
 // Return true if the given virtual address range is contiguous in physical memory.
 [[maybe_unused]] bool IsPhysicallyContiguous(vaddr_t base, size_t size) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   // Ranges smaller than a page are always physically contiguous.
   if (size <= PAGE_SIZE) {
@@ -96,8 +96,8 @@ zx::result<> El2TranslationTable::Init() {
   }
 
   // Map the kernel's code in read/execute.
-  vaddr_t code_start = ROUNDDOWN(reinterpret_cast<vaddr_t>(__code_start), PAGE_SIZE);
-  vaddr_t code_end = ROUNDUP(reinterpret_cast<vaddr_t>(__code_end), PAGE_SIZE);
+  vaddr_t code_start = ROUNDDOWN_PAGE_SIZE(reinterpret_cast<vaddr_t>(__code_start));
+  vaddr_t code_end = ROUNDUP_PAGE_SIZE(reinterpret_cast<vaddr_t>(__code_end));
   size_t code_size = code_end - code_start;
   DEBUG_ASSERT(IsPhysicallyContiguous(code_start, code_size));
   paddr_t code_start_paddr = vaddr_to_paddr(reinterpret_cast<const void*>(code_start));

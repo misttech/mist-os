@@ -93,27 +93,31 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.tracing.stop()
 
         # Terminate the tracing session.
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(
+            suffix=".fxt"
+        ) as trace_fxt, tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".json", encoding="utf8"
+        ) as trace_json:
             res = self.device.tracing.terminate_and_download(
-                directory=tmpdir, trace_file="trace.fxt"
+                directory=os.path.dirname(trace_fxt.name),
+                trace_file=os.path.basename(trace_fxt.name),
             )
 
             asserts.assert_equal(
-                res, f"{tmpdir}/trace.fxt", msg="trace not downloaded"
+                res, trace_fxt.name, msg="trace not downloaded"
             )
             asserts.assert_true(
-                os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
+                os.path.exists(trace_fxt.name), msg="trace failed"
             )
-            ps = subprocess.Popen(
-                [TRACE2JSON], stdin=subprocess.PIPE, stdout=subprocess.PIPE
+            output_json_path = trace_json.name
+            subprocess.check_call(
+                [
+                    TRACE2JSON,
+                    f"--input-file={res}",
+                    f"--output-file={output_json_path}",
+                ]
             )
-            trace_data: bytes = bytes([])
-            with open(res, "rb") as trace_file:
-                trace_data = trace_file.read()
-            js, _ = ps.communicate(input=trace_data)
-            # Asserts this can be converted into valid JSON.
-            js_obj = json.loads(js.decode("utf8"))
-            ps.kill()
+            js_obj = json.load(trace_json)
             asserts.assert_true(
                 js_obj.get("traceEvents") is not None,
                 "Expected traceEvents to be present",
@@ -150,13 +154,15 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """This test case tests the `tracing.trace_session()` context manager
         and asserts that the trace was downloaded successfully.
         """
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".fxt") as trace_fxt:
             with self.device.tracing.trace_session(
-                download=True, directory=tmpdir, trace_file="trace.fxt"
+                download=True,
+                directory=os.path.dirname(trace_fxt.name),
+                trace_file=os.path.basename(trace_fxt.name),
             ):
                 pass
             asserts.assert_true(
-                os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
+                os.path.exists(trace_fxt.name), msg="trace failed"
             )
 
     def test_multi_tracing_session(self) -> None:

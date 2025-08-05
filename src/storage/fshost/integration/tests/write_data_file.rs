@@ -98,38 +98,6 @@ async fn no_existing_data_volume() {
 }
 
 #[fuchsia::test]
-async fn unformatted_netboot() {
-    let mut builder = new_builder();
-    builder.fshost().set_config_value("netboot", true);
-    builder.with_disk().with_gpt().format_volumes(volumes_spec());
-    let fixture = builder.build().await;
-
-    let admin: fshost::AdminProxy =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
-    let disk = fixture.tear_down().await.unwrap();
-
-    let fixture = new_builder().with_disk_from(disk).build().await;
-
-    // Ensure the blob volume is present and unmodified.
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-
-    let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data", fio::PERM_READABLE),
-        SECRET_FILE_NAME,
-        fio::PERM_READABLE,
-    )
-    .await
-    .unwrap();
-    assert_eq!(&fuchsia_fs::file::read(&secret).await.unwrap(), PAYLOAD);
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
@@ -250,41 +218,6 @@ async fn formatted_file_in_root() {
     let secret = fuchsia_fs::directory::open_file(
         &fixture.dir("data", fio::PERM_READABLE),
         "test.txt",
-        fio::PERM_READABLE,
-    )
-    .await
-    .unwrap();
-    assert_eq!(&fuchsia_fs::file::read(&secret).await.unwrap(), PAYLOAD);
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn formatted_netboot() {
-    let mut builder = new_builder();
-    builder.fshost().set_config_value("netboot", true);
-    builder.with_disk().with_gpt().format_volumes(volumes_spec()).format_data(data_fs_spec());
-    let fixture = builder.build().await;
-
-    let admin: fshost::AdminProxy =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
-    let disk = fixture.tear_down().await.unwrap();
-
-    let fixture = new_builder().with_disk_from(disk).build().await;
-
-    // Ensure the blob volume is present and unmodified.
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-
-    // Make sure the original contents in the data partition still exist.
-    fixture.check_test_data_file().await;
-
-    let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data", fio::PERM_READABLE),
-        SECRET_FILE_NAME,
         fio::PERM_READABLE,
     )
     .await

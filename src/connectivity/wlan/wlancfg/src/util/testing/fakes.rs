@@ -320,18 +320,21 @@ pub fn create_inspect_persistence_channel() -> (mpsc::Sender<String>, mpsc::Rece
 
 /// Create past connection data with all random values. Tests can set the values they care about.
 pub fn random_connection_data() -> PastConnectionData {
-    let mut rng = rand::thread_rng();
-    let connect_time = fasync::MonotonicInstant::from_nanos(rng.gen::<u16>().into());
-    let time_to_connect = zx::MonotonicDuration::from_seconds(rng.gen_range::<i64, _>(5..10));
-    let uptime = zx::MonotonicDuration::from_seconds(rng.gen_range::<i64, _>(5..1000));
+    let mut rng = rand::rng();
+    let connect_time = fasync::MonotonicInstant::from_nanos(rng.random::<u16>().into());
+    let time_to_connect = zx::MonotonicDuration::from_seconds(rng.random_range::<i64, _>(5..10));
+    let uptime = zx::MonotonicDuration::from_seconds(rng.random_range::<i64, _>(5..1000));
     let disconnect_time = connect_time + time_to_connect + uptime;
     PastConnectionData::new(
-        client_types::Bssid::from(rng.gen::<[u8; 6]>()),
+        client_types::Bssid::from(rng.random::<[u8; 6]>()),
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
-        client_types::Signal { rssi_dbm: rng.gen_range(-90..-20), snr_db: rng.gen_range(10..50) },
-        rng.gen::<u8>().into(),
+        client_types::Signal {
+            rssi_dbm: rng.random_range(-90..-20),
+            snr_db: rng.random_range(10..50),
+        },
+        rng.random::<u8>().into(),
     )
 }
 

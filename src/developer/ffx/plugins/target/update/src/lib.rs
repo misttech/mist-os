@@ -16,7 +16,6 @@ use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use fidl_fuchsia_update_ext::State;
 use fidl_fuchsia_update_installer::{self as finstaller, InstallerProxy};
 use fuchsia_async::Timer;
-use fuchsia_url::AbsolutePackageUrl;
 use futures::future::{FusedFuture as _, FutureExt as _};
 use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
@@ -219,8 +218,7 @@ impl UpdateTool {
 
         let installer_proxy = self.installer_proxy.await?;
 
-        let pkg_url = AbsolutePackageUrl::parse(&cmd.update_pkg_url)
-            .bug_context("parsing update package url")?;
+        let update_url = cmd.update_pkg_url.parse().bug_context("parsing update url")?;
 
         if let Some(server_task) = package_server_task {
             // Use select! to run the package server at the same time as the others. This is preferable
@@ -233,7 +231,7 @@ impl UpdateTool {
                     self.rcs_proxy_connector.clone(),
                 )
                 .await?;
-                Self::force_install(pkg_url, cmd.reboot, installer_proxy, writer).await
+                Self::force_install(update_url, cmd.reboot, installer_proxy, writer).await
             };
 
             let fused_server_task = server_task.task.fuse();
@@ -259,12 +257,12 @@ impl UpdateTool {
                     return update_task_result}
             );
         } else {
-            Self::force_install(pkg_url, cmd.reboot, installer_proxy, writer).await
+            Self::force_install(update_url, cmd.reboot, installer_proxy, writer).await
         }
     }
 
     async fn force_install<W: std::io::Write>(
-        pkg_url: AbsolutePackageUrl,
+        pkg_url: url::Url,
         reboot: bool,
         installer_proxy: InstallerProxy,
         writer: &mut W,
@@ -758,7 +756,9 @@ mod tests {
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
         let target_env = ffx_target::fho::target_interface(&fho_env);
-        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
 
         let tool = UpdateTool {
             cmd: Update {
@@ -851,7 +851,9 @@ mod tests {
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
         let target_env = ffx_target::fho::target_interface(&fho_env);
-        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
 
         let tool = UpdateTool {
             cmd: Update { cmd: args::Command::ForceInstall(args.clone()) },

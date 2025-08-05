@@ -1304,12 +1304,6 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn zxio_fault_catching_disabled() -> bool;
 }
-unsafe extern "C" {
-    pub fn zxio_get_posix_mode(
-        protocols: zxio_node_protocols_t,
-        abilities: zxio_abilities_t,
-    ) -> u32;
-}
 pub type in_port_t = u16;
 pub type in_addr_t = u32;
 #[repr(C)]

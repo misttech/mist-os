@@ -104,8 +104,15 @@
     -->
     <package name="fuchsia/third_party/crosvm/${platform}"
              version="git_revision:304f2a68675abf803d6fb83e5ec6833310947c24"
-             platforms="linux-amd64,linux-arm64"
+             platforms="linux-amd64"
              path="prebuilt/third_party/crosvm/{{.OS}}-{{.Arch}}"/>
+
+    <!-- Unconditional - even on x86 hosts - as there are tests that run this
+         under pure arm64 emulation.
+    -->
+    <package name="fuchsia/third_party/crosvm/linux-arm64"
+             version="git_revision:304f2a68675abf803d6fb83e5ec6833310947c24"
+             path="prebuilt/third_party/crosvm/linux-arm64"/>
 
     <!-- EDKII firmware for emulating UEFI, from
          https://ci.chromium.org/p/fuchsia/builders/ci/edk2
@@ -646,26 +653,26 @@
     <!-- Starnix test binaries -->
     <package name="fuchsia/starnix/tests/syscalls/linux-amd64"
              path="prebuilt/starnix/tests/syscalls/linux-amd64"
-             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"/>
+             version="g3-revision:fuchsia_starnix_tests_20250725_02_RC00"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-arm64"
              path="prebuilt/starnix/tests/syscalls/linux-arm64"
-             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"/>
+             version="g3-revision:fuchsia_starnix_tests_20250725_02_RC00"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-debug-symbols-amd64"
              path="prebuilt/.build-id"
-             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"
+             version="g3-revision:fuchsia_starnix_tests_20250725_02_RC00"
              attributes="debug-symbols,debug-symbols-x64"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"
+             version="g3-revision:fuchsia_starnix_tests_20250725_02_RC00"
              attributes="debug-symbols,debug-symbols-arm64"/>
 
     <!-- ARM Mali Vulkan ICDs -->
     <package name="fuchsia/prebuilt/proprietary/vendor/arm/libvulkan/libvulkan_arm_mali_g52_r0p0"
              path="prebuilt/proprietary/vendor/arm/libvulkan_arm_g52_r0p0"
-             version="hUCz9_rFeSIToz8vUgmowz1qR9UiiJiJJK03BBp2aL4C"
+             version="fn9Iuqu52OGi5MAgr1nua7sXhPJoH0IF4NXFEo99UhcC"
              internal="true"/>
 
     <!-- Bazel SDK sample packages built OOT -->
@@ -687,10 +694,10 @@
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/drivers/wlan/intel/iwlwifi/x86_64"
              path="prebuilt/drivers/wlan/intel/iwlwifi"
-             version="git_revision:50b681ecc94973b8f2ac00e540ed753b5f5594d1"/>
+             version="git_revision:1b2b88e9fd7d776afb67afb0d3c44825f7c9118c"/>
     <package name="fuchsia/drivers/wlan/intel/iwlwifi/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:50b681ecc94973b8f2ac00e540ed753b5f5594d1"
+             version="git_revision:1b2b88e9fd7d776afb67afb0d3c44825f7c9118c"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/drivers/rtc/pcf8563/arm64"
              path="prebuilt/drivers/rtc/pcf8563"
@@ -720,45 +727,45 @@
      <!-- Components built OOT -->
     <package name="fuchsia/prebuilt/bt-host/arm64"
              path="prebuilt/connectivity/bluetooth/bt-host/arm64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-arm64"/>
     <package name="fuchsia/prebuilt/bt-host/x86_64"
              path="prebuilt/connectivity/bluetooth/bt-host/x64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/prebuilt/bt-host/riscv64"
              path="prebuilt/connectivity/bluetooth/bt-host/riscv64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-riscv64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-riscv64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/arm64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/arm64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-arm64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/x86_64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/x64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/riscv64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/riscv64"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-riscv64"
              path="prebuilt/.build-id"
-             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
+             version="git_revision:4103190e63aafb4e0cb734be6c5d3dedcafc1133"
              attributes="debug-symbols,debug-symbols-riscv64"/>
   </packages>
 </manifest>

@@ -9,7 +9,14 @@
 
 #include <cstdint>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using BufferCollectionIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::BufferCollectionId, uint64_t>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -17,16 +24,8 @@ namespace display {
 //
 // See `DriverBufferCollectionId` for the type used at the interface between the
 // display coordinator and the display drivers.
-DEFINE_STRONG_INT(BufferCollectionId, uint64_t);
+using BufferCollectionId = display::internal::IdType<display::internal::BufferCollectionIdTraits>;
 
-constexpr BufferCollectionId ToBufferCollectionId(
-    fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id) {
-  return BufferCollectionId(fidl_buffer_collection_id.value);
-}
-constexpr fuchsia_hardware_display::wire::BufferCollectionId ToFidlBufferCollectionId(
-    BufferCollectionId buffer_collection_id) {
-  return {.value = buffer_collection_id.value()};
-}
 }  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_BUFFER_COLLECTION_ID_H_

@@ -53,6 +53,7 @@
             protocol: "fuchsia.mediacodec.CodecFactory",
             from: "#codec_factory",
             to: "#bt-a2dp",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.power.battery.BatteryManager",

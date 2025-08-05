@@ -31,6 +31,5 @@ group("tests") {
     "input-synthesis:tests",
     "keymaps:tests",
     "terminal:tests",
-    "wayland:tests",
   ]
 }

@@ -36,7 +36,6 @@
 #include <optional>
 #include <vector>
 
-#include <wifi/wifi-config.h>
 #include <wlan/common/element.h>
 #include <wlan/common/ieee80211.h>
 #include <wlan/common/ieee80211_codes.h>
@@ -69,6 +68,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/proto.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/stats.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
+#include "src/devices/lib/broadcom/commands.h"
 #include "third_party/bcmdhd/crossdriver/bcmwifi_channels.h"
 #include "third_party/bcmdhd/crossdriver/dhd.h"
 #include "third_party/bcmdhd/crossdriver/include/devctrl_if/wlioctl_defs.h"
@@ -965,9 +965,9 @@ static zx_status_t brcmf_escan_prep(
     return ZX_ERR_INVALID_ARGS;
   } else {
     for (uint32_t i = 0; i < n_channels; i++) {
-      fuchsia_wlan_common::WlanChannel wlan_chan;
+      fuchsia_wlan_ieee80211::WlanChannel wlan_chan;
       wlan_chan.primary() = request->channels().data()[i];
-      wlan_chan.cbw() = fuchsia_wlan_common::ChannelBandwidth::kCbw20;
+      wlan_chan.cbw() = fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20;
       wlan_chan.secondary80() = 0;
       chanspec = channel_to_chanspec(&cfg->d11inf, &wlan_chan);
       BRCMF_DBG(SCAN, "Chan : %d, Channel spec: %x", request->channels().data()[i], chanspec);
@@ -1962,7 +1962,7 @@ void brcmf_return_roam_start(struct net_device* ndev) {
   std::copy(target_bss_info_bssid.begin(), target_bss_info_bssid.end(), selected_bss.bssid.begin());
 
   selected_bss.capability_info = target_bss_info->capability;
-  fuchsia_wlan_common_wire::WlanChannel chan;
+  fuchsia_wlan_ieee80211_wire::WlanChannel chan;
   chanspec_to_channel(&cfg->d11inf, target_bss_info->chanspec, &chan);
 
   selected_bss.channel.cbw = chan.cbw;
@@ -2121,13 +2121,112 @@ std::vector<uint8_t> brcmf_find_ssid_in_ies(const uint8_t* ie, size_t ie_len) {
   return ssid;
 }
 
+// Construct chanspec manually for 2.4 GHz 40 MHz channels.
+// Note: bcmdhd functions do not handle this case correctly, hence this function.
+static zx::result<chanspec_t> bss_chanspec_2g_bw40(const fuchsia_wlan_common::BssDescription& bss) {
+  const auto& primary = bss.channel().primary();
+  if (primary > CH_MAX_2G_CHANNEL) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  chanspec_t chanspec = WL_CHANSPEC_BAND_2G;
+
+  const auto& cbw = bss.channel().cbw();
+  using fuchsia_wlan_ieee80211::ChannelBandwidth;
+
+  uint8_t center_channel = primary;
+
+  uint8_t sb = WL_CHANSPEC_CTL_SB_NONE;
+  if (cbw == ChannelBandwidth::kCbw40) {
+    center_channel += 2;
+    sb = WL_CHANSPEC_CTL_SB_LOWER;
+  } else if (cbw == ChannelBandwidth::kCbw40Below) {
+    center_channel -= 2;
+    sb = WL_CHANSPEC_CTL_SB_UPPER;
+  } else {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  chanspec |= WL_CHANSPEC_BW_40;
+  chanspec |= center_channel;
+  chanspec |= sb;
+  if (chspec_malformed(chanspec)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  BRCMF_INFO("2G BW40 chanspec 0x%x", chanspec);
+  return zx::ok(chanspec);
+}
+
+// Construct chanspec manually for 80+80 MHz channels.
+// Note: bcmdhd functions may exist for this case, but it's difficult to test with existing test
+// infra.
+static zx::result<chanspec_t> bss_chanspec_bw8080(brcmf_if* ifp,
+                                                  const fuchsia_wlan_common::BssDescription& bss) {
+  using fuchsia_wlan_ieee80211::ChannelBandwidth;
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  if (bss.channel().cbw() != ChannelBandwidth::kCbw80P80) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  // Override the channel bandwidth with 20Mhz because `channel2chanspec` doesn't support
+  // encoding 80+80 Mhz, and we have always overridden to 20Mhz in this case.
+  // TODO(https://fxbug.dev/42144507) - Remove this override.
+  fuchsia_wlan_ieee80211::WlanChannel chan_override = bss.channel();
+  chan_override.cbw() = ChannelBandwidth::kCbw20;
+  const uint16_t chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
+  if (chspec_malformed(chanspec)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(chanspec);
+}
+
+// Return the chanspec for the given BSS description.
+static zx::result<chanspec_t> bss_chanspec(brcmf_if* ifp,
+                                           const fuchsia_wlan_common::BssDescription& bss) {
+  using fuchsia_wlan_ieee80211::ChannelBandwidth;
+  const auto& primary = bss.channel().primary();
+  const auto& cbw = bss.channel().cbw();
+  uint16_t bandwidth;
+  switch (cbw) {
+    case ChannelBandwidth::kCbw20:
+      bandwidth = WL_CHANSPEC_BW_20;
+      break;
+    case ChannelBandwidth::kCbw40:
+      [[fallthrough]];
+    case ChannelBandwidth::kCbw40Below:
+      bandwidth = WL_CHANSPEC_BW_40;
+      // Special case for 2.4 GHz 40 MHz channel, because channel2chanspec doesn't support it.
+      if (primary <= CH_MAX_2G_CHANNEL) {
+        return bss_chanspec_2g_bw40(bss);
+      }
+      break;
+    case ChannelBandwidth::kCbw80:
+      bandwidth = WL_CHANSPEC_BW_80;
+      break;
+    case ChannelBandwidth::kCbw160:
+      bandwidth = WL_CHANSPEC_BW_160;
+      break;
+    case ChannelBandwidth::kCbw80P80:
+      // Special case for 80+80 MHz channel, because channel2chanspec doesn't support it.
+      return bss_chanspec_bw8080(ifp, bss);
+    default:
+      BRCMF_ERR("Unsupported channel bandwidth");
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  chanspec_t chanspec;
+  const auto chanspec_status = channel2chspec(primary, bandwidth, &chanspec);
+  if (chanspec_status != ZX_OK) {
+    return zx::error(chanspec_status);
+  }
+  if (chspec_malformed(chanspec)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(chanspec);
+}
+
 zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
                                    const fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_join_params join_params;
-  fuchsia_wlan_common::WlanChannel chan_override;
-  uint16_t chanspec;
   size_t join_params_size = 0;
   std::vector<uint8_t> ssid;
   zx_status_t err = ZX_OK;
@@ -2141,6 +2240,17 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
   BRCMF_DBG(TRACE, "Enter");
   if (!check_vif_up(ifp->vif)) {
     return ZX_ERR_IO;
+  }
+
+  // TODO(https://fxbug.dev/42144507) - Remove this conversion, it is only for logging.
+  fuchsia_wlan_ieee80211::WlanChannel chan_override = ifp->connect_req.selected_bss()->channel();
+  chan_override.cbw() = fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20;
+  const uint16_t old_chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
+
+  const auto chanspec_result = bss_chanspec(ifp, req->selected_bss().value());
+  if (chanspec_result.is_error()) {
+    BRCMF_ERR("Connect failed, chanspec conversion error: %s", chanspec_result.status_string());
+    goto fail;
   }
 
   // Wait until disconnect completes before proceeding with the connect.
@@ -2196,15 +2306,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
 
   brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state);
 
-  // Override the channel bandwidth with 20Mhz because `channel_to_chanspec` doesn't support
-  // encoding 80Mhz and the upper layer had always passed 20Mhz historically so also need to
-  // test whether the 40Mhz encoding works properly.
-  // TODO(https://fxbug.dev/42144507) - Remove this override.
-  chan_override = ifp->connect_req.selected_bss()->channel();
-  chan_override.cbw() = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
-
-  chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
-  cfg->channel = chanspec;
+  cfg->channel = chanspec_result.value();
 
   ssid = brcmf_find_ssid_in_ies(ifp->connect_req.selected_bss()->ies().data(),
                                 ifp->connect_req.selected_bss()->ies().size());
@@ -2217,7 +2319,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
 
   memcpy(join_params.params_le.bssid, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
   join_params.params_le.chanspec_num = 1;
-  join_params.params_le.chanspec_list[0] = chanspec;
+  join_params.params_le.chanspec_list[0] = chanspec_result.value();
 
   // Attempt to clear counters here and ignore the error. Synaptics indicates that
   // some counters might be active even when the client is not connected.
@@ -2234,6 +2336,10 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
 
 fail:
   if (err != ZX_OK) {
+    if (chanspec_result.is_ok() && chanspec_result.value() != old_chanspec) {
+      BRCMF_WARN("Used new chanspec 0x%x instead of old chanspec 0x%x", chanspec_result.value(),
+                 old_chanspec);
+    }
     brcmf_clear_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state);
     BRCMF_DBG(CONN, "Failed during join: %s", zx_status_get_string(err));
     brcmf_return_assoc_result(ndev,
@@ -2791,9 +2897,10 @@ static zx_status_t brcmf_cfg80211_disconnect(struct net_device* ndev,
   memcpy(&scbval.ea, peer_sta_address, ETH_ALEN);
   scbval.val = reason_code;
 
-  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
+  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
+                                  sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to disassociate: %s, fw err %s", zx_status_get_string(status),
+    BRCMF_ERR("Failed to deauthenticate: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
     brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
     brcmf_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
@@ -3078,7 +3185,7 @@ static void brcmf_iedump(uint8_t* ies, size_t total_len) {
 }
 
 static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
-                                     fuchsia_wlan_common_wire::ChannelBandwidth chn_bw,
+                                     fuchsia_wlan_ieee80211_wire::ChannelBandwidth chn_bw,
                                      const uint8_t* bssid, uint16_t capability, uint16_t interval,
                                      uint8_t* ie, size_t ie_len, int16_t rssi_dbm,
                                      uint16_t snr_db) {
@@ -3151,7 +3258,7 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   uint8_t* notify_ie;
   size_t notify_ielen;
   int16_t notify_rssi_dbm;
-  fuchsia_wlan_common_wire::ChannelBandwidth notify_chn_bw;
+  fuchsia_wlan_ieee80211_wire::ChannelBandwidth notify_chn_bw;
   uint16_t notify_snr_db;
 
   if (bi->length > WL_BSS_INFO_MAX) {
@@ -3175,24 +3282,24 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   notify_snr_db = bi->SNR;
   switch (bi->chanspec & WL_CHANSPEC_BW_MASK) {
     case WL_CHANSPEC_BW_20:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
       break;
     case WL_CHANSPEC_BW_40:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw40;
       break;
     case WL_CHANSPEC_BW_80:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw80;
       break;
     case WL_CHANSPEC_BW_160:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw160;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw160;
       break;
     case WL_CHANSPEC_BW_8080:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80P80;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw80P80;
       break;
     default:
       BRCMF_WARN("Invalid channel BW in scan result chanspec: 0x%x", bi->chanspec);
       // Should this be dropped?
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
   }
 
   BRCMF_DBG(CONN,
@@ -3685,8 +3792,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
-  fuchsia_wlan_common::WlanChannel channel(req->channel(),
-                                           fuchsia_wlan_common::ChannelBandwidth::kCbw20, 0);
+  fuchsia_wlan_ieee80211::WlanChannel channel(req->channel(),
+                                              fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20, 0);
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP already started");
@@ -5645,9 +5752,9 @@ static void brcmf_log_conn_status(brcmf_if* ifp, brcmf_connect_status_t connect_
   }
 }
 
-// This function issues BRCMF_C_DISASSOC command to firmware for cleaning firmware and AP connection
-// states, firmware will send out deauth or disassoc frame to the AP based on current connection
-// state.
+// Issues commands to clear firmware and AP connection states.
+// Driver expects that firmware will send a deauthenticate frame to the current AP, but
+// this is best effort.
 static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
   struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
   zx_status_t status = ZX_OK;
@@ -5656,13 +5763,15 @@ static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
   struct brcmf_scb_val_le scbval;
   memcpy(&scbval.ea, prof->bssid, ETH_ALEN);
   scbval.val = static_cast<uint16_t>(fuchsia_wlan_ieee80211::ReasonCode::kStaLeaving);
-  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
-  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
+  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
+                                  sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to issue BRCMF_C_DISASSOC to firmware: %s, fw err %s",
+    BRCMF_ERR("Failed to issue BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to firmware: %s, fw err %s",
               zx_status_get_string(status), brcmf_fil_get_errstr(fw_err));
   }
-  brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+
+  // Once a deauth has been sent, client is not connected.
+  brcmf_clear_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
   status = brcmf_bss_reset(ifp);
   return status;
 }
@@ -5865,21 +5974,28 @@ zx_status_t brcmf_cfg80211_roam(struct net_device* ndev) {
 
   memcpy(&reassoc_params.bssid, ifp->roam_req->selected_bss()->bssid().data(), ETH_ALEN);
 
-  // Override the channel bandwidth with 20Mhz because `channel_to_chanspec` doesn't support
-  // encoding 80Mhz and the upper layer had always passed 20Mhz historically so also need to
-  // test whether the 40Mhz encoding works properly.
-  // TODO(https://fxbug.dev/42144507) - Remove this override.
+  // TODO(https://fxbug.dev/42144507) - Remove this override, it is only for logging.
   auto chan_override = ifp->roam_req->selected_bss()->channel();
-  chan_override.cbw() = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+  chan_override.cbw() = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
+  const auto old_chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
 
-  const auto chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
+  const auto chanspec_result = bss_chanspec(ifp, ifp->roam_req->selected_bss().value());
+  if (chanspec_result.is_error()) {
+    BRCMF_ERR("Roam failed, chanspec conversion error: %s", chanspec_result.status_string());
+    return chanspec_result.error_value();
+  }
+
   reassoc_params.chanspec_num = 1;
-  reassoc_params.chanspec_list[0] = chanspec;
-  cfg->channel = chanspec;
+  reassoc_params.chanspec_list[0] = chanspec_result.value();
+  cfg->channel = chanspec_result.value();
 
   status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_REASSOC, &reassoc_params, sizeof(reassoc_params),
                                   &fw_status);
   if (status != ZX_OK) {
+    if (chanspec_result.is_ok() && chanspec_result.value() != old_chanspec) {
+      BRCMF_WARN("Used new chanspec 0x%x instead of old chanspec 0x%x", chanspec_result.value(),
+                 old_chanspec);
+    }
     BRCMF_ERR("Roam failed due to firmware REASSOC command failure, firmware status: %s",
               zx_status_get_string(fw_status));
   }
@@ -5934,6 +6050,7 @@ void brcmf_if_roam_req(net_device* ndev,
   // Note that below this point, `req` and `ifp->roam_req` refer to the same roam request and
   // are equivalent.
   ifp->roam_req = fidl::ToNatural(*req);
+  cfg->target_bssid = ifp->roam_req->selected_bss()->bssid();
 
   brcmf_set_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
 
@@ -6504,7 +6621,7 @@ static void brcmf_connect_timeout_worker(WorkItem* work) {
       containerof(work, struct brcmf_cfg80211_info, connect_timeout_work);
   struct brcmf_if* ifp = cfg_to_if(cfg);
   BRCMF_WARN(
-      "Connection timeout, sending BRCMF_C_DISASSOC to firmware for state clean-up, and sending "
+      "Connection timeout, clearing firmware connection state, and sending "
       "assoc result to SME.");
   zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
   if (err != ZX_OK) {
@@ -6965,12 +7082,19 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
     // Disconnect happened during a roam attempt, so report that the roam failed.
     brcmf_bss_roam_done(ifp, brcmf_connect_status_t::ROAM_INTERRUPTED,
                         fuchsia_wlan_ieee80211_wire::StatusCode::kCanceled);
+  } else if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
+    // Default assoc_result for disconnections.
+    auto assoc_result = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified;
+    // Some connect_status values get a specific assoc_result.
+    if (connect_status == brcmf_connect_status_t::AUTHENTICATION_FAILED) {
+      assoc_result =
+          fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedUnauthenticatedAccessNotSupported;
+    } else if (connect_status == brcmf_connect_status_t::NO_NETWORK) {
+      assoc_result = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedExternalReason;
+    }
+    brcmf_bss_connect_done(ifp, connect_status, assoc_result);
   } else {
-    brcmf_bss_connect_done(
-        ifp, connect_status,
-        (connect_status == brcmf_connect_status_t::CONNECTED)
-            ? fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess
-            : fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified);
+    brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
   }
 
   fuchsia_wlan_ieee80211::ReasonCode reason_code =
@@ -7205,13 +7329,19 @@ static zx_status_t brcmf_process_disassoc_event(struct brcmf_if* ifp,
                                                 const struct brcmf_event_msg* e, void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     brcmf_notify_disassoc(ifp->ndev, ZX_OK);
     return ZX_OK;
   }
   // For now, any disassoc event incurs a full disconnect. This may change in the future.
-  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+  auto connect_status = brcmf_connect_status_t::DISASSOCIATING;
+  if (brcmf_test_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                     &cfg->disconnect_request_state)) {
+    connect_status = brcmf_connect_status_t::DEAUTHENTICATING;
+  }
+  return brcmf_indicate_client_disconnect(ifp, e, data, connect_status);
 }
 
 static zx_status_t brcmf_process_set_ssid_event(struct brcmf_if* ifp,

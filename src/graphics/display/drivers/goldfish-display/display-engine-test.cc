@@ -88,8 +88,8 @@ void GoldfishDisplayEngineTest::SetUp() {
       std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher());
 
   config_.display_id = 1;
-  config_.layer_list = layers_.data();
-  config_.layer_count = 1;
+  config_.layers_list = layers_.data();
+  config_.layers_count = 1;
 
   // Call SetupPrimaryDisplayForTesting() so that we can set up the display
   // devices without any dependency on proper driver binding.
@@ -101,7 +101,7 @@ void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
   // ensure we fail correctly if layers more than 1
-  config_.layer_count = kMaxLayerCount;
+  config_.layers_count = kMaxLayerCount;
 
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
@@ -267,8 +267,7 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidCollectionId(1);
-  constexpr uint64_t kBanjoValidCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
+  constexpr uint64_t kBanjoValidCollectionId = kValidCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
       kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
@@ -279,8 +278,7 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
-  constexpr uint64_t kBanjoInvalidCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
+  constexpr uint64_t kBanjoInvalidCollectionId = kInvalidCollectionId.ToBanjo();
   EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidCollectionId),
             ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidCollectionId));

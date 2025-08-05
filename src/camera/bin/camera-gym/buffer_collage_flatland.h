@@ -16,13 +16,13 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 
 #include <cstdint>
 #include <map>
 
 #include "fuchsia/camera/gym/cpp/fidl.h"
 #include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 
 namespace camera_flatland {
 using fuchsia::ui::composition::ContentId;

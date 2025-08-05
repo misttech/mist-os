@@ -4,26 +4,55 @@
 
 import("//build/rust/rustc_library.gni")
 
+rustc_library("thermal-netlink") {
+  edition = "2021"
+  version = "0.1.0"
+  source_root = "netlink_types.rs"
+
+  sources = [ "netlink_types.rs" ]
+
+  deps = [
+    "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
 rustc_library("thermal") {
   name = "starnix-modules-thermal"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
 
-  sources = [ "lib.rs" ]
+  sources = [
+    "family.rs",
+    "lib.rs",
+    "thermal_zone.rs",
+  ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   deps = [
+    ":thermal-netlink",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
     "//sdk/rust/zx",
+    "//src/connectivity/network/netlink",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/lib/mpmc",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_uapi",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
+    "//third_party/rust_crates:async-lock",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:once_cell",
   ]
 }

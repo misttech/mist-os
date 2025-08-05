@@ -106,7 +106,10 @@ class HandoffPrep {
  private:
   // TODO(https://fxbug.dev/42164859): Populate with prepared elements of C++
   // ABI set-up (e.g., mapped stacks).
-  struct ZirconAbi {};
+  struct ZirconAbi {
+    uintptr_t machine_stack_top = 0;
+    uintptr_t shadow_call_stack_base = 0;
+  };
 
   // Comprises a list in scratch memory of the pending VM objects so they can
   // be packed into a single array at the end (via NewFromList()).
@@ -365,6 +368,15 @@ class HandoffPrep {
     return PublishSingleMappingVmar(name, PhysMapping::Type::kMmio, addr, size,
                                     PhysMapping::Permissions::Rw());
   }
+
+  // A specialization for an MMIO range.
+  MappedRange<ktl::byte> PublishSingleWritableDataMappingVmar(ktl::string_view name, uintptr_t addr,
+                                                              size_t size) {
+    return PublishSingleMappingVmar(name, PhysMapping::Type::kNormal, addr, size,
+                                    PhysMapping::Permissions::Rw());
+  }
+
+  MappedMemoryRange PublishStackVmar(ZirconAbiSpec::Stack stack, memalloc::Type type);
 
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.
   PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);

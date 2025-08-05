@@ -77,7 +77,7 @@ rust_library(
     }),
     version = "0.3.1",
     deps = [
-        "//third_party/rust_crates/vendor/ppv-lite86-0.2.10:ppv_lite86",
+        "//third_party/rust_crates/vendor/ppv-lite86-0.2.20:ppv_lite86",
         "//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core",
     ],
 )

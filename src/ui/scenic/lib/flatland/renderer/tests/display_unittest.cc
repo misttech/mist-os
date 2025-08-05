@@ -240,11 +240,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
 
   const auto import_image_result =
-      display_coordinator->sync()->ImportImage(image_metadata,
-                                               {
-                                                   .buffer_collection_id = display_collection_id,
-                                                   .buffer_index = 0,
-                                               },
+      display_coordinator->sync()->ImportImage(image_metadata, display_collection_id, 0,
                                                scenic_impl::ToDisplayFidlImageId(display_image_id));
   ASSERT_TRUE(import_image_result.ok())
       << "Failed to call FIDL ImportImage: " << import_image_result.status_string();
@@ -306,13 +302,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   allocation::GlobalImageId image_ids[kNumVmos];
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();
-    const auto import_image_result =
-        display_coordinator->sync()->ImportImage(image_metadata,
-                                                 {
-                                                     .buffer_collection_id = display_collection_id,
-                                                     .buffer_index = i,
-                                                 },
-                                                 scenic_impl::ToDisplayFidlImageId(image_ids[i]));
+    const auto import_image_result = display_coordinator->sync()->ImportImage(
+        image_metadata, display_collection_id, i, scenic_impl::ToDisplayFidlImageId(image_ids[i]));
     ASSERT_TRUE(import_image_result.ok())
         << "Failed to call FIDL ImportImage: " << import_image_result.status_string();
     ASSERT_TRUE(import_image_result->is_ok())

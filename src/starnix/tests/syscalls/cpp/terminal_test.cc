@@ -11,6 +11,8 @@
 #include <sys/sysmacros.h>
 #include <termios.h>
 
+#include <string>
+
 #include <gtest/gtest.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
@@ -527,6 +529,47 @@ TEST_F(Pty, DetectReplicaClosing) {
     SAFE_SYSCALL(kill(child_pid, SIGUSR2));
     ASSERT_EQ(1, SAFE_SYSCALL(HANDLE_EINTR(poll(&fds, 1, 10000))));
     ASSERT_EQ(fds.revents, POLLHUP);
+  });
+}
+
+TEST_F(Pty, NewInstance) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    test_helper::ScopedTempDir mount_point1, mount_point2;
+
+    // Mount a default devpts instance.
+    auto mount1 = ASSERT_RESULT_SUCCESS_AND_RETURN(
+        test_helper::ScopedMount::Mount("devpts", mount_point1.path(), "devpts", 0, nullptr));
+
+    // Mount a new devpts instance.
+    auto mount2 = ASSERT_RESULT_SUCCESS_AND_RETURN(
+        test_helper::ScopedMount::Mount("devpts", mount_point2.path(), "devpts", 0, "newinstance"));
+
+    struct stat stat_buf;
+
+    // Open ptmx in the first instance, which should create pts/0.
+    std::string ptmx1_path = mount_point1.path() + "/ptmx";
+    fbl::unique_fd ptmx1_fd(open(ptmx1_path.c_str(), O_RDWR));
+    ASSERT_TRUE(ptmx1_fd.is_valid());
+    std::string pts1_0_path = mount_point1.path() + "/0";
+    ASSERT_EQ(0, stat(pts1_0_path.c_str(), &stat_buf));
+
+    // The two instances should be separate. Opening a pty in the second instance
+    // should not create a new pty in the first one.
+    std::string pts2_0_path = mount_point2.path() + "/0";
+    ASSERT_EQ(-1, stat(pts2_0_path.c_str(), &stat_buf));
+    ASSERT_EQ(ENOENT, errno);
+
+    // Open ptmx in the second instance, which should now create pts/0.
+    std::string ptmx2_path = mount_point2.path() + "/ptmx";
+    fbl::unique_fd ptmx2_fd(open(ptmx2_path.c_str(), O_RDWR));
+    ASSERT_TRUE(ptmx2_fd.is_valid());
+    ASSERT_EQ(0, stat(pts2_0_path.c_str(), &stat_buf));
   });
 }
 

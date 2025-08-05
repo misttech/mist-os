@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/intrin.h>
+#include <lib/thread-stack/abi.h>
 #include <lib/unittest/unittest.h>
 
 #include <kernel/auto_preempt_disabler.h>
@@ -18,7 +19,7 @@ namespace {
 // Test that the kernel is able to handle interrupts when half the kernel stack is used.
 bool kstack_interrupt_depth_test() {
   BEGIN_TEST;
-  constexpr size_t kSize = DEFAULT_STACK_SIZE / 2;
+  constexpr size_t kSize = internal::kMachineStackSize / 2;
   volatile uint8_t buffer[kSize] = {};
 
   // Spin for a bit while we have a large, active buffer on the kernel stack.
@@ -37,7 +38,7 @@ bool kstack_interrupt_depth_test() {
 #if __has_feature(safe_stack)
 __attribute__((no_sanitize("safe-stack"))) bool kstack_interrupt_depth_test_no_safestack() {
   BEGIN_TEST;
-  constexpr size_t kSize = DEFAULT_STACK_SIZE / 2;
+  constexpr size_t kSize = internal::kMachineStackSize / 2;
   volatile uint8_t buffer[kSize] = {};
 
   // Spin for a bit while we have a large, active buffer on the kernel stack.
@@ -78,7 +79,7 @@ bool kstack_mp_sync_exec_test() {
     // have the IPI interrupt *this* thread and push its frame onto *this* thread's stack.
     AutoPreemptDisabler preempt_disable;
 
-    constexpr size_t kSize = DEFAULT_STACK_SIZE / 2;
+    constexpr size_t kSize = internal::kMachineStackSize / 2;
     volatile uint8_t buffer[kSize] = {};
 
     Context* const context = reinterpret_cast<Context*>(arg);

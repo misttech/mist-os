@@ -72,10 +72,6 @@ impl RealmQuery {
                     let result = get_instance(&model, &scope_moniker, &moniker).await;
                     responder.send(result.as_ref().map_err(|e| *e))
                 }
-                fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
-                    let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
-                    responder.send(result)
-                }
                 fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
                     let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
@@ -206,7 +202,14 @@ async fn get_instance(
         let state = instance.lock_state().await;
 
         if let Some(resolved_state) = state.get_resolved_state() {
-            let resolved_url = Some(resolved_state.address().url().to_string());
+            let resolved_url = Some(
+                resolved_state
+                    .address()
+                    .await
+                    .map_err(|_| fsys::GetInstanceError::InstanceNotFound)?
+                    .url()
+                    .to_string(),
+            );
             let execution_info =
                 state.get_started_state().map(|started_state| fsys::ExecutionInfo {
                     start_reason: Some(started_state.start_reason.to_string()),
@@ -308,6 +311,7 @@ async fn resolve_declaration(
         let address = if url.starts_with("#") {
             resolved_state
                 .address_for_relative_url(url)
+                .await
                 .map_err(|_| fsys::GetDeclarationError::BadUrl)?
         } else {
             Url::new(url)
@@ -706,17 +710,29 @@ async fn get_fidl_instance_and_children(
         let state = instance.lock_state().await;
 
         if let Some(resolved_state) = state.get_resolved_state() {
-            let resolved_url = Some(resolved_state.address().url().to_string());
-            let children = resolved_state.children().map(|(_, c)| c.clone()).collect();
-            let execution_info =
-                state.get_started_state().map(|started_state| fsys::ExecutionInfo {
-                    start_reason: Some(started_state.start_reason.to_string()),
-                    ..Default::default()
-                });
-            (
-                Some(fsys::ResolvedInfo { resolved_url, execution_info, ..Default::default() }),
-                children,
-            )
+            match resolved_state.address().await {
+                Ok(address) => {
+                    let resolved_url = Some(address.url().to_string());
+                    let children = resolved_state.children().map(|(_, c)| c.clone()).collect();
+                    let execution_info =
+                        state.get_started_state().map(|started_state| fsys::ExecutionInfo {
+                            start_reason: Some(started_state.start_reason.to_string()),
+                            ..Default::default()
+                        });
+                    (
+                        Some(fsys::ResolvedInfo {
+                            resolved_url,
+                            execution_info,
+                            ..Default::default()
+                        }),
+                        children,
+                    )
+                }
+                Err(err) => {
+                    warn!(err:%, moniker:%; "GetAllInstances: could not fetch component address?");
+                    (None, vec![])
+                }
+            }
         } else {
             (None, vec![])
         }

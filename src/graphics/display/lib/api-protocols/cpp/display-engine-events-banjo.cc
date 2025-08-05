@@ -11,6 +11,7 @@
 #include <zircon/assert.h>
 #include <zircon/time.h>
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 
@@ -53,7 +54,7 @@ void DisplayEngineEventsBanjo::OnDisplayAdded(
   }
 
   const raw_display_info_t banjo_display_info = {
-      .display_id = display::ToBanjoDisplayId(display_id),
+      .display_id = display_id.ToBanjo(),
       .preferred_modes_list = banjo_preferred_modes_buffer.data(),
       .preferred_modes_count = preferred_modes.size(),
       .edid_bytes_list = edid_bytes.data(),
@@ -71,7 +72,7 @@ void DisplayEngineEventsBanjo::OnDisplayAdded(
 }
 
 void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
-  const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
+  const uint64_t banjo_display_id = display_id.ToBanjo();
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
@@ -81,12 +82,12 @@ void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
   display_engine_listener_.OnDisplayRemoved(banjo_display_id);
 }
 
-void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id,
+                                              zx::time_monotonic timestamp,
                                               display::DriverConfigStamp config_stamp) {
-  const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
-  const zx_time_t banjo_timestamp = timestamp.get();
-  const config_stamp_t banjo_driver_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
-
+  const uint64_t banjo_display_id = display_id.ToBanjo();
+  const zx_instant_mono_t banjo_timestamp = timestamp.get();
+  const config_stamp_t banjo_driver_config_stamp = config_stamp.ToBanjo();
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
     fdf::warn("OnDisplayVsync() emitted with invalid event listener; event dropped");

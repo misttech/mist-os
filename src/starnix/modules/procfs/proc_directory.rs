@@ -32,7 +32,7 @@ use starnix_core::vfs::pseudo::simple_file::{BytesFile, SimpleFileNode};
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    fs_node_impl_dir_readonly, CloseFreeSafe, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
 };
 use starnix_logging::{bug_ref, track_stub, BugRef};
@@ -200,6 +200,8 @@ impl FsNodeOps for ProcDirectoryNode {
     }
 }
 
+/// `ProcDirectory` doesn't implement the `close` method.
+impl CloseFreeSafe for ProcDirectory {}
 impl FileOps for ProcDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();

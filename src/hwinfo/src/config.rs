@@ -189,13 +189,6 @@ impl Into<fidl_fuchsia_hwinfo::BoardInfo> for BoardInfo {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ConfigFile {
-    pub name: String,
-    pub model: String,
-    pub manufacturer: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProductInfo {
     pub sku: Option<String>,
     pub language: Option<String>,

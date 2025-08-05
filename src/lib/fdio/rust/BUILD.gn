@@ -46,6 +46,26 @@ rustc_library("fdio") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+rustc_library("fdio_zxio") {
+  with_unit_tests = true
+  version = "0.1.0"
+  edition = "2021"
+  source_root = "src/fdio_zxio.rs"
+  sources = [
+    "src/fdio_sys.rs",
+    "src/fdio_zxio.rs",
+    "src/zxio_sys.rs",
+  ]
+  deps = [
+    "//sdk/lib/zxio",
+    "//sdk/rust/zx",
+  ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:libc",
+  ]
+}
+
 rustc_binary("spawn_test_target") {
   version = "0.2.0"
   edition = "2021"
@@ -76,9 +96,18 @@ fuchsia_component("test-component") {
   manifest = "meta/fdio_lib_test.cml"
 }
 
+fuchsia_unittest_component("fdio_zxio_test_component") {
+  visibility = [ ":*" ]
+  component_name = "fdio_zxio_test"
+  deps = [ ":fdio_zxio_test" ]
+}
+
 fuchsia_test_package("test-package") {
   package_name = "fdio-rust-tests"
-  test_components = [ ":test-component" ]
+  test_components = [
+    ":test-component",
+    ":fdio_zxio_test_component",
+  ]
 }
 
 group("tests") {

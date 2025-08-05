@@ -5,11 +5,12 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_MAX98927_MAX98927_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_MAX98927_MAX98927_H_
 
-#include <lib/device-protocol/i2c-channel.h>
 #include <zircon/types.h>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace audio {
 namespace max98927 {

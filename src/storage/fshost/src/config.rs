@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::boot_args::BootArgs;
-
 #[cfg(test)]
 pub fn default_test_config() -> fshost_config::Config {
     fshost_config::Config {
@@ -28,7 +26,6 @@ pub fn default_test_config() -> fshost_config::Config {
         gpt_all: false,
         mbr: false,
         nand: false,
-        netboot: false,
         no_zxcrypt: false,
         storage_host: false,
         use_disk_migration: false,
@@ -37,11 +34,5 @@ pub fn default_test_config() -> fshost_config::Config {
         disable_automount: false,
         blobfs_write_compression_algorithm: "".to_string(),
         blobfs_cache_eviction_policy: "".to_string(),
-    }
-}
-
-pub fn apply_boot_args_to_config(config: &mut fshost_config::Config, boot_args: &BootArgs) {
-    if boot_args.netboot() || config.disable_automount {
-        config.netboot = true;
     }
 }

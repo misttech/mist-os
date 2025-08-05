@@ -11,11 +11,14 @@ rustc_library("device_mapper") {
   source_root = "lib.rs"
   sources = [ source_root ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//src/lib/mundane",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/starnix_ext",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",

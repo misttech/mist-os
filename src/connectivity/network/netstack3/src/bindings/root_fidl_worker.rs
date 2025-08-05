@@ -99,8 +99,9 @@ pub(crate) async fn serve_routes_v4(
                     async move {
                         serve_route_set::<Ipv4, _, _>(
                             stream,
-                            &mut GlobalRouteSet::new(ctx),
+                            &mut GlobalRouteSet::<Ipv4>::new(&ctx),
                             std::future::pending(), /* never cancelled */
+                            &ctx,
                         )
                         .await
                     }
@@ -125,8 +126,9 @@ pub(crate) async fn serve_routes_v6(
                     async move {
                         serve_route_set::<Ipv6, _, _>(
                             stream,
-                            &mut GlobalRouteSet::new(ctx),
+                            &mut GlobalRouteSet::<Ipv6>::new(&ctx),
                             std::future::pending(), /* never cancelled */
+                            &ctx,
                         )
                         .await
                     }

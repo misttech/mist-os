@@ -18,6 +18,9 @@
 // root resource.  This is primarily used to ensure that even user-mode code may
 // not gain direct access to RAM, or to other kernel exclusive resources such as
 // the interrupt controller or IOMMU.
+//
+// In the case of MMIO, automatic page rounding will be applied, as we cannot
+// restrict access to only part of a page of MMIO.
 void root_resource_filter_add_deny_region(uintptr_t base, size_t size, zx_rsrc_kind_t kind);
 
 // Called by object/resource.cc code to check whether or not a resource of the

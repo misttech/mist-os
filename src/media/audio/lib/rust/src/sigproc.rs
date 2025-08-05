@@ -368,7 +368,6 @@ impl From<ElementState> for fhaudio_sigproc::ElementState {
     fn from(value: ElementState) -> Self {
         Self {
             type_specific: value.type_specific.map(Into::into),
-            enabled: None,
             vendor_specific_data: value.vendor_specific_data,
             started: Some(value.started),
             bypassed: value.bypassed,

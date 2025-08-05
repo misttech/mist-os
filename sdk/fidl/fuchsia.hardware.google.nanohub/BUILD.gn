@@ -5,6 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.google.nanohub") {
-  sources = [ "nanohub.fidl" ]
+  sources = [
+    "nanohub.fidl",
+    "nanohubdisplay.fidl",
+    "overview.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

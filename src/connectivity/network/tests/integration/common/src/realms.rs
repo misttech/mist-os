@@ -206,6 +206,7 @@ pub enum ManagerConfig {
     IfacePrefix,
     DuplicateNames,
     EnableSocketProxy,
+    EnableSocketProxyAllDelegated,
     PacketFilterEthernet,
     PacketFilterWlan,
     WithBlackhole,
@@ -221,6 +222,9 @@ impl ManagerConfig {
             ManagerConfig::IfacePrefix => "/pkg/netcfg/iface_prefix.json",
             ManagerConfig::DuplicateNames => "/pkg/netcfg/duplicate_names.json",
             ManagerConfig::EnableSocketProxy => "/pkg/netcfg/enable_socket_proxy.json",
+            ManagerConfig::EnableSocketProxyAllDelegated => {
+                "/pkg/netcfg/enable_socket_proxy_all_delegated.json"
+            }
             ManagerConfig::PacketFilterEthernet => "/pkg/netcfg/packet_filter_ethernet.json",
             ManagerConfig::PacketFilterWlan => "/pkg/netcfg/packet_filter_wlan.json",
             ManagerConfig::WithBlackhole => "/pkg/netcfg/with_blackhole.json",
@@ -390,6 +394,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     | ManagerConfig::IfacePrefix
                     | ManagerConfig::DuplicateNames
                     | ManagerConfig::EnableSocketProxy
+                    | ManagerConfig::EnableSocketProxyAllDelegated
                     | ManagerConfig::PacketFilterEthernet
                     | ManagerConfig::PacketFilterWlan
                     | ManagerConfig::WithBlackhole => false,

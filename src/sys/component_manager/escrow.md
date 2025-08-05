@@ -7,6 +7,9 @@ details. After we prove that we can stop three components, the full design will
 be socialized as an RFC where the syntax and security implications etc. will be
 refined.
 
+> **Note:** Protocols need to be marked as `@discoverable` to support escrowing.
+  This allows components to reconnect to channels after waking from idle.
+
 ## Escrowing stateless protocols
 
 Some FIDL connections don't carry state. Every request functions identically

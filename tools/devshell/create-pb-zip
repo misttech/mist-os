@@ -7,9 +7,10 @@
 ### Create pb.zip suitable for flashing based on product_bundles.json file.
 ## The created zip file will default to ${pwd}/pb.zip
 
-## usage: fx create-pb-zip [-b <product_bundle>] [-o <output>]
+## usage: fx create-pb-zip [-b <product_bundle>] [-o <output>] [-c <compression_level>]
 ##   -o     Output location of built zip file
 ##   -b     Name of product bundle to zip
+##   -c     Compression level for zip. 0 for no compression -- this can be much faster.
 
 set -o errexit
 
@@ -21,6 +22,7 @@ main() {
     local product_name=""
     local product_bundle_path=""
     local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+    local compression_level=""
 
     while [[ $# -ge 1 ]]; do
         case "$1" in
@@ -36,6 +38,10 @@ main() {
                 fx-error "Invalid product bundle $product_name"
                 exit 1
             fi
+            ;;
+        -c)
+            shift
+            compression_level="$1"
             ;;
         esac
         shift
@@ -65,7 +71,12 @@ main() {
         echo "product_bundle.json" >> "$tmpfile_path"
         sed -i -e 's/^/product_bundle\//' "$tmpfile_path"
 
-        zip pb.zip -@ < "$tmpfile_path"
+        local compression_arg=""
+        if [[ -n "${compression_level}" ]]; then
+          compression_arg="-${compression_level}"
+        fi
+
+        zip ${compression_arg} pb.zip -@ < "$tmpfile_path"
         rm -rf "$tmpfile_path"
         if [[ $output != "$(pwd)/pb.zip" ]]; then
             mv -f pb.zip "${output}"

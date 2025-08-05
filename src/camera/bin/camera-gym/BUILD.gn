@@ -72,7 +72,6 @@ source_set("lib") {
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
     "//src/lib/ui/flatland-frame-scheduling:simple_present_hlcpp",
-    "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/utils:utils",
     "//third_party/googletest:gtest_prod",
     "//zircon/system/ulib/fzl",

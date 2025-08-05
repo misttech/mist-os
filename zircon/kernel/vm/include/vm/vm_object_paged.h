@@ -184,7 +184,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t ZeroRangeUntracked(uint64_t offset, uint64_t len) override {
     // We don't expect any committed pages to remain at the end of this call, so we should be
     // operating on whole pages.
-    if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(len)) {
+    if (!IS_PAGE_ROUNDED(offset) || !IS_PAGE_ROUNDED(len)) {
       return ZX_ERR_INVALID_ARGS;
     }
     return ZeroRangeInternal(offset, len, /*dirty_track=*/false);

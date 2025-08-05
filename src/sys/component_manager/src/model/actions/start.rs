@@ -79,7 +79,6 @@ impl Action for StartAction {
 
 struct StartContext {
     runner: Option<RemoteRunner>,
-    url: String,
     namespace_builder: NamespaceBuilder,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
@@ -219,7 +218,6 @@ async fn do_start(
     };
     let start_context = StartContext {
         runner,
-        url: resolved_component.resolved_url.clone(),
         namespace_builder,
         numbered_handles,
         encoded_config,
@@ -292,7 +290,6 @@ async fn start_component(
 
         let StartContext {
             runner,
-            url,
             namespace_builder,
             numbered_handles,
             encoded_config,
@@ -311,7 +308,7 @@ async fn start_component(
                 .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
 
             let start_info = StartInfo {
-                resolved_url: url,
+                url: component.component_url.clone().into(),
                 program: decl
                     .program
                     .as_ref()
@@ -638,14 +635,11 @@ mod tests {
         let (done, mut hook_done_receiver) = mpsc::channel(1);
         let start_hook =
             Arc::new(ShutdownOnStartHook { component: child.clone(), done: Mutex::new(done) });
-        child
-            .hooks
-            .install(vec![HooksRegistration::new(
-                "my_start_hook",
-                vec![EventType::Started],
-                Arc::downgrade(&start_hook) as Weak<dyn Hook>,
-            )])
-            .await;
+        child.hooks.install(vec![HooksRegistration::new(
+            "my_start_hook",
+            vec![EventType::Started],
+            Arc::downgrade(&start_hook) as Weak<dyn Hook>,
+        )]);
 
         ActionsManager::register(
             child.clone(),
@@ -702,14 +696,11 @@ mod tests {
         let (done, mut hook_done_receiver) = mpsc::channel(1);
         let start_hook =
             Arc::new(StopOnStartHook { component: child.clone(), done: Mutex::new(done) });
-        child
-            .hooks
-            .install(vec![HooksRegistration::new(
-                "my_start_hook",
-                vec![EventType::Started],
-                Arc::downgrade(&start_hook) as Weak<dyn Hook>,
-            )])
-            .await;
+        child.hooks.install(vec![HooksRegistration::new(
+            "my_start_hook",
+            vec![EventType::Started],
+            Arc::downgrade(&start_hook) as Weak<dyn Hook>,
+        )]);
 
         ActionsManager::register(
             child.clone(),
@@ -752,7 +743,7 @@ mod tests {
         );
         let stop_fut = ActionsManager::register(child.clone(), StopAction::new(false));
         let mut futs = vec![start_fut.boxed(), stop_fut.boxed()];
-        futs.shuffle(&mut rand::thread_rng());
+        futs.shuffle(&mut rand::rng());
         let stream: FuturesUnordered<_> = futs.into_iter().collect();
         let _: Vec<_> = stream.collect().await;
 
@@ -1004,7 +995,6 @@ mod tests {
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
         let decl = ComponentDeclBuilder::new().child_default(TEST_CHILD_NAME).build();
         let resolved_component = Component {
-            resolved_url: "".to_string(),
             context_to_resolve_children: None,
             decl,
             package: None,
@@ -1014,7 +1004,7 @@ mod tests {
         let ris = ResolvedInstanceState::new(
             &child,
             resolved_component.clone(),
-            ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
+            ComponentAddress::from_absolute_url(&child.component_url).unwrap().into(),
             Default::default(),
             ComponentInput::default(),
         )
@@ -1027,7 +1017,7 @@ mod tests {
             let ris = ResolvedInstanceState::new(
                 &child,
                 resolved_component,
-                ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
+                ComponentAddress::from_absolute_url(&child.component_url).unwrap().into(),
                 Default::default(),
                 ComponentInput::default(),
             )

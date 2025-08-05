@@ -204,9 +204,9 @@ int emu_get_used_resources(const char* path, uint64_t* out_data_size, uint64_t* 
 
 bool emu_is_mounted() { return fake_fs.fake_root != nullptr; }
 
-// Converts POSIX open() flags to |VnodeConnectionOptions|.
-fs::VnodeConnectionOptions fdio_flags_to_connection_options(uint32_t flags) {
-  fs::VnodeConnectionOptions options;
+// Converts POSIX open() flags to |DeprecatedOptions|.
+fs::DeprecatedOptions fdio_flags_to_connection_options(uint32_t flags) {
+  fs::DeprecatedOptions options;
 
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
@@ -255,8 +255,9 @@ int emu_open(const char* path, int flags) {
   for (int fd = 0; fd < kMaxFd; fd++) {
     if (fdtab[fd].vn == nullptr) {
       std::string_view str(path + PREFIX_SIZE);
-      fs::VnodeConnectionOptions options = fdio_flags_to_connection_options(flags);
-      auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, str, options, fuchsia_io::kRwStarDir);
+      fs::DeprecatedOptions options = fdio_flags_to_connection_options(flags);
+      auto result =
+          fake_fs.fake_vfs->DeprecatedOpen(fake_fs.fake_root, str, options, fuchsia_io::kRwStarDir);
       if (result.is_error()) {
         STATUS(result.error());
       }
@@ -472,9 +473,10 @@ int emu_mkdir(const char* path) {
 DIR* emu_opendir(const char* name) {
   ZX_DEBUG_ASSERT_MSG(!host_path(name), "'emu_' functions can only operate on target paths");
   std::string_view path(name + PREFIX_SIZE);
-  fs::VnodeConnectionOptions options{.flags = fuchsia_io::OpenFlags::kPosixWritable,
-                                     .rights = fuchsia_io::kRStarDir};
-  auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fuchsia_io::kRwStarDir);
+  fs::DeprecatedOptions options{.flags = fuchsia_io::OpenFlags::kPosixWritable,
+                                .rights = fuchsia_io::kRStarDir};
+  auto result =
+      fake_fs.fake_vfs->DeprecatedOpen(fake_fs.fake_root, path, options, fuchsia_io::kRwStarDir);
   if (result.is_error()) {
     return nullptr;
   }
@@ -486,15 +488,15 @@ DIR* emu_opendir(const char* name) {
 dirent* emu_readdir(DIR* dirp) {
   MinDir* dir = reinterpret_cast<MinDir*>(dirp);
   for (;;) {
-    if (dir->size >= sizeof(vdirent_t)) {
-      vdirent_t* vde = reinterpret_cast<vdirent_t*>(dir->ptr);
+    if (dir->size >= sizeof(fs::DirectoryEntry)) {
+      fs::DirectoryEntry* vde = reinterpret_cast<fs::DirectoryEntry*>(dir->ptr);
       dirent* ent = &dir->de;
-      size_t name_len = vde->size;
-      size_t entry_len = vde->size + sizeof(vdirent_t);
+      size_t name_len = vde->name_length;
+      size_t entry_len = vde->name_length + sizeof(fs::DirectoryEntry);
       ZX_DEBUG_ASSERT(dir->size >= entry_len);
       memcpy(ent->d_name, vde->name, name_len);
       ent->d_name[name_len] = '\0';
-      ent->d_type = vde->type;
+      ent->d_type = uint8_t{vde->type};
       dir->ptr += entry_len;
       dir->size -= entry_len;
       return ent;

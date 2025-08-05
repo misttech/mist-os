@@ -5,13 +5,14 @@ library fuchsia.developer.ffx;
 
 using fuchsia.tracing.controller;
 using fuchsia.tracing;
+using zx;
 
 /// The maximum length allowed for paths passed to tracing commands.
 ///
 /// We choose the value of 4096 here to match Linux's maximum path length.
 const MAX_PATH_LENGTH uint32 = 4096;
 
-/// This covers erorr from using the `Tracing` protocol below (specifically
+/// This covers errors from using the `Tracing` protocol (specifically
 /// trace recording errors).
 type RecordingError = strict enum {
     /// Error encountered when opening the proxy to the target.
@@ -65,13 +66,13 @@ type Trigger = table {
 /// Covers how a trace will be run when invoking `StartRecording`.
 type TraceOptions = table {
     /// Determines how long a trace recording will run before terminating in
-    /// fractional seconds. This is an "at-least" duration, with the actual
+    /// nanoseconds. This is an "at-least" duration, with the actual
     /// runtime terminating likely a few dozen milliseconds longer.
     ///
     /// If this is not set, a trace will run indefinitely and must be stopped
     /// using `StopRecording`. Or by cleanly shutting down the daemon via
     /// `ffx daemon stop` or by using the Deamon proxy itself.
-    1: duration float64;
+    1: duration_ns zx.Duration;
 
     /// The triggers to run against this trace.
     2: triggers vector<Trigger>:MAX;

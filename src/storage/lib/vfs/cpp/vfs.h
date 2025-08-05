@@ -49,8 +49,8 @@ struct VdirCookie {
 // The Vfs object must outlive the Vnodes which it serves. This class is thread-safe.
 class Vfs {
  public:
+  class DeprecatedOpenResult;
   class OpenResult;
-  class Open2Result;
 
   Vfs();
   virtual ~Vfs() = default;
@@ -58,15 +58,17 @@ class Vfs {
   // Traverse the path to the target vnode, and create / open it using the underlying filesystem
   // functions (lookup, create, open).
   //
-  // The return value will suggest the next action to take. Refer to the variants in |OpenResult|
-  // for more information.
-  OpenResult Open(fbl::RefPtr<Vnode> vn, std::string_view path, VnodeConnectionOptions options,
-                  fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
+  // The return value will suggest the next action to take. Refer to the variants in
+  // |DeprecatedOpenResult| for more information.
+  DeprecatedOpenResult DeprecatedOpen(fbl::RefPtr<Vnode> vn, std::string_view path,
+                                      DeprecatedOptions options,
+                                      fuchsia_io::Rights connection_rights)
+      __TA_EXCLUDES(vfs_lock_);
 
   // Traverse the path to the target node, and create or open it.
-  zx::result<Open2Result> Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                fuchsia_io::Flags flags, const fuchsia_io::wire::Options* options,
-                                fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
+  zx::result<OpenResult> Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                              fuchsia_io::Flags flags, const fuchsia_io::wire::Options* options,
+                              fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
 
   // Implements Unlink for a pre-validated and trimmed name.
   virtual zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir)
@@ -118,7 +120,7 @@ class Vfs {
   bool readonly_ = false;
 };
 
-class Vfs::OpenResult {
+class Vfs::DeprecatedOpenResult {
  public:
   // When this variant is active, the indicated error occurred.
   using Error = zx_status_t;
@@ -138,16 +140,16 @@ class Vfs::OpenResult {
   // posix-flag rights expansion.
   struct Ok {
     fbl::RefPtr<Vnode> vnode;
-    VnodeConnectionOptions options;
+    DeprecatedOptions options;
   };
 
-  // Forwards the constructor arguments into the underlying |std::variant|. This allows |OpenResult|
-  // to be constructed directly from one of the variants, e.g.
+  // Forwards the constructor arguments into the underlying |std::variant|. This allows
+  // |DeprecatedOpenResult| to be constructed directly from one of the variants, e.g.
   //
-  //     OpenResult r = OpenResult::Error{ZX_ERR_ACCESS_DENIED};
+  //     DeprecatedOpenResult r = DeprecatedOpenResult::Error{ZX_ERR_ACCESS_DENIED};
   //
   template <typename T>
-  OpenResult(T&& v) : variants_(std::forward<T>(v)) {}
+  DeprecatedOpenResult(T&& v) : variants_(std::forward<T>(v)) {}
 
   // Applies the |visitor| function to the variant payload. It simply forwards the visitor into the
   // underlying |std::variant|. Returns the return value of |visitor|. Refer to C++ documentation
@@ -173,48 +175,48 @@ class Vfs::OpenResult {
 };
 
 // Holds a (possibly opened) Vnode, ensuring that the open count is managed correctly.
-class Vfs::Open2Result {
+class Vfs::OpenResult {
  public:
   // Cannot allow copy as this will result in the open count being incorrect.
-  Open2Result(const Open2Result&) = delete;
-  Open2Result& operator=(const Open2Result&) = delete;
-  Open2Result(Open2Result&&) = default;
-  Open2Result& operator=(Open2Result&&) = default;
+  OpenResult(const OpenResult&) = delete;
+  OpenResult& operator=(const OpenResult&) = delete;
+  OpenResult(OpenResult&&) = default;
+  OpenResult& operator=(OpenResult&&) = default;
 
   // Handles opening |vnode| if required based on the specified |protocol|. The |vnode| will be
   // closed when this object is destroyed, if required, unless |TakeVnode()| is called.
-  static zx::result<Open2Result> OpenVnode(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
+  static zx::result<OpenResult> OpenVnode(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
     // We don't open the node for node reference connections.
     if (protocol == VnodeProtocol::kNode) {
-      return Open2Result::Local(std::move(vnode), protocol);
+      return OpenResult::Local(std::move(vnode), protocol);
     }
     if (zx_status_t status = fs::OpenVnode(&vnode); status != ZX_OK) {
       return zx::error(status);
     }
     if (vnode->IsRemote()) {
       // Opening the node redirected us to a remote, forward the request to it.
-      return Open2Result::Remote(std::move(vnode), ".");
+      return OpenResult::Remote(std::move(vnode), ".");
     }
-    return Open2Result::Local(std::move(vnode), protocol);
+    return OpenResult::Local(std::move(vnode), protocol);
   }
 
-  // Creates a new |Open2Result| from a remote |vnode|. This object keeps an unowned copy of |path|,
+  // Creates a new |OpenResult| from a remote |vnode|. This object keeps an unowned copy of |path|,
   // so the underlying string must outlive this object.
-  static zx::result<Open2Result> Remote(fbl::RefPtr<fs::Vnode> vnode, std::string_view path) {
+  static zx::result<OpenResult> Remote(fbl::RefPtr<fs::Vnode> vnode, std::string_view path) {
     ZX_DEBUG_ASSERT(vnode->IsRemote());
-    return zx::ok(Open2Result(std::move(vnode), path));
+    return zx::ok(OpenResult(std::move(vnode), path));
   }
 
-  // Creates a new |Open2Result| from a local node. |vnode| is assumed to already have been opened,
+  // Creates a new |OpenResult| from a local node. |vnode| is assumed to already have been opened,
   // and unless |TakeVnode()| is called, will be closed when this object is destroyed.
-  static zx::result<Open2Result> Local(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
+  static zx::result<OpenResult> Local(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
     ZX_DEBUG_ASSERT(!vnode->IsRemote());
-    return zx::ok(Open2Result(std::move(vnode), protocol));
+    return zx::ok(OpenResult(std::move(vnode), protocol));
   }
 
   // Ensure we roll back the vnode open count when required. There are only two cases where we do
   // not open a vnode: 1) remote nodes, and 2) node-reference connections
-  ~Open2Result() {
+  ~OpenResult() {
     if (vnode_ && !vnode_->IsRemote() && protocol_ && *protocol_ != VnodeProtocol::kNode) {
       vnode_->Close();
     }
@@ -235,10 +237,10 @@ class Vfs::Open2Result {
   std::string_view path() const { return path_; }
 
  private:
-  Open2Result() = delete;
-  Open2Result(fbl::RefPtr<fs::Vnode> vnode, fs::VnodeProtocol protocol)
+  OpenResult() = delete;
+  OpenResult(fbl::RefPtr<fs::Vnode> vnode, fs::VnodeProtocol protocol)
       : vnode_(std::move(vnode)), protocol_(protocol) {}
-  Open2Result(fbl::RefPtr<fs::Vnode> vnode, std::string_view path)
+  OpenResult(fbl::RefPtr<fs::Vnode> vnode, std::string_view path)
       : vnode_(std::move(vnode)), path_(path) {}
 
   fbl::RefPtr<fs::Vnode> vnode_;

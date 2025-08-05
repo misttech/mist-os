@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
+#include <lib/thread-stack/abi.h>
 #include <stdio.h>
 #include <string.h>
 #include <trace.h>
@@ -18,6 +19,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/utility.h>
+#include <phys/zircon-abi-spec.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
@@ -29,63 +31,59 @@
 
 namespace {
 
-struct StackType {
+struct Stack : public ZirconAbiSpec::Stack {
+  enum class Growth : bool {
+    kUp,
+    kDown,
+  };
+
+  constexpr Stack(const char* name, ZirconAbiSpec::Stack stack, Growth growth)
+      : ZirconAbiSpec::Stack(stack), name(name), growth(growth) {}
+
   const char* name;
-  size_t size;
-  enum class Grow : bool {
-    Up,
-    Down,
-  } dir;
+  Growth growth;
 };
 
 KCOUNTER(vm_kernel_stack_bytes, "vm.kstack.allocated_bytes")
 
-constexpr size_t SafeStackSize() {
-  // If there is no unsafe stack on x86, double the size of the main stack for consistency.
-#if defined(__x86_64__) && !__has_feature(safe_stack)
-  return DEFAULT_STACK_SIZE * 2;
-#else
-  return DEFAULT_STACK_SIZE;
-#endif
-}
-
-constexpr StackType kSafe = {"kernel-safe-stack", SafeStackSize(), StackType::Grow::Down};
+constexpr Stack kSafe = {"kernel-safe-stack", kMachineStack, Stack::Growth::kDown};
 #if __has_feature(safe_stack)
-constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
+constexpr Stack kUnsafe = {"kernel-unsafe-stack", kUnsafeStack, Stack::Growth::kDown};
 #endif
 #if __has_feature(shadow_call_stack)
-constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE, StackType::Grow::Up};
+constexpr Stack kShadowCall = {"kernel-shadow-call-stack", kShadowCallStack, Stack::Growth::kUp};
 #endif
-
-constexpr size_t kStackPaddingSize = PAGE_SIZE;
 
 // Choose a pattern for the stack canary that hopefully doesn't collide with other patterns that
 // might get used on the stack. Explicitly avoid 0xAA, for example, as it is used for filling
 // uninitialized stack variables.
 constexpr unsigned char kStackCanary = 0xBB;
 
-size_t stack_canary_offset(const StackType& type) {
-  const size_t off = type.size / 100 * ktl::min(100ul, gBootOptions->stack_canary_percent_free);
-  return type.dir == StackType::Grow::Down ? off : type.size - off - 1;
+size_t stack_canary_offset(const Stack& stack) {
+  const size_t off =
+      stack.size_bytes / 100 * ktl::min(100ul, gBootOptions->stack_canary_percent_free);
+  return stack.growth == Stack::Growth::kDown ? off : stack.size_bytes - off - 1;
 }
 
-void stack_canary_write(const StackType& type, void* base) {
+void stack_canary_write(const Stack& type, void* base) {
   static_cast<unsigned char*>(base)[stack_canary_offset(type)] = kStackCanary;
 }
 
-void stack_canary_check(const StackType& type, void* base) {
-  const size_t off = stack_canary_offset(type);
+void stack_canary_check(const Stack& stack, void* base) {
+  const size_t off = stack_canary_offset(stack);
   if (static_cast<unsigned char*>(base)[off] != kStackCanary) {
-    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %zu was corrupted.\n", off,
-                type.name, base, type.size);
+    // TODO(https://fxbug.dev/431001857): Upgrade this to an OOPS once we have either fixed root
+    // cause or have more diagnostic data to log.
+    printf("Canary at offset %zu in stack %s as base %p of size %#x was corrupted.\n", off,
+           stack.name, base, stack.size_bytes);
   }
 }
 
 // Takes a portion of the VMO and maps a kernel stack with one page of padding before and after the
 // mapping.
-zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t* offset,
+zx_status_t map(const Stack& stack, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t* offset,
                 KernelStack::Mapping* map) {
-  LTRACEF("allocating %s\n", type.name);
+  LTRACEF("allocating %s\n", stack.name);
 
   // assert that this mapping hasn't already be created
   DEBUG_ASSERT(!map->vmar_);
@@ -97,8 +95,8 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   // create a vmar with enough padding for a page before and after the stack
   fbl::RefPtr<VmAddressRegion> kstack_vmar;
   zx_status_t status = vmar->CreateSubVmar(
-      0, 2 * kStackPaddingSize + type.size, 0,
-      VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, type.name,
+      0, stack.lower_guard_size_bytes + stack.size_bytes + stack.upper_guard_size_bytes, 0,
+      VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, stack.name,
       &kstack_vmar);
   if (status != ZX_OK) {
     return status;
@@ -108,27 +106,27 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   // this will also clean up any mappings that may get placed on the vmar
   auto vmar_cleanup = fit::defer([&kstack_vmar]() { kstack_vmar->Destroy(); });
 
-  LTRACEF("%s vmar at %#" PRIxPTR "\n", type.name, kstack_vmar->base());
+  LTRACEF("%s vmar at %#" PRIxPTR "\n", stack.name, kstack_vmar->base());
 
-  // create a mapping offset kStackPaddingSize into the vmar we created
+  // create a mapping offset kStackGuardRegionSize into the vmar we created
   zx::result<VmAddressRegion::MapResult> mapping_result = kstack_vmar->CreateVmMapping(
-      kStackPaddingSize, type.size, 0, VMAR_FLAG_SPECIFIC, vmo, *offset,
-      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, type.name);
+      stack.lower_guard_size_bytes, stack.size_bytes, 0, VMAR_FLAG_SPECIFIC, vmo, *offset,
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, stack.name);
   if (mapping_result.is_error()) {
     return mapping_result.status_value();
   }
 
-  LTRACEF("%s mapping at %#" PRIxPTR "\n", type.name, mapping_result->base);
+  LTRACEF("%s mapping at %#" PRIxPTR "\n", stack.name, mapping_result->base);
 
   // fault in all the pages so we dont demand fault in the stack
-  status = mapping_result->mapping->MapRange(0, type.size, true);
+  status = mapping_result->mapping->MapRange(0, stack.size_bytes, true);
   if (status != ZX_OK) {
     return status;
   }
 
-  stack_canary_write(type, reinterpret_cast<void*>(mapping_result->base));
+  stack_canary_write(stack, reinterpret_cast<void*>(mapping_result->base));
 
-  vm_kernel_stack_bytes.Add(type.size);
+  vm_kernel_stack_bytes.Add(stack.size_bytes);
 
   // Cancel the cleanup handler on the vmar since we're about to save a
   // reference to it.
@@ -138,12 +136,12 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   map->vmar_ = ktl::move(kstack_vmar);
 
   // Increase the offset to claim this portion of the VMO.
-  *offset += type.size;
+  *offset += stack.size_bytes;
 
   return ZX_OK;
 }
 
-zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
+zx_status_t unmap(const Stack& type, KernelStack::Mapping& map) {
   if (!map.vmar_) {
     return ZX_OK;
   }
@@ -156,7 +154,7 @@ zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
     return status;
   }
   map.vmar_.reset();
-  vm_kernel_stack_bytes.Add(-static_cast<int64_t>(type.size));
+  vm_kernel_stack_bytes.Add(-static_cast<int64_t>(type.size_bytes));
   return ZX_OK;
 }
 
@@ -164,23 +162,23 @@ zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
 
 vaddr_t KernelStack::Mapping::base() const {
   // The actual stack mapping starts after the padding.
-  return vmar_ ? vmar_->base() + kStackPaddingSize : 0;
+  return vmar_ ? vmar_->base() + internal::kStackGuardRegionSize : 0;
 }
 
 size_t KernelStack::Mapping::size() const {
   // Remove the padding from the vmar to get the actual stack size.
-  return vmar_ ? vmar_->size() - kStackPaddingSize * 2 : 0;
+  return vmar_ ? vmar_->size() - internal::kStackGuardRegionSize * 2 : 0;
 }
 
 zx_status_t KernelStack::Init() {
   // Determine the total VMO size we needed for all stacks.
-  size_t vmo_size = kSafe.size;
+  size_t vmo_size = kSafe.size_bytes;
 #if __has_feature(safe_stack)
-  vmo_size += kUnsafe.size;
+  vmo_size += kUnsafe.size_bytes;
 #endif
 
 #if __has_feature(shadow_call_stack)
-  vmo_size += kShadowCall.size;
+  vmo_size += kShadowCall.size_bytes;
 #endif
 
   // Create a VMO for our stacks. Although multiple stacks will be allocated from adjacent blocks of

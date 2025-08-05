@@ -442,9 +442,9 @@ mod handle_mlme_request_tests {
                 beacon_period: 101,
                 capability_info: 102,
                 ies: vec![103u8, 104, 105],
-                channel: fidl_common::WlanChannel {
+                channel: fidl_ieee80211::WlanChannel {
                     primary: 106,
-                    cbw: fidl_common::ChannelBandwidth::Cbw40,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                     secondary80: 0,
                 },
                 rssi_dbm: 107,
@@ -486,9 +486,9 @@ mod handle_mlme_request_tests {
             assert_eq!(selected_bss.ies, vec![103u8, 104, 105]);
             assert_eq!(
                 selected_bss.channel,
-                fidl_common::WlanChannel {
+                fidl_ieee80211::WlanChannel {
                     primary: 106,
-                    cbw: fidl_common::ChannelBandwidth::Cbw40,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                     secondary80: 0,
                 }
             );
@@ -634,7 +634,7 @@ mod handle_mlme_request_tests {
             mesh_id: vec![13],
             rsne: Some(vec![14; RSNE_LEN]),
             phy: fidl_common::WlanPhyType::Vht,
-            channel_bandwidth: fidl_common::ChannelBandwidth::Cbw80,
+            channel_bandwidth: fidl_ieee80211::ChannelBandwidth::Cbw80,
         });
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
@@ -1081,9 +1081,9 @@ mod handle_driver_event_tests {
             beacon_period: 1,
             capability_info: 2,
             ies: vec![3, 4, 5],
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 6,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             rssi_dbm: 7,

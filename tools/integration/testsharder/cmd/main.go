@@ -205,7 +205,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		for ei, env := range testSpecs[ti].Envs {
 			dt := env.Dimensions.DeviceType()
 			// Only applies to host and emulator tests.
-			if dt == "" || strings.HasSuffix(dt, "EMU") {
+			if dt == "" || env.TargetsEmulator() {
 				if _, ok := env.Dimensions["cpu"]; !ok {
 					testSpecs[ti].Envs[ei].Dimensions["cpu"] = defaultCPU
 				}
@@ -394,7 +394,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if pbPath == "" {
 			return fmt.Errorf("product bundle %s is not included in the product_bundles.json manifest", s.ProductBundle)
 		}
-		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), params.Pave, pbPath, ffxPath); err != nil {
+		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, pbPath, ffxPath); err != nil {
 			return err
 		}
 	}

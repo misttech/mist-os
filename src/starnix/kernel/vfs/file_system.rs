@@ -135,7 +135,7 @@ pub enum CacheMode {
 impl FileSystem {
     /// Create a new filesystem.
     pub fn new<L>(
-        _locked: &mut Locked<L>,
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
@@ -156,7 +156,7 @@ impl FileSystem {
             root: OnceLock::new(),
             ops: Box::new(ops),
             options,
-            dev_id: kernel.device_registry.next_anonymous_dev_id(),
+            dev_id: kernel.device_registry.next_anonymous_dev_id(locked),
             rename_mutex: Mutex::new(()),
             node_cache,
             dcache: match cache_mode {
@@ -178,7 +178,8 @@ impl FileSystem {
     }
 
     fn set_root(self: &FileSystemHandle, root: FsNodeHandle) {
-        let root_dir = DirEntry::new(root, None, FsString::default());
+        // No need to cache the root directory, it is owned by the filesystem.
+        let root_dir = DirEntry::new_uncached(root, None, FsString::default());
         assert!(
             self.root.set(root_dir).is_ok(),
             "FileSystem::set_root can't be called more than once"

@@ -83,7 +83,6 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
 
       case ZBI_TYPE_NVRAM: {
         ZX_ASSERT(payload.size() >= sizeof(zbi_nvram_t));
-        handoff_->nvram = *reinterpret_cast<const zbi_nvram_t*>(payload.data());
         SaveForMexec(*header, payload);
         break;
       }

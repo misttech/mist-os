@@ -10,17 +10,13 @@ lock_ordering! {
     Unlocked => UninterruptibleLock,
     // Artificial level for ResourceAccessor.add_file_with_flags(..)
     Unlocked => ResourceAccessorLevel,
-    // Artificial level for DeviceOps.open(..)
-    ResourceAccessorLevel => DeviceOpen,
-    // Artificial level for several FileOps and FsNodeOps method forming a connected group
-    // because of dependencies between them: FileOps.read, FsNode.create_file_ops, ...
-    DeviceOpen => FileOpsCore,
     // Artificial level for methods in FsNodeOps/FileOps that require access to the
     // FsNode.append_lock
     Unlocked => BeforeFsNodeAppend,
-    // FsNode.append_lock
     BeforeFsNodeAppend => FsNodeAppend,
+    // Artificial level for file operations.
     FsNodeAppend => FileOpsCore,
+    ResourceAccessorLevel => FileOpsCore,
     // FileOpsCore are interruptible
     FileOpsCore => UninterruptibleLock,
     // Artificial lock level for {Task, CurrentTask}.release()
@@ -58,4 +54,12 @@ lock_ordering! {
     UninterruptibleLock => MemoryXattrStorageLevel,
     // Bpf Map State objects
     UninterruptibleLock => BpfMapStateLevel,
+    // DeviceRegistty
+    UninterruptibleLock => DeviceRegistryState,
+    FileOpsCore => DeviceRegistryState,
+
+    // Terminal Level. No lock level should ever be defined after this. Can be used for any locks
+    // that is never acquired before any other lock.
+    UninterruptibleLock => TerminalLock,
+    FileOpsCore => TerminalLock,
 }

@@ -5,6 +5,7 @@
 #ifndef LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
 #define LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
 
+#include <lib/elfldltl/resolve.h>
 #include <lib/fit/result.h>
 
 #include <gtest/gtest.h>
@@ -61,7 +62,20 @@ class DlTestsBase : public ::testing::Test {
 
   // Whether the test fixture will resolve to the first symbol it finds, even if
   // the symbol is marked weak.
-  static constexpr bool kStrictLinkOrderResolution = true;
+  static constexpr elfldltl::ResolverPolicy kResolverPolicy =
+      elfldltl::ResolverPolicy::kStrictLinkOrder;
+
+  // Whether the test fixture implementation emits the unsupported flag value
+  // in its error message.
+  static constexpr bool kEmitsDlInfoUnsupportedValue = false;
+
+  // Whether the test fixture supports RTLD_DI_* extension flags. Older glibc
+  // versions don't support these options.
+  static constexpr bool kSupportsDlInfoExtensionFlags = true;
+
+  // Whether the test fixture's dlclose will run destructors out of order. Older
+  // glibc versions resort the order that destructors are run.
+  static constexpr bool kDestructorsRunOutOfOrder = false;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);

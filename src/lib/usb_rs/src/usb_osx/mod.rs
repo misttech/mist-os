@@ -8,9 +8,10 @@ use crate::{
 };
 use fuchsia_async::{MonotonicDuration, TimeoutExt};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::executor::block_on;
 use futures::future::poll_fn;
 use futures::task::AtomicWaker;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -35,7 +36,7 @@ pub struct DeviceHandleInner {
 
 impl DeviceHandleInner {
     pub fn debug_name(&self) -> String {
-        format!("{:?}", self.0)
+        format!("{:?}", self.service)
     }
 
     pub fn scan_interfaces(
@@ -43,9 +44,8 @@ impl DeviceHandleInner {
         _urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
-        let dev: DeviceInterface500 =
-            PlugInInterface::new(self.service.clone(), GetIOUSBDeviceUserClientTypeID())?
-                .query_interface()?;
+        let dev = PlugInInterface::new(self.service.clone(), GetIOUSBDeviceUserClientTypeID())?
+            .query_interface::<Result<DeviceInterface500>>()??;
         let device_descriptor = dev.descriptor();
 
         for iface in dev.iter_interfaces()? {
@@ -58,10 +58,10 @@ impl DeviceHandleInner {
             };
 
             if f(&device_descriptor, &interface_descriptor) {
-                iface.register_with_event_loop(&self.1)?;
+                iface.register_with_event_loop(&self.run_loop)?;
                 return Ok(Interface {
                     inner: Arc::new(iface),
-                    _run_loop: Arc::clone(&self.1),
+                    _run_loop: Arc::clone(&self.run_loop),
                     endpoint_descriptors: interface_descriptor.endpoints,
                 });
             }
@@ -107,9 +107,16 @@ fn handle_event(
 
     for device in iter {
         let service = IOService::from_raw(device);
-        let dev: DeviceInterface500 =
-            PlugInInterface::new(service.clone(), GetIOUSBDeviceUserClientTypeID())?
-                .query_interface()?;
+        let Ok(iface) = PlugInInterface::new(service.clone(), GetIOUSBDeviceUserClientTypeID())
+        else {
+            return;
+        };
+        let Ok(dev_res) = iface.query_interface::<Result<DeviceInterface500>>() else {
+            return;
+        };
+        let Ok(dev) = dev_res else {
+            return;
+        };
         let serial = dev.serial_number();
 
         let _ = data.event_sender.unbounded_send(f(DeviceHandleInner {
@@ -133,20 +140,20 @@ extern "C" fn removed(refcon: *mut ::std::os::raw::c_void, iterator: iokit_usb::
 pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
     let mut res: Vec<DeviceHandle> = vec![];
     block_on(async {
-        let stream = wait_for_devices(true, false)?;
+        let Ok(mut stream) = wait_for_devices(true, false) else {
+            return;
+        };
         loop {
-            match stream.next().on_timeout(MonotonicDuration::from_secs(1), || {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Timed out reading from bulk interface",
-                ))
-            }) {
-                Ok(Some(dh)) => res.push(dh),
-                Ok(None) => break,
-                Err(_) => break,
+            match stream.next().on_timeout(MonotonicDuration::from_secs(1), || None).await {
+                Some(Ok(de)) => match de {
+                    DeviceEvent::Added(dh) => res.push(dh),
+                    _ => {}
+                },
+                Some(Err(_)) => break,
+                None => break,
             }
         }
-    })?;
+    });
     Ok(res)
 }
 

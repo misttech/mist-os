@@ -146,6 +146,10 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     lazy.record_string("should not", "appear in hierarchy").await.unwrap();
     lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
 
+    let lazy = writer.record_lazy_values("lazy-node-always-hangs-2").await?.into_proxy();
+    lazy.record_string("should not", "appear in hierarchy").await.unwrap();
+    lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
+
     writer.record_int("int", 3).await?;
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
@@ -158,9 +162,13 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
         .expect("got inspect data");
 
     assert_eq!(data.len(), 1);
-    assert_eq!(data[0].metadata.errors.as_ref().unwrap().len(), 1);
+    assert_eq!(data[0].metadata.errors.as_ref().unwrap().len(), 2);
     assert_eq!(
         data[0].metadata.errors.as_ref().unwrap()[0],
+        InspectError { message: "Lazy value root could not be loaded: Timeout".to_string() }
+    );
+    assert_eq!(
+        data[0].metadata.errors.as_ref().unwrap()[1],
         InspectError { message: "Lazy value root could not be loaded: Timeout".to_string() }
     );
     assert_json_diff!(data[0].payload.as_ref().unwrap(), root: {

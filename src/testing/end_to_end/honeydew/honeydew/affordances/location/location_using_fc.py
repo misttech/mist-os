@@ -64,10 +64,6 @@ class LocationUsingFc(location.Location):
     def verify_supported(self) -> None:
         """Check if location is supported on the DUT.
 
-        Args:
-            device: Device name returned by `ffx target list`.
-            ffx: FFX transport
-
         Raises:
             NotSupportedError: Location affordance is not supported by Fuchsia device.
         """

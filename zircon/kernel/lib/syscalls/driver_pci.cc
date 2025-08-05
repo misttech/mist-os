@@ -241,13 +241,13 @@ zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t
       continue;
     }
 
-    enum interrupt_trigger_mode tm = IRQ_TRIGGER_MODE_EDGE;
+    interrupt_trigger_mode tm = interrupt_trigger_mode::EDGE;
     if (arg->irqs[i].level_triggered) {
-      tm = IRQ_TRIGGER_MODE_LEVEL;
+      tm = interrupt_trigger_mode::LEVEL;
     }
-    enum interrupt_polarity pol = IRQ_POLARITY_ACTIVE_LOW;
+    enum interrupt_polarity pol = interrupt_polarity::LOW;
     if (arg->irqs[i].active_high) {
-      pol = IRQ_POLARITY_ACTIVE_HIGH;
+      pol = interrupt_polarity::HIGH;
     }
 
     zx_status_t configure_status = configure_interrupt(irq, tm, pol);

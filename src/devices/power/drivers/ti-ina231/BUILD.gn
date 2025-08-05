@@ -17,7 +17,7 @@ group("common") {
     "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

@@ -146,7 +146,6 @@ impl Features {
                         mlock_always_onfault,
                         mlock_pin_flavor,
                         netstack_mark,
-                        rtnetlink_assume_ifb0_existence,
                     },
                 selinux,
                 ashmem,
@@ -250,10 +249,6 @@ impl Features {
                     inspect_node
                         .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
                     inspect_node.record_bool("netstack_mark", *netstack_mark);
-                    inspect_node.record_bool(
-                        "rtnetlink_assume_ifb0_existence",
-                        *rtnetlink_assume_ifb0_existence,
-                    );
                 });
             }
         });
@@ -350,9 +345,6 @@ pub fn parse_features(
                 return Err(anyhow!("Perfetto Producer feature must contain a socket path"));
             }
             (Feature::RootfsRw, _) => features.rootfs_rw = true,
-            (Feature::RtnetlinkAssumeIfb0Existence, _) => {
-                features.kernel.rtnetlink_assume_ifb0_existence = true;
-            }
             (Feature::SelfProfile, _) => features.self_profile = true,
             (Feature::Selinux, arg) => {
                 features.selinux = SELinuxFeature {
@@ -465,17 +457,17 @@ pub fn run_container_features(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_TOUCH_DEVICE_ID,
-        );
+        )?;
         keyboard_device.clone().register(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_KEYBOARD_DEVICE_ID,
-        );
+        )?;
         mouse_device.clone().register(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_MOUSE_DEVICE_ID,
-        );
+        )?;
 
         let input_events_relay = InputEventsRelay::new();
         input_events_relay.start_relays(
@@ -489,12 +481,12 @@ pub fn run_container_features(
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
             mouse_device.open_files.clone(),
-            Some(touch_device.inspect_status.clone()),
-            Some(keyboard_device.inspect_status.clone()),
-            Some(mouse_device.inspect_status.clone()),
+            Some(touch_device.inspect_status),
+            Some(keyboard_device.inspect_status),
+            Some(mouse_device.inspect_status),
         );
 
-        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
+        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay)?;
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();
@@ -562,7 +554,7 @@ pub fn run_container_features(
         thermal_device_init(locked, kernel, devices.clone());
     }
     if features.hvdcp_opti {
-        hvdcp_opti_init(locked, system_task);
+        hvdcp_opti_init(locked, system_task)?;
     }
     if features.fastrpc {
         fastrpc_device_init(locked, system_task);

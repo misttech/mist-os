@@ -35,6 +35,7 @@ group("hermetic_tests") {
     "diagnostics:tests",
     "dictionaries:tests",
     "dictionaries_route_to_all:tests",
+    "directory_routing:tests",
     "dynamic_offers:tests",
     "elf_runner:tests",
     "events:events_integration_test",

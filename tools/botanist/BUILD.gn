@@ -65,7 +65,6 @@ go_library("targets") {
     "//third_party/golibs:github.com/kr/pretty",
     "//third_party/golibs:golang.org/x/crypto",
     "//third_party/golibs:golang.org/x/sync",
-    "//tools/bootserver:bootserver_lib",
     "//tools/lib/ffxutil",
     "//tools/lib/iomisc",
     "//tools/lib/logger",

@@ -197,7 +197,7 @@ bool TestRemoveByKey() {
   ASSERT_EQ(ZX_OK, dispatcher->AddObserver(&observer, handle1.get(), ZX_USER_SIGNAL_0));
 
   // Cancel the wrong handle / port / key.
-  int different_port;
+  int different_port = 0;
   ASSERT_FALSE(dispatcher->CancelByKey(handle2.get(), &dummy_port, dummy_key));
   ASSERT_FALSE(dispatcher->CancelByKey(handle1.get(), &different_port, dummy_key));
   ASSERT_FALSE(dispatcher->CancelByKey(handle1.get(), &dummy_port, 0x321));

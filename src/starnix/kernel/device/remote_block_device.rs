@@ -9,9 +9,11 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
+use crate::vfs::{
+    default_ioctl, default_seek, FileObject, FileOps, FsString, NamespaceNode, SeekTarget,
+};
 use anyhow::Error;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -45,7 +47,7 @@ impl RemoteBlockDevice {
         minor: u32,
         name: &str,
         backing_memory: MemoryObject,
-    ) -> Arc<Self>
+    ) -> Result<Arc<Self>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -72,8 +74,8 @@ impl RemoteBlockDevice {
             ),
             virtual_block_class,
             |device, dir| build_block_device_directory(device, device_weak, dir),
-        );
-        device
+        )?;
+        Ok(device)
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
@@ -208,20 +210,21 @@ impl FileOps for RemoteBlockDeviceFile {
 }
 
 fn open_remote_block_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task.kernel().remote_block_device_registry.open(id.minor())?.create_file_ops())
 }
 
-pub fn remote_block_device_init(_locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
+pub fn remote_block_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     current_task
         .kernel()
         .device_registry
         .register_major(
+            locked,
             "remote-block".into(),
             DeviceMode::Block,
             REMOTE_BLOCK_MAJOR,
@@ -266,7 +269,7 @@ impl RemoteBlockDeviceRegistry {
         let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?)
             .with_zx_name(b"starnix:remote_block_device");
         let minor = self.next_minor.fetch_add(1, Ordering::Relaxed);
-        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory);
+        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory)?;
         if let Some(callback) = self.device_added_fn.get() {
             callback(name, minor, &device);
         }

@@ -83,7 +83,12 @@ pub struct PlatformUiConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub display_mode: DisplayModeConfig,
 
+    /// Enables a frame counter overlay in Scenic.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub scenic_frame_counter_overlay: bool,
+
     /// Set visual_debugging_level to enable visual debugging features.
+    /// See "Config for Fuchsia Visual Debugging": go/config-fuchsia-visual-debugging
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub visual_debugging_level: VisualDebuggingLevel,
 
@@ -108,6 +113,7 @@ impl Default for PlatformUiConfig {
             with_synthetic_device_support: Default::default(),
             renderer: Default::default(),
             display_mode: Default::default(),
+            scenic_frame_counter_overlay: Default::default(),
             visual_debugging_level: Default::default(),
             attach_a11y_view: true,
         }

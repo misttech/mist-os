@@ -6,9 +6,10 @@
 
 use anyhow::{Context, Result};
 use fidl_fuchsia_io as fio;
+use rand::distr::{Distribution, StandardUniform};
 use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
-use rand::{distributions, Rng, SeedableRng};
+use rand::seq::IndexedMutRandom;
+use rand::{Rng, SeedableRng};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // Arbitrary maximum file size just to put a cap on it.
@@ -53,10 +54,10 @@ impl std::fmt::Display for File {
     }
 }
 
-impl distributions::Distribution<File> for distributions::Standard {
+impl Distribution<File> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> File {
         static NAME: AtomicU64 = AtomicU64::new(0);
-        let size = rng.gen_range(1..BLACKOUT_MAX_FILE_SIZE);
+        let size = rng.random_range(1..BLACKOUT_MAX_FILE_SIZE);
         let mut contents = vec![0; size];
         rng.fill(contents.as_mut_slice());
         let name = NAME.fetch_add(1, Ordering::Relaxed);
@@ -116,7 +117,7 @@ pub async fn generate_load<S: OpSampler>(
     let mut rng = StdRng::seed_from_u64(seed);
 
     // Make a set of 16 possible files to mess with.
-    let mut files: Vec<File> = (&mut rng).sample_iter(distributions::Standard).take(16).collect();
+    let mut files: Vec<File> = (&mut rng).sample_iter(StandardUniform).take(16).collect();
     log::debug!("xx: creating initial files");
     for file in &mut files {
         log::debug!("    creating {}", file);
@@ -165,8 +166,8 @@ pub async fn generate_load<S: OpSampler>(
             Op::Allocate => {
                 // len has to be bigger than zero so make sure there is at least one byte to
                 // request.
-                let offset = rng.gen_range(0..BLACKOUT_MAX_FILE_SIZE - 1);
-                let len = rng.gen_range(1..BLACKOUT_MAX_FILE_SIZE - offset);
+                let offset = rng.random_range(0..BLACKOUT_MAX_FILE_SIZE - 1);
+                let len = rng.random_range(1..BLACKOUT_MAX_FILE_SIZE - offset);
                 log::debug!(
                     "op: {}, allocate range: {}..{}, len: {}",
                     file,
@@ -186,8 +187,8 @@ pub async fn generate_load<S: OpSampler>(
             }
             Op::Write => {
                 // Make sure we are always writing at least one byte.
-                let offset = rng.gen_range(0..BLACKOUT_MAX_FILE_SIZE - 1);
-                let len = rng.gen_range(1..std::cmp::min(8192, BLACKOUT_MAX_FILE_SIZE - offset));
+                let offset = rng.random_range(0..BLACKOUT_MAX_FILE_SIZE - 1);
+                let len = rng.random_range(1..std::cmp::min(8192, BLACKOUT_MAX_FILE_SIZE - offset));
                 log::debug!(
                     "op: {}, write range: {}..{}, len: {}",
                     file,
@@ -213,7 +214,7 @@ pub async fn generate_load<S: OpSampler>(
                 file.contents[offset..offset + len].copy_from_slice(&data);
             }
             Op::Truncate => {
-                let offset = rng.gen_range(0..BLACKOUT_MAX_FILE_SIZE);
+                let offset = rng.random_range(0..BLACKOUT_MAX_FILE_SIZE);
                 log::debug!("op: {}, truncate offset: {}", file, offset);
                 file.proxy()
                     .resize(offset as u64)
@@ -240,7 +241,7 @@ pub async fn generate_load<S: OpSampler>(
                     .context("replace unlink fidl error")?
                     .map_err(zx::Status::from_raw)
                     .context("replace unlink returned error")?;
-                *file = rng.gen();
+                *file = rng.random();
                 log::debug!("    {} is replacement", file);
                 file.create(root)
                     .await

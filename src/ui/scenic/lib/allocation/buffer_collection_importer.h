@@ -9,6 +9,7 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/id.h"
+#include "src/ui/scenic/lib/types/blend_mode.h"
 
 namespace allocation {
 
@@ -47,7 +48,7 @@ struct ImageMetadata {
   std::array<float, 4> multiply_color = {1.f, 1.f, 1.f, 1.f};
 
   // The blend mode to use when compositing this image.
-  fuchsia_ui_composition::BlendMode blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
+  types::BlendMode blend_mode = types::BlendMode::kReplace();
 
   // The flip/reflection mode to use for this particular image.
   fuchsia_ui_composition::ImageFlip flip = fuchsia_ui_composition::ImageFlip::kNone;
@@ -58,19 +59,6 @@ struct ImageMetadata {
             multiply_color == meta.multiply_color);
   }
 };
-
-inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_ui_composition::BlendMode& blend_mode) {
-  switch (blend_mode) {
-    case fuchsia_ui_composition::BlendMode::kSrc:
-      out << "SRC";
-      break;
-    case fuchsia_ui_composition::BlendMode::kSrcOver:
-      out << "SRC_OVER";
-      break;
-  }
-  return out;
-}
 
 inline std::ostream& operator<<(std::ostream& str, const ImageMetadata& m) {
   str << "size=" << (m.collection_id == kInvalidImageId ? 1 : m.width) << "x"

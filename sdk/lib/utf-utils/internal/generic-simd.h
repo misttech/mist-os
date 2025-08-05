@@ -5,14 +5,14 @@
 #ifndef LIB_UTF_UTILS_INTERNAL_GENERIC_SIMD_H_
 #define LIB_UTF_UTILS_INTERNAL_GENERIC_SIMD_H_
 
-#include <lib/utf-utils/internal/scalar.h>
-
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cinttypes>
 #include <cstddef>
 #include <cstring>
+
+#include "scalar.h"
 
 // This is an implementation of a SIMD-based validation method based on the lookup method described
 // in the paper DOI:10.1002/spe.2920.

@@ -7,6 +7,7 @@ use crate::utils::update_process_name;
 use anyhow::{Context, Result};
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use fuchsia_async::Timer;
 use fuchsia_component::client;
 use futures::channel::oneshot;
 use futures::{StreamExt, TryStreamExt};
@@ -22,6 +23,8 @@ use {
 
 /// Any stored data is removed after this amount of time
 const EXCEPTIONS_CLEANUP_DEADLINE_SECONDS: i64 = 600;
+/// The period of time to wait between checking for stalled threads
+const THREAD_MONITOR_TIME_SECONDS: i64 = 5;
 
 /// We use Weak<Driver> to avoid accidentally extending the lifetime of the Driver. Driver must be
 /// droped and have it's destroy hook called in the driver runtime's shutdown observer callback in
@@ -181,7 +184,7 @@ impl DriverHost {
                     break;
                 };
 
-                let timer = fuchsia_async::Timer::new(sleep_until);
+                let timer = Timer::new(sleep_until);
                 timer.await;
 
                 let Some(this) = this.upgrade() else {
@@ -192,6 +195,19 @@ impl DriverHost {
                 while !exceptions.is_empty() && zx::MonotonicInstant::get() > exceptions[0].deadline
                 {
                     exceptions.remove(0);
+                }
+            }
+        });
+    }
+
+    pub fn run_thread_monitor_task(&self) {
+        self.scope.spawn_local(async move {
+            loop {
+                Timer::new(zx::MonotonicDuration::from_seconds(THREAD_MONITOR_TIME_SECONDS)).await;
+                // SAFETY: this call does not use any memory allocated by rust and only does
+                // anything if the fdf_env is currently set up, otherwise it does nothing.
+                unsafe {
+                    fdf_sys::fdf_env_scan_threads_for_stalls();
                 }
             }
         });

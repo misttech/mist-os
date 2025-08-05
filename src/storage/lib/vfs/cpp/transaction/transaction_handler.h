@@ -5,14 +5,13 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_TRANSACTION_HANDLER_H_
 #define SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_TRANSACTION_HANDLER_H_
 
-#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <vector>
 
-#include <fbl/algorithm.h>
-#include <fbl/macros.h>
-#include <fbl/vector.h>
 #include <storage/buffer/block_buffer.h>
 #include <storage/operation/operation.h>
 

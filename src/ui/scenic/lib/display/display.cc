@@ -16,18 +16,15 @@
 namespace scenic_impl {
 namespace display {
 
-Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
-                 uint32_t height_in_px, uint32_t width_in_mm, uint32_t height_in_mm,
-                 std::vector<fuchsia_images2::PixelFormat> pixel_formats,
-                 uint32_t maximum_refresh_rate_in_millihertz)
+Display::Display(fuchsia_hardware_display_types::wire::DisplayId id,
+                 const fuchsia_hardware_display_types::wire::Mode& mode, uint32_t width_in_mm,
+                 uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats)
     : vsync_timing_(std::make_shared<scheduling::VsyncTiming>()),
       display_id_(id),
-      width_in_px_(width_in_px),
-      height_in_px_(height_in_px),
+      mode_(mode),
       width_in_mm_(width_in_mm),
       height_in_mm_(height_in_mm),
-      pixel_formats_(std::move(pixel_formats)),
-      maximum_refresh_rate_in_millihertz_(maximum_refresh_rate_in_millihertz) {
+      pixel_formats_(std::move(pixel_formats)) {
   zx::event::create(0, &ownership_event_);
   device_pixel_ratio_.store({1.f, 1.f});
 
@@ -36,7 +33,11 @@ Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t wi
 }
 Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
                  uint32_t height_in_px)
-    : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kB8G8R8A8}, 0) {}
+    : Display(id,
+              fuchsia_hardware_display_types::wire::Mode{
+                  .active_area = {.width = width_in_px, .height = height_in_px},
+                  .refresh_rate_millihertz = 0},
+              0, 0, {fuchsia_images2::PixelFormat::kB8G8R8A8}) {}
 
 void Display::Claim() {
   FX_DCHECK(!claimed_);
@@ -48,7 +49,7 @@ void Display::Unclaim() {
   claimed_ = false;
 }
 
-void Display::OnVsync(zx::time timestamp,
+void Display::OnVsync(zx::time_monotonic timestamp,
                       fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
   // Estimate current vsync interval. Need to include a maximum to mitigate any
   // potential issues during long breaks.

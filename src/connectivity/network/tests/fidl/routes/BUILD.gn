@@ -17,6 +17,7 @@ rustc_test("routes") {
     "//sdk/rust/zx-status",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/fidl/routes:common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
@@ -31,6 +32,7 @@ rustc_test("routes") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:test-case",
   ]
   sources = [
     "src/lib.rs",

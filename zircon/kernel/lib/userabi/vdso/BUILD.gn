@@ -60,6 +60,7 @@ if (toolchain_environment == "user.basic") {
       "zx_cprng_draw.cc",
       "zx_deadline_after.cc",
       "zx_exception_get_string.cc",
+      "zx_handle_check_valid.cc",
       "zx_status_get_string.cc",
       "zx_system_get_dcache_line_size.cc",
       "zx_system_get_features.cc",

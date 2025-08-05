@@ -10,7 +10,6 @@ use fuchsia_async as fasync;
 use futures::channel::{mpsc, oneshot};
 use futures::future::{select, AbortHandle, Abortable, Either};
 use futures::{AsyncRead, AsyncWrite, FutureExt, SinkExt, Stream, StreamExt};
-use rand::Rng;
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::num::NonZero;
@@ -20,8 +19,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use thiserror::Error;
 use usb_vsock::{
-    Address, Header, Packet, PacketType, ProtocolVersion, UsbPacketBuilder, VsockPacketIterator,
-    CID_ANY, CID_HOST, CID_LOOPBACK,
+    Address, Header, Packet, PacketType, ProtocolVersion, ReadyConnect, UsbPacketBuilder,
+    VsockPacketIterator, CID_ANY, CID_HOST, CID_LOOPBACK,
 };
 
 /// How long to wait for the USB protocol to synchronize.
@@ -377,7 +376,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
         cid: Option<u32>,
         port: u32,
         sender: mpsc::Sender<IncomingConnection<S>>,
-    ) -> Result<(), UsbVsockError> {
+    ) -> Result<(), ListenError> {
         match self {
             PortListening::AnyCid(old) if old.is_closed() => {
                 if let Some(cid) = cid {
@@ -399,7 +398,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
                                 occupied_entry.insert(sender);
                                 Ok(())
                             } else {
-                                Err(UsbVsockError::PortInUse(port))
+                                Err(ListenError::PortInUse(port))
                             }
                         }
                     }
@@ -407,10 +406,10 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
                     *self = PortListening::AnyCid(sender);
                     Ok(())
                 } else {
-                    Err(UsbVsockError::PortInUse(port))
+                    Err(ListenError::PortInUse(port))
                 }
             }
-            _ => Err(UsbVsockError::PortInUse(port)),
+            _ => Err(ListenError::PortInUse(port)),
         }
     }
 }
@@ -436,9 +435,9 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortState<S> {
         cid: Option<u32>,
         port: u32,
         sender: mpsc::Sender<IncomingConnection<S>>,
-    ) -> Result<(), UsbVsockError> {
+    ) -> Result<(), ListenError> {
         match self {
-            PortState::Reserved => Err(UsbVsockError::PortInUse(port)),
+            PortState::Reserved => Err(ListenError::PortInUse(port)),
             PortState::Listening(l) => l.add_listener(cid, port, sender),
         }
     }
@@ -477,6 +476,28 @@ pub enum UsbVsockError {
     PortOutOfRange,
 }
 
+/// Errors returned from [`UsbVsockHost::connect`]
+#[derive(Debug, Error)]
+pub enum ConnectError {
+    #[error("No target found with cid {0}")]
+    NotFound(u32),
+    #[error("Port {0} already in use")]
+    PortInUse(u32),
+    #[error("Connection failed")]
+    Failed(std::io::Error),
+    #[error("Port number was too large")]
+    PortOutOfRange,
+}
+
+/// Errors returned from [`UsbVsockHost::listen`]
+#[derive(Debug, Error)]
+pub enum ListenError {
+    #[error("No target found with cid {0}")]
+    NotFound(u32),
+    #[error("Port {0} already in use")]
+    PortInUse(u32),
+}
+
 /// Lock-protected fields of `UsbVsockHost`.
 struct UsbVsockHostInner<S> {
     conns: HashMap<u32, ConnectionState<S>>,
@@ -493,15 +514,26 @@ pub enum UsbVsockHostEvent {
 
 /// Represents an incoming connection on a port we are listening on.
 pub struct IncomingConnection<S> {
-    acceptor: oneshot::Sender<(S, oneshot::Sender<std::io::Result<usb_vsock::ConnectionState>>)>,
+    address: Address,
+    acceptor: oneshot::Sender<oneshot::Sender<std::io::Result<ReadyConnect<Vec<u8>, S>>>>,
 }
 
 impl<S: AsyncRead + AsyncWrite + Send + 'static> IncomingConnection<S> {
+    /// Address the connector is using.
+    pub fn address(&self) -> &Address {
+        &self.address
+    }
+
     /// Accept the connection. Data will be sent over the provided socket.
     pub async fn accept(self, socket: S) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
+        Ok(self.accept_late().await?.finish_connect(socket).await)
+    }
+
+    /// Accept the connection. The returned `ReadyConnect` can be used to provide a socket for data.
+    pub async fn accept_late(self) -> Result<usb_vsock::ReadyConnect<Vec<u8>, S>, UsbVsockError> {
         let (sender, receiver) = futures::channel::oneshot::channel();
         self.acceptor
-            .send((socket, sender))
+            .send(sender)
             .map_err(|_| UsbVsockError::AcceptFailed(std::io::Error::other("Driver gone")))?;
         receiver
             .await
@@ -566,6 +598,11 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         ret
     }
 
+    /// Get all CIDs for currently-existing connections.
+    pub fn active_conns(&self) -> Vec<u32> {
+        self.inner.lock().unwrap().conns.keys().copied().collect()
+    }
+
     /// Connect to a new USB device by device path and assign it a CID. Returns
     /// `true` if the device was added successfully. `false` could just indicate
     /// the device wasn't a USB VSOCK device, so it's a normal event, not an
@@ -578,7 +615,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
     /// connection the host initiates.
     fn alloc_port(&self) -> u32 {
         loop {
-            let random_port = rand::thread_rng().gen_range(RANDOM_PORT_RANGE);
+            let random_port = rand::random_range(RANDOM_PORT_RANGE);
 
             if let std::collections::hash_map::Entry::Vacant(entry) =
                 self.inner.lock().unwrap().port_states.entry(random_port)
@@ -595,9 +632,9 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         cid: NonZero<u32>,
         port: u32,
         socket: S,
-    ) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
+    ) -> Result<usb_vsock::ConnectionState, ConnectError> {
         if port == u32::MAX {
-            return Err(UsbVsockError::PortOutOfRange);
+            return Err(ConnectError::PortOutOfRange);
         }
 
         let cid = cid.get();
@@ -607,7 +644,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         let Some(conn) =
             self.inner.lock().unwrap().conns.get_mut(&cid).map(|x| Arc::clone(&x.connection))
         else {
-            return Err(UsbVsockError::NotFound(cid));
+            return Err(ConnectError::NotFound(cid));
         };
 
         // TODO(407622199): Arrange for this port to be released when the connection dies.
@@ -623,7 +660,42 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
             socket,
         )
         .await
-        .map_err(UsbVsockError::ConnectFailed)
+        .map_err(ConnectError::Failed)
+    }
+
+    /// Connect a new socket to a target with the given CID and port, but don't
+    /// give the data socket. Instead return a [`ReadyConnect`] which can be
+    /// used to provide the socket later.
+    pub async fn connect_late(
+        &self,
+        cid: NonZero<u32>,
+        port: u32,
+    ) -> Result<usb_vsock::ReadyConnect<Vec<u8>, S>, ConnectError> {
+        if port == u32::MAX {
+            return Err(ConnectError::PortOutOfRange);
+        }
+
+        let cid = cid.get();
+        let cid = if cid == CID_LOOPBACK { CID_HOST } else { cid };
+
+        // TODO(407622394): Handle loopback cases.
+        let Some(conn) =
+            self.inner.lock().unwrap().conns.get_mut(&cid).map(|x| Arc::clone(&x.connection))
+        else {
+            return Err(ConnectError::NotFound(cid));
+        };
+
+        // TODO(407622199): Arrange for this port to be released when the connection dies.
+        let host_port = self.alloc_port();
+
+        conn.connect_late(usb_vsock::Address {
+            device_cid: cid,
+            host_cid: CID_HOST,
+            device_port: port,
+            host_port,
+        })
+        .await
+        .map_err(ConnectError::Failed)
     }
 
     /// Listen for connections to the host (cid 2) on the given port.
@@ -631,7 +703,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         &self,
         port: u32,
         cid: Option<NonZero<u32>>,
-    ) -> Result<impl Stream<Item = IncomingConnection<S>>, UsbVsockError> {
+    ) -> Result<impl Stream<Item = IncomingConnection<S>> + 'static, ListenError> {
         let cid = cid.map(|x| x.get()).map(|x| if x == CID_LOOPBACK { CID_HOST } else { x });
         let mut inner = self.inner.lock().unwrap();
 
@@ -639,7 +711,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         // See comment in add_incoming_request_handler
         if let Some(cid) = cid {
             if cid > CID_HOST && !inner.conns.contains_key(&cid) {
-                return Err(UsbVsockError::NotFound(cid));
+                return Err(ListenError::NotFound(cid));
             }
         }
 
@@ -780,15 +852,17 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
 
                 if let Some(mut accept_channel) = accept_channel {
                     let (sender, receiver) = futures::channel::oneshot::channel();
-                    if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender}).await {
+                    if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender, address: *incoming.address() }).await {
                         log::warn!(cid; "Listener disappeared while accepting connection");
-                    } else if let Ok((sock, responder)) = receiver.await {
-                        if let Err(_) = responder.send(connection.accept(incoming, sock).await) {
+                    } else if let Ok(responder) = receiver.await {
+                        let address = incoming.address().clone();
+                        if let Err(_) = responder.send(connection.accept_late(incoming).await) {
                             log::warn!(cid; "Accepting connection request failed");
+                            let _: Result<_, _> = connection.reset(&address).await;
                         }
-                        return;
+                        continue;
                     } else {
-                        log::warn!(cid; "Listener did not respond to incoming connection");
+                        log::debug!(cid; "Listener rejected incoming connection");
                     }
                 }
 
@@ -798,9 +872,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
             }
         });
     }
-}
 
-impl UsbVsockHost<fasync::Socket> {
     /// Create a new USB VSOCK host for testing. Guaranteed not to try to touch
     /// the machine's actual USB devices.
     pub fn new_for_test(event_sender: mpsc::Sender<UsbVsockHostEvent>) -> Arc<Self> {
@@ -818,7 +890,7 @@ impl UsbVsockHost<fasync::Socket> {
     /// Add a new test connection to this host.
     pub fn add_connection_for_test(
         self: &Arc<Self>,
-        connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
+        connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
         incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     ) -> u32 {
         let cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
@@ -834,22 +906,26 @@ impl UsbVsockHost<fasync::Socket> {
     }
 }
 
+/// Collection of values related to a UsbVsockHost that has been set up for testing.
+pub struct TestHost<S: AsyncRead + AsyncWrite + Send + 'static> {
+    pub host: Arc<UsbVsockHost<S>>,
+    pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
+}
+
 /// Collection of values related to a test connection.
-pub struct TestConnection {
+pub struct TestConnection<S: AsyncRead + AsyncWrite + Send + 'static> {
     pub cid: u32,
-    pub host: Arc<UsbVsockHost<fasync::Socket>>,
-    pub connection: Arc<usb_vsock::Connection<Vec<u8>, fasync::Socket>>,
+    pub connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),
-    pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
     pub scope: fasync::Scope,
 }
 
-impl TestConnection {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> TestConnection<S> {
     /// Creates a new host with one connected CID inside of it, and also a raw
     /// usb_vsock connection which is the other end of that connection
     /// (representing the target perspective).
-    pub fn new() -> TestConnection {
+    pub fn new() -> (TestHost<S>, TestConnection<S>) {
         let (a_incoming_requests_tx, a_incoming_requests) = mpsc::channel(1);
         let a = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
@@ -894,15 +970,16 @@ impl TestConnection {
         let host = UsbVsockHost::new_for_test(event_sender);
         let cid = host.add_connection_for_test(a, a_incoming_requests);
 
-        TestConnection {
-            cid,
-            host,
-            connection: b,
-            incoming_requests: b_incoming_requests,
-            abort_transfer: (abort_a, abort_b),
-            event_receiver,
-            scope,
-        }
+        (
+            TestHost { host, event_receiver },
+            TestConnection {
+                cid,
+                connection: b,
+                incoming_requests: b_incoming_requests,
+                abort_transfer: (abort_a, abort_b),
+                scope,
+            },
+        )
     }
 }
 
@@ -915,15 +992,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                mut incoming_requests,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -969,67 +1047,74 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                incoming_requests: _,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
-        let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
-        let other_end = fasync::Socket::from_socket(other_end);
-        let mut listener = host.listen(1234, None).unwrap();
-        let connect_task = fasync::Task::spawn(async move {
-            connection
-                .connect(
-                    usb_vsock::Address {
-                        device_cid: cid,
-                        host_cid: 2,
-                        device_port: 16384,
-                        host_port: 1234,
-                    },
-                    other_end,
-                )
-                .await
-        });
+        let connection = Arc::new(connection);
 
-        let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
-        let other_end = fasync::Socket::from_socket(other_end);
-        let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
-        let _remote_state = connect_task.await.unwrap();
+        for port_offset in 0..2 {
+            let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
+            let other_end = fasync::Socket::from_socket(other_end);
+            let mut listener = host.listen(1234, None).unwrap();
+            let connection_clone = Arc::clone(&connection);
+            let connect_task = fasync::Task::spawn(async move {
+                connection_clone
+                    .connect(
+                        usb_vsock::Address {
+                            device_cid: cid,
+                            host_cid: 2,
+                            device_port: 16384 + port_offset,
+                            host_port: 1234,
+                        },
+                        other_end,
+                    )
+                    .await
+            });
 
-        let mut a = fasync::Socket::from_socket(a);
-        let mut b = fasync::Socket::from_socket(b);
+            let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
+            let other_end = fasync::Socket::from_socket(other_end);
+            let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
+            let _remote_state = connect_task.await.unwrap();
 
-        const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
-        const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
+            let mut a = fasync::Socket::from_socket(a);
+            let mut b = fasync::Socket::from_socket(b);
 
-        a.write_all(TEST_STR_1).await.unwrap();
-        b.write_all(TEST_STR_2).await.unwrap();
+            const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
+            const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
 
-        let mut buf = vec![0u8; TEST_STR_2.len()];
-        a.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf, TEST_STR_2);
+            a.write_all(TEST_STR_1).await.unwrap();
+            b.write_all(TEST_STR_2).await.unwrap();
 
-        let mut buf = vec![0u8; TEST_STR_1.len()];
-        b.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf, TEST_STR_1);
+            let mut buf = vec![0u8; TEST_STR_2.len()];
+            a.read_exact(&mut buf).await.unwrap();
+            assert_eq!(&buf, TEST_STR_2);
+
+            let mut buf = vec![0u8; TEST_STR_1.len()];
+            b.read_exact(&mut buf).await.unwrap();
+            assert_eq!(&buf, TEST_STR_1);
+        }
     }
 
     #[fuchsia::test]
     async fn test_listen_one_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1077,7 +1162,7 @@ mod test {
         let host = UsbVsockHost::new_for_test(event_sender);
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
-        let Err(UsbVsockError::NotFound(got_cid)) =
+        let Err(ConnectError::NotFound(got_cid)) =
             host.connect(3.try_into().unwrap(), 1234, sock).await
         else {
             panic!()
@@ -1088,18 +1173,19 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_bad_port() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _c,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _c,
+                incoming_requests: _,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
-        let Err(UsbVsockError::PortOutOfRange) =
+        let Err(ConnectError::PortOutOfRange) =
             host.connect(cid.try_into().unwrap(), u32::MAX, sock).await
         else {
             panic!()
@@ -1108,15 +1194,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_rejection() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
         let connect_task =
@@ -1127,22 +1214,23 @@ mod test {
         let req = incoming_requests.next().await.unwrap();
         connection.reject(req).await.unwrap();
 
-        let Err(UsbVsockError::ConnectFailed(_)) = connect_task.await else {
+        let Err(ConnectError::Failed(_)) = connect_task.await else {
             panic!();
         };
     }
 
     #[fuchsia::test]
     async fn test_refuse_connection() {
-        let TestConnection {
-            cid,
-            host: _host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host: _host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
         let Err(_) = connection
@@ -1163,15 +1251,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_reject_weird_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1194,15 +1283,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_reject_from_weird_cid() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1225,18 +1315,19 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
             panic!();
         };
         assert_eq!(1234, port);
@@ -1244,15 +1335,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_then_listen() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1270,7 +1362,7 @@ mod test {
         let _remote_state = connection.accept(request, socket).await.unwrap();
         let _state = connect_task.await.unwrap();
 
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(host_port, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(host_port, None) else {
             panic!();
         };
         assert_eq!(host_port, port);
@@ -1278,18 +1370,19 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen_second_narrower() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1298,18 +1391,19 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen_second_broader() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
             panic!();
         };
         assert_eq!(1234, port);
@@ -1317,17 +1411,18 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_bad_cid() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
-        let Err(UsbVsockError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
+        let Err(ListenError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1336,15 +1431,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_dropped_conn() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let mut listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
 
@@ -1353,8 +1449,7 @@ mod test {
             .is_pending());
         host.remove_device(cid);
         std::mem::drop(connection);
-        let Err(UsbVsockError::NotFound(got_cid)) =
-            host.listen(5678, Some(cid.try_into().unwrap()))
+        let Err(ListenError::NotFound(got_cid)) = host.listen(5678, Some(cid.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1363,15 +1458,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_then_drop_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: (abort_a, abort_b),
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: (abort_a, abort_b),
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1425,7 +1521,7 @@ mod test {
 
         let (_unused, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
-        let Err(UsbVsockError::NotFound(got_cid)) =
+        let Err(ConnectError::NotFound(got_cid)) =
             host.connect(cid.try_into().unwrap(), 1234, other_end).await
         else {
             panic!();
@@ -1436,15 +1532,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_drop_listen() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let listener = host.listen(1234, None).unwrap();
         std::mem::drop(listener);
@@ -1453,15 +1550,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_events() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            mut event_receiver,
-            scope: _scope,
-        } = TestConnection::new();
+        let (
+            TestHost { host, mut event_receiver },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let Some(UsbVsockHostEvent::AddedCid(got_cid)) = event_receiver.next().await else {
             panic!();

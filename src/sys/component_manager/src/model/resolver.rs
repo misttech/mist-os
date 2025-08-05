@@ -93,7 +93,6 @@ mod tests {
     #[derive(Debug)]
     struct MockOkResolver {
         pub expected_url: String,
-        pub resolved_url: String,
     }
 
     #[async_trait]
@@ -104,7 +103,6 @@ mod tests {
         ) -> Result<ResolvedComponent, ResolverError> {
             assert_eq!(&self.expected_url, component_address.url());
             Ok(ResolvedComponent {
-                resolved_url: self.resolved_url.clone(),
                 // MockOkResolver only resolves one component, so it does not
                 // need to provide a context for resolving children.
                 context_to_resolve_children: None,
@@ -145,7 +143,6 @@ mod tests {
     #[derive(Debug, Clone)]
     struct ResolveState {
         pub expected_url: String,
-        pub resolved_url: String,
         pub expected_context: Option<ComponentResolutionContext>,
         pub context_to_resolve_children: Option<ComponentResolutionContext>,
     }
@@ -156,12 +153,7 @@ mod tests {
             expected_context: Option<ComponentResolutionContext>,
             context_to_resolve_children: Option<ComponentResolutionContext>,
         ) -> Self {
-            Self {
-                expected_url: url.to_string(),
-                resolved_url: url.to_string(),
-                expected_context,
-                context_to_resolve_children,
-            }
+            Self { expected_url: url.to_string(), expected_context, context_to_resolve_children }
         }
     }
 
@@ -182,17 +174,12 @@ mod tests {
             &self,
             component_address: &ComponentAddress,
         ) -> Result<ResolvedComponent, ResolverError> {
-            let ResolveState {
-                expected_url,
-                resolved_url,
-                expected_context,
-                context_to_resolve_children,
-            } = self.resolve_states.lock().unwrap().remove(0);
+            let ResolveState { expected_url, expected_context, context_to_resolve_children } =
+                self.resolve_states.lock().unwrap().remove(0);
             let (component_url, some_context) = component_address.to_url_and_context();
             assert_eq!(expected_url, component_url);
             assert_eq!(expected_context.as_ref(), some_context, "resolving {}", component_url);
             Ok(ResolvedComponent {
-                resolved_url,
                 context_to_resolve_children,
 
                 // We don't actually need to return a valid component here as these unit tests only
@@ -297,10 +284,7 @@ mod tests {
         let mut registry = ResolverRegistry::new();
         registry.register(
             "foo".to_string(),
-            Arc::new(MockOkResolver {
-                expected_url: "foo://url".to_string(),
-                resolved_url: "foo://resolved".to_string(),
-            }),
+            Arc::new(MockOkResolver { expected_url: "foo://url".to_string() }),
         );
         registry.register(
             "bar".to_string(),
@@ -322,10 +306,6 @@ mod tests {
         )
         .await;
 
-        // Resolve known scheme that returns success.
-        let component = registry.resolve(&address_from_absolute_url("foo://url")).await.unwrap();
-        assert_eq!("foo://resolved", component.resolved_url);
-
         // Resolve a different scheme that produces an error.
         let expected_res: Result<ResolvedComponent, ResolverError> =
             Err(ResolverError::manifest_not_found(format_err!("not available")));
@@ -342,6 +322,9 @@ mod tests {
             format!("{:?}", registry.resolve(&address_from_absolute_url("unknown://url")).await),
         );
 
+        // Resolve known scheme that returns success.
+        let _ = registry.resolve(&address_from_absolute_url("foo://url")).await.unwrap();
+
         // Resolve a possible relative path (e.g., subpackage) URL lacking a
         // resolvable parent causes a SchemeNotRegistered.
         assert_matches!(
@@ -354,10 +337,8 @@ mod tests {
     #[should_panic(expected = "Found duplicate scheme in ComponentDecl")]
     fn test_duplicate_registration() {
         let mut registry = ResolverRegistry::new();
-        let resolver_a =
-            MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
-        let resolver_b =
-            MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
+        let resolver_a = MockOkResolver { expected_url: "".to_string() };
+        let resolver_b = MockOkResolver { expected_url: "".to_string() };
         registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_a));
         registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_b));
     }
@@ -365,10 +346,8 @@ mod tests {
     #[fuchsia::test]
     fn test_multiple_scheme_registration() {
         let mut registry = ResolverRegistry::new();
-        let resolver_a =
-            MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
-        let resolver_b =
-            MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
+        let resolver_a = MockOkResolver { expected_url: "".to_string() };
+        let resolver_b = MockOkResolver { expected_url: "".to_string() };
         registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_a));
         registry.register("fuchsia-boot".to_string(), Arc::new(resolver_b));
     }
@@ -769,7 +748,6 @@ mod tests {
 
         let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
 
         Ok(())
@@ -849,7 +827,6 @@ mod tests {
 
         let resolved = resolve_component(&child_two.component_url, &child_two).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }
@@ -908,7 +885,6 @@ mod tests {
 
         let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }
@@ -967,7 +943,6 @@ mod tests {
 
         let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }
@@ -1086,7 +1061,6 @@ mod tests {
 
         let resolved = resolve_component(&child_two.component_url, &child_two).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }
@@ -1185,7 +1159,6 @@ mod tests {
 
         let resolved = resolve_component(&child_three.component_url, &child_three).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }
@@ -1227,10 +1200,7 @@ mod tests {
         );
         resolver.register(
             "realm-builder".to_string(),
-            Arc::new(MockOkResolver {
-                expected_url: "realm-builder://0/my-realm".to_string(),
-                resolved_url: "realm-builder://0/my-realm".to_string(),
-            }),
+            Arc::new(MockOkResolver { expected_url: "realm-builder://0/my-realm".to_string() }),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -1326,7 +1296,6 @@ mod tests {
 
         let resolved = resolve_component(&child_four.component_url, &child_four).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
-        assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
         Ok(())
     }

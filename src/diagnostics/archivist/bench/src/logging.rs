@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use archivist_lib::identity::ComponentIdentity;
-use archivist_lib::logs::shared_buffer::{LazyItem, SharedBuffer};
+use archivist_lib::logs::shared_buffer::{create_ring_buffer, LazyItem, SharedBuffer};
 use archivist_lib::logs::stored_message::StoredMessage;
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
 use diagnostics_log_encoding::{Argument, Record};
@@ -20,6 +20,8 @@ use std::pin::pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
+
+const RING_BUFFER_SIZE: usize = 65536;
 
 fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
     let record = Record {
@@ -45,7 +47,11 @@ fn get_component_identity() -> Arc<ComponentIdentity> {
 fn bench_fill(b: &mut criterion::Bencher, size: usize) {
     // SharedBuffer needs an executor even though we don't use it in the benchmark.
     let _executor = fasync::SendExecutor::new(1);
-    let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {})));
+    let buffer = Arc::new(SharedBuffer::new(
+        create_ring_buffer(RING_BUFFER_SIZE),
+        Box::new(|_| {}),
+        Default::default(),
+    ));
     let msg =
         make_message(std::str::from_utf8(&[65; 100]).unwrap(), zx::BootInstant::from_nanos(1));
     let container = Arc::new(buffer.new_container_buffer(get_component_identity(), Arc::default()));
@@ -67,7 +73,11 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     let mut executor = fasync::SendExecutor::new(1);
     let done = Arc::new(AtomicBool::new(false));
     // Messages take up a a little less than 200 bytes in the buffer.
-    let buffer = Arc::new(SharedBuffer::new(200 * args.size, Box::new(|_| {})));
+    let buffer = Arc::new(SharedBuffer::new(
+        create_ring_buffer(200 * args.size),
+        Box::new(|_| {}),
+        Default::default(),
+    ));
     let msg = Arc::new(make_message(
         std::str::from_utf8(&[65; 100]).unwrap(),
         zx::BootInstant::from_nanos(1),

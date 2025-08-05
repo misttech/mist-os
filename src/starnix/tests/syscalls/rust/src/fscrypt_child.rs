@@ -8,7 +8,6 @@ use linux_uapi::{
     fscrypt_policy_v2, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_POLICY_FLAGS_PAD_16,
     FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
 };
-use rand::Rng;
 use std::os::fd::AsRawFd;
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -100,7 +99,7 @@ fn main() {
             } else {
                 let mut random_vector: [u8; 64] = [0; 64];
                 for i in 0..random_vector.len() {
-                    let rand_u8: u8 = rand::thread_rng().gen();
+                    let rand_u8: u8 = rand::random();
                     random_vector[i] = rand_u8;
                 }
                 random_vector

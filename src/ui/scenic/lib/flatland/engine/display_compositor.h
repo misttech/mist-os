@@ -36,6 +36,21 @@ class DisplayCompositorTest;
 
 using allocation::BufferCollectionUsage;
 
+// Provides overridable default values for constructing a DisplayCompositor.
+struct DisplayCompositorConfig {
+  // Whether to attempt display composition at all. If false we always fall back to GPU-compositing.
+  bool enable_direct_to_display = true;
+
+  // The maximum number of layers that can be displayed at once, on a given display.
+  uint32_t max_display_layers = 1;
+
+  // If true, all images will be tinted when we fall back to GPU-compositing.
+  bool tint_gpu_fallback_images = false;
+
+  // If true, the current frame number will be displayed above all other images.
+  bool enable_frame_counter_overlay = false;
+};
+
 // The DisplayCompositor is responsible for compositing Flatland render data onto the display(s).
 // It accomplishes this either by direct hardware compositing via the display coordinator
 // interface, or rendering on the GPU via a custom renderer API. It also handles the
@@ -75,8 +90,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
                         display_coordinator,
                     const std::shared_ptr<Renderer>& renderer,
                     fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
-                    bool enable_display_composition, uint32_t max_display_layers,
-                    uint8_t visual_debugging_level);
+                    const DisplayCompositorConfig& config);
 
   ~DisplayCompositor() override;
 
@@ -181,7 +195,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Notifies the compositor that a vsync has occurred, in response to a display configuration
   // applied by the compositor.  It is the compositor's responsibility to signal any release fences
   // corresponding to the frame identified by |frame_number|.
-  void OnVsync(zx::time timestamp,
+  void OnVsync(zx::time_monotonic timestamp,
                fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp);
 
   std::vector<allocation::ImageMetadata> AllocateDisplayRenderTargets(
@@ -243,10 +257,13 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Erases the configuration that has been set on the display coordinator.
   void DiscardConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Applies the config to the display coordinator and returns the ConfigStamp associated with this
-  // config. ConfigStamp is provided by the display coordinator. This should only be called after
-  // CheckConfig has verified that the config is okay, since ApplyConfig does not return any errors.
-  fuchsia_hardware_display::wire::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  // Applies the config to the display coordinator and record the corresponding ConfigStamp, so that
+  // we can observe Vsync events to know when this config was actually displayed.
+  //
+  // This should only be called after CheckConfig() has verified that the config is okay, since
+  // ApplyConfig does not return any errors.
+  void ApplyConfig(uint64_t frame_number, uint64_t trace_flow_id)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
@@ -341,18 +358,11 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
-  // Whether to attempt display composition at all. If false we always fall back to GPU-compositing.
-  // Constant except for in tests.
-  bool enable_display_composition_ = true;
-
-  // The maximum number of layers that can be displayed at once, on a given display.
-  const uint32_t max_display_layers_;
-
   ColorConversionStateMachine cc_state_machine_;
 
   const async_dispatcher_t* const main_dispatcher_;
 
-  uint8_t visual_debugging_level_ = 0;
+  const DisplayCompositorConfig config_;
 };
 
 }  // namespace flatland

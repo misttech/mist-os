@@ -7,7 +7,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
 #include "tun_device.h"
@@ -20,15 +20,15 @@ zx::result<std::unique_ptr<TunCtl>> TunCtl::Create(async_dispatcher_t* fidl_disp
 
   zx::result dispatchers = network::OwnedDeviceInterfaceDispatchers::Create();
   if (dispatchers.is_error()) {
-    FX_LOGF(ERROR, "tun", "failed to create owned dispatchers: %s", dispatchers.status_string());
+    FX_PLOGST(ERROR, "tun", dispatchers.status_value()) << "failed to create owned dispatchers";
     return dispatchers.take_error();
   }
   tun_ctl->dispatchers_ = std::move(dispatchers.value());
 
   zx::result shim_dispatchers = network::OwnedShimDispatchers::Create();
   if (shim_dispatchers.is_error()) {
-    FX_LOGF(ERROR, "tun", "failed to create owned shim dispatchers: %s",
-            shim_dispatchers.status_string());
+    FX_PLOGST(ERROR, "tun", shim_dispatchers.status_value())
+        << "failed to create owned shim dispatchers";
     return shim_dispatchers.take_error();
   }
   tun_ctl->shim_dispatchers_ = std::move(shim_dispatchers.value());
@@ -59,14 +59,14 @@ void TunCtl::CreateDevice(CreateDeviceRequestView request, CreateDeviceCompleter
       DeviceConfig(request->config));
 
   if (tun_device.is_error()) {
-    FX_LOGF(ERROR, "tun", "TunCtl: TunDevice creation failed: %s", tun_device.status_string());
+    FX_PLOGST(ERROR, "tun", tun_device.status_value()) << "TunCtl: TunDevice creation failed";
     request->device.Close(tun_device.error_value());
     return;
   }
   auto& value = tun_device.value();
   value->Bind(std::move(request->device));
   devices_.push_back(std::move(value));
-  FX_LOG(INFO, "tun", "TunCtl: Created TunDevice");
+  FX_LOGST(INFO, "tun") << "TunCtl: Created TunDevice";
 }
 
 void TunCtl::CreatePair(CreatePairRequestView request, CreatePairCompleter::Sync& completer) {
@@ -81,14 +81,14 @@ void TunCtl::CreatePair(CreatePairRequestView request, CreatePairCompleter::Sync
       DevicePairConfig(request->config));
 
   if (tun_pair.is_error()) {
-    FX_LOGF(ERROR, "tun", "TunCtl: TunPair creation failed: %s", tun_pair.status_string());
+    FX_PLOGST(ERROR, "tun", tun_pair.status_value()) << "TunCtl: TunPair creation failed";
     request->device_pair.Close(tun_pair.status_value());
     return;
   }
   auto& value = tun_pair.value();
   value->Bind(std::move(request->device_pair));
   device_pairs_.push_back(std::move(value));
-  FX_LOG(INFO, "tun", "TunCtl: Created TunPair");
+  FX_LOGST(INFO, "tun") << "TunCtl: Created TunPair";
 }
 
 void TunCtl::SetSafeShutdownCallback(fit::callback<void()> shutdown_callback) {

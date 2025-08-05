@@ -92,7 +92,7 @@ impl BlobfsEnvironment {
 
         // Create the blob actors
         let small_blob_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let uncompressed_size = UncompressedSize::Exact(EIGHT_KIB);
             let compressibility = Compressibility::Uncompressible;
             let factory = FileFactory::new(rng, uncompressed_size, compressibility);
@@ -101,7 +101,7 @@ impl BlobfsEnvironment {
         };
 
         let medium_blob_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let uncompressed_size = UncompressedSize::InRange(ONE_MIB, FOUR_MIB);
             let compressibility = Compressibility::Compressible;
             let factory = FileFactory::new(rng, uncompressed_size, compressibility);
@@ -109,7 +109,7 @@ impl BlobfsEnvironment {
             Arc::new(Mutex::new(BlobActor::new(factory, root_dir)))
         };
         let large_blob_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let uncompressed_size = UncompressedSize::Exact(2 * disk_size);
             let compressibility = Compressibility::Compressible;
             let factory = FileFactory::new(rng, uncompressed_size, compressibility);
@@ -119,14 +119,14 @@ impl BlobfsEnvironment {
 
         // Create the read actor
         let read_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let root_dir = open_blobfs_root();
             Arc::new(Mutex::new(ReadActor::new(rng, root_dir)))
         };
 
         // Create the deletion actor
         let deletion_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let root_dir = open_blobfs_root();
             Arc::new(Mutex::new(DeletionActor::new(rng, root_dir)))
         };

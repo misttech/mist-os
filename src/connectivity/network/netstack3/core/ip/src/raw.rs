@@ -34,9 +34,9 @@ use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
-use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
-use crate::socket::{
-    IpSockCreateAndSendError, IpSocketHandler, RouteResolutionOptions, SendOptions,
+use crate::internal::socket::{
+    IpSockCreateAndSendError, IpSocketArgs, IpSocketHandler, RouteResolutionOptions,
+    SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use crate::DEFAULT_HOP_LIMITS;
 
@@ -166,7 +166,7 @@ where
         let remote_ip = match DualStackRemoteIp::<I, _>::new(remote_ip) {
             DualStackRemoteIp::ThisStack(addr) => addr,
             DualStackRemoteIp::OtherStack(_addr) => {
-                return Err(RawIpSocketSendToError::MappedRemoteIp)
+                return Err(RawIpSocketSendToError::MappedRemoteIp);
             }
         };
         let protocol = id.protocol().proto();
@@ -213,11 +213,13 @@ where
             core_ctx
                 .send_oneshot_ip_packet_with_fallible_serializer(
                     bindings_ctx,
-                    device.as_ref().map(|d| d.as_ref()),
-                    local_ip,
-                    remote_ip,
-                    protocol,
-                    &send_options,
+                    IpSocketArgs {
+                        device: device.as_ref().map(|d| d.as_ref()),
+                        local_ip,
+                        remote_ip,
+                        proto: protocol,
+                        options: &send_options,
+                    },
                     tx_metadata,
                     build_packet_fn,
                 )

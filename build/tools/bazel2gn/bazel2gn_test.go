@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
-	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
 
@@ -27,8 +26,7 @@ func toSyntaxFile(t *testing.T, s string) *syntax.File {
 		t.Fatalf("Failed to write test Bazel file: %v", err)
 	}
 
-	opts := new(syntax.FileOptions)
-	f, _, err := starlark.SourceProgramOptions(opts, p, nil, func(string) bool { return true })
+	f, err := bazel2gn.Parse(p)
 	if err != nil {
 		t.Fatalf("Failed to parse test Bazel build file: %v, file content:\n%s", err, s)
 	}
@@ -353,26 +351,39 @@ func TestIDKConversion(t *testing.T) {
 			bazel: `load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
 
 idk_cc_source_library(
-	name = "magma_common",
+	name = "foo",
 	api_area = "Media",
 	category = "partner",
-	idk_name = "magma_common",
+	idk_name = "foobar",
 	stable = True,
-	hdrs = ["include/lib/magma_common/magma_common_defs.h"],
-	public_configs = [ ":magma_include" ],
+	hdrs = ["include/lib/foobar/foobar_defs.h"],
+	hdrs_for_internal_use = ["path/to/internal.h"],
+	public_configs = [":foo_include"],
+	deps = ["//path/to/public_deps"],
+	implementation_deps = ["//path/to/implementation_deps"],
 	visibility = [ "//visibility:public" ],
 )
 `,
-			wantGN: `sdk_source_set("magma_common") {
+			wantGN: `sdk_source_set("foo") {
 	sdk_area = "Media"
 	category = "partner"
-	sdk_name = "magma_common"
+	sdk_name = "foobar"
 	stable = true
 	public = [
-		"include/lib/magma_common/magma_common_defs.h",
+		"include/lib/foobar/foobar_defs.h",
 	]
+	sdk_headers_for_internal_use = [
+		"path/to/internal.h",
+	]
+	public += sdk_headers_for_internal_use
 	public_configs = [
-		":magma_include",
+		":foo_include",
+	]
+	public_deps = [
+		"//path/to/public_deps",
+	]
+	deps = [
+		"//path/to/implementation_deps",
 	]
 	visibility = [
 		"*",
@@ -411,7 +422,7 @@ func TestCCConversion(t *testing.T) {
 		"yet/another/path/to/foo.cc",
 	],
 	hdrs = [
-	"path/to/baz.h",
+		"path/to/baz.h",
 		"path/to/foo.h",
 	],
 	deps = [
@@ -477,6 +488,55 @@ func TestCCConversion(t *testing.T) {
 		configs += [
 		]
 	}
+}`,
+		},
+		{
+			name: "configs append by default",
+			bazel: `cc_library(
+	name = "configs_append",
+	copts = [],
+)
+`,
+			wantGN: `source_set("configs_append") {
+	configs += [
+	]
+}`,
+		},
+		{
+			name: "explicit config clearing with annotation",
+			bazel: `cc_library(
+	name = "empty_configs",
+	copts = [], # bazel2gn: clear
+)
+`,
+			wantGN: `source_set("empty_configs") {
+	configs = [
+	]
+}`,
+		},
+		{
+			name: "irrelevant comments are ignored",
+			bazel: `cc_library(
+	name = "empty_configs",
+	copts = [], # this comment does NOT affect bazel2gn
+)
+`,
+			wantGN: `source_set("empty_configs") {
+	configs += [
+	]
+}`,
+		},
+		{
+			name: "comments above are ignored",
+			bazel: `cc_library(
+	name = "comment_above",
+	# bazel2gn: clear
+	copts = [],
+)
+`,
+			wantGN: `source_set("comment_above") {
+	configs += [
+	]
 }`,
 		},
 	} {

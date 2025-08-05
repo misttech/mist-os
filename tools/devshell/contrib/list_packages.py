@@ -45,7 +45,7 @@ Note: list-packages DOES NOT list all packages that *could* be built, only
 those that are included in the current build configuration.
 """,
         epilog="""
-See https://fuchsia.dev/fuchsia-src/development/build/boards_and_products
+See https://fuchsia.dev/fuchsia-src/development/build/build_system/boards_and_products
 for more information about using these package sets.
 """,
     )

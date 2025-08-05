@@ -35,8 +35,8 @@ const TEST_CERTS_PATH: &str = "/pkg/data/ssl";
 const TEST_REPO_URL: &str = "fuchsia-pkg://integration.test.fuchsia.com";
 
 pub enum OmahaState {
-    /// Don't use Omaha for this update, instead use the provided, or default, update package URL.
-    Disabled(Option<fuchsia_url::AbsolutePackageUrl>),
+    /// Don't use Omaha for this update, instead use the provided, or default, update URL.
+    Disabled(Option<url::Url>),
     /// Set up an Omaha server automatically.
     Auto(OmahaResponse),
     /// Pass the given OmahaConfig to Omaha.
@@ -113,12 +113,7 @@ impl<R> TestEnvBuilder<R> {
             blobfs: None,
             board: "test-board".to_owned(),
             channel: "test".to_owned(),
-            omaha: OmahaState::Disabled(Some(fuchsia_url::AbsolutePackageUrl::new(
-                TEST_REPO_URL.parse().unwrap(),
-                "update".parse().unwrap(),
-                None,
-                None,
-            ))),
+            omaha: OmahaState::Disabled(Some(format!("{TEST_REPO_URL}/update").parse().unwrap())),
             packages: vec![],
             paver: MockPaverServiceBuilder::new(),
             repo_config: None,

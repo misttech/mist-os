@@ -410,13 +410,11 @@ mod test {
             .query("test.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::String("config_value_thingy".to_owned()))
-            .await
             .unwrap();
         env.context
             .query("other.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::Number(serde_json::Number::from_f64(2f64).unwrap()))
-            .await
             .unwrap();
 
         // If this is set, this should pop up before the config values.
@@ -429,7 +427,6 @@ mod test {
             .query("other.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::String("oaiwhfoiwh".to_owned()))
-            .await
             .unwrap();
 
         // This should just compile and drop without panicking is all.
@@ -456,28 +453,6 @@ mod test {
             .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(sdk_root.to_string_lossy().into())
-            .await
-            .expect("creating temp sdk root");
-
-        put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
-        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
-        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a-host-tool");
-
-        let sdk = env.context.get_sdk().expect("test sdk");
-
-        let result = get_host_tool(&sdk, "a_host_tool").expect("a_host_tool");
-        assert_eq!(result, sdk_root.join("tools/x64/a-host-tool"));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_host_tool_override() {
-        let env = ffx_config::test_init().await.expect("create test config");
-        let sdk_root = env.isolate_root.path().join("sdk");
-        env.context
-            .query("sdk.root")
-            .level(Some(ConfigLevel::User))
-            .set(sdk_root.to_string_lossy().into())
-            .await
             .expect("creating temp sdk root");
 
         put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
@@ -490,7 +465,6 @@ mod test {
             .query(&format!("{SDK_OVERRIDE_KEY_PREFIX}.a_host_tool"))
             .level(Some(ConfigLevel::User))
             .set(override_path.to_string_lossy().into())
-            .await
             .expect("setting override");
 
         let sdk = env.context.get_sdk().expect("test sdk");
@@ -507,7 +481,6 @@ mod test {
             .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(sdk_root.to_string_lossy().into())
-            .await
             .expect("creating temp sdk root");
 
         put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
@@ -522,7 +495,6 @@ mod test {
             .query(&format!("{SDK_OVERRIDE_KEY_PREFIX}.a_host_tool"))
             .level(Some(ConfigLevel::User))
             .set(override_path.to_string_lossy().into())
-            .await
             .expect("setting override");
 
         let sdk = env.context.get_sdk().expect("test sdk");

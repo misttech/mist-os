@@ -97,13 +97,13 @@ class FakeNetInterfaces : public ::fuchsia::net::interfaces::State,
     callback(std::move(event));
   }
 
-  void AddExistingInterface(::fuchsia::hardware::network::DeviceClass device_class,
+  void AddExistingInterface(::fuchsia::hardware::network::PortClass port_class,
                             bool online = true) {
-    ::fuchsia::net::interfaces::DeviceClass device;
-    device.set_device(device_class);
+    ::fuchsia::net::interfaces::PortClass device;
+    device.set_device(port_class);
 
     ::fuchsia::net::interfaces::Properties properties;
-    properties.set_device_class(std::move(device));
+    properties.set_port_class(std::move(device));
     properties.set_online(online);
 
     ::fuchsia::net::interfaces::Event event;
@@ -554,9 +554,9 @@ TEST_F(GuestManagerTest, GuestProbablyHasNetworking) {
   ASSERT_TRUE(launch_callback_called);
 
   // There's a virtual interface, a bridge, and host networking. Everything looks good!
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::ETHERNET);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::VIRTUAL);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::BRIDGE);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::ETHERNET);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::VIRTUAL);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::BRIDGE);
 
   std::optional<GuestNetworkState> result;
   auto handle = std::async(std::launch::async, [&manager, &result] {
@@ -618,8 +618,8 @@ TEST_F(GuestManagerTest, BridgingRequiredHostOnWifi) {
 
   // There's no bridge, and the host is on WiFi with no ethernet connection. This will result
   // in no internet connection.
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::WLAN);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::VIRTUAL);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::WLAN_CLIENT);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::VIRTUAL);
 
   std::optional<GuestNetworkState> result;
   auto handle = std::async(std::launch::async, [&manager, &result] {
@@ -654,9 +654,9 @@ TEST_F(GuestManagerTest, BridgingRequiredHostOnWifiAndEthernet) {
   // There's no bridge, but the host has both a WiFi and ethernet connection. The host should
   // be able to bridge the virtual connection to the ethernet connection, so the lack of a bridge
   // may be transient.
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::WLAN);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::ETHERNET);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::VIRTUAL);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::WLAN_CLIENT);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::ETHERNET);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::VIRTUAL);
 
   std::optional<GuestNetworkState> result;
   auto handle = std::async(std::launch::async, [&manager, &result] {
@@ -689,8 +689,8 @@ TEST_F(GuestManagerTest, BridgingRequiredHostOnEthernet) {
   ASSERT_TRUE(launch_callback_called);
 
   // There's no bridge, but the host has a working ethernet connection. This may be transient.
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::ETHERNET);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::VIRTUAL);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::ETHERNET);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::VIRTUAL);
 
   std::optional<GuestNetworkState> result;
   auto handle = std::async(std::launch::async, [&manager, &result] {
@@ -727,8 +727,8 @@ TEST_F(GuestManagerTest, NotEnoughVirtualInterfaces) {
   ASSERT_TRUE(launch_callback_called);
 
   // Config has two guest interfaces, but there's only one present.
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::ETHERNET);
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::VIRTUAL);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::ETHERNET);
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::VIRTUAL);
 
   std::optional<GuestNetworkState> result;
   auto handle = std::async(std::launch::async, [&manager, &result] {
@@ -761,7 +761,7 @@ TEST_F(GuestManagerTest, NoHostNetworking) {
   ASSERT_TRUE(launch_callback_called);
 
   // Only active interfaces are used.
-  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::DeviceClass::ETHERNET,
+  fake_net_interfaces_->AddExistingInterface(::fuchsia::hardware::network::PortClass::ETHERNET,
                                              /*online=*/false);
 
   std::optional<GuestNetworkState> result;

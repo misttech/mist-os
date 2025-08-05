@@ -46,7 +46,7 @@ impl ProbeSequence {
     }
 
     pub fn random_new() -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // This unwrap is safe, since START_IDX is const and always a valid TxVecIdx.
         let default_idx = TxVecIdx::new(START_IDX).unwrap();
         let mut probe_table = [[default_idx; SEQUENCE_LENGTH]; NUM_PROBE_SEQUENCE];

@@ -50,6 +50,12 @@ def main() -> int:
         help="Path to output directory.",
     )
     parser.add_argument(
+        "--gendir",
+        type=pathlib.Path,
+        required=True,
+        help="Path to gendir directory.",
+    )
+    parser.add_argument(
         "--stamp",
         type=pathlib.Path,
         required=True,
@@ -83,11 +89,13 @@ def main() -> int:
 
     output = run_product_assembly(
         ffx_bin=args.ffx_bin,
+        platform=args.input_bundles_dir,
         product=args.product_assembly_config,
         board_info=args.board_information,
         input_bundles=args.input_bundles_dir,
         legacy_bundle=args.legacy_bundle,
         outdir=args.outdir,
+        gendir=args.gendir,
         suppress_overrides_warning=args.suppress_overrides_warning,
         **kwargs,
     )

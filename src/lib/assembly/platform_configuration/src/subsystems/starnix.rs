@@ -6,8 +6,7 @@ use crate::subsystems::prelude::*;
 use anyhow::ensure;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::starnix_config::{
-    NetworkManagerTreatment, PlatformStarnixConfig, RtnetlinkTreatmentOfIfb0Interface,
-    SocketMarkTreatment,
+    NetworkManagerTreatment, PlatformStarnixConfig, SocketMarkTreatment,
 };
 use starnix_features::{Feature, FeatureAndArgs};
 
@@ -18,13 +17,8 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
         starnix_config: &PlatformStarnixConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let PlatformStarnixConfig {
-            enabled,
-            enable_android_support,
-            socket_mark,
-            rtnetlink_ifb0,
-            network_manager,
-        } = starnix_config;
+        let PlatformStarnixConfig { enabled, enable_android_support, socket_mark, network_manager } =
+            starnix_config;
 
         if *enabled {
             ensure!(
@@ -75,15 +69,6 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                                 feature: Feature::NetstackMark,
                                 raw_args: None,
                             }),
-                        },
-                        match rtnetlink_ifb0 {
-                            RtnetlinkTreatmentOfIfb0Interface::ProvideFake => None,
-                            RtnetlinkTreatmentOfIfb0Interface::NoProvideFake => {
-                                Some(FeatureAndArgs {
-                                    feature: Feature::RtnetlinkAssumeIfb0Existence,
-                                    raw_args: None,
-                                })
-                            }
                         },
                         match network_manager {
                             NetworkManagerTreatment::Disabled => None,

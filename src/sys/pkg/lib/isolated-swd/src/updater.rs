@@ -32,10 +32,7 @@ impl Updater {
     /// If `update_package` is Some, use the given package URL as the URL for the update package.
     /// Otherwise, `system-updater` uses the default URL.
     /// This will not install any images to the recovery partitions.
-    pub async fn install_update(
-        &mut self,
-        update_package: Option<&fuchsia_url::AbsolutePackageUrl>,
-    ) -> Result<(), Error> {
+    pub async fn install_update(&mut self, update_package: Option<&url::Url>) -> Result<(), Error> {
         let update_package = match update_package {
             Some(url) => url.to_owned(),
             None => DEFAULT_UPDATE_PACKAGE_URL.parse().unwrap(),

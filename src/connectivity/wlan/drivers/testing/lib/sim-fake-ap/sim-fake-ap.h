@@ -65,7 +65,7 @@ class FakeAp final : public StationIfc {
   explicit FakeAp(Environment* environ) : environment_(environ) { environ->AddStation(this); }
 
   FakeAp(Environment* environ, const common::MacAddr& bssid,
-         const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_common::WlanChannel channel)
+         const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_ieee80211::WlanChannel channel)
       : environment_(environ), bssid_(bssid), ssid_(ssid) {
     environ->AddStation(this);
     tx_info_.channel = channel;
@@ -78,19 +78,19 @@ class FakeAp final : public StationIfc {
 
   ~FakeAp() { environment_->RemoveStation(this); }
 
-  void SetChannel(const wlan_common::WlanChannel& channel);
+  void SetChannel(const wlan_ieee80211::WlanChannel& channel);
   void SetBssid(const common::MacAddr& bssid);
   void SetSsid(const fuchsia_wlan_ieee80211::Ssid& ssid);
   void SetCsaBeaconInterval(zx::duration interval);
 
-  wlan_common::WlanChannel GetChannel() const { return tx_info_.channel; }
+  wlan_ieee80211::WlanChannel GetChannel() const { return tx_info_.channel; }
 
   common::MacAddr GetBssid() const { return bssid_; }
   fuchsia_wlan_ieee80211::Ssid GetSsid() const { return ssid_; }
   uint32_t GetNumAssociatedClient() const;
 
   // Will we receive a message sent on the specified channel?
-  bool CanReceiveChannel(const wlan_common::WlanChannel& channel);
+  bool CanReceiveChannel(const wlan_ieee80211::WlanChannel& channel);
 
   // When this is not called, the default is open network.
   zx_status_t SetSecurity(struct Security sec);
@@ -170,7 +170,7 @@ class FakeAp final : public StationIfc {
     // Are we waiting for the execution of scheduled channel switch announcement?
     bool is_switching_channel = false;
     // This is the channel AP about to change to
-    wlan_common::WlanChannel channel_after_csa;
+    wlan_ieee80211::WlanChannel channel_after_csa;
 
     // Unique value that is associated with the next beacon event
     uint64_t beacon_notification_id;

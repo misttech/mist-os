@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use derivative::Derivative;
-use macro_rules_attribute::apply;
-use starnix_sync::{Mutex, RwLock};
-use std::collections::{BTreeSet, HashMap, VecDeque};
-use std::sync::{Arc, Weak};
-
 use crate::fs::devpts::{get_device_type_for_pts, DEVPTS_COUNT};
 use crate::mutable_state::{state_accessor, state_implementation};
-use crate::task::{
-    CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter,
-};
+use crate::task::{EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
+use crate::vfs::{DirEntryHandle, FsString, Mounts};
+use derivative::Derivative;
+use macro_rules_attribute::apply;
 use starnix_logging::track_stub;
-use starnix_sync::{LockBefore, Locked, ProcessGroupState};
+use starnix_sync::{LockBefore, Locked, Mutex, ProcessGroupState, RwLock};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -26,6 +21,8 @@ use starnix_uapi::{
     ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF,
     VEOL, VEOL2, VERASE, VINTR, VKILL, VQUIT, VSUSP, VWERASE, XTABS,
 };
+use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::sync::{Arc, Weak};
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
 // terminal input in canonical mode. See https://github.com/google/gvisor/blob/master/pkg/sentry/fs/tty/line_discipline.go
@@ -64,10 +61,11 @@ impl TtyState {
     /// Returns the next available terminal.
     pub fn get_next_terminal(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
+        dev_pts_root: DirEntryHandle,
+        creds: FsCred,
     ) -> Result<Arc<Terminal>, Errno> {
         let id = self.pts_ids_set.lock().acquire()?;
-        let terminal = Arc::new(Terminal::new(self.clone(), current_task.as_fscred(), id));
+        let terminal = Terminal::new(self.clone(), dev_pts_root, creds, id);
         assert!(self.terminals.write().insert(id, Arc::downgrade(&terminal)).is_none());
         Ok(terminal)
     }
@@ -158,9 +156,15 @@ pub struct TerminalMutableState {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Terminal {
+    /// Weak self to allow cloning.
+    weak_self: Weak<Self>,
+
     /// The global devpts state.
     #[derivative(Debug = "ignore")]
     state: Arc<TtyState>,
+
+    /// The root of the devpts fs responsible for this terminal.
+    pub dev_pts_root: DirEntryHandle,
 
     /// The owner of the terminal.
     pub fscred: FsCred,
@@ -173,8 +177,24 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(state: Arc<TtyState>, fscred: FsCred, id: u32) -> Self {
-        Self { state, fscred, id, mutable_state: RwLock::new(Default::default()) }
+    pub fn new(
+        state: Arc<TtyState>,
+        dev_pts_root: DirEntryHandle,
+        fscred: FsCred,
+        id: u32,
+    ) -> Arc<Self> {
+        Arc::new_cyclic(|weak_self| Self {
+            weak_self: weak_self.clone(),
+            state,
+            dev_pts_root,
+            fscred,
+            id,
+            mutable_state: RwLock::new(Default::default()),
+        })
+    }
+
+    pub fn to_owned(&self) -> Arc<Terminal> {
+        self.weak_self.upgrade().expect("This should never be called while releasing the terminal")
     }
 
     /// Sets the terminal configuration.
@@ -188,6 +208,10 @@ impl Terminal {
 
     /// `close` implementation of the main side of the terminal.
     pub fn main_close(&self) {
+        // Remove the entry in the file system.
+        let id = FsString::from(self.id.to_string());
+        // The child is not a directory, the mount doesn't matter.
+        self.dev_pts_root.remove_child(id.as_ref(), &Mounts::new());
         self.write().main_close();
     }
 

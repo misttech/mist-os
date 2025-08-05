@@ -94,7 +94,7 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use wlan_common::assert_variant;
-    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
+    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync};
 
     struct TestValues {
         iface: IfaceRef,
@@ -225,9 +225,9 @@ mod tests {
                         ssid: ssid.as_bytes().to_vec(),
                         rssi_dbm,
                         snr_db: 0,
-                        channel: fidl_common::WlanChannel {
+                        channel: fidl_ieee80211::WlanChannel {
                             primary: 1,
-                            cbw: fidl_common::ChannelBandwidth::Cbw20,
+                            cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                             secondary80: 0,
                         },
                         protection: fidl_sme::Protection::Unknown,

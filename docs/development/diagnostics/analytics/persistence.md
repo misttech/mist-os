@@ -78,8 +78,8 @@ unlike allowlist selectors.
 Privacy needs to review Persistence configuration. To get a review,
 
 *   Get the CL +2'd
-*   Add cphoenix@ and miguelfrde@ to the CL.
-*   We will +1 the CL and add the Privacy team to the CL.
+*   Add claytonmccray@, crjohns@, and bbosak@ to the CL.
+*   One of us will +1 the CL and add Privacy reviewers.
 *   Someone in Privacy will +2 the CL (or raise a concern).
 *   When the CL is +2'd by Privacy (which may take about a week) it will show
     OWNERS approval and you can submit it.

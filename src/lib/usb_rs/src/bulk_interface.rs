@@ -6,8 +6,9 @@ use futures::io::{AsyncRead, AsyncWrite};
 use std::future::Future;
 use std::io::Write;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::task::Poll;
+use tokio::sync::RwLock;
 
 const MAX_USBFS_BULK_WRITE_SIZE: usize = 256 * 1024;
 
@@ -46,7 +47,7 @@ impl AsyncRead for BulkInterface {
         cx: &mut std::task::Context<'_>,
         mut buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
-        log::debug!("BulkInterface Poll read: {:#?}", self);
+        log::debug!("BulkInterface Poll read: {:?}", self);
         if self.read_future.is_none() {
             let inner_ref = self.inner.clone();
             let guard_ref = self.guard.clone();
@@ -55,14 +56,17 @@ impl AsyncRead for BulkInterface {
                 // Get the bulk in interface
                 for endpoint in inner_ref.endpoints() {
                     if let Endpoint::BulkIn(bie) = endpoint {
-                        let guard = guard_ref.read();
+                        let _guard = guard_ref.read().await;
+                        log::debug!(
+                            "Found bulk in endpoint, reading to buf of len: {}",
+                            buffer.len()
+                        );
                         bie.read(&mut buffer).await.map_err(|e| {
                             std::io::Error::new(
                                 std::io::ErrorKind::Other,
                                 format!("Error reading from bulk endpoint: {}", e),
                             )
                         })?;
-                        drop(guard);
                         return Ok(buffer);
                     }
                 }

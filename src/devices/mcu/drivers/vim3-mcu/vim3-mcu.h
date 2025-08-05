@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.fan/cpp/fidl.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <threads.h>
 
@@ -16,6 +15,8 @@
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 // STM8S003 MCU specific reg definitions
 // dl.khadas.com/Hardware/VIM3/MCU/VIM3_MCU_REG_EN.pdf for reg details

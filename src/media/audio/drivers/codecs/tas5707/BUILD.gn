@@ -20,7 +20,7 @@ fuchsia_cc_driver("tas5707-driver") {
   sources = [ "tas5707.cc" ]
   deps = [
     ":ti_tas5707-bind",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/driver",
     "//src/devices/lib/ti",
     "//src/lib/ddk",

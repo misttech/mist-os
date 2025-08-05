@@ -82,12 +82,25 @@ __asm__(
     ".size ThreadEntry, . - ThreadEntry\n"
     ".popsection");
 
-// Tests that creating a virtual interrupt with wakeable set fails.
+// Test the rules for creating a virtual interrupt.
+//
+// 1) Creating a basic virtual interrupt succeeds regardless of what resource
+//    object is passed.
+// 2) Creating a wake-vector virtual interrupt succeeds _only_ if the IRQ
+//    resource is provided, and fails otherwise.
+//
 TEST_F(InterruptTest, VirtualNotWakeable) {
+  const zx::resource invalid_handle{};
   zx::interrupt interrupt;
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
-            zx::interrupt::create(*irq_resource(), 0,
-                                  ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_WAKE_VECTOR, &interrupt));
+
+  constexpr uint32_t kBasicOpts = ZX_INTERRUPT_VIRTUAL;
+  ASSERT_OK(zx::interrupt::create(invalid_handle, 0, kBasicOpts, &interrupt));
+  ASSERT_OK(zx::interrupt::create(*irq_resource(), 0, kBasicOpts, &interrupt));
+
+  constexpr uint32_t kWakeVectorOpts = ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_WAKE_VECTOR;
+  ASSERT_EQ(ZX_ERR_BAD_HANDLE,
+            zx::interrupt::create(invalid_handle, 0, kWakeVectorOpts, &interrupt));
+  ASSERT_OK(zx::interrupt::create(*irq_resource(), 0, kWakeVectorOpts, &interrupt));
 }
 
 // Tests to bind interrupt to a non-bindable port

@@ -10,7 +10,6 @@
   "pkg/stdcompat/include/lib/stdcompat/internal/atomic.h": "fa8274c8b7ce958bfb0a5eddc36683bb",
   "pkg/stdcompat/include/lib/stdcompat/internal/bit.h": "88cc0b98aaaac25c449795ec51a7279e",
   "pkg/stdcompat/include/lib/stdcompat/internal/erase.h": "b001e4e4d0039f9c47bf00e9f442765d",
-  "pkg/stdcompat/include/lib/stdcompat/internal/exception.h": "a02ee08c8f2ef2173382c8d84f8b873f",
   "pkg/stdcompat/include/lib/stdcompat/internal/functional.h": "b34f835fcb0c34b0f7de1249a65ea85d",
   "pkg/stdcompat/include/lib/stdcompat/internal/linkage.h": "4d6bfe988d3274c850e081014b98dbdc",
   "pkg/stdcompat/include/lib/stdcompat/internal/span.h": "4142c01480f0e87a91df0fd546eb3411",

@@ -399,6 +399,10 @@ template("sdk_atom") {
     is_stable = is_stable
     category = category
 
+    if (defined(invoker.sdk_area)) {
+      api_area = invoker.sdk_area
+    }
+
     # Ensure tools that may be built multiple times in the same build directory
     # have unique labels.
     if (_cross_compiled_atom_types + [ atom_type ] - [ atom_type ] !=

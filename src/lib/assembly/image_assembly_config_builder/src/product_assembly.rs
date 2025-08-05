@@ -31,6 +31,7 @@ pub struct ProductAssembly {
     validation_mode: ValidationMode,
     builder_forensics_file_path: Option<Utf8PathBuf>,
     board_forensics_file_path: Option<Utf8PathBuf>,
+    include_example_aib_for_tests: bool,
 }
 
 impl ProductAssembly {
@@ -38,6 +39,7 @@ impl ProductAssembly {
         platform_artifacts: PlatformArtifacts,
         product_config: AssemblyConfig,
         board_config: BoardInformation,
+        include_example_aib_for_tests: bool,
     ) -> Result<Self> {
         let image_mode = product_config.platform.storage.filesystems.image_mode;
         let builder = ImageAssemblyConfigBuilder::new(
@@ -72,6 +74,7 @@ impl ProductAssembly {
             validation_mode: ValidationMode::On,
             builder_forensics_file_path: None,
             board_forensics_file_path: None,
+            include_example_aib_for_tests,
         })
     }
 
@@ -156,6 +159,7 @@ impl ProductAssembly {
         let product = self.product_config.product;
         let board_config = self.board_config;
         let mut builder = self.builder;
+        let include_example_aib_for_tests = self.include_example_aib_for_tests;
 
         builder
             .add_bundle(&self.kernel_aib)
@@ -210,6 +214,7 @@ impl ProductAssembly {
             &outdir,
             &resource_dir,
             self.developer_only_options.as_ref(),
+            include_example_aib_for_tests,
         )?;
 
         // Set the info used for BoardDriver arguments.
@@ -235,8 +240,8 @@ impl ProductAssembly {
         // Add the configuration capabilities.
         builder.add_configuration_capabilities(configuration.configuration_capabilities)?;
 
-        // Add the board's Board Input Bundles, if it has them.
         if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+            // Add the board's Board Input Bundles, if it has them.
             for (bundle_path, bundle) in board_input_bundles {
                 builder
                     .add_board_input_bundle(
@@ -245,6 +250,12 @@ impl ProductAssembly {
                             || platform.feature_set_level == FeatureSetLevel::Embeddable,
                     )
                     .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+            }
+            // Add the product's Product Input Bundles, if it has them.
+            for bundle in self.product_config.product_input_bundles.values() {
+                builder.add_product_input_bundle(bundle).with_context(|| {
+                    format!("Adding product input bundle: {}", &bundle.release_info.name)
+                })?;
             }
         }
 
@@ -277,16 +288,15 @@ impl ProductAssembly {
         builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 
         // Add product-specified packages and configuration
-        if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
+        if product.bootfs_files_package.is_some() {
             match platform.feature_set_level {
                 FeatureSetLevel::TestNoPlatform
                 | FeatureSetLevel::Embeddable
-                | FeatureSetLevel::Bootstrap
-                | FeatureSetLevel::Utility => {
+                | FeatureSetLevel::Bootstrap => {
                     // these are the only valid feature set levels for adding these files.
                 }
                 _ => {
-                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap', or 'utility' feature set levels");
+                    bail!("bootfs files can only be added to the 'empty', 'embeddable', or 'bootstrap' feature set levels");
                 }
             }
         }
@@ -318,6 +328,13 @@ impl ProductAssembly {
         builder
             .add_product_base_drivers(product.base_drivers)
             .context("Adding product-provided base-drivers")?;
+
+        // Add ZBI extra items.
+        if let Some(zbi_extra_items_path) = &board_config.zbi_extra_items {
+            builder
+                .add_zbi_extra_items(zbi_extra_items_path)
+                .context("Adding ZBI extra items image")?;
+        }
 
         // Add devicetree binary
         if let Some(devicetree_path) = &board_config.devicetree {

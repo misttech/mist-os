@@ -33,7 +33,6 @@
 #include <arch/x86/feature.h>
 #include <arch/x86/mmu.h>
 #include <arch/x86/mp.h>
-#include <kernel/auto_lock.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <vm/vm.h>
@@ -95,8 +94,10 @@ static bool xsave_supported = false;
 static bool fxsave_supported = false;
 /* Maximum register state size */
 static size_t register_state_size = 0;
-/* Spinlock to guard register state size changes */
-static SpinLock state_lock;
+/* Spinlock to guard register state size changes. This is declared as a raw SpinLock and not a
+ * LockDep style DECLARE_SINGLETON_SPINLOCK since this lock needs to be used prior to global ctors
+ * being run, and a LockDep singleton is not constinit. */
+SpinLock state_lock;
 
 /* For FXRSTOR, we need 512 bytes to save the state.  For XSAVE-based
  * mechanisms, we only need 512 + 64 bytes for the initial state, since
@@ -481,13 +482,18 @@ static void recompute_state_size(void) {
     new_size = leaf.b;
   }
 
-  AutoSpinLockNoIrqSave guard(&state_lock);
+  DEBUG_ASSERT(arch_ints_disabled());
+  // This is the only place state_lock is used, and as it's a short block and we are unable to
+  // declare this as a LockDep managed lock we opt for a manual acquire/release here. Due to clang
+  // static analysis we will get errors if the Release is forgotten, so this is still fairly safe.
+  state_lock.Acquire();
   /* Only allow size to increase; all CPUs should converge to the same value,
    * but for sanity let's keep it monotonically increasing */
   if (new_size > register_state_size) {
     register_state_size = new_size;
     DEBUG_ASSERT(register_state_size <= X86_MAX_EXTENDED_REGISTER_SIZE);
   }
+  state_lock.Release();
 }
 
 static void fxsave(void* register_state) {

@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	stdio "io"
 	"log"
@@ -135,9 +136,12 @@ func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
+const ModeTypeMask uint32 = 1044480
+const ModeTypeService uint32 = 65536
+
 func (*Service) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      uint32(io.ModeTypeService),
+		Mode:      ModeTypeService,
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -159,7 +163,10 @@ func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Nod
 }
 
 func (*Service) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("Service.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -324,7 +331,7 @@ func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 
 func (*directoryState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      uint32(io.ModeTypeDirectory) | uint32(fdio.VtypeIRUSR),
+		Mode:      uint32(fdio.VtypeDir | fdio.VtypeIRUSR),
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -346,7 +353,10 @@ func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) 
 }
 
 func (*directoryState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("directoryState.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -410,12 +420,19 @@ func (dirState *directoryState) Open(ctx fidl.Context, path string, flags io.Fla
 			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
 				return dir.Open(ctx, path[i+len(slash):], flags, options, channel)
 			}
-			return CloseWithEpitaph(channel, zx.ErrNotDir)
+			if err := closeWithEpitaphIgnorePeerClosed(channel, zx.ErrNotDir); err != nil {
+				logError(fmt.Errorf("directoryState.Open: %w", err))
+			}
+			return nil
 		}
 	} else if node, ok := dirState.Directory.Get(path); ok {
 		return node.addConnection(flags, channel)
 	}
-	return CloseWithEpitaph(channel, zx.ErrNotFound)
+
+	if err := closeWithEpitaphIgnorePeerClosed(channel, zx.ErrNotDir); err != nil {
+		logError(fmt.Errorf("directoryState.Open: %w", err))
+	}
+	return nil
 }
 
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.DirectoryUnlinkResult, error) {
@@ -445,12 +462,12 @@ func (dirState *directoryState) ReadDirents(ctx fidl.Context, maxOut uint64) (in
 				Ino:  attr.Id,
 				Size: uint8(len(name)),
 				Type: uint8(func() io.DirentType {
-					switch modeType := attr.Mode & io.ModeTypeMask; modeType {
-					case io.ModeTypeDirectory:
+					switch modeType := attr.Mode & ModeTypeMask; modeType {
+					case uint32(fdio.VtypeDir):
 						return io.DirentTypeDirectory
-					case io.ModeTypeFile:
+					case uint32(fdio.VtypeFile):
 						return io.DirentTypeFile
-					case io.ModeTypeService:
+					case ModeTypeService:
 						return io.DirentTypeService
 					default:
 						panic(fmt.Sprintf("unknown mode type: %b", modeType))
@@ -729,7 +746,7 @@ func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 
 func (fState *fileState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:        uint32(io.ModeTypeFile) | uint32(fdio.VtypeIRUSR),
+		Mode:        uint32(fdio.VtypeFile | fdio.VtypeIRUSR),
 		Id:          io.InoUnknown,
 		ContentSize: fState.size,
 		LinkCount:   1,
@@ -752,7 +769,10 @@ func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.N
 }
 
 func (*fileState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("fileState.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -870,4 +890,17 @@ func (fState *fileState) GetBackingMemory(fidl.Context, io.VmoFlags) (io.FileGet
 		}
 	}
 	return io.FileGetBackingMemoryResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+// closeWithEpitaphIgnorePeerClosed closes req with status as its epitaph. It
+// returns observed errors except for peer closed.
+func closeWithEpitaphIgnorePeerClosed(req zx.Channel, status zx.Status) error {
+	err := CloseWithEpitaph(req, status)
+	var e *zx.Error
+	if errors.As(err, &e) {
+		if e.Status == zx.ErrPeerClosed {
+			return nil
+		}
+	}
+	return err
 }

@@ -989,13 +989,12 @@ which is almost certainly a mistake: {}",
                             match &id {
                                 CapabilityId::Protocol(_)
                                 | CapabilityId::Dictionary(_)
+                                | CapabilityId::Directory(_)
                                 | CapabilityId::Runner(_)
                                 | CapabilityId::Resolver(_)
                                 | CapabilityId::Service(_)
                                 | CapabilityId::Configuration(_) => {}
-                                CapabilityId::Directory(_)
-                                | CapabilityId::Storage(_)
-                                | CapabilityId::EventStream(_) => {
+                                CapabilityId::Storage(_) | CapabilityId::EventStream(_) => {
                                     let type_name = id.type_str();
                                     return Err(Error::validate(format!(
                                         "\"offer\" to dictionary \"{to}\" for \"{type_name}\" but \

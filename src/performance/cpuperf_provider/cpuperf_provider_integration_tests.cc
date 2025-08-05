@@ -6,6 +6,8 @@
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 
+#include <string_view>
+
 #include <gtest/gtest.h>
 #include <trace-reader/file_reader.h>
 
@@ -68,8 +70,8 @@ TEST(CpuperfProvider, IntegrationTest) {
   };
 
   bool got_error = false;
-  auto error_handler = [&got_error](fbl::String error) {
-    FX_LOGS(ERROR) << "While reading records got error: " << error.c_str();
+  auto error_handler = [&got_error](std::string_view error) {
+    FX_LOGS(ERROR) << "While reading records got error: " << error;
     got_error = true;
   };
 

@@ -17,10 +17,10 @@ namespace wlan::brcmfmac {
 
 // Some default AP and association request values
 
-constexpr wlan_common::WlanChannel kAp0Channel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_common::WlanChannel kAp1Channel = {
-    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kAp0Channel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kAp1Channel = {
+    .primary = 11, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint8_t kAp1OperatingClass = 101;
 
 const common::MacAddr kAp0Bssid("12:34:56:78:9a:bc");
@@ -211,20 +211,23 @@ TEST_F(WnmTest, RoamOnBtmReqButTargetApIgnoresReassoc) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
 
-  // Also verify that we got only the right disconnect.
-  ASSERT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
-  const auto& disassoc_ind = client_ifc_.stats_.disassoc_indications.front();
-  ASSERT_TRUE(disassoc_ind.reason_code().has_value());
-  EXPECT_EQ(disassoc_ind.reason_code().value(), wlan_ieee80211::ReasonCode::kStaLeaving);
-  // Firmware-initiated disconnect with no SME-requested disconnect means
-  // locally initiated.
-  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
-  EXPECT_TRUE(disassoc_ind.locally_initiated().value());
+  // Roam result should have been sent.
+  ASSERT_EQ(client_ifc_.stats_.roam_result_indications.size(), 1U);
+  const auto& roam_result_ind = client_ifc_.stats_.roam_result_indications.front();
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_FALSE(roam_result_ind.original_association_maintained().value());
+  ASSERT_TRUE(roam_result_ind.target_bss_authenticated().has_value());
+  // In this case, target AP has allowed authentication but ignored association.
+  EXPECT_TRUE(roam_result_ind.target_bss_authenticated().value());
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_NE(wlan_ieee80211::StatusCode::kSuccess, roam_result_ind.status_code().value());
+
+  // No other SME notifications about disconnects should have been sent.
+  EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.deauth_results.size(), 0U);
@@ -272,7 +275,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthForTargetInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
@@ -330,7 +332,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDisassocInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
@@ -384,7 +385,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
@@ -440,9 +440,18 @@ TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoUnsupported) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
-  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
+
+  // Roam result should have been sent.
+  ASSERT_EQ(client_ifc_.stats_.roam_result_indications.size(), 1U);
+  const auto& roam_result_ind = client_ifc_.stats_.roam_result_indications.front();
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_FALSE(roam_result_ind.original_association_maintained().value());
+  ASSERT_TRUE(roam_result_ind.target_bss_authenticated().has_value());
+  // In this case, DUT does not attempt to roam to target.
+  EXPECT_FALSE(roam_result_ind.target_bss_authenticated().value());
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_NE(wlan_ieee80211::StatusCode::kSuccess, roam_result_ind.status_code().value());
 }
 
 // DUT is configured to roam when AP sends a BTM request, but the firmware
@@ -489,9 +498,18 @@ TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoIeBufferMalformed) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
-  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
+
+  // Roam result should have been sent.
+  ASSERT_EQ(client_ifc_.stats_.roam_result_indications.size(), 1U);
+  const auto& roam_result_ind = client_ifc_.stats_.roam_result_indications.front();
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_FALSE(roam_result_ind.original_association_maintained().value());
+  ASSERT_TRUE(roam_result_ind.target_bss_authenticated().has_value());
+  // In this case, DUT does not attempt to roam to target.
+  EXPECT_FALSE(roam_result_ind.target_bss_authenticated().value());
+  ASSERT_TRUE(roam_result_ind.status_code().has_value());
+  EXPECT_NE(wlan_ieee80211::StatusCode::kSuccess, roam_result_ind.status_code().value());
 }
 
 }  // namespace wlan::brcmfmac

@@ -1257,26 +1257,6 @@ assembly_input_bundle("networking_basic_packages_gub") {
   base_packages = [ "//src/connectivity/policy/netcfg:package-basic_gub" ]
 }
 
-# networking_test_collection
-#
-# Includes a test collection inside the network realm that has access to all
-# networking administrative capabilities.
-assembly_input_bundle("networking_test_collection") {
-  testonly = true
-  compiled_packages = [
-    {
-      name = "network"
-      components = [
-        {
-          component_name = "network"
-          shards =
-              [ "//src/connectivity/network/meta/test-collection.shard.cml" ]
-        },
-      ]
-    },
-  ]
-}
-
 # This is common across all eng-mode products that include the core realm.
 #
 # This is mutually-exclusive with the `core_realm_user_and_userdebug` AIB.
@@ -1645,7 +1625,10 @@ assembly_input_bundle("core_realm_development_access") {
       components = [
         {
           component_name = "toolbox"
-          shards = [ "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml" ]
+          shards = [
+            "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher_from_core.toolbox_shard.cml",
+          ]
         },
       ]
     },
@@ -2653,8 +2636,9 @@ assembly_input_bundle("fastbootd_usb_support") {
 #
 assembly_input_bundle("nanohub_support") {
   base_packages = [
-    "//src/starnix/modules/nanohub:sockettunnel",
+    "//src/starnix/modules/nanohub:google_display",
     "//src/starnix/modules/nanohub:google_nanohub",
+    "//src/starnix/modules/nanohub:sockettunnel",
   ]
   compiled_packages = [
     {
@@ -2663,8 +2647,9 @@ assembly_input_bundle("nanohub_support") {
         {
           component_name = "core"
           shards = [
-            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
+            "//src/starnix/modules/nanohub/meta/display.core_shard.cml",
             "//src/starnix/modules/nanohub/meta/nanohub.core_shard.cml",
+            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
           ]
         },
       ]
@@ -5015,7 +5000,8 @@ assembly_resources_directory("resources") {
 
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
-    "//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
+    "//src/developer/forensics/feedback_id/flash_ts/meta/flash_ts_feedback_id.core_shard.cml.template",
+    "//src/developer/forensics/feedback_id/sysinfo/meta/sysinfo_feedback_id.core_shard.cml.template",
     "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",

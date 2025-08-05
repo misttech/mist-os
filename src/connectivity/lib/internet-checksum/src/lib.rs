@@ -720,13 +720,13 @@ mod tests {
         for _ in 0..2048 {
             // use an odd length so we test the odd length logic
             const BUF_LEN: usize = 31;
-            let buf: [u8; BUF_LEN] = rng.gen();
+            let buf: [u8; BUF_LEN] = rng.random();
             let mut c = Checksum::new();
             c.add_bytes(&buf);
 
             let (begin, end) = loop {
-                let begin = rng.gen::<usize>() % BUF_LEN;
-                let end = begin + (rng.gen::<usize>() % (BUF_LEN + 1 - begin));
+                let begin = rng.random_range(0..BUF_LEN);
+                let end = begin + (rng.random_range(0..(BUF_LEN + 1 - begin)));
                 // update requires that begin is even and end is either even or
                 // the end of the input
                 if begin % 2 == 0 && (end % 2 == 0 || end == BUF_LEN) {
@@ -736,7 +736,7 @@ mod tests {
 
             let mut new_buf = buf;
             for i in begin..end {
-                new_buf[i] = rng.gen();
+                new_buf[i] = rng.random();
             }
             let updated = update(c.checksum(), &buf[begin..end], &new_buf[begin..end]);
             let from_scratch = {
@@ -761,7 +761,7 @@ mod tests {
             for _ in 0..4 {
                 let mut buf = vec![];
                 for _ in 0..len {
-                    buf.push(rng.gen());
+                    buf.push(rng.random());
                 }
                 c1.add_bytes(&buf[..]);
                 c2.add_bytes_small(&buf[..]);

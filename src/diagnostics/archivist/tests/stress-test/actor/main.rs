@@ -67,11 +67,11 @@ fn simple_writer(_: &mut WorkerData, _: SmallRng) -> BoxFuture<'_, Result<()>> {
 
 fn length_writer(_: &mut WorkerData, mut rng: SmallRng) -> BoxFuture<'_, Result<()>> {
     async move {
-        let random_string_len = rng.gen_range(1..1000);
+        let random_string_len = rng.random_range(1..1000);
         let mut random_string = String::new();
 
         for _ in 0..random_string_len {
-            let c = rng.gen::<char>();
+            let c = rng.random::<char>();
             random_string.push(c)
         }
 

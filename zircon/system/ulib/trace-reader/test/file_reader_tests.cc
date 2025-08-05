@@ -9,10 +9,9 @@
 
 #include <iterator>
 #include <memory>
-#include <utility>
+#include <string_view>
+#include <vector>
 
-#include <fbl/algorithm.h>
-#include <fbl/vector.h>
 #include <trace-reader/file_reader.h>
 #include <zxtest/zxtest.h>
 
@@ -43,8 +42,8 @@ TEST(TraceFileReader, Records) {
   ASSERT_EQ(fclose(f), 0);
 
   std::unique_ptr<trace::FileReader> reader;
-  fbl::Vector<trace::Record> records;
-  fbl::String error;
+  std::vector<trace::Record> records;
+  std::string_view error;
   ASSERT_TRUE(trace::FileReader::Create(kTestInputFile, test::MakeRecordConsumer(&records),
                                         test::MakeErrorHandler(&error), &reader));
 

@@ -10,7 +10,14 @@
 
 #include <cstdint>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using DriverImageIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display_engine::wire::ImageId, uint64_t>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -25,25 +32,7 @@ namespace display {
 //
 // TODO(https://fxbug.dev/42079544): Unify this type with `DriverCaptureImageId`
 // when unifying image ID namespaces.
-DEFINE_STRONG_INT(DriverImageId, uint64_t);
-
-constexpr DriverImageId ToDriverImageId(uint64_t banjo_driver_image_id) {
-  return DriverImageId(banjo_driver_image_id);
-}
-
-constexpr DriverImageId ToDriverImageId(
-    fuchsia_hardware_display_engine::wire::ImageId fidl_driver_image_id) {
-  return DriverImageId(fidl_driver_image_id.value);
-}
-
-constexpr uint64_t ToBanjoDriverImageId(DriverImageId driver_image_id) {
-  return driver_image_id.value();
-}
-
-constexpr fuchsia_hardware_display_engine::wire::ImageId ToFidlDriverImageId(
-    DriverImageId driver_image_id) {
-  return fuchsia_hardware_display_engine::wire::ImageId{.value = driver_image_id.value()};
-}
+using DriverImageId = display::internal::IdType<display::internal::DriverImageIdTraits>;
 
 constexpr DriverImageId kInvalidDriverImageId(INVALID_ID);
 

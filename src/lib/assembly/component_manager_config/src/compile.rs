@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use cm_types::{symmetrical_enums, Url};
+use cm_types::{symmetrical_enums, Name, Path, Url};
 use cml::error::{Error, Location};
 use cml::translate::CompileOptions;
 use fidl::persist;
 use itertools::Itertools;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Write;
@@ -129,6 +129,7 @@ struct Config {
     abi_revision_policy: Option<AbiRevisionPolicy>,
     vmex_source: Option<VmexSource>,
     health_check: Option<HealthCheck>,
+    inject: Option<Vec<InjectedBundle>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -142,6 +143,69 @@ impl Into<component_internal::HealthCheck> for HealthCheck {
         component_internal::HealthCheck {
             monikers: self.monikers,
             ..component_internal::HealthCheck::default()
+        }
+    }
+}
+
+/// An extra capability to be injected into a component.
+///
+/// At the moment, only protocol capabilities are supported.
+#[derive(Deserialize, Debug, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
+pub enum InjectedUse {
+    /// A protocol capability to be injected into a component.
+    Protocol(InjectedUseProtocol),
+}
+
+impl Into<component_internal::InjectedUse> for InjectedUse {
+    fn into(self) -> component_internal::InjectedUse {
+        match self {
+            InjectedUse::Protocol(protocol) => {
+                component_internal::InjectedUse::Protocol(protocol.into())
+            }
+        }
+    }
+}
+
+/// A protocol capability to be injected into a component.
+#[derive(Deserialize, Debug, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct InjectedUseProtocol {
+    /// Name identifying the protocol within the root component.
+    pub source_name: Name,
+
+    /// The path where the capability should be injected in the new component's namespace.
+    pub target_path: Path,
+}
+
+impl Into<component_internal::InjectedUseProtocol> for InjectedUseProtocol {
+    fn into(self) -> component_internal::InjectedUseProtocol {
+        component_internal::InjectedUseProtocol {
+            source_name: Some(self.source_name.to_string()),
+            target_path: Some(self.target_path.to_string()),
+            ..component_internal::InjectedUseProtocol::default()
+        }
+    }
+}
+
+/// A group of extra elements that are layered at runtime on top of those
+/// normally present in the matching components.
+#[derive(Deserialize, Debug, Default, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct InjectedBundle {
+    /// Components that will have this bundle injected into.
+    pub components: Vec<cm_config::AllowlistEntry>,
+
+    /// Capabilities to be injected.
+    pub r#use: Option<Vec<InjectedUse>>,
+}
+
+impl Into<component_internal::InjectedBundle> for InjectedBundle {
+    fn into(self) -> component_internal::InjectedBundle {
+        component_internal::InjectedBundle {
+            components: Some(self.components.into_iter().map(|entry| entry.to_string()).collect()),
+            use_: Some(self.r#use.unwrap_or_default().into_iter().map(Into::into).collect()),
+            ..component_internal::InjectedBundle::default()
         }
     }
 }
@@ -484,6 +548,7 @@ impl TryFrom<Config> for component_internal::Config {
             abi_revision_policy: config.abi_revision_policy.map(Into::into),
             vmex_source: config.vmex_source.map(Into::into),
             health_check: config.health_check.map(Into::into),
+            inject: Some(config.inject.unwrap_or_default().into_iter().map(Into::into).collect()),
             ..Default::default()
         })
     }
@@ -600,6 +665,7 @@ impl Config {
             abi_revision_policy: merge_field!(self, another, abi_revision_policy),
             vmex_source: merge_field!(self, another, vmex_source),
             health_check: merge_field!(self, another, health_check),
+            inject: deep_merge_field!(self, another, inject),
         })
     }
 
@@ -911,6 +977,18 @@ mod tests {
             realm_builder_resolver_and_runner: "namespace",
             vmex_source: "namespace",
             health_check: { monikers : ["/block/an/update", "/check/before/committing"]},
+            inject: [
+                {
+                    "components": [ "/hello", "/hello/world" ],
+                    "use": [
+                        {
+                            "type": "protocol",
+                            "source_name": "fuchsia.foo.bar",
+                            "target_path": "/svc/fuchsia.foo.baz",
+                        },
+                    ],
+                },
+            ],
         }"#;
         let config = compile_str(input).expect("failed to compile");
         assert_eq!(
@@ -1032,6 +1110,17 @@ mod tests {
                     ]),
                     ..Default::default()
                 }),
+                inject: Some(vec![component_internal::InjectedBundle {
+                    components: Some(vec!["/hello".to_string(), "/hello/world".to_string()]),
+                    use_: Some(vec![component_internal::InjectedUse::Protocol(
+                        component_internal::InjectedUseProtocol {
+                            source_name: Some("fuchsia.foo.bar".to_string()),
+                            target_path: Some("/svc/fuchsia.foo.baz".to_string()),
+                            ..Default::default()
+                        }
+                    )]),
+                    ..Default::default()
+                }]),
                 ..Default::default()
             }
         );

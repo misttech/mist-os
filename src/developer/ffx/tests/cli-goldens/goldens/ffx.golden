@@ -162,6 +162,14 @@
       "short": null,
       "description": "switch which enables the 'strict' feature set. When set, ffx has stricter behavioual patterns. Including but not limited to:   * Not doing discovery   * Not starting the daemon   * Communicating directly with the target from the ffx cli (not the daemon)   * Configuration is read only The features in this flag are currently under active development.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--direct",
+      "short": "d",
+      "description": "make a direct connection to the target",
+      "hidden": false
     }
   ],
   "notes": [],

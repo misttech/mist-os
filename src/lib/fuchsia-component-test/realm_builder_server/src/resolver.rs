@@ -295,7 +295,6 @@ impl Registry {
         )
         .await?;
         Ok(fresolution::Component {
-            url: Some(component_url.to_string()),
             decl: Some(encode(decl)?),
             package,
             config_values,
@@ -377,7 +376,6 @@ impl Registry {
         )
         .await?;
         Ok(fresolution::Component {
-            url: Some(component_url.clone()),
             resolution_context: None,
             decl: Some(encode(component_decl).map_err(|e| {
                 error!("while encoding component decl: {}", e);

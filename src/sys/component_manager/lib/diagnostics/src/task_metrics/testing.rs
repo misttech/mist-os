@@ -8,8 +8,8 @@ use crate::task_metrics::runtime_stats_source::*;
 use crate::task_metrics::task_info::{TaskInfo, TaskState};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
-use futures::lock::Mutex;
 use injectable_time::{IncrementingFakeTime, TimeSource};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -39,7 +39,7 @@ impl FakeTask {
         }
     }
 
-    pub async fn terminate(&self) {
+    pub fn terminate(&self) {
         self.event
             .signal_handle(zx::Signals::NONE, zx::Signals::TASK_TERMINATED)
             .expect("signal task terminated");
@@ -56,18 +56,18 @@ impl RuntimeStatsSource for FakeTask {
         self.event.as_handle_ref()
     }
 
-    async fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status> {
-        Ok(self.values.lock().await.pop_front().unwrap_or(zx::TaskRuntimeInfo::default()))
+    fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status> {
+        Ok(self.values.lock().pop_front().unwrap_or(zx::TaskRuntimeInfo::default()))
     }
 }
 
 impl TaskInfo<FakeTask> {
     pub async fn force_terminate(&mut self) {
-        let mut guard = self.most_recent_measurement_nanos.lock().await;
+        let mut guard = self.most_recent_measurement_nanos.lock();
         *guard = Some(self.time_source.now());
         drop(guard);
-        match &*self.task.lock().await {
-            TaskState::Alive(t) | TaskState::Terminated(t) => t.terminate().await,
+        match &*self.task.lock() {
+            TaskState::Alive(t) | TaskState::Terminated(t) => t.terminate(),
             TaskState::TerminatedAndMeasured => {}
         }
 
@@ -75,7 +75,7 @@ impl TaskInfo<FakeTask> {
         // terminated to avoid flaking.
         loop {
             if matches!(
-                *self.task.lock().await,
+                *self.task.lock(),
                 TaskState::Terminated(_) | TaskState::TerminatedAndMeasured
             ) {
                 return;
@@ -109,8 +109,8 @@ impl FakeRuntime {
 
 #[async_trait]
 impl ComponentStartedInfo<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
-    async fn get_receiver(&self) -> Option<oneshot::Receiver<FakeDiagnosticsContainer>> {
-        match self.container.lock().await.take() {
+    fn get_receiver(&self) -> Option<oneshot::Receiver<FakeDiagnosticsContainer>> {
+        match self.container.lock().take() {
             None => None,
             Some(container) => {
                 let (snd, rcv) = oneshot::channel();

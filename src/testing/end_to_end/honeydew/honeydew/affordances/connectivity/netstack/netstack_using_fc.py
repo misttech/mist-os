@@ -74,10 +74,6 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
     def verify_supported(self) -> None:
         """Check if WLAN Policy is supported on the DUT.
 
-        Args:
-            device: Device name returned by `ffx target list`.
-            ffx: FFX transport
-
         Raises:
             NotSupportedError: Netstack affordance is not supported by Fuchsia device.
         """

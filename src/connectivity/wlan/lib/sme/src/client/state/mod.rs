@@ -3801,8 +3801,8 @@ mod tests {
             beacon_period: 0,
             capability_info: 0,
             ies: Vec::new(),
-            channel: fidl_common::WlanChannel {
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+            channel: fidl_ieee80211::WlanChannel {
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 primary: 0,
                 secondary80: 0,
             },

@@ -48,7 +48,6 @@ pub fn round_down<
 }
 
 pub struct TestFixtureBuilder {
-    netboot: bool,
     no_fuchsia_boot: bool,
     disk: Option<Disk>,
     extra_disks: Vec<Disk>,
@@ -61,7 +60,6 @@ pub struct TestFixtureBuilder {
 impl TestFixtureBuilder {
     pub fn new(fshost_component_name: &'static str, storage_host: bool) -> Self {
         Self {
-            netboot: false,
             no_fuchsia_boot: false,
             disk: None,
             extra_disks: Vec::new(),
@@ -101,11 +99,6 @@ impl TestFixtureBuilder {
         self.zbi_ramdisk.as_mut().unwrap()
     }
 
-    pub fn netboot(mut self) -> Self {
-        self.netboot = true;
-        self
-    }
-
     pub fn no_fuchsia_boot(mut self) -> Self {
         self.no_fuchsia_boot = true;
         self
@@ -126,7 +119,7 @@ impl TestFixtureBuilder {
             None => None,
         };
         let (tx, crash_reports) = mpsc::channel(32);
-        let mocks = mocks::new_mocks(self.netboot, maybe_zbi_vmo, tx, device_config).await;
+        let mocks = mocks::new_mocks(maybe_zbi_vmo, tx, device_config).await;
 
         let mocks = builder
             .add_local_child("mocks", move |h| mocks(h).boxed(), ChildOptions::new())

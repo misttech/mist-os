@@ -5,6 +5,10 @@
 """Repository rules used to populate Clang-based repositories."""
 
 load(
+    "@rules_fuchsia//common:repository_utils.bzl",
+    "bazel_major_version_is_at_least",
+)
+load(
     "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
     "prepare_clang_repository",
 )
@@ -29,12 +33,16 @@ def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
     )
     workspace_dir = str(repo_ctx.workspace_root)
 
-    if hasattr(repo_ctx.attr, "repository_version_file"):
+    if repo_ctx.attr.repository_version_file:
         # Force Bazel to record an association with this file, if it is provided.
         # If its content changes (for example after a `jiri update` that modifies
         # the toolchain directory), this Bazel repository will be automatically
         # re-generated.
-        repo_ctx.path(Label("@//:" + repo_ctx.attr.repository_version_file))
+        if bazel_major_version_is_at_least(repo_ctx, 7):
+            repo_ctx.watch("%s/%s" % (workspace_dir, repo_ctx.attr.repository_version_file))
+        else:
+            # This can only work if the path does not cross package boundaries.
+            repo_ctx.path(Label("@//:" + repo_ctx.attr.repository_version_file))
 
     repo_ctx.symlink(
         repo_ctx.path(Label("@//build/bazel/toolchains/clang:prebuilt_clang.BUILD.bazel")),

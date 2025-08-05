@@ -68,15 +68,15 @@ void riscv64_software_exception() {
           reason);
 
   if (reason & (1u << MP_IPI_RESCHEDULE)) {
-    mp_mbx_reschedule_irq(nullptr);
+    mp_mbx_reschedule_irq();
     reason &= ~(1u << MP_IPI_RESCHEDULE);
   }
   if (reason & (1u << MP_IPI_GENERIC)) {
-    mp_mbx_generic_irq(nullptr);
+    mp_mbx_generic_irq();
     reason &= ~(1u << MP_IPI_GENERIC);
   }
   if (reason & (1u << MP_IPI_INTERRUPT)) {
-    mp_mbx_interrupt_irq(nullptr);
+    mp_mbx_interrupt_irq();
     reason &= ~(1u << MP_IPI_INTERRUPT);
   }
   if (reason & (1u << MP_IPI_HALT)) {

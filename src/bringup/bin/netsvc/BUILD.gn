@@ -76,8 +76,6 @@ source_set("netsvc_common") {
     "file-api.cc",
     "netboot.cc",
     "netcp.cc",
-    "paver.cc",
-    "payload-streamer.cc",
     "tftp.cc",
     "zbi.cc",
   ]
@@ -99,11 +97,8 @@ source_set("netsvc_common") {
   ]
   public_deps = [
     ":inet6",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
-    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//src/bringup/lib/netboot",
-    "//src/storage/testing:fake-paver",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
@@ -118,8 +113,6 @@ test("netsvc-test") {
     "test/debuglog-test.cc",
     "test/file-api-test.cc",
     "test/match-test.cc",
-    "test/paver-test.cc",
-    "test/payload-streamer-test.cc",
   ]
   deps = [
     ":args",
@@ -140,32 +133,6 @@ test("netsvc-test") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
-  ]
-}
-
-test("netsvc-stress-test") {
-  sources = [ "test/paver-stress-test.cc" ]
-  deps = [
-    ":netsvc_common",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fdio",
-    "//src/devices/testing/devmgr-integration-test-shim",
-    "//src/storage/lib/ramdevice_client/cpp",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_test_component("netsvc-stress-test-component") {
-  component_name = "netsvc-stress-test"
-  manifest = "meta/netsvc-stress-test.cml"
-  deps = [
-    ":netsvc-stress-test",
-    "//src/devices/board/drivers/integration-test",
-    "//src/devices/bus/drivers/platform",
   ]
 }
 
@@ -201,10 +168,7 @@ group("tests") {
 
 fuchsia_test_package("netsvc-tests-package") {
   package_name = "netsvc-tests"
-  test_components = [
-    ":netsvc-stress-test-component",
-    ":netsvc-test-component",
-  ]
+  test_components = [ ":netsvc-test-component" ]
 
   # TODO(https://fxbug.dev/355757666): Fix cause of ERROR logs
   if (true || is_coverage) {
@@ -217,11 +181,6 @@ fuchsia_test_package("netsvc-tests-package") {
         max_severity = "ERROR"
       }
     }
-  }
-  if (current_cpu == "riscv64") {
-    # TODO(b/310244232): This test runs extremely slowly on RISC-V QEMU and
-    # times out in CI/CQ. Reenable once it can be run on real RISC-V hardware.
-    test_components -= [ ":netsvc-stress-test-component" ]
   }
 }
 

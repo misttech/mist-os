@@ -26,7 +26,7 @@ use fuchsia_scenic::BufferCollectionTokenPair;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::{FutureExt, StreamExt};
 use starnix_core::mm::memory::MemoryObject;
-use starnix_core::task::Kernel;
+use starnix_core::task::{Kernel, LockedAndTask};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::log_error;
 use starnix_sync::Mutex;
@@ -281,17 +281,13 @@ pub fn start_presentation_loop(
 ) {
     let flatland = server.flatland.clone();
     let mut flatland_event_stream = flatland.take_event_stream();
-    let server_clone = server.clone();
-    let mut presentation_receiver = server_clone.presentation_receiver.lock();
-    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
-    kernel.kthreads.spawner().spawn(|_, current_task| {
-        let kernel = current_task.kernel();
-        let mut executor = fasync::LocalExecutor::new();
+    let mut presentation_receiver = server.presentation_receiver.lock().deref_mut().take().unwrap();
+    kernel.kthreads.spawner().spawn_async(async move |locked_and_task: LockedAndTask<'_>| {
+        let kernel = locked_and_task.current_task().kernel();
         let scheduler = ThroughputScheduler::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
         let mut maybe_view_controller_proxy = None;
-        executor.run_singlethreaded(async move {
             let mut scene_state = None;
             let link_token_pair =
                 ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
@@ -445,6 +441,5 @@ pub fn start_presentation_loop(
                     }
                 }
             }
-        });
     });
 }

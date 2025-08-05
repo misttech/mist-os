@@ -32,7 +32,7 @@ bool pending_ipi() {
     // Pend an interrupt to ourselves to ensure that platform_suspend_cpu returns quickly.
     mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(curr_cpu));
 
-    const zx_status_t status = platform_suspend_cpu();
+    const zx_status_t status = platform_suspend_cpu(PlatformAllowDomainPowerDown::No);
     ASSERT_OK(status);
   }
 
@@ -76,7 +76,7 @@ bool one_wakes_another() {
     InterruptDisableGuard irqd;
 
     arg->target_state.store(State::SUSPENDING, ktl::memory_order_release);
-    const zx_status_t status = platform_suspend_cpu();
+    const zx_status_t status = platform_suspend_cpu(PlatformAllowDomainPowerDown::No);
     arg->target_state.store(State::DONE, ktl::memory_order_release);
 
     return status;

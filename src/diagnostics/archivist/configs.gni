@@ -14,7 +14,6 @@ default_config = {
     "fuchsia.component.SamplerBinder",
   ]
   enable_klog = true
-  log_to_debuglog = true
   logs_max_cached_original_bytes = archivist_max_cached_logs_bytes
   maximum_concurrent_snapshots_per_reader = 4
   num_threads = 1
@@ -30,6 +29,5 @@ embedded_config = {
 
   bind_services = []
   enable_klog = false
-  log_to_debuglog = false
   per_component_batch_timeout_seconds = -1
 }

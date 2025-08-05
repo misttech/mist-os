@@ -5,8 +5,7 @@
 #ifndef SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_OPERATION_STATE_H_
 #define SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_OPERATION_STATE_H_
 
-#include <fuchsia/virtualization/guest/interaction/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
+#include <fidl/fuchsia.virtualization.guest.interaction/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -230,21 +229,32 @@ class PutCallData final : public CallData {
   grpc::Status finish_status_;
 };
 
-class ListenerInterface : fuchsia::virtualization::guest::interaction::CommandListener {
+class ListenerInterface
+    : public fidl::Server<fuchsia_virtualization_guest_interaction::CommandListener> {
  public:
   ListenerInterface(
-      fidl::InterfaceRequest<fuchsia::virtualization::guest::interaction::CommandListener> req,
-      async_dispatcher_t* dispatcher)
-      : binding_(this, std::move(req), dispatcher) {}
+      async_dispatcher_t* dispatcher,
+      fidl::ServerEnd<fuchsia_virtualization_guest_interaction::CommandListener> server_end)
+      : binding_(fidl::BindServer(dispatcher, std::move(server_end), this)) {}
 
-  void OnStarted(zx_status_t status) { binding_.events().OnStarted(status); }
+  void OnStarted(zx_status_t status) {
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding_)->OnStarted({{.status = status}});
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "OnStarted failed: " << result.error_value().FormatDescription();
+    }
+  }
 
   void OnTerminated(zx_status_t status, int32_t ret_code) {
-    binding_.events().OnTerminated(status, ret_code);
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding_)->OnTerminated({{.status = status, .return_code = ret_code}});
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "OnTerminated failed: " << result.error_value().FormatDescription();
+    }
   }
 
  private:
-  fidl::Binding<fuchsia::virtualization::guest::interaction::CommandListener> binding_;
+  fidl::ServerBindingRef<fuchsia_virtualization_guest_interaction::CommandListener> binding_;
 };
 
 // Pump incoming stdin into the child process managed by the guest service.

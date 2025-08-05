@@ -205,7 +205,7 @@ async fn handle_inspect_writer(
                     .expect("response succeeds");
                 std::process::exit(0);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fpuppet::InspectWriterRequest::RecordLazyValues { key, responder } => {
                 let (client, requests) = create_request_stream();
                 responder.send(client).expect("response succeeds");
@@ -372,7 +372,7 @@ async fn record_lazy_values(
             | fpuppet::LazyInspectPuppetRequest::EscrowAndExit { .. } => {
                 unimplemented!()
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fpuppet::LazyInspectPuppetRequest::RecordLazyValues { .. } => unimplemented!(),
         };
     }

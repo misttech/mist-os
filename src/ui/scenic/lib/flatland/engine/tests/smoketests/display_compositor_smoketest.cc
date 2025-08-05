@@ -172,7 +172,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debug_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
@@ -200,7 +200,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
                                       .vmo_index = 0,
                                       .width = kTextureWidth,
                                       .height = kTextureHeight,
-                                      .blend_mode = fuchsia_ui_composition::BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
   auto result =
       display_compositor->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);
   EXPECT_TRUE(result);
@@ -224,8 +224,11 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0, 0, static_cast<float>(kTextureWidth),
-                                                          static_cast<float>(kTextureHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0,
+                         .y = 0,
+                         .width = static_cast<float>(kTextureWidth),
+                         .height = static_cast<float>(kTextureHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   // Now we can finally render.

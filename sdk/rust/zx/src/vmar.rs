@@ -430,6 +430,7 @@ assoc_values!(VmarOp, [
     DECOMMIT =         sys::ZX_VMAR_OP_DECOMMIT;
     PREFETCH =         sys::ZX_VMAR_OP_PREFETCH;
     MAP_RANGE =        sys::ZX_VMAR_OP_MAP_RANGE;
+    ZERO =             sys::ZX_VMAR_OP_ZERO;
     DONT_NEED =        sys::ZX_VMAR_OP_DONT_NEED;
     ALWAYS_NEED =      sys::ZX_VMAR_OP_ALWAYS_NEED;
 ]);

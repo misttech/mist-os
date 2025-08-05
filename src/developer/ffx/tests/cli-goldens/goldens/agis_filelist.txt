@@ -1,5 +1,0 @@
-ffx/agis.golden
-ffx/agis/listen.golden
-ffx/agis/register.golden
-ffx/agis/shutdown.golden
-ffx/agis/vtcs.golden

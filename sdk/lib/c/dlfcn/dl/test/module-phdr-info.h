@@ -41,6 +41,8 @@ class ModulePhdrInfo {
 
   constexpr std::span<const Phdr> phdrs() const { return std::span{phdr_, phnum_}; }
 
+  constexpr uint16_t phnum() const { return phnum_; }
+
   constexpr size_t tls_modid() const { return tls_modid_; }
 
   constexpr void* tls_data() const { return tls_data_; }

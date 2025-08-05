@@ -4,7 +4,7 @@
 
 use futures::channel::mpsc;
 use fuzz::fuzz;
-use rand::distributions::{Alphanumeric, DistString as _};
+use rand::distr::{Alphanumeric, SampleString};
 use wlan_common::assert_variant;
 use wlancfg_lib::config_management::network_config::{Credential, NetworkIdentifier};
 use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
@@ -65,5 +65,5 @@ async fn create_saved_networks(store_id: &String) -> SavedNetworksManager {
 
 /// Generate a random string of length 16
 pub fn generate_string() -> String {
-    Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+    Alphanumeric.sample_string(&mut rand::rng(), 16)
 }

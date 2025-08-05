@@ -28,6 +28,7 @@ group("tests") {
     "suspend:tests",
     "syscalls:tests",
     "sysrq:tests",
+    "thermal:tests",
     "vdso:tests",
   ]
 

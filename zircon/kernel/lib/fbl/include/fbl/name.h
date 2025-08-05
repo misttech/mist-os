@@ -12,7 +12,6 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <kernel/auto_lock.h>
 #include <kernel/spinlock.h>
 #include <ktl/algorithm.h>
 
@@ -43,7 +42,7 @@ class Name {
   void get(size_t out_len, char* out_name) const __NONNULL((3)) {
     memset(out_name, 0, out_len);
     if (out_len > 0u) {
-      AutoSpinLock lock(&lock_);
+      Guard<SpinLock, IrqSave> lock(&lock_);
       strlcpy(out_name, name_, ktl::min(out_len, Size));
     }
   }
@@ -57,7 +56,7 @@ class Name {
     if (len >= Size)
       len = Size - 1;
 
-    AutoSpinLock lock(&lock_);
+    Guard<SpinLock, IrqSave> lock(&lock_);
     memcpy(name_, name, len);
     memset(name_ + len, 0, Size - len);
     return ZX_OK;
@@ -76,7 +75,7 @@ class Name {
   // These Names are often included for diagnostic purposes, and
   // access to the Name might be made under various other locks or
   // in interrupt context. So we use a spinlock to serialize.
-  mutable SpinLock lock_;
+  mutable DECLARE_SPINLOCK(Name) lock_;
   // This includes the trailing NUL.
   char name_[Size] TA_GUARDED(lock_) = {};
 };

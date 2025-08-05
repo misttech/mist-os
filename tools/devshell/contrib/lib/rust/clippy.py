@@ -66,8 +66,15 @@ def main():
                 t
                 for t in rust_target_mapping
                 for l in args.input
-                if str(GnTarget(l, args.fuchsia_dir))
-                in possible_labels(t, build_dir)
+                if (
+                    any(
+                        pl.startswith(l[:-2])
+                        for pl in possible_labels(t, build_dir)
+                    )
+                    if l.endswith("**")
+                    else str(GnTarget(l, args.fuchsia_dir))
+                    in possible_labels(t, build_dir)
+                )
             ]
 
     clippy_outputs = list(
@@ -163,9 +170,14 @@ def build_targets(clippy_outputs, build_dir, args):
         prebuilt / "ninja" / HOST_PLATFORM / "ninja",
         "-C",
         build_dir,
-        "-k",
-        "0",
     ]
+    if args.stop_on_first_error:
+        ninja += ["-k", "1"]
+    else:
+        ninja += ["-k", "0"]
+    if args.jobs is not None:
+        ninja += ["-j", str(args.jobs)]
+
     if args.verbose:
         ninja += ["--verbose"]
     if args.quiet:
@@ -203,7 +215,12 @@ def parse_args():
         help="treat the inputs as source files rather than gn targets",
     )
     inputs = parser.add_mutually_exclusive_group(required=True)
-    inputs.add_argument("input", nargs="*", default=[])
+    inputs.add_argument(
+        "input",
+        nargs="*",
+        help="GN targets to run. Strings ending in '**' match any targets up to the glob",
+        default=[],
+    )
     inputs.add_argument(
         "--all", action="store_true", help="run on all clippy targets"
     )
@@ -228,6 +245,19 @@ def parse_args():
         "--no-build",
         action="store_true",
         help="don't build the clippy output, instead expect that it already exists",
+    )
+    advanced.add_argument(
+        "--stop-on-first-error",
+        action="store_true",
+        help="stop on first error",
+        default=False,
+    )
+    advanced.add_argument(
+        "--jobs",
+        "-j",
+        type=int,
+        help="number of concurrent jobs to run",
+        default=None,
     )
     return parser.parse_args()
 

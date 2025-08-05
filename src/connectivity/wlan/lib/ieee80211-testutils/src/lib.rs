@@ -22,16 +22,15 @@ mod tests {
     use rand::Rng;
 
     fn random_six_byte_array() -> [u8; 6] {
-        let mut rng = rand::thread_rng();
-        rng.gen::<[u8; 6]>()
+        rand::random::<[u8; 6]>()
     }
 
     #[test]
     fn ssid_to_string_shape() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let ssid = Ssid::from_bytes_unchecked(
-            (0..(rng.gen::<usize>() % fidl_ieee80211::MAX_SSID_BYTE_LEN as usize))
-                .map(|_| rng.gen::<u8>())
+            (0..rng.random_range(0..fidl_ieee80211::MAX_SSID_BYTE_LEN as usize))
+                .map(|_| rng.random::<u8>())
                 .collect::<Vec<u8>>(),
         );
         assert!(SSID_REGEX.is_match(&ssid.to_string()));

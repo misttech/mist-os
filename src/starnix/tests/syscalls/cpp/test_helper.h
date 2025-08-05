@@ -239,6 +239,8 @@ class NetlinkEncoder {
     Write(&value, sizeof(T));
   }
 
+  void WriteSpan(const std::span<uint8_t> &data) { Write(data.data(), data.size_bytes()); }
+
   // Writes a value to the buffer at a specified offset
   template <typename T>
   void Write(T &value, size_t offset) {
@@ -298,7 +300,7 @@ class NetlinkEncoder {
     nlmsghdr hdr;
     Read(hdr, netlink_header);
     out.iov_base = data_.data() + netlink_header;
-    hdr.nlmsg_len += offset_ - genetlink_header;
+    hdr.nlmsg_len = static_cast<uint32_t>(offset_);
     out.iov_len = hdr.nlmsg_len;
     sequence_++;
     Write(hdr, netlink_header);
@@ -397,6 +399,8 @@ class ScopedMount {
   std::string target_path_;
   bool is_mounted_ = false;
 };
+
+std::optional<size_t> parse_field_in_kb(std::string_view value);
 
 // Returns the first memory mapping that matches the given predicate.
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,

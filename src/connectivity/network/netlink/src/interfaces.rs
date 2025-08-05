@@ -24,7 +24,6 @@ use {
     fidl_fuchsia_net_root as fnet_root,
 };
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
 use either::Either;
 use futures::channel::oneshot;
@@ -54,7 +53,6 @@ use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::util::respond_to_completer;
-use crate::FeatureFlags;
 
 /// A handler for interface events.
 pub trait InterfacesHandler: Send + Sync + 'static {
@@ -333,12 +331,7 @@ async fn set_link_address(
     interfaces_proxy: &fnet_root::InterfacesProxy,
     id: NonZeroU64,
     link_address: &mut Option<Vec<u8>>,
-    feature_flags: &FeatureFlags,
 ) {
-    if !feature_flags.assume_ifb0_existence && id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
-        return;
-    }
-
     match interfaces_proxy
         .get_mac(id.get())
         .await
@@ -392,7 +385,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         route_clients: ClientTable<NetlinkRoute, S>,
         interfaces_proxy: fnet_root::InterfacesProxy,
         interfaces_state_proxy: fnet_interfaces::StateProxy,
-        feature_flags: &FeatureFlags,
     ) -> (
         Self,
         impl futures::Stream<
@@ -417,30 +409,12 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         .await
         .expect("determining already installed interfaces should succeed");
 
-        if !feature_flags.assume_ifb0_existence {
-            assert_matches!(
-                interface_properties.insert(
-                    fake_ifb0::FAKE_IFB0_LINK_ID,
-                    fnet_interfaces_ext::PropertiesAndState {
-                        state: InterfaceState {
-                            addresses: Default::default(),
-                            link_address: Some(vec![0, 0, 0, 0, 0, 0]),
-                            control: None,
-                            accept_ra_rt_table: AcceptRaRtTable::default(),
-                        },
-                        properties: fake_ifb0::fake_ifb0_properties(),
-                    },
-                ),
-                None
-            );
-        }
-
         for fnet_interfaces_ext::PropertiesAndState {
             properties,
             state: InterfaceState { addresses, link_address, control: _, accept_ra_rt_table: _ },
         } in interface_properties.values_mut()
         {
-            set_link_address(&interfaces_proxy, properties.id, link_address, feature_flags).await;
+            set_link_address(&interfaces_proxy, properties.id, link_address).await;
 
             if let Some(interface_addresses) =
                 addresses_optionally_from_interface_properties(properties)
@@ -476,7 +450,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) async fn handle_interface_watcher_event(
         &mut self,
         event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
-        feature_flags: &FeatureFlags,
     ) {
         let update = self
             .interface_properties
@@ -488,13 +461,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 properties,
                 state: InterfaceState { addresses, link_address, control: _, accept_ra_rt_table },
             } => {
-                set_link_address(
-                    &self.interfaces_proxy,
-                    properties.id,
-                    link_address,
-                    feature_flags,
-                )
-                .await;
+                set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
                 // The newly added device should have the default sysctl.
                 *accept_ra_rt_table = self.default_accept_ra_rt_table;
 
@@ -768,13 +735,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     async fn handle_set_link_request(
         &mut self,
         args: SetLinkArgs,
-        feature_flags: &FeatureFlags,
     ) -> Result<Option<PendingRequestKind>, RequestError> {
         let SetLinkArgs { link, enable } = args;
         let id = self.get_link(link).ok_or(RequestError::UnrecognizedInterface)?.properties.id;
-        if !feature_flags.assume_ifb0_existence && id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
-            return Ok(None);
-        }
 
         // NB: Only check if their is a change after verifying the provided
         // interface is valid. This is for conformance with Linux which will
@@ -831,13 +794,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
             add_subnet_route,
         }: NewAddressArgs,
-        feature_flags: &FeatureFlags,
     ) -> Result<Option<AddressAndInterfaceArgs>, RequestError> {
-        if !feature_flags.assume_ifb0_existence
-            && u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID
-        {
-            return Ok(None);
-        }
         let control = self
             .get_interface_control(interface_id.into())
             .ok_or(RequestError::UnrecognizedInterface)?;
@@ -943,14 +900,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
         }: DelAddressArgs,
-        feature_flags: &FeatureFlags,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        if !feature_flags.assume_ifb0_existence
-            && u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID
-        {
-            return Ok(address_and_interface_id);
-        }
-
         let control = self
             .get_interface_control(interface_id.into())
             .ok_or(RequestError::UnrecognizedInterface)?;
@@ -973,7 +923,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     fnet_interfaces_admin::ControlRemoveAddressErrorUnknown!() => {
                         log_error!(
                             "unrecognized address removal error {:?} for address {} on interface ({})",
-                            e, address, interface_id,
+                            e,
+                            address,
+                            interface_id,
                         );
 
                         // Assume the error was because the request was invalid.
@@ -992,7 +944,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) async fn handle_request(
         &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
-        feature_flags: &FeatureFlags,
     ) -> Option<PendingRequest<S>> {
         log_debug!("handling request {args:?} from {client}");
 
@@ -1001,7 +952,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 self.handle_get_link_request(args, sequence_number, &mut client)
             }
             RequestArgs::Link(LinkRequestArgs::Set(args)) => {
-                match self.handle_set_link_request(args, feature_flags).await {
+                match self.handle_set_link_request(args).await {
                     Ok(Some(kind)) => return Some(PendingRequest { kind, client, completer }),
                     Ok(None) => Ok(()),
                     Err(e) => Err(e),
@@ -1033,26 +984,26 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     }
                 },
                 AddressRequestArgs::New(args) => {
-                    match self.handle_new_address_request(args, feature_flags).await {
+                    match self.handle_new_address_request(args).await {
                         Ok(None) => Ok(()),
                         Ok(Some(address_and_interface_id)) => {
                             return Some(PendingRequest {
                                 kind: PendingRequestKind::AddAddress(address_and_interface_id),
                                 client,
                                 completer,
-                            })
+                            });
                         }
                         Err(e) => Err(e),
                     }
                 }
                 AddressRequestArgs::Del(args) => {
-                    match self.handle_del_address_request(args, feature_flags).await {
+                    match self.handle_del_address_request(args).await {
                         Ok(address_and_interface_id) => {
                             return Some(PendingRequest {
                                 kind: PendingRequestKind::DelAddress(address_and_interface_id),
                                 client,
                                 completer,
-                            })
+                            });
                         }
                         Err(e) => Err(e),
                     }
@@ -1126,30 +1077,6 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 /// struct will be handled separately.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct NetlinkLinkMessage(LinkMessage);
-
-// TODO(https://fxbug.dev/387998791): Remove these once blackhole interfaces are implemented.
-mod fake_ifb0 {
-    use super::*;
-
-    pub(super) const FAKE_IFB0_LINK_NAME: &str = "ifb0";
-
-    // Chosen to look super arbitrary and human-allocated, and also large enough
-    // to be very unlikely to collide with another interface in practice.
-    pub(super) const FAKE_IFB0_LINK_ID: u64 = 13371337;
-
-    pub(super) fn fake_ifb0_properties(
-    ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
-        fnet_interfaces_ext::Properties {
-            id: NonZeroU64::new(FAKE_IFB0_LINK_ID).unwrap(),
-            name: FAKE_IFB0_LINK_NAME.to_string(),
-            online: true,
-            addresses: Vec::new(),
-            has_default_ipv4_route: false,
-            has_default_ipv6_route: false,
-            port_class: fnet_interfaces_ext::PortClass::Virtual,
-        }
-    }
-}
 
 impl NetlinkLinkMessage {
     fn optionally_from(
@@ -1268,7 +1195,7 @@ fn interface_properties_to_link_message(
     // We expect interface ids to safely fit in the range of u32 values.
     let id: u32 = match id.get().try_into() {
         Err(std::num::TryFromIntError { .. }) => {
-            return Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id.clone().into()))
+            return Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id.clone().into()));
         }
         Ok(id) => id,
     };
@@ -1397,7 +1324,9 @@ fn interface_properties_to_address_messages(
     // We expect interface ids to safely fit in the range of the u32 values.
     let id: u32 = match id.get().try_into() {
         Err(std::num::TryFromIntError { .. }) => {
-            return Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(id.clone().into()))
+            return Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(
+                id.clone().into(),
+            ));
         }
         Ok(id) => id,
     };
@@ -1495,7 +1424,6 @@ pub(crate) mod testutil {
     use crate::eventloop::{EventLoopComponent, IncludedWorkers, Optional, Required};
     use crate::messaging::testutil::FakeSender;
     use crate::protocol_family::route::NetlinkRouteNotifiedGroup;
-    use crate::FeatureFlags;
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
     pub(crate) const LO_NAME: &str = "lo";
@@ -1647,7 +1575,6 @@ pub(crate) mod testutil {
             ndp_option_watcher_provider: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
-            feature_flags: FeatureFlags::test(),
         };
 
         let interfaces_request_stream = interfaces.into_stream();
@@ -1799,6 +1726,7 @@ mod tests {
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
 
+    use assert_matches::assert_matches;
     use futures::sink::SinkExt as _;
     use futures::stream::Stream;
     use futures::FutureExt as _;
@@ -2149,12 +2077,6 @@ mod tests {
                 HandledLink { name: LO_NAME.to_string(), kind: HandledLinkKind::New },
                 HandledLink { name: ETH_NAME.to_string(), kind: HandledLinkKind::New },
                 HandledLink { name: PPP_NAME.to_string(), kind: HandledLinkKind::New },
-                // TODO(https://fxbug.dev/387998791): Remove this once blackhole interfaces are
-                // implemented.
-                HandledLink {
-                    name: fake_ifb0::FAKE_IFB0_LINK_NAME.to_string(),
-                    kind: HandledLinkKind::New
-                },
                 HandledLink { name: WLAN_NAME.to_string(), kind: HandledLinkKind::New },
                 HandledLink { name: ETH_NAME.to_string(), kind: HandledLinkKind::Del },
             ],
@@ -2303,9 +2225,6 @@ mod tests {
     const PPP_MAC: Option<fnet::MacAddress> = Some(fnet::MacAddress { octets: [2, 2, 2, 2, 2, 2] });
     const WLAN_MAC: Option<fnet::MacAddress> =
         Some(fnet::MacAddress { octets: [3, 3, 3, 3, 3, 3] });
-    // TODO(https://fxbug.dev/387998791): Remove this once blackhole interfaces are implemented.
-    const FAKE_IFB0_MAC: Option<fnet::MacAddress> =
-        Some(fnet::MacAddress { octets: [0, 0, 0, 0, 0, 0] });
 
     fn handle_get_mac_root_request_or_panic(req: fnet_root::InterfacesRequest) {
         match req {
@@ -2315,7 +2234,6 @@ mod tests {
                     ETH_INTERFACE_ID => ETH_MAC,
                     PPP_INTERFACE_ID => PPP_MAC,
                     WLAN_INTERFACE_ID => WLAN_MAC,
-                    fake_ifb0::FAKE_IFB0_LINK_ID => FAKE_IFB0_MAC,
                     id => panic!("unexpected interface ID {id}"),
                 };
 
@@ -2498,9 +2416,7 @@ mod tests {
 
     #[test_case(
         GetLinkArgs::Dump,
-        &[LO_INTERFACE_ID, ETH_INTERFACE_ID,
-        // TODO(https://fxbug.dev/387998791): Remove this once blackhole interfaces are implemented.
-        fake_ifb0::FAKE_IFB0_LINK_ID],
+        &[LO_INTERFACE_ID, ETH_INTERFACE_ID],
         Ok(()); "dump")]
     #[test_case(
         GetLinkArgs::Get(LinkSpecifier::Index(
@@ -2534,9 +2450,6 @@ mod tests {
         let arphrd_ether_u16: u16 = ARPHRD_ETHER as u16;
         // Conversion to u16 is safe because 772 <= 65535
         let arphrd_loopback_u16: u16 = ARPHRD_LOOPBACK as u16;
-        // Conversion to u16 is safe because this is 65535 (and the safety of this casts in a const
-        // context is checked by the compiler).
-        let arphrd_void_u16: u16 = ARPHRD_VOID as u16;
         let expected_messages = expected_new_links
             .iter()
             .map(|link_id| {
@@ -2552,19 +2465,6 @@ mod tests {
                         arphrd_ether_u16,
                         0,
                         create_nlas(ETH_NAME.to_string(), arphrd_ether_u16, false, &ETH_MAC),
-                    ),
-                    // TODO(https://fxbug.dev/387998791): Remove this once blackhole interfaces are
-                    // implemented.
-                    fake_ifb0::FAKE_IFB0_LINK_ID => create_netlink_link_message(
-                        fake_ifb0::FAKE_IFB0_LINK_ID,
-                        arphrd_void_u16,
-                        ONLINE_IF_FLAGS,
-                        create_nlas(
-                            fake_ifb0::FAKE_IFB0_LINK_NAME.to_string(),
-                            arphrd_void_u16,
-                            true,
-                            &FAKE_IFB0_MAC,
-                        ),
                     ),
                     _ => unreachable!("GetLink should only be tested with loopback and ethernet"),
                 };

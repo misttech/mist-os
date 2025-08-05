@@ -6,7 +6,7 @@
 
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
 #include <fbl/auto_lock.h>
@@ -64,14 +64,13 @@ zx::result<std::unique_ptr<TunDevice>> TunDevice::Create(
 
   if (zx_status_t status = zx::eventpair::create(0, &tun->signals_peer_, &tun->signals_self_);
       status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init failed to create eventpair %s",
-            zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "TunDevice::Init failed to create eventpair";
     return zx::error(status);
   }
 
   zx::result device = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
   if (device.is_error()) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init device init failed with %s", device.status_string());
+    FX_PLOGST(ERROR, "tun", device.status_value()) << "TunDevice::Init device init failed";
     return device.take_error();
   }
   tun->device_ = std::move(device.value());
@@ -96,7 +95,7 @@ TunDevice::~TunDevice() {
   }
   loop_.Shutdown();
 
-  FX_VLOG(1, "tun", "TunDevice destroyed");
+  FX_LOGST(DEBUG, "tun") << "TunDevice destroyed";
 }
 
 void TunDevice::Bind(fidl::ServerEnd<fuchsia_net_tun::Device> req) {
@@ -164,7 +163,7 @@ void TunDevice::RunReadFrame() {
       std::vector<uint8_t> data;
       zx_status_t status = buff.Read(data);
       if (status != ZX_OK) {
-        FX_LOGF(ERROR, "tun", "Failed to read from tx buffer: %s", zx_status_get_string(status));
+        FX_PLOGST(ERROR, "tun", status) << "Failed to read from tx buffer";
         // The error reported here is relayed back to clients as an errored tx frame. There's a
         // contract about specific meanings of errors returned in a tx frame through the netdevice
         // banjo API and it might not match the semantics of the buffer API that generated this
@@ -172,7 +171,7 @@ void TunDevice::RunReadFrame() {
         return ZX_ERR_INTERNAL;
       }
       if (data.empty()) {
-        FX_LOG(WARNING, "tun", "Ignoring empty tx buffer");
+        FX_LOGST(WARNING, "tun") << "Ignoring empty tx buffer";
         return ZX_OK;
       }
       fidl::WireTableFrame<fuchsia_net_tun::wire::Frame> fidl_frame;
@@ -321,7 +320,7 @@ void TunDevice::AddPort(AddPortRequestView request, AddPortCompleter::Sync& _com
     DevicePortConfig& port_config = maybe_port_config.value();
     std::unique_ptr<Port>& port_slot = ports_[port_config.port_id];
     if (port_slot) {
-      FX_LOGF(WARNING, "tun", "port %d already exists", port_config.port_id);
+      FX_LOGST(WARNING, "tun") << "port " << port_config.port_id << " already exists";
       return ZX_ERR_ALREADY_EXISTS;
     }
 
@@ -341,7 +340,7 @@ void TunDevice::AddPort(AddPortRequestView request, AddPortCompleter::Sync& _com
 void TunDevice::GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) {
   zx_status_t status = device_->Bind(std::move(request->device));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "Failed to bind to network device: %s", zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "Failed to bind to network device";
   }
 }
 
@@ -349,7 +348,7 @@ void TunDevice::DelegateRxLease(DelegateRxLeaseRequestView request,
                                 DelegateRxLeaseCompleter::Sync& completer) {
   zx_status_t status = device_->DelegateRxLease(request->lease);
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "Failed to delegate rx lease: %s", zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "Failed to delegate rx lease";
     // Failures here mean the lease is bad and can't be converted. Fail loudly
     // by propagating up to the caller in the form of an epitaph.
     completer.Close(status);
@@ -380,7 +379,7 @@ zx::result<std::unique_ptr<TunDevice::Port>> TunDevice::Port::Create(
   port->adapter_ = std::make_unique<PortAdapter>(port.get(), config, std::move(mac));
   zx_status_t status = parent->device_->AddPort(port->adapter());
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "Failed to add port: %s", zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "Failed to add port";
     return zx::error(status);
   }
   // At this point the port has been added to netdevice and the Port object should only complete
@@ -459,7 +458,7 @@ void TunDevice::Port::SetOnline(bool online) {
 void TunDevice::Port::GetPort(GetPortRequestView request, GetPortCompleter::Sync& _completer) {
   zx_status_t status = parent_->device_->BindPort(adapter_->id(), std::move(request->port));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "BindPort %d failed: %s", adapter_->id(), zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "BindPort " << adapter_->id() << " failed";
   }
 }
 

@@ -311,7 +311,6 @@ mod tests {
     use super::*;
     use crate::MmioOperand;
     use fuchsia_sync::RwLock;
-    use rand::distributions::{Distribution, Standard};
     use rand::Rng;
     use std::sync::Barrier;
     use std::thread::sleep;
@@ -426,21 +425,6 @@ mod tests {
         }
     }
 
-    // Rust 2024 edition reserves gen as a keyword.
-    //
-    // This extension mimics the corresponding name change in the rand trait which hasn't made it
-    // into the vendored crate yet.
-    trait RngExt: Rng {
-        fn random<T>(&mut self) -> T
-        where
-            Standard: Distribution<T>,
-        {
-            self.r#gen()
-        }
-    }
-
-    impl<R: Rng> RngExt for R {}
-
     #[test]
     fn test_memory_region_thread_safety() {
         // The number of concurrent threads.
@@ -476,14 +460,14 @@ mod tests {
             for _ in 0..CONCURRENCY {
                 let mut split = region.split_off(BYTES_PER_THREAD);
                 s.spawn(move || {
-                    let mut rng = rand::thread_rng();
+                    let mut rng = rand::rng();
 
                     // Wait until threads are ready to start to increase the chance of a race.
                     barrier.wait();
 
                     for _i in 0..THREAD_OP_COUNT {
-                        let offset = rng.random::<usize>() % BYTES_PER_THREAD;
-                        let op = rng.random::<usize>() % 8;
+                        let offset = rng.random_range(0..BYTES_PER_THREAD);
+                        let op = rng.random_range(0usize..8);
 
                         let size = 1 << (op % 4);
                         // Choose a random offset from 0 to 2x the size of this region. MmioRegion
@@ -513,7 +497,7 @@ mod tests {
         const LEN: usize = 64;
         let registers = CheckedRegisters::new(LEN, Duration::ZERO);
         let mut region = MmioRegion::new(registers).into_split();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         fn assert_alignment<M: Mmio, T: MmioOperand>(
             mmio: &mut M,

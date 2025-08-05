@@ -30,12 +30,6 @@
         "type": "fuchsia.component.resolution/Context"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.component.resolution/Component.url",
-        "ordinal": "1",
-        "type": "string:2083"
-    },
-    {
         "kind": "table",
         "name": "fuchsia.component.resolution/Component",
         "resourceness": "resource"

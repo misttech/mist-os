@@ -345,14 +345,14 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
 
   DEBUG_ASSERT(!is_user());
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!vmo) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (!IS_PAGE_ALIGNED(offset)) {
+  if (!IS_PAGE_ROUNDED(offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -366,7 +366,7 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
     vmar_offset = reinterpret_cast<vaddr_t>(*ptr);
 
     // check that it's page aligned
-    if (!IS_PAGE_ALIGNED(vmar_offset) || vmar_offset < base_) {
+    if (!IS_PAGE_ROUNDED(vmar_offset) || vmar_offset < base_) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -420,12 +420,12 @@ zx_status_t VmAspace::AllocPhysical(const char* name, size_t size, void** ptr, u
           " vmm_flags 0x%x arch_mmu_flags 0x%x\n",
           this, name, size, ptr ? *ptr : 0, paddr, vmm_flags, arch_mmu_flags);
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(paddr));
 
   if (size == 0) {
     return ZX_OK;
   }
-  if (!IS_PAGE_ALIGNED(paddr)) {
+  if (!IS_PAGE_ROUNDED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -459,7 +459,7 @@ zx_status_t VmAspace::AllocContiguous(const char* name, size_t size, void** ptr,
   LTRACEF("aspace %p name '%s' size 0x%zx ptr %p align %hhu vmm_flags 0x%x arch_mmu_flags 0x%x\n",
           this, name, size, ptr ? *ptr : 0, align_pow2, vmm_flags, arch_mmu_flags);
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -487,7 +487,7 @@ zx_status_t VmAspace::Alloc(const char* name, size_t size, void** ptr, uint8_t a
   LTRACEF("aspace %p name '%s' size 0x%zx ptr %p align %hhu vmm_flags 0x%x arch_mmu_flags 0x%x\n",
           this, name, size, ptr ? *ptr : 0, align_pow2, vmm_flags, arch_mmu_flags);
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -584,7 +584,7 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
 
   // With the original va logged in the traces can now convert to a page aligned address suitable
   // for passing to PageFaultLocked.
-  va = ROUNDDOWN(va, PAGE_SIZE);
+  va = ROUNDDOWN_PAGE_SIZE(va);
 
   return PageFaultInternal(va, flags, 0);
 }
@@ -685,8 +685,8 @@ zx_status_t VmAspace::SoftFaultInRange(vaddr_t va, uint flags, size_t len) {
   }
   DEBUG_ASSERT(va <= range_end);
 
-  const uint64_t va_page_base = ROUNDDOWN(va, PAGE_SIZE);
-  const uint64_t last_page_base = ROUNDDOWN(range_end, PAGE_SIZE);
+  const uint64_t va_page_base = ROUNDDOWN_PAGE_SIZE(va);
+  const uint64_t last_page_base = ROUNDDOWN_PAGE_SIZE(range_end);
   const uint64_t extra_pages = (last_page_base - va_page_base) / PAGE_SIZE;
   return PageFaultInternal(va_page_base, flags, extra_pages);
 }
@@ -695,7 +695,7 @@ zx_status_t VmAspace::AccessedFault(vaddr_t va) {
   VM_KTRACE_DURATION(2, "VmAspace::AccessedFault", ("va", ktrace::Pointer{va}));
   // There are no permissions etc associated with accessed bits so we can skip any vmar walking and
   // just let the hardware aspace walk for the virtual address.
-  va = ROUNDDOWN(va, PAGE_SIZE);
+  va = ROUNDDOWN_PAGE_SIZE(va);
   return arch_aspace_.MarkAccessed(va, 1);
 }
 

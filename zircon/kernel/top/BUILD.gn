@@ -32,6 +32,7 @@ source_set("top") {
     "//zircon/kernel/lib/io",
     "//zircon/kernel/lib/jtrace:headers",
     "//zircon/kernel/lib/lockup_detector",
+    "//zircon/kernel/lib/thread-stack",
     "//zircon/kernel/lib/userabi",
     "//zircon/kernel/lib/version",
     "//zircon/kernel/phys:handoff",

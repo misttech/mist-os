@@ -40,7 +40,6 @@
                 "fuchsia.ui.observation.test.Registry",
                 "fuchsia.ui.pointer.augment.LocalHit",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
         },
@@ -205,6 +204,15 @@
             type: "int32",
         },
         {
+            // If true, then a frame counter will be displayed above all client images.
+            config: "fuchsia.scenic.FrameCounterOverlay",
+            key: "enable_frame_counter_overlay",
+            type: "bool",
+        },
+        {
+            // If this value is >= 2, then client images will be tinted whenever Flatland falls back
+            // to GPU composition.  If this value is >= 3, then a frame counter will be displayed
+            // above all client images (equivalent to `fuchsia.scenic.FrameCounterOverlay`).
             config: "fuchsia.ui.VisualDebuggingLevel",
             key: "visual_debugging_level",
             type: "uint8",
@@ -232,7 +240,6 @@
                 "fuchsia.ui.observation.test.Registry",
                 "fuchsia.ui.pointer.augment.LocalHit",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "self",

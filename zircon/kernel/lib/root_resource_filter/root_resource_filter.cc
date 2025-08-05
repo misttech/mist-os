@@ -52,6 +52,12 @@ void RootResourceFilter::Finalize() {
   };
   memalloc::NormalizeRanges(gPhysHandoff->memory.get(), add_region, filter_for_ram);
 
+  // Ditto for the NVRAM range, which backs kernel state like the crashlog.
+  if (const ktl::optional<MappedMemoryRange> nvram = gPhysHandoff->nvram) {
+    mmio_deny_.AddRegion({.base = nvram->paddr, .size = nvram->size_bytes()},
+                         RegionAllocator::AllowOverlap::No);
+  }
+
   // Dump the deny list at spew level for debugging purposes.
   if (DPRINTF_ENABLED_FOR_LEVEL(SPEW)) {
     dprintf(SPEW, "Final MMIO Deny list is:\n");

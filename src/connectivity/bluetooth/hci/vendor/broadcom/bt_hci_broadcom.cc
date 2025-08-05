@@ -318,6 +318,72 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBaudRate(uint32_t baud_ra
           });
 }
 
+fpromise::promise<void, zx_status_t> BtHciBroadcom::EnableLowPowerMode(
+    zx::duration host_idle_threshold, zx::duration device_idle_threshold) {
+  if (serial_pid_ != PDEV_PID_BCM4381A1) {
+    FDF_LOG(INFO, "skipping low power settings on non-4381");
+    return fpromise::make_promise(
+        []() { return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok()); });
+  }
+  // These are in 12.5ms increments.
+  uint8_t host_idle_units = static_cast<uint8_t>(host_idle_threshold.to_nsecs() / 12500000);
+  uint8_t device_idle_units = static_cast<uint8_t>(device_idle_threshold.to_nsecs() / 12500000);
+  BcmWriteSleepModeCmd command = {
+      .header =
+          {
+              .opcode = kBcmWriteSleepModeCmdOpCode,
+              .parameter_total_size = sizeof(BcmWriteSleepModeCmd) - sizeof(HciCommandHeader),
+          },
+      .mode = BcmSleepMode::kUart,
+      .idle_threshold_host = host_idle_units,
+      .idle_threshold_device = device_idle_units,
+      .bt_wake_polarity = 1,
+      .host_wake_polarity = 1,
+      .sleep_during_sco = 1,
+      .combine_sleep_and_lpm = 1,
+      .tri_state_uart_before_sleep = 0,
+      .usb_flags = {0, 0, 0},  // unused
+      .pulsed_host_wake = 0,
+  };
+
+  return SendCommand(&command, sizeof(command))
+      .and_then([](const std::vector<uint8_t>& cmd_complete) {
+        if (sizeof(HciCommandComplete) <= cmd_complete.size()) {
+          HciCommandComplete event;
+          std::memcpy(&event, cmd_complete.data(), sizeof(event));
+          if (event.return_code == 0x00) {
+            FDF_LOG(INFO, "set low power mode settings");
+          } else {
+            FDF_LOG(WARNING, "failed to set low power mode: 0x%02x", event.return_code);
+          }
+        } else {
+          FDF_LOG(WARNING, "LowPowerMode CmdComplete is too small: %lu < %lu", cmd_complete.size(),
+                  sizeof(HciCommandComplete));
+        }
+      });
+}
+
+fpromise::promise<void, zx_status_t> BtHciBroadcom::DisableLowPowerMode() {
+  if (serial_pid_ != PDEV_PID_BCM4381A1) {
+    FDF_LOG(INFO, "skipping low power settings on non-4381");
+    return fpromise::make_promise(
+        []() { return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok()); });
+  }
+  return SendCommand(&kDisableLowPowerModeCmd, sizeof(kDisableLowPowerModeCmd))
+      .and_then([](const std::vector<uint8_t>& cmd_complete) {
+        if (sizeof(HciCommandComplete) <= cmd_complete.size()) {
+          HciCommandComplete event;
+          std::memcpy(&event, cmd_complete.data(), sizeof(event));
+          if (event.return_code != 0x00) {
+            FDF_LOG(WARNING, "failed to disable low power mode: 0x%02x", event.return_code);
+          }
+        } else {
+          FDF_LOG(WARNING, "LowPowerMode CmdComplete is too small: %lu < %lu", cmd_complete.size(),
+                  sizeof(HciCommandComplete));
+        }
+      });
+}
+
 fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBdaddr(
     const std::array<uint8_t, kMacAddrLen>& bdaddr) {
   BcmSetBdaddrCmd command = {
@@ -586,6 +652,8 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
         return SetBdaddr(octets);
       })
       .and_then([this]() { return SetDefaultPowerCaps(); })
+      .and_then(
+          [this]() { return EnableLowPowerMode(kDefaultIdleThreshold, kDefaultIdleThreshold); })
       .and_then([this]() { return AddNode(); })
       .then([this](fpromise::result<void, zx_status_t>& result) {
         zx_status_t status = result.is_ok() ? ZX_OK : result.error();

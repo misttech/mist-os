@@ -40,9 +40,6 @@ type RunCommand struct {
 	// ConfigFile is the path to the target configurations.
 	configFile string
 
-	// ImageManifest is a path to an image manifest.
-	imageManifest string
-
 	// ProductBundle is a path to product_bundles.json file.
 	productBundles string
 
@@ -113,7 +110,6 @@ func (*RunCommand) Synopsis() string {
 
 func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.configFile, "config", "", "path to file of device config")
-	f.StringVar(&r.imageManifest, "images", "", "path to an image manifest")
 	f.StringVar(&r.productBundles, "product-bundles", "", "path to product_bundles.json file")
 	f.StringVar(&r.productBundleName, "product-bundle-name", "", "name of product bundle to use")
 	f.BoolVar(&r.isBootTest, "boot-test", false, "whether the provided product bundle is for a boot test.")
@@ -196,9 +192,8 @@ func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeM
 	extraConfigs := ffxutil.ConfigSettings{
 		Level: "global",
 		Settings: map[string]any{
-			"daemon.autostart":              false,
-			"discovery.mdns.enabled":        false,
-			"ffx.target-list.local-connect": true,
+			"daemon.autostart":       false,
+			"discovery.mdns.enabled": false,
 		},
 	}
 	// By default, the ssh.priv and ssh.pub values are in $HOME, which had earlier been configured to be a tmpdir.
@@ -314,7 +309,6 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		}
 		startOpts := targets.StartOptions{
 			Netboot:           r.netboot,
-			ImageManifest:     r.imageManifest,
 			ZirconArgs:        r.zirconArgs,
 			ProductBundles:    r.productBundles,
 			ProductBundleName: r.productBundleName,

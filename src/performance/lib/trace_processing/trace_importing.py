@@ -170,6 +170,7 @@ def convert_trace_file_to_json(
     compressed_input: bool = False,
     compressed_output: bool = False,
     trace2json_path: str | os.PathLike[Any] | None = None,
+    timer_cmd: list[str] | None = None,
 ) -> str:
     """Converts the specified trace file to JSON.
 
@@ -185,6 +186,40 @@ def convert_trace_file_to_json(
 
     Returns:
       The path to the converted trace file.
+    """
+    converted_path, _ = time_convert_trace_file_to_json(
+        trace_path,
+        compressed_input,
+        compressed_output,
+        trace2json_path,
+        timer_cmd,
+    )
+    return converted_path
+
+
+def time_convert_trace_file_to_json(
+    trace_path: str | os.PathLike[Any],
+    compressed_input: bool = False,
+    compressed_output: bool = False,
+    trace2json_path: str | os.PathLike[Any] | None = None,
+    timer_cmd: list[str] | None = None,
+) -> tuple[str, str]:
+    """Converts the specified trace file to JSON.
+
+    Args:
+      trace_path: The path to the trace file to convert.
+      trace2json_path: The path to the trace2json executable. When unset, find
+          at a runtime_deps/trace2json location in a parent directory.
+      compressed_input: Whether the input file is compressed.
+      compressed_output: Whether the output file should be compressed.
+      timer_cmd: Command (e.g. `/usr/bin/time -v`) to wrap conversion process in
+
+    Raises:
+      subprocess.CalledProcessError: The trace2json process returned an error.
+
+    Returns:
+      The path to the converted trace file.
+      Output of the conversion process.
     """
     _LOGGER.info(f"Converting {trace_path} to json")
 
@@ -203,7 +238,8 @@ def convert_trace_file_to_json(
             f.chmod(f.stat().st_mode | stat.S_IEXEC)
             trace2json_path = f
 
-        args: List[str] = [
+        args: list[str] = timer_cmd.copy() if timer_cmd else []
+        args += [
             str(trace2json_path),
             f"--input-file={trace_path}",
             f"--output-file={output_path}",
@@ -217,7 +253,7 @@ def convert_trace_file_to_json(
         )
         _LOGGER.debug("Output of running %s: %s", args, conversion_output)
 
-    return output_path
+    return (output_path, conversion_output)
 
 
 def create_model_from_trace_file_path(

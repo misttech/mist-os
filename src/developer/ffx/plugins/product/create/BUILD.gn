@@ -35,6 +35,7 @@ ffx_plugin("ffx_product_create") {
     "//src/lib/assembly/platform_artifacts",
     "//src/lib/assembly/product_bundle",
     "//src/lib/assembly/tool",
+    "//src/storage/lib/delivery_blob",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",

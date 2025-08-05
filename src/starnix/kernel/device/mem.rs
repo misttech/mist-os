@@ -10,15 +10,16 @@ use crate::mm::{
 };
 use crate::task::syslog::{self, KmsgLevel};
 use crate::task::{
-    CurrentTask, EventHandler, LogSubscription, Syslog, SyslogAccess, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, KernelOrTask, LogSubscription, Syslog, SyslogAccess, WaitCanceler,
+    Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
-    FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
+    FileWriteGuardRef, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use starnix_logging::{log_info, track_stub, Level};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -262,10 +263,10 @@ impl FileOps for DevRandom {
 }
 
 pub fn open_kmsg(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     if flags.can_read() {
@@ -446,60 +447,64 @@ impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
     }
 }
 
-pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
+pub fn mem_device_init<'a, L>(
+    locked: &mut Locked<L>,
+    kernel_or_task: impl KernelOrTask<'a>,
+) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let kernel = system_task.kernel();
+    let kernel = kernel_or_task.kernel();
     let registry = &kernel.device_registry;
 
     let mem_class = registry.objects.mem_class();
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "null".into(),
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevNull>,
-    );
+    )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "zero".into(),
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevZero>,
-    );
+    )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "full".into(),
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevFull>,
-    );
+    )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "random".into(),
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "urandom".into(),
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "kmsg".into(),
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,
         open_kmsg,
-    );
+    )?;
+    Ok(())
 }

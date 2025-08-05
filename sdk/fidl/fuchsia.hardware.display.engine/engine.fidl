@@ -144,7 +144,7 @@ type Layer = struct {
 
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
-    display_id uint64;
+    display_id fuchsia.hardware.display.types.DisplayId;
 
     mode DisplayMode;
 
@@ -160,7 +160,7 @@ type DisplayConfig = struct {
     cc_postoffsets array<float32, 3>;
 
     /// Valid display configurations have at least one layer.
-    layer vector<Layer>:MAX;
+    layers vector<Layer>:MAX;
 };
 
 // An E-EDID can contain up to 256 data blocks, each of which contains 128
@@ -182,7 +182,7 @@ const MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES uint32 = 4;
 /// and converting the information into forms that are more suitable for
 /// higher-level software.
 type RawDisplayInfo = resource struct {
-    display_id uint64;
+    display_id fuchsia.hardware.display.types.DisplayId;
 
     /// Operational modes known to be supported by the display.
     ///
@@ -195,7 +195,8 @@ type RawDisplayInfo = resource struct {
     /// only supported operational mode in this member. Drivers that support
     /// seamless display handoff from a bootloader report the display's initial
     /// mode in this member.
-    preferred_modes vector<DisplayMode>:<MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES>;
+    preferred_modes
+            vector<fuchsia.hardware.display.types.Mode>:<MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES>;
 
     /// Display capabilities, encoded using the E-EDID standard.
     ///
@@ -239,33 +240,30 @@ open protocol EngineListener {
 
     /// Called when a display is removed.
     ///
-    /// `display_id` must be a valid display ID that occurred in a previous
-    /// `OnDisplayAdded()` event.
-    ///
     /// Display Engine drivers must have finished accessing all images which
-    /// were on the removed display before calling `OnDisplayRemoved()`.
+    /// were on the removed display before calling this method.
     flexible OnDisplayRemoved(struct {
-        display_id uint64;
+        /// Must be a valid ID reported by a previous call to
+        /// [`EngineListener.OnDisplayAdded`].
+        display_id fuchsia.hardware.display.types.DisplayId;
     });
 
-    /// Called at the start of each display device's vertical synchronization
-    /// (Vsync) period, regardless of whether the display has applied any
-    /// configuration.
-    ///
-    /// Arguments
-    /// - `timestamp`
-    ///      The ZX_CLOCK_MONOTONIC timestamp at which the vsync occurred.
-    /// - `config_stamp`
-    ///      The config stamp of the latest configuration that is currently
-    ///      fully applied to all the layers of the display with `display_id`.
-    ///        If none of the configurations are currently fully applied to
-    ///      this display, a null value will be passed to the driver.
-    ///        Note that an `ApplyConfiguration()` call may contain multiple
-    ///      configurations with a certain `config_stamp`; Only the application
-    ///      status of the configuration with ID `display_id` is related.
+    /// Called when a display finished showing a configuration.
     flexible OnDisplayVsync(struct {
-        display_id uint64;
-        timestamp zx.Time;
+        /// Must be a valid ID reported by a previous call to
+        /// [`EngineListener.OnDisplayAdded`].
+        display_id fuchsia.hardware.display.types.DisplayId;
+
+        /// The time when the engine driver learned about the VSync.
+        ///
+        /// This is the best available approximation for the VSync start time.
+        timestamp zx.InstantMono;
+
+        /// Identifies the configuration shown at VSync time.
+        ///
+        /// Must be valid. Engine drivers must not send VSync notifications for
+        /// displays that haven't received a configuration via
+        /// [`Engine.ApplyConfiguration`], as that would waste system resources.
         config_stamp ConfigStamp;
     });
 
@@ -346,7 +344,7 @@ open protocol Engine {
     ///
     /// Fails with ZX_ERR_INTERNAL if any error occurs during the setup process,
     /// which mainly consists of communicating with the Sysmem service.
-    flexible ImportBufferCollection2(resource struct {
+    flexible ImportBufferCollection(resource struct {
         /// Identifies the imported BufferCollection.
         ///
         /// The ID must not be invalid, and must not be already assigned.
@@ -373,7 +371,7 @@ open protocol Engine {
         /// When the call completes, the ID is no longer assigned to the
         /// BufferCollection, and can be used in a future call to
         /// [`Engine.ImportBufferCollection2`].
-        collection_id uint64;
+        buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
     /// Sets up the hardware to use a buffer as a display image data source.
@@ -391,8 +389,11 @@ open protocol Engine {
         /// Identifies a previously imported BufferCollection.
         ///
         /// The ID must be assigned to an imported BufferCollection, via a
-        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
-        buffer_id BufferId;
+        /// successful [`DisplayEngine.ImportBufferCollection`] call.
+        buffer_collection_id BufferCollectionId;
+
+        /// Must be a valid index in the imported BufferCollection.
+        buffer_collection_index uint32;
     }) -> (struct {
         /// Assigned to the imported image buffer.
         ///
@@ -416,8 +417,11 @@ open protocol Engine {
         /// Identifies a previously imported BufferCollection.
         ///
         /// The ID must be assigned to an imported BufferCollection, via a
-        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
-        buffer_id BufferId;
+        /// successful [`DisplayEngine.ImportBufferCollection`] call.
+        buffer_collection_id BufferCollectionId;
+
+        /// Must be a valid index in the imported BufferCollection.
+        buffer_collection_index uint32;
     }) -> (struct {
         /// Assigned to the imported capture image buffer.
         ///
@@ -498,7 +502,7 @@ open protocol Engine {
         /// Identifies a previously imported BufferCollection.
         ///
         /// The ID must be assigned to an imported BufferCollection, via a
-        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
+        /// successful [`DisplayEngine.ImportBufferCollection`] call.
         buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
@@ -510,7 +514,7 @@ open protocol Engine {
         ///
         /// TODO(https://fxbug.dev/399954526): Update the contract to cover
         /// configurations that reference an unassigned DisplayId.
-        display_id uint64;
+        display_id fuchsia.hardware.display.types.DisplayId;
 
         /// The display's new power state.
         ///

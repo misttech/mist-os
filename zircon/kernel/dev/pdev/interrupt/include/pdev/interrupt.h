@@ -15,22 +15,22 @@
 
 // Invokes the handler for the given vector if one is registered. If true is
 // returned a handler was present, otherwise false is returned.
-bool pdev_invoke_int_if_present(unsigned int vector);
+bool pdev_invoke_int_if_present(interrupt_vector_t vector);
 
 // Interrupt Controller interface
 struct pdev_interrupt_ops {
-  zx_status_t (*mask)(unsigned int vector);
-  zx_status_t (*unmask)(unsigned int vector);
-  zx_status_t (*deactivate)(unsigned int vector);
-  zx_status_t (*configure)(unsigned int vector, enum interrupt_trigger_mode tm,
+  zx_status_t (*mask)(interrupt_vector_t vector);
+  zx_status_t (*unmask)(interrupt_vector_t vector);
+  zx_status_t (*deactivate)(interrupt_vector_t vector);
+  zx_status_t (*configure)(interrupt_vector_t vector, enum interrupt_trigger_mode tm,
                            enum interrupt_polarity pol);
-  zx_status_t (*get_config)(unsigned int vector, enum interrupt_trigger_mode* tm,
+  zx_status_t (*get_config)(interrupt_vector_t vector, enum interrupt_trigger_mode* tm,
                             enum interrupt_polarity* pol);
-  zx_status_t (*set_affinity)(unsigned int vector, cpu_mask_t mask);
-  bool (*is_valid)(unsigned int vector, uint32_t flags);
+  zx_status_t (*set_affinity)(interrupt_vector_t vector, cpu_mask_t mask);
+  bool (*is_valid)(interrupt_vector_t vector, uint32_t flags);
   uint32_t (*get_base_vector)();
   uint32_t (*get_max_vector)();
-  unsigned int (*remap)(unsigned int vector);
+  unsigned int (*remap)(interrupt_vector_t vector);
   zx_status_t (*send_ipi)(cpu_mask_t target, mp_ipi_t ipi);
   void (*init_percpu_early)();
   void (*init_percpu)();
@@ -46,8 +46,7 @@ struct pdev_interrupt_ops {
   zx_status_t (*msi_alloc_block)(uint requested_irqs, bool can_target_64bit, bool is_msix,
                                  msi_block_t* out_block);
   void (*msi_free_block)(msi_block_t* block);
-  void (*msi_register_handler)(const msi_block_t* block, uint msi_id, int_handler handler,
-                               void* ctx);
+  void (*msi_register_handler)(const msi_block_t* block, uint msi_id, interrupt_handler_t handler);
 };
 
 void pdev_register_interrupts(const struct pdev_interrupt_ops* ops);

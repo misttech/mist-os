@@ -47,7 +47,7 @@ type WlanRxInfo = struct {
     valid_fields uint32;
     phy fuchsia.wlan.common.WlanPhyType;
     data_rate uint32;
-    channel fuchsia.wlan.common.WlanChannel;
+    channel ieee80211.WlanChannel;
     mcs uint8;
     rssi_dbm int8;
     snr_dbh int16;
@@ -173,7 +173,7 @@ type TxArgs = struct {
 
 type SetChannelArgs = struct {
     wlan_softmac_id uint16;
-    channel fuchsia.wlan.common.WlanChannel;
+    channel ieee80211.WlanChannel;
 };
 
 type JoinBssArgs = struct {

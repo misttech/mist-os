@@ -1604,7 +1604,7 @@ mod tests {
             let mut out_dir = OutDir::new();
             out_dir.add_echo_protocol("/svc/foo.bar/instance_a/echo".parse().unwrap());
             out_dir.add_echo_protocol("/svc/foo.bar/instance_b/echo".parse().unwrap());
-            test.mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
+            test.mock_runner.add_host_fn(&format!("test:///{}", name), out_dir.host_fn());
 
             let child = test
                 .model
@@ -1624,8 +1624,8 @@ mod tests {
                 .await
                 .unwrap();
             target.ensure_started(&StartReason::Debug).await.unwrap();
-            test.mock_runner.wait_for_url("test:///target_resolved").await;
-            let ns = test.mock_runner.get_namespace("test:///target_resolved").unwrap();
+            test.mock_runner.wait_for_url("test:///target").await;
+            let ns = test.mock_runner.get_namespace("test:///target").unwrap();
             let ns = ns.lock().await;
             // /pkg and /svc
             let mut ns = ns.clone().flatten();

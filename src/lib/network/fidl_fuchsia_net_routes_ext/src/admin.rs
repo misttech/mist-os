@@ -43,9 +43,9 @@ pub enum RouteTableCreationError {
 pub trait FidlRouteAdminIpExt: Ip {
     /// The "route table" protocol to use for this IP version.
     type RouteTableMarker: DiscoverableProtocolMarker<
-        RequestStream = Self::RouteTableRequestStream,
-        Proxy: Clone,
-    >;
+            RequestStream = Self::RouteTableRequestStream,
+            Proxy: Clone + Debug,
+        > + Unpin;
     /// The "root set" protocol to use for this IP version.
     type GlobalRouteTableMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
@@ -407,6 +407,49 @@ pub fn new_route_table<I: Ip + FidlRouteAdminIpExt>(
 
     result.map_err(RouteTableCreationError::RouteTable)?;
     Ok(route_table_proxy)
+}
+
+/// Dispatches `get_interface_local_table` on either the `RouteTableProviderV4`
+/// or `RouteTableProviderV6` proxy.
+pub async fn get_interface_local_table<I: Ip + FidlRouteAdminIpExt>(
+    route_table_provider_proxy: &<I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
+    credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+) -> Result<
+    Result<
+        <I::RouteTableMarker as ProtocolMarker>::Proxy,
+        fnet_routes_admin::GetInterfaceLocalTableError,
+    >,
+    fidl::Error,
+> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Input<'a, I: FidlRouteAdminIpExt> {
+        route_table_provider_proxy: &'a <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
+        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+    }
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Output<I: FidlRouteAdminIpExt>(
+        fidl::client::QueryResponseFut<
+            Result<
+                fidl::endpoints::ClientEnd<I::RouteTableMarker>,
+                fnet_routes_admin::GetInterfaceLocalTableError,
+            >,
+        >,
+    );
+
+    let Output(fut) = I::map_ip(
+        Input::<'_, I> { route_table_provider_proxy, credential },
+        |Input { route_table_provider_proxy, credential }| {
+            Output::<Ipv4>(route_table_provider_proxy.get_interface_local_table(credential))
+        },
+        |Input { route_table_provider_proxy, credential }| {
+            Output::<Ipv6>(route_table_provider_proxy.get_interface_local_table(credential))
+        },
+    );
+
+    fut.await.map(|r| r.map(fidl::endpoints::ClientEnd::into_proxy))
 }
 
 /// Dispatches `new_route_set` on either the `RouteTableV4`

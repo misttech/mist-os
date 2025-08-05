@@ -34,6 +34,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "AEMU.botanist.json",
             "AEMU_tests.json",
@@ -42,7 +43,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
         ],
@@ -81,8 +81,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "604s",
             "-ffx",
@@ -134,6 +132,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "affected:AEMU.botanist.json",
             "affected:AEMU_tests.json",
@@ -142,7 +141,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
         ],
@@ -181,8 +179,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "842s",
             "-ffx",
@@ -233,13 +229,13 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "host_x64/botanist",
             "host_x64/ffx",
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "multiplied:AEMU.botanist.json",
             "multiplied:AEMU_tests.json",
             "product_bundle/zbi",
@@ -280,8 +276,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "842s",
             "-ffx",

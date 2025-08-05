@@ -22,7 +22,7 @@ cc_test_executable("aml-g12-tdm-test-bin") {
     "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/gpio/testing/fake-gpio",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/amlogic",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",

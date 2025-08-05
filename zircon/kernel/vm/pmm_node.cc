@@ -328,10 +328,6 @@ zx::result<vm_page_t*> PmmNode::AllocLoanedPage(
   DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
   AutoPreemptDisabler preempt_disable;
 
-  if (!pmm_physical_page_borrowing_config()->is_any_borrowing_enabled()) {
-    return zx::error(ZX_ERR_NO_RESOURCES);
-  }
-
   bool free_list_had_fill_pattern = false;
   vm_page* page = nullptr;
   {
@@ -497,7 +493,7 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
     return ZX_OK;
   }
 
-  address = ROUNDDOWN(address, PAGE_SIZE);
+  address = ROUNDDOWN_PAGE_SIZE(address);
 
   bool free_list_had_fill_pattern = false;
 
@@ -635,8 +631,8 @@ zx_status_t PmmNode::InitArena(const PmmArenaSelection& selected) TA_NO_THREAD_S
 }
 
 void PmmNode::InitReservedRange(const memalloc::Range& range) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.addr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(range.addr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(range.size));
 
   ktl::string_view what =
       range.type == memalloc::Type::kReserved ? "hole in RAM"sv : memalloc::ToString(range.type);

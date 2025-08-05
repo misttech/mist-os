@@ -2,8 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
+
+declare_args() {
+  # This flag affects the return value of a signal ioctl used by certain container
+  # binaries to direct them to use kgsl-based or magma-based drivers. It does not
+  # affect the availability of the kgsl device within the container.
+  starnix_kgsl_enable = false
+}
 
 rustc_library("kgsl") {
   name = "starnix-modules-kgsl"
@@ -11,11 +17,17 @@ rustc_library("kgsl") {
   version = "0.1.0"
   source_root = "lib.rs"
 
+  if (starnix_kgsl_enable) {
+    features = [ "starnix-kgsl-enable" ]
+  }
+
   sources = [
     "file.rs",
     "init.rs",
     "lib.rs",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   deps = [
     "//sdk/rust/zx",
@@ -26,5 +38,6 @@ rustc_library("kgsl") {
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",
+    "//src/starnix/modules/kgsl/strings",
   ]
 }

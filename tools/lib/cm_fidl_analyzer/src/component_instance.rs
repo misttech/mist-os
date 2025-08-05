@@ -4,7 +4,7 @@
 
 use crate::component_model::{BuildAnalyzerModelError, Child, DynamicDictionaryConfig};
 use crate::component_sandbox::{
-    build_capability_sourced_capabilities_dictionary, build_framework_dictionary,
+    build_capability_sourced_capabilities_dictionary, build_framework_router,
     build_root_component_input, new_aggregate_router,
     static_children_component_output_dictionary_routers, ProgramOutputGenerator,
 };
@@ -27,7 +27,7 @@ use routing::component_instance::{
 use routing::environment::RunnerRegistry;
 use routing::error::{ComponentInstanceError, ErrorReporter, RouteRequestErrorInfo};
 use routing::policy::GlobalPolicyChecker;
-use routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use routing::resolving::{ComponentAddress, ComponentResolutionContext, ResolverError};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -189,7 +189,7 @@ impl ComponentInstanceForAnalyzer {
             &decl,
             input,
             program_output_dict,
-            build_framework_dictionary(&self_),
+            build_framework_router(&self_),
             build_capability_sourced_capabilities_dictionary(&self_, &decl),
             declared_dictionaries,
             NullErrorReporter {},
@@ -302,6 +302,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     }
 }
 
+#[async_trait]
 impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
     type Component = Self;
 
@@ -334,8 +335,8 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
         vec![]
     }
 
-    fn address(&self) -> ComponentAddress {
-        ComponentAddress::from_absolute_url(&"none://not_used".parse().unwrap()).unwrap()
+    async fn address(&self) -> Result<ComponentAddress, ResolverError> {
+        Ok(ComponentAddress::from_absolute_url(&"none://not_used".parse().unwrap()).unwrap())
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {

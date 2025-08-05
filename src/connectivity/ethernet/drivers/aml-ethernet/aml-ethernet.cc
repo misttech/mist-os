@@ -10,7 +10,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -23,6 +22,7 @@
 #include <soc/aml-s912/s912-hw.h>
 
 #include "aml-regs.h"
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace eth {
 

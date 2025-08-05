@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Context as _, Error};
 use async_trait::async_trait;
+use fetch_url::fetch_url;
 use fidl::endpoints::ProtocolMarker as _;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_hash::Hash;
@@ -11,7 +12,7 @@ use fuchsia_sync::Mutex;
 use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl};
 use futures::channel::oneshot;
 use futures::future::FutureExt as _;
-use futures::stream::{FusedStream, TryStreamExt as _};
+use futures::stream::{FusedStream, StreamExt as _, TryStreamExt as _};
 use futures::Future;
 use include_str_from_working_dir::include_str_from_working_dir_env;
 use log::{error, info, warn};
@@ -19,15 +20,15 @@ use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use update_package::manifest::OtaManifestV1;
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg_ext as fpkg_ext, fidl_fuchsia_space as fspace,
     fidl_fuchsia_update_installer_ext as fupdate_installer_ext,
 };
 
 mod config;
 mod environment;
-mod fetch;
 mod genutil;
 mod history;
 mod metrics;
@@ -73,9 +74,6 @@ enum PrepareError {
     #[error("while determining update mode")]
     ParseUpdateMode(#[source] update_package::ParseUpdateModeError),
 
-    #[error("while writing image to paver")]
-    PaverWriteImage(#[source] anyhow::Error),
-
     #[error("while preparing partitions for update")]
     PreparePartitionMetdata(#[source] paver::PreparePartitionMetadataError),
 
@@ -103,16 +101,21 @@ enum PrepareError {
     ParseUpdatePackageUrl(#[source] fuchsia_url::ParseError),
 
     #[error("while fetching update url")]
-    FetchUrl(#[source] fetch::FetchError),
+    FetchUrl(#[source] fetch_url::errors::FetchUrlError),
+
+    #[error("while parsing OTA manifest")]
+    ParseManifest(#[source] update_package::manifest::OtaManifestError),
+
+    #[error("while opening blobfs")]
+    OpenBlobfs(#[source] blobfs::BlobfsError),
 }
 
 impl PrepareError {
     fn reason(&self) -> fupdate_installer_ext::PrepareFailureReason {
         match self {
-            Self::ResolveUpdate(ResolveError::Error(
-                fidl_fuchsia_pkg_ext::ResolveError::NoSpace,
-                _,
-            )) => fupdate_installer_ext::PrepareFailureReason::OutOfSpace,
+            Self::ResolveUpdate(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _)) => {
+                fupdate_installer_ext::PrepareFailureReason::OutOfSpace
+            }
             Self::UnsupportedDowngrade { .. } => {
                 fupdate_installer_ext::PrepareFailureReason::UnsupportedDowngrade
             }
@@ -133,6 +136,15 @@ enum StageError {
     #[error("while resolving an image package")]
     Resolve(#[source] ResolveError),
 
+    #[error("while communicating over fidl")]
+    Fidl(#[source] fidl::Error),
+
+    #[error("while fetching a blob")]
+    FetchBlob(#[source] fpkg_ext::ResolveError),
+
+    #[error("while getting a blob vmo")]
+    GetBlobVmo(#[source] blobfs::GetBlobVmoError),
+
     #[error("while writing images")]
     Write(#[source] anyhow::Error),
 }
@@ -140,7 +152,8 @@ enum StageError {
 impl StageError {
     fn reason(&self) -> fupdate_installer_ext::StageFailureReason {
         match self {
-            Self::Resolve(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => {
+            Self::Resolve(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _))
+            | Self::FetchBlob(fpkg_ext::ResolveError::NoSpace) => {
                 fupdate_installer_ext::StageFailureReason::OutOfSpace
             }
             _ => fupdate_installer_ext::StageFailureReason::Internal,
@@ -154,6 +167,12 @@ enum FetchError {
     #[error("while resolving a package")]
     Resolve(#[source] ResolveError),
 
+    #[error("while communicating over fidl")]
+    Fidl(#[source] fidl::Error),
+
+    #[error("while fetching a blob")]
+    FetchBlob(#[source] fpkg_ext::ResolveError),
+
     #[error("while syncing pkg-cache")]
     Sync(#[source] anyhow::Error),
 }
@@ -161,7 +180,8 @@ enum FetchError {
 impl FetchError {
     fn reason(&self) -> fupdate_installer_ext::FetchFailureReason {
         match self {
-            Self::Resolve(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => {
+            Self::Resolve(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _))
+            | Self::FetchBlob(fpkg_ext::ResolveError::NoSpace) => {
                 fupdate_installer_ext::FetchFailureReason::OutOfSpace
             }
             _ => fupdate_installer_ext::FetchFailureReason::Internal,
@@ -246,7 +266,8 @@ impl Updater for RealUpdater {
             Arc::clone(&self.history),
             reboot_controller,
             self.structured_config.concurrent_package_resolves.into(),
-            self.structured_config.enable_attempt_v2,
+            self.structured_config.concurrent_blob_fetches.into(),
+            self.structured_config.allow_packageless_update,
             cancel_receiver,
         )
         .await;
@@ -269,7 +290,8 @@ async fn update(
     history: Arc<Mutex<UpdateHistory>>,
     reboot_controller: RebootController,
     concurrent_package_resolves: usize,
-    enable_attempt_v2: bool,
+    concurrent_blob_fetches: usize,
+    allow_packageless_update: bool,
     mut cancel_receiver: oneshot::Receiver<()>,
 ) -> (String, impl FusedStream<Item = fupdate_installer_ext::State>) {
     let attempt_fut = history.lock().start_update_attempt(
@@ -308,10 +330,12 @@ async fn update(
 
         let attempt_res = {
             let attempt_fut = match config.update_url.scheme() {
-                "http" | "https" if enable_attempt_v2 => AttemptV2 { config: &config, env: &env }
-                    .run(&mut co, &mut phase, &mut target_version)
-                    .left_future()
-                    .fuse(),
+                "http" | "https" if allow_packageless_update => {
+                    PackagelessAttempt { config: &config, env: &env, concurrent_blob_fetches }
+                        .run(&mut co, &mut phase, &mut target_version)
+                        .left_future()
+                        .fuse()
+                }
                 _ => Attempt { config: &config, env: &env, concurrent_package_resolves }
                     .run(&mut co, &mut phase, &mut target_version)
                     .right_future()
@@ -359,7 +383,7 @@ async fn update(
         info!("flushing cobalt events");
         let () = flush_cobalt(cobalt_forwarder_task, COBALT_FLUSH_TIMEOUT).await;
 
-        let (state, mode, _packages) = match attempt_res {
+        let (state, mode) = match attempt_res {
             Ok(ok) => ok,
             Err(e) => {
                 error!("system update failed: {:#}", anyhow!(e));
@@ -496,7 +520,7 @@ impl ImagesToWrite {
 
         let url_directory_map = resolver::resolve_image_packages(
             pkg_resolver,
-            package_urls.iter(),
+            package_urls.into_iter(),
             concurrent_package_resolves,
         )
         .await
@@ -639,10 +663,7 @@ impl Attempt<'_> {
         co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<
-        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
-        AttemptError,
-    > {
+    ) -> Result<(state::WaitToReboot, update_package::UpdateMode), AttemptError> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
@@ -693,11 +714,11 @@ impl Attempt<'_> {
         let mut state = state.enter_fetch(co).await;
         *phase = metrics::Phase::PackageDownload;
 
-        let packages = match self
+        let () = match self
             .fetch_packages(co, &mut state, packages_to_fetch, mode, update_pkg.1)
             .await
         {
-            Ok(packages) => packages,
+            Ok(()) => (),
             Err(e) => {
                 state.fail(co, e.reason()).await;
                 return Err(e.into());
@@ -708,7 +729,7 @@ impl Attempt<'_> {
         let state = state.enter_commit(co).await;
         *phase = metrics::Phase::ImageCommit;
 
-        let () = match self.commit_images(mode, current_configuration).await {
+        let () = match commit_images(&self.env.boot_manager, mode, current_configuration).await {
             Ok(()) => (),
             Err(e) => {
                 state.fail(co).await;
@@ -720,7 +741,7 @@ impl Attempt<'_> {
         let state = state.enter_wait_to_reboot(co).await;
         *phase = metrics::Phase::SuccessPendingReboot;
 
-        Ok((state, mode, packages))
+        Ok((state, mode))
     }
 
     /// Acquire the necessary data to perform the update.
@@ -811,126 +832,102 @@ impl Attempt<'_> {
             update_package::UpdateMode::ForceRecovery => vec![],
         };
 
-        let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
+        let epoch =
+            update_pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(
+                || {
+                    info!("no epoch in update package, assuming it's 0");
+                    0
+                },
+            );
+        let () = validate_epoch(SOURCE_EPOCH_RAW, epoch)?;
 
         let images_metadata =
             update_pkg.images_metadata().await.map_err(PrepareError::ParseImages)?;
         let () = images_metadata.verify(mode).map_err(PrepareError::VerifyImages)?;
         let mut images_to_write = ImagesToWrite::new();
 
+        let target_config = current_config.to_non_current_configuration().to_target_configuration();
         if let Some(fuchsia) = images_metadata.fuchsia() {
-            target_version.zbi_hash = fuchsia.zbi().sha256().to_string();
-
-            // Determine if the fuchsia zbi has changed in this update. If an error is raised, do
-            // not fail the update.
-            match image_to_write(
-                fuchsia.zbi(),
+            // Determine if the fuchsia zbi has changed in this update.
+            if should_write_image(
+                fuchsia.zbi().sha256(),
+                fuchsia.zbi().size(),
                 current_config,
+                target_config,
                 &self.env.data_sink,
                 ImageType::Asset(fpaver::Asset::Kernel),
             )
             .await
             {
-                Ok(Some(url)) => images_to_write.fuchsia.set_zbi(url),
-                Ok(None) => (),
-                Err(e) => {
-                    error!(
-                        "Error while determining whether to write the zbi image, assume update is \
-                        needed: {:#}",
-                        anyhow!(e)
-                    );
-                    images_to_write.fuchsia.set_zbi(fuchsia.zbi().url().clone());
-                }
-            };
+                images_to_write.fuchsia.set_zbi(fuchsia.zbi().url().clone());
+            }
 
             if let Some(vbmeta) = fuchsia.vbmeta() {
                 target_version.vbmeta_hash = vbmeta.sha256().to_string();
-                // Determine if the vbmeta has changed in this update. If an error is raised, do
-                // not fail the update.
-                match image_to_write(
-                    vbmeta,
+                // Determine if the vbmeta has changed in this update.
+                if should_write_image(
+                    vbmeta.sha256(),
+                    vbmeta.size(),
                     current_config,
+                    target_config,
                     &self.env.data_sink,
                     ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
                 )
                 .await
                 {
-                    Ok(Some(url)) => images_to_write.fuchsia.set_vbmeta(url),
-                    Ok(None) => (),
-                    Err(e) => {
-                        error!(
-                            "Error while determining whether to write the vbmeta image, assume \
-                            update is needed: {:#}",
-                            anyhow!(e)
-                        );
-                        images_to_write.fuchsia.set_vbmeta(vbmeta.url().clone())
-                    }
-                };
+                    images_to_write.fuchsia.set_vbmeta(vbmeta.url().clone());
+                }
             }
         }
 
         // Only check these images if we have to.
         if self.config.should_write_recovery {
             if let Some(recovery) = images_metadata.recovery() {
-                match recovery_to_write(recovery.zbi(), &self.env.data_sink, fpaver::Asset::Kernel)
-                    .await
+                let target_config =
+                    paver::TargetConfiguration::Single(fpaver::Configuration::Recovery);
+                if should_write_image(
+                    recovery.zbi().sha256(),
+                    recovery.zbi().size(),
+                    current_config,
+                    target_config,
+                    &self.env.data_sink,
+                    ImageType::Asset(fpaver::Asset::Kernel),
+                )
+                .await
                 {
-                    Ok(Some(url)) => images_to_write.recovery.set_zbi(url),
-                    Ok(None) => (),
-                    Err(e) => {
-                        error!(
-                            "Error while determining whether to write the recovery zbi image, \
-                            assume update is needed: {:#}",
-                            anyhow!(e)
-                        );
-                        images_to_write.recovery.set_zbi(recovery.zbi().url().clone());
-                    }
-                };
+                    images_to_write.recovery.set_zbi(recovery.zbi().url().clone());
+                }
 
                 if let Some(vbmeta_image) = recovery.vbmeta() {
-                    // Determine if the vbmeta has changed in this update. If an error is raised,
-                    // do not fail the update.
-                    match recovery_to_write(
-                        vbmeta_image,
+                    // Determine if the vbmeta has changed in this update.
+                    if should_write_image(
+                        vbmeta_image.sha256(),
+                        vbmeta_image.size(),
+                        current_config,
+                        target_config,
                         &self.env.data_sink,
-                        fpaver::Asset::VerifiedBootMetadata,
+                        ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
                     )
                     .await
                     {
-                        Ok(Some(url)) => images_to_write.recovery.set_vbmeta(url),
-                        Ok(None) => (),
-                        Err(e) => {
-                            error!(
-                                "Error while determining whether to write the recovery vbmeta \
-                                image, assume update is needed: {:#}",
-                                anyhow!(e)
-                            );
-                            images_to_write.recovery.set_vbmeta(vbmeta_image.url().clone())
-                        }
-                    };
+                        images_to_write.recovery.set_vbmeta(vbmeta_image.url().clone())
+                    }
                 }
             }
         }
 
         for (type_, metadata) in images_metadata.firmware() {
-            match image_to_write(
-                metadata,
+            if should_write_image(
+                metadata.sha256(),
+                metadata.size(),
                 current_config,
+                target_config,
                 &self.env.data_sink,
                 ImageType::Firmware { type_ },
             )
             .await
             {
-                Ok(Some(url)) => images_to_write.firmware.push((type_.clone(), url)),
-                Ok(None) => (),
-                Err(e) => {
-                    // If an error is raised, do not fail the update.
-                    error!(
-                        "Error while determining firmware to write, assume update is needed: {:#}",
-                        anyhow!(e)
-                    );
-                    images_to_write.firmware.push((type_.clone(), metadata.url().clone()))
-                }
+                images_to_write.firmware.push((type_.clone(), metadata.url().clone()))
             }
         }
 
@@ -1024,7 +1021,7 @@ impl Attempt<'_> {
         packages_to_fetch: Vec<PinnedAbsolutePackageUrl>,
         mode: update_package::UpdateMode,
         update_pkg: Option<Hash>,
-    ) -> Result<Vec<fio::DirectoryProxy>, FetchError> {
+    ) -> Result<(), FetchError> {
         // Remove ImagesToWrite from the retained_index.
         // GC to remove the ImagesToWrite from blobfs.
         let () = replace_retained_packages(
@@ -1044,20 +1041,13 @@ impl Attempt<'_> {
             error!("unable to gc packages during Fetch state: {:#}", anyhow!(e));
         }
 
-        let mut packages = Vec::with_capacity(packages_to_fetch.len());
+        let mut package_dir_futs = futures::stream::iter(packages_to_fetch)
+            .map(async |url| resolver::resolve_package(&self.env.pkg_resolver, &url.into()).await)
+            .buffer_unordered(self.concurrent_package_resolves);
 
-        let package_dir_futs = resolver::resolve_packages(
-            &self.env.pkg_resolver,
-            packages_to_fetch.iter(),
-            self.concurrent_package_resolves,
-        );
-        futures::pin_mut!(package_dir_futs);
-
-        while let Some(package_dir) =
+        while let Some(_package_dir) =
             package_dir_futs.try_next().await.map_err(FetchError::Resolve)?
         {
-            packages.push(package_dir);
-
             state.add_progress(co, 1).await;
         }
 
@@ -1068,68 +1058,122 @@ impl Attempt<'_> {
             update_package::UpdateMode::ForceRecovery => {}
         }
 
-        Ok(packages)
-    }
-
-    /// Configure the non-current configuration (or recovery) as active for the next boot.
-    async fn commit_images(
-        &self,
-        mode: update_package::UpdateMode,
-        current_configuration: paver::CurrentConfiguration,
-    ) -> Result<(), Error> {
-        let desired_config = current_configuration.to_non_current_configuration();
-
-        match mode {
-            update_package::UpdateMode::Normal => {
-                let () =
-                    paver::set_configuration_active(&self.env.boot_manager, desired_config).await?;
-            }
-            update_package::UpdateMode::ForceRecovery => {
-                let () = paver::set_recovery_configuration_active(&self.env.boot_manager).await?;
-            }
-        }
-
-        match desired_config {
-            paver::NonCurrentConfiguration::A | paver::NonCurrentConfiguration::B => {
-                paver::paver_flush_boot_manager(&self.env.boot_manager).await?;
-            }
-            paver::NonCurrentConfiguration::NotSupported => {}
-        }
-
         Ok(())
     }
 }
 
-// Update attempt that uses a manifest instead of update package.
-struct AttemptV2<'a> {
-    config: &'a Config,
-    env: &'a Environment,
+/// Configure the non-current configuration (or recovery) as active for the next boot.
+async fn commit_images(
+    boot_manager: &fpaver::BootManagerProxy,
+    mode: update_package::UpdateMode,
+    current_configuration: paver::CurrentConfiguration,
+) -> Result<(), Error> {
+    let desired_config = current_configuration.to_non_current_configuration();
+
+    match mode {
+        update_package::UpdateMode::Normal => {
+            let () = paver::set_configuration_active(boot_manager, desired_config).await?;
+        }
+        update_package::UpdateMode::ForceRecovery => {
+            let () = paver::set_recovery_configuration_active(boot_manager).await?;
+        }
+    }
+
+    match desired_config {
+        paver::NonCurrentConfiguration::A | paver::NonCurrentConfiguration::B => {
+            paver::paver_flush_boot_manager(boot_manager).await?;
+        }
+        paver::NonCurrentConfiguration::NotSupported => {}
+    }
+
+    Ok(())
 }
 
-impl AttemptV2<'_> {
+// Update attempt that uses a manifest instead of update package.
+struct PackagelessAttempt<'a> {
+    config: &'a Config,
+    env: &'a Environment,
+    concurrent_blob_fetches: usize,
+}
+
+impl PackagelessAttempt<'_> {
     // Run the update attempt, if update is canceled, any await during this attempt could be an
     // early return point.
     async fn run(
         mut self,
         co: &mut async_generator::Yield<fupdate_installer_ext::State>,
-        _phase: &mut metrics::Phase,
+        phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<
-        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
-        AttemptError,
-    > {
+    ) -> Result<(state::WaitToReboot, update_package::UpdateMode), AttemptError> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
-        let _current_configuration = match self.prepare(target_version).await {
-            Ok(current_configuration) => current_configuration,
+        let (current_configuration, manifest) = match self.prepare(target_version).await {
+            Ok(tuple) => tuple,
             Err(e) => {
                 state.fail(co, e.reason()).await;
                 return Err(e.into());
             }
         };
 
-        unimplemented!("AttemptV2 is still work in progress");
+        let blobfs = blobfs::Client::builder()
+            .readable()
+            .build()
+            .await
+            .map_err(|e| AttemptError::Prepare(PrepareError::OpenBlobfs(e)))?;
+
+        // Write images
+        let mut state = state
+            .enter_stage(
+                co,
+                fupdate_installer_ext::UpdateInfo::builder().download_size(0).build(),
+                (manifest.images.len() + manifest.blobs.len()) as u64,
+            )
+            .await;
+        *phase = metrics::Phase::ImageWrite;
+
+        let () = match self
+            .stage_images(co, &mut state, current_configuration, &manifest, &blobfs)
+            .await
+        {
+            Ok(()) => (),
+            Err(e) => {
+                state.fail(co, e.reason()).await;
+                return Err(e.into());
+            }
+        };
+
+        // Fetch blobs
+        let mut state = state.enter_fetch(co).await;
+        *phase = metrics::Phase::PackageDownload;
+
+        let () = match self.fetch_blobs(co, &mut state, &manifest, &blobfs).await {
+            Ok(()) => (),
+            Err(e) => {
+                state.fail(co, e.reason()).await;
+                return Err(e.into());
+            }
+        };
+
+        // Commit the update
+        let state = state.enter_commit(co).await;
+        *phase = metrics::Phase::ImageCommit;
+
+        let () = match commit_images(&self.env.boot_manager, manifest.mode, current_configuration)
+            .await
+        {
+            Ok(()) => (),
+            Err(e) => {
+                state.fail(co).await;
+                return Err(AttemptError::Commit(e));
+            }
+        };
+
+        // Success!
+        let state = state.enter_wait_to_reboot(co).await;
+        *phase = metrics::Phase::SuccessPendingReboot;
+
+        Ok((state, manifest.mode))
     }
 
     /// Acquire the necessary data to perform the update.
@@ -1138,8 +1182,8 @@ impl AttemptV2<'_> {
     /// target OS and partition images that need written.
     async fn prepare(
         &mut self,
-        _target_version: &mut history::Version,
-    ) -> Result<paver::CurrentConfiguration, PrepareError> {
+        target_version: &mut history::Version,
+    ) -> Result<(paver::CurrentConfiguration, OtaManifestV1), PrepareError> {
         // Ensure that the partition boot metadata is ready for the update to begin. Specifically:
         // - the current configuration must be Healthy and Active, and
         // - the non-current configuration must be Unbootable.
@@ -1163,12 +1207,241 @@ impl AttemptV2<'_> {
             .await
             .map_err(PrepareError::PreparePartitionMetdata)?;
 
-        let _manifest_bytes = fetch::fetch_url(self.config.update_url.to_string())
+        let manifest_bytes = fetch_url(self.config.update_url.as_ref(), None)
             .await
             .map_err(PrepareError::FetchUrl)?;
 
-        // TODO(https://fxbug.dev/429271527): parse manifest
-        Ok(current_config)
+        let manifest = update_package::manifest::parse_ota_manifest(&manifest_bytes)
+            .map_err(PrepareError::ParseManifest)?;
+
+        *target_version = history::Version::for_manifest(&manifest);
+
+        match manifest.mode {
+            update_package::UpdateMode::Normal => {}
+            update_package::UpdateMode::ForceRecovery => {
+                if !self.config.should_write_recovery {
+                    return Err(PrepareError::VerifyUpdateMode);
+                }
+                // Must have recovery zbi image in force recovery mode.
+                if !manifest.images.iter().any(|image| {
+                    image.slot == update_package::manifest::Slot::R
+                        && image.image_type
+                            == update_package::manifest::ImageType::Asset(
+                                update_package::images::AssetType::Zbi,
+                            )
+                }) {
+                    return Err(PrepareError::VerifyImages(
+                        update_package::VerifyError::MissingZbi,
+                    ));
+                }
+            }
+        }
+
+        let () = verify_board_in_manifest(&self.env.build_info, &manifest)
+            .await
+            .map_err(PrepareError::VerifyBoard)?;
+
+        let () = validate_epoch(SOURCE_EPOCH_RAW, manifest.epoch)?;
+
+        Ok((current_config, manifest))
+    }
+
+    /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
+    async fn stage_images(
+        &mut self,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
+        state: &mut state::Stage,
+        current_configuration: paver::CurrentConfiguration,
+        manifest: &OtaManifestV1,
+        blobfs: &blobfs::Client,
+    ) -> Result<(), StageError> {
+        // Protect all blobs to guarantee forward progress, this might cause out of space issue in a
+        // rare condition: a previous update attempt was almost done before it was stopped and then
+        // we attempt a new update which contains a different image but most blobs are the same. If
+        // we encounter out of space error fetching images, fallback to only retain blobs for
+        // images.
+        let () = replace_retained_blobs(
+            manifest
+                .images
+                .iter()
+                .map(|image| image.fuchsia_merkle_root)
+                .chain(manifest.blobs.iter().map(|blob| blob.fuchsia_merkle_root)),
+            &self.env.retained_blobs,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            error!(
+                "unable to replace retained blobs set before gc in preparation \
+                    for fetching images listed in OTA manifest: {:#}",
+                anyhow!(e)
+            )
+        });
+
+        if let Err(e) = gc(&self.env.space_manager).await {
+            error!("unable to gc blobs in preparation to write image blobs: {:#}", anyhow!(e));
+        }
+
+        info!("Images to write: {:?}", manifest.images);
+        let desired_config = current_configuration.to_non_current_configuration();
+        info!("Targeting configuration: {:?}", desired_config);
+        let target_config = desired_config.to_target_configuration();
+
+        let mut stream = futures::stream::iter(manifest.images.iter())
+            .map(async |image| {
+                if !self.config.should_write_recovery
+                    && image.slot == update_package::manifest::Slot::R
+                {
+                    return Ok(());
+                }
+                let image_type = (&image.image_type).into();
+                if should_write_image(
+                    image.sha256,
+                    image.size,
+                    current_configuration,
+                    target_config,
+                    &self.env.data_sink,
+                    image_type,
+                )
+                .await
+                {
+                    let blob_id = fpkg_ext::BlobId::from(image.fuchsia_merkle_root).into();
+                    match self
+                        .env
+                        .ota_downloader
+                        .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                        .await
+                        .map_err(StageError::Fidl)?
+                    {
+                        Ok(()) => {}
+                        Err(fpkg::ResolveError::NoSpace) => {
+                            let () = replace_retained_blobs(
+                                manifest.images.iter().map(|image| image.fuchsia_merkle_root),
+                                &self.env.retained_blobs,
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                error!(
+                                    "while fetching images, unable to minimize retained blobs set \
+                                     before second gc attempt: {:#}",
+                                    anyhow!(e)
+                                )
+                            });
+
+                            if let Err(e) = gc(&self.env.space_manager).await {
+                                error!(
+                                    "unable to gc blobs before retry fetching blobs: {:#}",
+                                    anyhow!(e)
+                                );
+                            }
+                            let () = self
+                                .env
+                                .ota_downloader
+                                .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                                .await
+                                .map_err(StageError::Fidl)?
+                                .map_err(|e| StageError::FetchBlob(e.into()))?;
+                        }
+                        Err(e) => {
+                            return Err(StageError::FetchBlob(e.into()));
+                        }
+                    }
+                    let vmo = blobfs
+                        .get_blob_vmo(&image.fuchsia_merkle_root)
+                        .await
+                        .map_err(StageError::GetBlobVmo)?;
+                    // The paver service requires VMOs that are resizable, and blobfs does not give
+                    // out resizable VMOs. Fortunately, a copy-on-write child clone of the vmo can
+                    // be made resizable.
+                    let vmo = vmo
+                        .create_child(
+                            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
+                                | zx::VmoChildOptions::RESIZABLE,
+                            0,
+                            image.size,
+                        )
+                        .map_err(|status| {
+                            StageError::OpenImageError(
+                                update_package::OpenImageError::CloneBuffer {
+                                    path: image.fuchsia_merkle_root.to_string(),
+                                    status,
+                                },
+                            )
+                        })?;
+                    let buffer = fmem::Buffer { vmo, size: image.size };
+
+                    paver::write_image(&self.env.data_sink, buffer, target_config, image_type)
+                        .await
+                        .map_err(StageError::Write)?;
+                }
+                Ok(())
+            })
+            .buffer_unordered(self.concurrent_blob_fetches);
+
+        while let Some(()) = stream.try_next().await? {
+            state.add_progress(co, 1).await;
+        }
+
+        paver::paver_flush_data_sink(&self.env.data_sink).await.map_err(StageError::PaverFlush)?;
+
+        Ok(())
+    }
+
+    /// Fetch all blobs needed by the target OS.
+    async fn fetch_blobs(
+        &mut self,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
+        state: &mut state::Fetch,
+        manifest: &OtaManifestV1,
+        blobfs: &blobfs::Client,
+    ) -> Result<(), FetchError> {
+        // Remove blobs of images from the retained_index.
+        // GC to remove the blobs of images from blobfs.
+        let () = replace_retained_blobs(
+            manifest.blobs.iter().map(|blob| blob.fuchsia_merkle_root),
+            &self.env.retained_blobs,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            error!(
+                "unable to replace retained blobs set before gc in preparation \
+                 for fetching blobs listed in update manifest: {:#}",
+                anyhow!(e)
+            )
+        });
+
+        if let Err(e) = gc(&self.env.space_manager).await {
+            error!("unable to gc blobs during Fetch state: {:#}", anyhow!(e));
+        }
+
+        let existing_blobs = blobfs.list_known_blobs().await.unwrap_or_else(|e| {
+            error!("unable to list known blobs, assuming empty: {:#}", anyhow!(e));
+            HashSet::new()
+        });
+
+        let mut stream = futures::stream::iter(manifest.blobs.iter())
+            .map(async |blob| {
+                if existing_blobs.contains(&blob.fuchsia_merkle_root) {
+                    return Ok(());
+                }
+                let blob_id = fpkg_ext::BlobId::from(blob.fuchsia_merkle_root).into();
+                let () = self
+                    .env
+                    .ota_downloader
+                    .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                    .await
+                    .map_err(FetchError::Fidl)?
+                    .map_err(|e| FetchError::FetchBlob(e.into()))?;
+                Ok(())
+            })
+            .buffer_unordered(self.concurrent_blob_fetches);
+
+        while let Some(()) = stream.try_next().await? {
+            state.add_progress(co, 1).await;
+        }
+
+        let () = sync_package_cache(&self.env.pkg_cache).await.map_err(FetchError::Sync)?;
+
+        Ok(())
     }
 }
 
@@ -1185,79 +1458,73 @@ async fn write_image_from_package(
         .map_err(StageError::Write)
 }
 
-/// Ok(None) indicates that the asset is on the device in the desired configuration.
+/// Returning false indicates that the asset is on the device in the desired configuration.
 /// If the asset is on the active configuration, this function will write it to the desired
-/// configuration before returning Ok(None).
+/// configuration before returning false.
 ///
-/// Ok(Some(url)) indicates that the asset in the update differs from what is on the device.
-async fn image_to_write(
-    image_metadata: &update_package::ImageMetadata,
+/// Returning true indicates that the asset in the update differs from what is on the device.
+async fn should_write_image(
+    image_sha256: fuchsia_hash::Sha256,
+    image_size: u64,
     current_config: paver::CurrentConfiguration,
+    target_config: paver::TargetConfiguration,
     data_sink: &fpaver::DataSinkProxy,
     image_type: ImageType<'_>,
-) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    let desired_config = current_config.to_non_current_configuration();
-    if let Some(non_current_config) = desired_config.to_configuration() {
+) -> bool {
+    if let paver::TargetConfiguration::Single(single_target_config) = target_config {
         if get_image_buffer_if_hash_and_size_match(
             data_sink,
-            non_current_config,
+            single_target_config,
             image_type,
-            image_metadata,
+            image_sha256,
+            image_size,
         )
         .await
         .is_some()
         {
-            return Ok(None);
+            info!(
+                target_config:?,
+                image_type:?,
+                image_sha256:?,
+                image_size;
+                "Target configuration already contains the desired target image, skip writing"
+            );
+            return false;
         }
-
+    }
+    // Skip if writing to recovery slot, because the recovery images won't have the same content as
+    // current slot.
+    if target_config != paver::TargetConfiguration::Single(fpaver::Configuration::Recovery) {
         if let Some(current_config) = current_config.to_configuration() {
             if let Some(buffer) = get_image_buffer_if_hash_and_size_match(
                 data_sink,
                 current_config,
                 image_type,
-                image_metadata,
+                image_sha256,
+                image_size,
             )
             .await
             {
-                let target_config = desired_config.to_target_configuration();
                 info!(
                     current_config:?,
                     target_config:?,
                     image_type:?,
-                    image_metadata:?;
+                    image_sha256:?,
+                    image_size;
                     "Current configuration contains the desired target image, \
                     copying to avoid a download"
                 );
-                paver::write_image(data_sink, buffer, target_config, image_type)
-                    .await
-                    .map_err(PrepareError::PaverWriteImage)?;
-                return Ok(None);
+                if let Err(e) =
+                    paver::write_image(data_sink, buffer, target_config, image_type).await
+                {
+                    error!("Error copying {image_type:?}, fallback to download: {:#}", anyhow!(e));
+                    return true;
+                }
+                return false;
             }
         }
     }
-    Ok(Some(image_metadata.url().clone()))
-}
-
-/// Ok(None) indicates that the recovery asset is on the device in the recovery configuration.
-///
-/// Ok(Some(url)) indicates that the asset in the update differs from what is on the device.
-async fn recovery_to_write(
-    image_metadata: &update_package::ImageMetadata,
-    data_sink: &fpaver::DataSinkProxy,
-    asset: fpaver::Asset,
-) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    if get_image_buffer_if_hash_and_size_match(
-        data_sink,
-        fpaver::Configuration::Recovery,
-        ImageType::Asset(asset),
-        image_metadata,
-    )
-    .await
-    .is_some()
-    {
-        return Ok(None);
-    }
-    Ok(Some(image_metadata.url().to_owned()))
+    true
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1266,11 +1533,24 @@ enum ImageType<'a> {
     Firmware { type_: &'a str },
 }
 
+impl<'a> From<&'a update_package::manifest::ImageType> for ImageType<'a> {
+    fn from(image_type: &'a update_package::manifest::ImageType) -> Self {
+        match image_type {
+            update_package::manifest::ImageType::Asset(asset) => ImageType::Asset(match asset {
+                update_package::images::AssetType::Zbi => fpaver::Asset::Kernel,
+                update_package::images::AssetType::Vbmeta => fpaver::Asset::VerifiedBootMetadata,
+            }),
+            update_package::manifest::ImageType::Firmware(type_) => ImageType::Firmware { type_ },
+        }
+    }
+}
+
 async fn get_image_buffer_if_hash_and_size_match(
     data_sink: &fpaver::DataSinkProxy,
     configuration: fpaver::Configuration,
     image_type: ImageType<'_>,
-    image_metadata: &update_package::ImageMetadata,
+    image_sha256: fuchsia_hash::Sha256,
+    image_size: u64,
 ) -> Option<fmem::Buffer> {
     let fmem::Buffer { vmo, size } =
         match paver::read_image(data_sink, configuration, image_type).await {
@@ -1279,7 +1559,8 @@ async fn get_image_buffer_if_hash_and_size_match(
                 warn!(
                     configuration:?,
                     image_type:?,
-                    image_metadata:?;
+                    image_sha256:?,
+                    image_size;
                     "Error reading image, so it will not be used to avoid a download: {:#}",
                     anyhow!(e)
                 );
@@ -1289,24 +1570,25 @@ async fn get_image_buffer_if_hash_and_size_match(
 
     // The size field of the fuchsia.mem.Buffer is either the size of the entire partition or just
     // the image.
-    if size < image_metadata.size() {
+    if size < image_size {
         return None;
     }
-    let buffer = fmem::Buffer { vmo, size: image_metadata.size() };
+    let buffer = fmem::Buffer { vmo, size: image_size };
     let buffer_hash = match sha256_buffer(&buffer) {
         Ok(hash) => hash,
         Err(e) => {
             warn!(
                 configuration:?,
                 image_type:?,
-                image_metadata:?;
+                image_sha256:?,
+                image_size;
                 "Error hashing image so it will not be used to avoid a download: {:#}",
                 anyhow!(e)
             );
             return None;
         }
     };
-    if buffer_hash == image_metadata.sha256() {
+    if buffer_hash == image_sha256 {
         Some(buffer)
     } else {
         None
@@ -1366,10 +1648,7 @@ async fn write_image_packages(
         .await
     {
         Ok(()) => return Ok(()),
-        Err(StageError::Resolve(ResolveError::Error(
-            fidl_fuchsia_pkg_ext::ResolveError::NoSpace,
-            _,
-        ))) => {}
+        Err(StageError::Resolve(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _))) => {}
         Err(e) => return Err(e),
     };
 
@@ -1401,7 +1680,7 @@ async fn resolve_update_package(
     // First, attempt to resolve the update package.
     match resolver::resolve_update_package(pkg_resolver, update_url).await {
         Ok(update_pkg) => return Ok(update_pkg),
-        Err(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => (),
+        Err(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _)) => (),
         Err(e) => return Err(e),
     }
 
@@ -1411,7 +1690,7 @@ async fn resolve_update_package(
     }
     match resolver::resolve_update_package(pkg_resolver, update_url).await {
         Ok(update_pkg) => return Ok(update_pkg),
-        Err(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => (),
+        Err(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _)) => (),
         Err(e) => return Err(e),
     }
 
@@ -1454,6 +1733,19 @@ where
     Ok(())
 }
 
+async fn verify_board_in_manifest<B>(build_info: &B, manifest: &OtaManifestV1) -> Result<(), Error>
+where
+    B: BuildInfo,
+{
+    let current_board = build_info.board().await.context("while determining current board")?;
+    if let Some(current_board) = current_board {
+        if manifest.board != current_board {
+            return Err(anyhow!("expected board name {current_board} found {}", manifest.board));
+        }
+    }
+    Ok(())
+}
+
 async fn update_mode(
     pkg: &update_package::UpdatePackage,
 ) -> Result<update_package::UpdateMode, update_package::ParseUpdateModeError> {
@@ -1468,20 +1760,13 @@ async fn update_mode(
 
 /// Verify that epoch is non-decreasing. For more context, see
 /// [RFC-0071](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0071_ota_backstop).
-async fn validate_epoch(
-    source_epoch_raw: &str,
-    pkg: &update_package::UpdatePackage,
-) -> Result<(), PrepareError> {
+#[allow(clippy::result_large_err)]
+fn validate_epoch(source_epoch_raw: &str, target: u64) -> Result<(), PrepareError> {
     let src = match serde_json::from_str(source_epoch_raw)
         .map_err(|e| PrepareError::ParseSourceEpochError(source_epoch_raw.to_string(), e))?
     {
         epoch::EpochFile::Version1 { epoch } => epoch,
     };
-    let target =
-        pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(|| {
-            info!("no epoch in update package, assuming it's 0");
-            0
-        });
     if target < src {
         return Err(PrepareError::UnsupportedDowngrade { src, target });
     }
@@ -1494,12 +1779,9 @@ async fn replace_retained_packages(
 ) -> Result<(), anyhow::Error> {
     let (client_end, stream) = fidl::endpoints::create_request_stream();
     let replace_resp = retained_packages.replace(client_end);
-    let () = fidl_fuchsia_pkg_ext::serve_fidl_iterator_from_slice(
+    let () = fpkg_ext::serve_fidl_iterator_from_slice(
         stream,
-        hashes
-            .into_iter()
-            .map(|hash| fidl_fuchsia_pkg_ext::BlobId::from(hash).into())
-            .collect::<Vec<_>>(),
+        hashes.into_iter().map(|hash| fpkg_ext::BlobId::from(hash).into()).collect::<Vec<_>>(),
     )
     .await
     .unwrap_or_else(|e| {
@@ -1512,12 +1794,29 @@ async fn replace_retained_packages(
     replace_resp.await.context("calling RetainedPackages.Replace")
 }
 
+async fn replace_retained_blobs(
+    hashes: impl IntoIterator<Item = fuchsia_hash::Hash>,
+    retained_blobs: &fpkg::RetainedBlobsProxy,
+) -> Result<(), anyhow::Error> {
+    let (client_end, stream) = fidl::endpoints::create_request_stream();
+    let replace_resp = retained_blobs.replace(client_end);
+    let () = fpkg_ext::serve_fidl_iterator_from_slice(
+        stream,
+        hashes.into_iter().map(|hash| fpkg_ext::BlobId::from(hash).into()).collect::<Vec<_>>(),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        error!("error serving {} protocol: {:#}", fpkg::RetainedBlobsMarker::DEBUG_NAME, anyhow!(e))
+    });
+    replace_resp.await.context("calling RetainedBlobs.Replace")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage};
+    use fuchsia_pkg_testing::make_epoch_json;
 
     // Simulate the cobalt test hanging indefinitely, and ensure we time out correctly.
     // This test deliberately logs an error.
@@ -1527,58 +1826,33 @@ mod tests {
         flush_cobalt(hung_task, Duration::from_secs(2)).await;
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_success() {
+    #[test]
+    fn validate_epoch_success() {
         let source = make_epoch_json(1);
-        let target = make_epoch_json(2);
-        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
+        let target = 2;
 
-        let res = validate_epoch(&source, &p).await;
+        let res = validate_epoch(&source, target);
 
         assert_matches!(res, Ok(()));
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_unsupported_downgrade() {
+    #[test]
+    fn validate_epoch_fail_unsupported_downgrade() {
         let source = make_epoch_json(2);
-        let target = make_epoch_json(1);
-        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
+        let target = 1;
 
-        let res = validate_epoch(&source, &p).await;
+        let res = validate_epoch(&source, target);
 
         assert_matches!(res, Err(PrepareError::UnsupportedDowngrade { src: 2, target: 1 }));
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_parse_source() {
-        let p = FakeUpdatePackage::new().add_file("epoch.json", make_epoch_json(1)).await;
-
-        let res = validate_epoch("invalid source epoch.json", &p).await;
+    #[test]
+    fn validate_epoch_fail_parse_source() {
+        let res = validate_epoch("invalid source epoch.json", 1);
 
         assert_matches!(
             res,
             Err(PrepareError::ParseSourceEpochError(s, _)) if s == "invalid source epoch.json"
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_parse_target() {
-        let p = FakeUpdatePackage::new()
-            .add_file("epoch.json", "invalid target epoch.json".to_string())
-            .await;
-
-        let res = validate_epoch(&make_epoch_json(1), &p).await;
-
-        assert_matches!(res, Err(PrepareError::ParseTargetEpochError(_)));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_target_defaults_to_zero() {
-        let p = FakeUpdatePackage::new();
-
-        assert_matches!(
-            validate_epoch(&make_epoch_json(1), &p).await,
-            Err(PrepareError::UnsupportedDowngrade { src: 1, target: 0 })
         );
     }
 }

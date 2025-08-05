@@ -24,9 +24,9 @@
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
@@ -66,44 +66,50 @@ class LayerTest : public TestBase {
     applied_display_config_layer_list.push_front(&layer.applied_display_config_list_node_);
   }
 
-  // Helper method that returns a unique_ptr with a custom deleter which destroys the layer on the
-  // controller loop, as required by the Layer destructor.
+  // Returns a unique_ptr to `Layer` created on the driver dispatcher.
   //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
+  // The returned `Layer` is created with a custom deleter which destroys the
+  // layer on the driver dispatcher, as required by the Layer destructor.
+  //
+  // Must not be called on the driver dispatcher, otherwise deadlock is guaranteed.
   std::unique_ptr<Layer, std::function<void(Layer*)>> CreateLayerForTest(
-      display::DriverLayerId layer_id) {
+      display::LayerId layer_id) {
     auto deleter = [this](Layer* layer) {
       libsync::Completion completion;
-      async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(),
+      async::PostTask(CoordinatorController()->driver_dispatcher()->async_dispatcher(),
                       [&completion, layer]() {
                         delete layer;
                         completion.Signal();
                       });
       completion.Wait();
     };
-    return std::unique_ptr<Layer, decltype(deleter)>(new Layer(CoordinatorController(), layer_id),
-                                                     std::move(deleter));
+
+    return RunOnDriverDispatcher<std::unique_ptr<Layer, std::function<void(Layer*)>>>(
+        [this, layer_id, deleter = std::move(deleter)]() {
+          return std::unique_ptr<Layer, decltype(deleter)>(
+              new Layer(CoordinatorController(), layer_id), std::move(deleter));
+        });
   }
 
-  // Helper struct for `RunOnControllerLoop()`.  `std::optional<void>` is illegal, so we need our
+  // Helper struct for `RunOnDriverDispatcher()`.  `std::optional<void>` is illegal, so we need our
   // own structs, one for each of the void and non-void cases.
   //
   // Note: T must be default-constructable.  This is for simplicity, and meets current use cases.
   template <typename T>
-  struct RunOnControllerLoopResultHolder {
+  struct RunOnDriverDispatcherResultHolder {
     T value;
   };
 
   // Specialization for void return type.
   template <>
-  struct RunOnControllerLoopResultHolder<void> {};
+  struct RunOnDriverDispatcherResultHolder<void> {};
 
   template <typename ReturnType>
-  ReturnType RunOnControllerLoop(std::function<ReturnType()> func) {
-    RunOnControllerLoopResultHolder<ReturnType> result;
+  ReturnType RunOnDriverDispatcher(std::function<ReturnType()> func) {
+    RunOnDriverDispatcherResultHolder<ReturnType> result;
     libsync::Completion completion;
 
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
+    async::PostTask(CoordinatorController()->driver_dispatcher()->async_dispatcher(), [&]() {
       if constexpr (std::is_same_v<ReturnType, void>) {
         func();
       } else {
@@ -128,128 +134,120 @@ class LayerTest : public TestBase {
 };
 
 TEST_F(LayerTest, PrimaryBasic) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
-  auto image = CreateReadyImage();
-  layer->SetImage(image, display::kInvalidEventId);
-  layer->ApplyChanges();
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    auto image = CreateReadyImage();
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
 }
 
 TEST_F(LayerTest, CleanUpImage) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   auto displayed_image = CreateReadyImage();
-  layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges();
+  RunOnDriverDispatcher<void>([&] {
+    layer->SetImage(displayed_image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  RunOnDriverDispatcher<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
   auto fence_release = fit::defer([this, kWaitFenceId] {
-    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+    RunOnDriverDispatcher<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
   });
 
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto draft_image = CreateReadyImage();
   layer->SetImage(draft_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   EXPECT_TRUE(layer->applied_image());
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*not_matching_image);
-  }));
+  EXPECT_FALSE(
+      RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*not_matching_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a waiting image.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*waiting_image);
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*waiting_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a draft image.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*draft_image);
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*draft_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up the associated image.
   //
   // The layer is not in a display's applied configuration list. So, cleaning up
   // the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*displayed_image);
-  }));
+  EXPECT_FALSE(
+      RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*displayed_image); }));
   EXPECT_FALSE(layer->applied_image());
 }
 
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> applied_layers;
 
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   // Clean up images, which doesn't change the applied config.
   {
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpImage(*image);
-    }));
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*image); }));
     EXPECT_FALSE(layer->applied_image());
   }
 
@@ -258,21 +256,19 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     MakeLayerApplied(*layer, applied_layers);
 
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
 
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpImage(*image);
-    }));
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*image); }));
     EXPECT_FALSE(layer->applied_image());
 
     applied_layers.clear();
@@ -280,82 +276,82 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 }
 
 TEST_F(LayerTest, CleanUpAllImages) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   auto displayed_image = CreateReadyImage();
-  layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges();
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  RunOnDriverDispatcher<void>([&] {
+    layer->SetImage(displayed_image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  RunOnDriverDispatcher<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
   auto fence_release = fit::defer([this, kWaitFenceId] {
-    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+    RunOnDriverDispatcher<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
   });
 
   auto waiting_image = CreateReadyImage();
-  layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  RunOnDriverDispatcher<void>([&] { layer->SetImage(waiting_image, kWaitFenceId); });
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto draft_image = CreateReadyImage();
-  layer->SetImage(draft_image, display::kInvalidEventId);
+  RunOnDriverDispatcher<void>([&] { layer->SetImage(draft_image, display::kInvalidEventId); });
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   // The layer is not in a display's applied configuration list. So, cleaning
   // up the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpAllImages();
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
   EXPECT_FALSE(layer->applied_image());
 }
 
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> applied_layers;
 
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_config = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_config);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_config = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_config);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   // Clean up all images, which doesn't change the applied config.
   {
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpAllImages();
-    }));
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
     EXPECT_FALSE(layer->applied_image());
   }
 
@@ -364,20 +360,18 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     MakeLayerApplied(*layer, applied_layers);
 
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpAllImages();
-    }));
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
     EXPECT_FALSE(layer->applied_image());
 
     applied_layers.clear();

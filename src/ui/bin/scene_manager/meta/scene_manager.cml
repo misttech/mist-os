@@ -51,7 +51,6 @@
 
                 // Used by the input pipeline library to distribute focus.
                 "fuchsia.ui.keyboard.focus.Controller",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
         },

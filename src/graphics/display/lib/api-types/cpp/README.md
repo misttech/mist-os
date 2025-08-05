@@ -50,12 +50,11 @@ FIDL generated code:
 
 - FIDL currently lacks newtype support for non-composite types (numeric and
   boolean), and the recommended workaround is struct wrappers. This library
-  offers `fbl::StrongInt`-based types for internal representation, together
-  with conversion helpers for FIDL’s struct wrappers. This is especially useful
-  for the Display stack, which makes extensive use of 64-bit integers as
-  handles for various resources. For a concrete example, compare
-  `display::DisplayId` with the `fuchsia.hardware.display.types/DisplayId` FIDL
-  type.
+  offers typesafe identifier types, together with conversion helpers for FIDL’s
+  struct wrappers. This is especially useful for the Display stack, which makes
+  extensive use of 64-bit integers as handles for various resources. For a
+  concrete example, compare `display::DisplayId` with the
+  `fuchsia.hardware.display.types/DisplayId` FIDL type.
 
 - Generated binding for FIDL types containing tables or unions require arena
   allocations.

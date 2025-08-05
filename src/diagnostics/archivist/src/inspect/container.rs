@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::constants;
 use crate::diagnostics::{GlobalConnectionStats, TRACE_CATEGORY};
 use crate::identity::ComponentIdentity;
 use crate::inspect::collector::{self as collector, InspectData};
@@ -11,11 +10,11 @@ use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl::endpoints::Proxy;
 use flyweights::FlyStr;
-use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
+use fuchsia_inspect::UintProperty;
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
-use log::warn;
 use selectors::SelectorExt;
 use std::collections::HashMap;
 use std::future::Future;
@@ -24,8 +23,11 @@ use std::time::Duration;
 use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
-    fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_trace as ftrace,
+    inspect_fidl_load as deprecated_inspect,
 };
+
+const DIRECTORY_READ_TIMED_OUT: &str = "Reading Inspect handles from a directory timed out";
 
 #[derive(Debug)]
 pub enum InspectHandle {
@@ -224,8 +226,6 @@ impl InspectArtifactsContainer {
     }
 }
 
-static TIMEOUT_MESSAGE: &str = "Exceeded per-component time limit for fetching diagnostics data";
-
 #[derive(Debug)]
 pub enum ReadSnapshot {
     Single(Snapshot),
@@ -254,9 +254,10 @@ impl SnapshotData {
     async fn new(
         name: Option<InspectHandleName>,
         data: InspectData,
-        lazy_child_timeout: zx::MonotonicDuration,
+        lazy_child_timeout: Duration,
         identity: &ComponentIdentity,
         parent_trace_id: ftrace::Id,
+        timeout_counter: &UintProperty,
     ) -> SnapshotData {
         let trace_id = ftrace::Id::random();
         let _trace_guard = ftrace::async_enter!(
@@ -279,9 +280,13 @@ impl SnapshotData {
         );
         match data {
             InspectData::Tree(tree) => {
-                let lazy_child_timeout =
-                    Duration::from_nanos(lazy_child_timeout.into_nanos() as u64);
-                match SnapshotTree::try_from_with_timeout(&tree, lazy_child_timeout).await {
+                match SnapshotTree::try_from_with_timeout(
+                    &tree,
+                    lazy_child_timeout,
+                    timeout_counter,
+                )
+                .await
+                {
                     Ok(snapshot_tree) => {
                         SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), name, false)
                     }
@@ -375,6 +380,7 @@ pub struct PopulatedInspectDataContainer {
 enum Status {
     Begin,
     Pending(collector::InspectHandleDeque),
+    DirectoryFailed,
 }
 
 struct State {
@@ -404,6 +410,18 @@ impl State {
         }
     }
 
+    fn into_directory_failed(self, start_time: zx::MonotonicInstant) -> Self {
+        Self {
+            unpopulated: self.unpopulated,
+            status: Status::DirectoryFailed,
+            batch_timeout: self.batch_timeout,
+            global_stats: self.global_stats,
+            elapsed_time: self.elapsed_time + (zx::MonotonicInstant::get() - start_time),
+            trace_guard: self.trace_guard,
+            trace_id: self.trace_id,
+        }
+    }
+
     fn add_elapsed_time(&mut self, start_time: zx::MonotonicInstant) {
         self.elapsed_time += zx::MonotonicInstant::get() - start_time
     }
@@ -412,12 +430,20 @@ impl State {
         mut self,
         start_time: zx::MonotonicInstant,
     ) -> Option<(PopulatedInspectDataContainer, State)> {
+        let timeout = Duration::from_nanos(self.batch_timeout.into_nanos() as u64);
         loop {
             match &mut self.status {
                 Status::Begin => {
-                    let data_map =
-                        collector::populate_data_map(&self.unpopulated.inspect_handles).await;
-                    self = self.into_pending(data_map, start_time);
+                    match collector::populate_data_map(&self.unpopulated.inspect_handles)
+                        .map(Some)
+                        // This timeout is protecting against unresponsive directories only.
+                        // It does not handle timeouts for the reading/snapshotting process.
+                        .on_timeout(timeout.after_now(), || None)
+                        .await
+                    {
+                        Some(data_map) => self = self.into_pending(data_map, start_time),
+                        None => self = self.into_directory_failed(start_time),
+                    }
                 }
                 Status::Pending(ref mut pending) => match pending.pop_front() {
                     None => {
@@ -431,9 +457,10 @@ impl State {
                         let snapshot = SnapshotData::new(
                             name,
                             data,
-                            self.batch_timeout / constants::LAZY_NODE_TIMEOUT_PROPORTION,
+                            timeout,
                             &self.unpopulated.identity,
                             self.trace_id,
+                            self.global_stats.timeout_counter(),
                         )
                         .await;
                         let result = PopulatedInspectDataContainer {
@@ -445,6 +472,20 @@ impl State {
                         return Some((result, self));
                     }
                 },
+                Status::DirectoryFailed => {
+                    self.global_stats.add_timeout();
+                    let result = PopulatedInspectDataContainer {
+                        identity: Arc::clone(&self.unpopulated.identity),
+                        component_allowlist: self.unpopulated.component_allowlist.clone(),
+                        snapshot: SnapshotData::failed(
+                            schema::InspectError { message: DIRECTORY_READ_TIMED_OUT.to_string() },
+                            None,
+                            false,
+                        ),
+                    };
+
+                    return Some((result, self.into_pending(Default::default(), start_time)));
+                }
             }
         }
     }
@@ -496,42 +537,9 @@ impl UnpopulatedInspectDataContainer {
         };
 
         futures::stream::unfold(state, |state| {
-            let unpopulated_for_timeout = Arc::clone(&state.unpopulated);
-            let timeout = state.batch_timeout;
-            let elapsed_time = state.elapsed_time;
-            let global_stats = Arc::clone(&state.global_stats);
             let start_time = zx::MonotonicInstant::get();
-            let trace_guard = Arc::clone(&state.trace_guard);
-            let trace_id = state.trace_id;
 
-            state
-                .iterate(start_time)
-                .on_timeout((timeout - elapsed_time).after_now(), move || {
-                    warn!(identity:? = unpopulated_for_timeout.identity.moniker; "{TIMEOUT_MESSAGE}");
-                    global_stats.add_timeout();
-                    let result = PopulatedInspectDataContainer {
-                        identity: Arc::clone(&unpopulated_for_timeout.identity),
-                        component_allowlist: unpopulated_for_timeout.component_allowlist.clone(),
-                        snapshot: SnapshotData::failed(
-                            schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
-                            None,
-                            false,
-                        ),
-                    };
-                    Some((
-                        result,
-                        State {
-                            status: Status::Pending(collector::InspectHandleDeque::new()),
-                            unpopulated: unpopulated_for_timeout,
-                            batch_timeout: timeout,
-                            global_stats,
-                            elapsed_time: elapsed_time + (zx::MonotonicInstant::get() - start_time),
-                            trace_guard,
-                            trace_id,
-                        },
-                    ))
-                })
-                .boxed()
+            state.iterate(start_time)
         })
     }
 }
@@ -540,6 +548,7 @@ impl UnpopulatedInspectDataContainer {
 mod test {
     use super::*;
     use fuchsia_inspect::Node;
+    use std::pin::pin;
 
     use futures::StreamExt;
     use std::sync::LazyLock;
@@ -572,16 +581,16 @@ mod test {
             inspect_handles: vec![Arc::downgrade(&handle)],
             component_allowlist: ComponentAllowlist::new_disabled(),
         };
-        let mut stream = container.populate(
+        let mut stream = pin!(container.populate(
             0,
             Arc::new(GlobalConnectionStats::new(Node::default())),
             ftrace::Id::random(),
-        );
+        ));
         let res = stream.next().await.unwrap();
         assert_eq!(res.snapshot.name, None);
         assert_eq!(
             res.snapshot.errors,
-            vec![schema::InspectError { message: TIMEOUT_MESSAGE.to_string() }]
+            vec![schema::InspectError { message: DIRECTORY_READ_TIMED_OUT.to_string() }]
         );
     }
 
@@ -595,11 +604,11 @@ mod test {
             inspect_handles: vec![Arc::downgrade(&directory)],
             component_allowlist: ComponentAllowlist::new_disabled(),
         };
-        let mut stream = container.populate(
+        let mut stream = pin!(container.populate(
             1000000,
             Arc::new(GlobalConnectionStats::new(Node::default())),
             ftrace::Id::random(),
-        );
+        ));
         assert!(stream.next().await.is_none());
     }
 

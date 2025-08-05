@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <arch/defines.h>
 #include <lib/arch/asm.h>
+#include <lib/thread-stack/abi.h>
 
 // We avoid the `la` pseudoinstruction while doing something equivalent
 // so that we can avoid generating a .got relocation and thus can assert
@@ -27,13 +27,6 @@
   // save the time stamp we recorded earlier
   lla     t0, kernel_entry_ticks
   sd      a2, (t0)
-
-  // set the default stack
-  lla     sp, .Lboot_cpu_kstack_end
-
-#if __has_feature(shadow_call_stack)
-  lla     shadow_call_sp, boot_shadow_call_stack
-#endif
 
   // Run the boot cpu init routine with the boot hart id.
   // This will do basic initialization of the cpu such as initializing
@@ -58,16 +51,6 @@
   wfi
   j       0b
 .end_function
-
-.object boot_cpu_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
-  .balign 16
-.Lboot_cpu_kstack_end:
-.end_object
-
-.object boot_shadow_call_stack, bss, local
-  .skip PAGE_SIZE
-.end_object
 
 // This symbol is used by gdb python to know the base of the kernel module
 .label KERNEL_BASE_ADDRESS, global, value=KERNEL_BASE

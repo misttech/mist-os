@@ -34,7 +34,7 @@ impl<'a> StructCompatTemplate<'a> {
             compat,
 
             name: strct.name.decl_name().camel(),
-            compat_name: filters::compat_camel(strct.name.decl_name()).unwrap(),
+            compat_name: filters::escape_compat_camel(strct.name.decl_name()),
             denylist: compat.rust_or_rust_next_denylist(&strct.name),
         }
     }

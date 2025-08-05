@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
-#define LIB_DL_TEST_DL_IMPL_TESTS_H_
+#ifndef LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_
+#define LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_
 
 #include <lib/fit/defer.h>
 #include <lib/ld/testing/startup-ld-abi.h>
@@ -69,6 +69,9 @@ class DlImplTests : public Base {
   // modules waiting to be loaded in a LinkingSession. See
   // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
   static constexpr bool kSonameLookupInPendingDeps = false;
+  // The resolver policy that determines symbol resolution order, and that tests
+  // use to verify resolved values.
+  static constexpr elfldltl::ResolverPolicy kResolverPolicy = ld::kResolverPolicy;
 
 #ifndef __Fuchsia__
   // TODO(https://fxbug.dev/419872720): Disable a DT_SONAME lookup test on host
@@ -123,7 +126,7 @@ class DlImplTests : public Base {
       }
       // TODO(https://fxbug.dev/382527519): RuntimeDynamicLinker should have a
       // `RunInitializers` method that will run this with proper synchronization.
-      static_cast<RuntimeModule*>(result.value())->InitializeModuleTree();
+      RuntimeModule::FromPtr(result.value()).InitializeModuleTree();
       Base::TrackModule(result.value(), file);
     }
     return result;
@@ -143,8 +146,8 @@ class DlImplTests : public Base {
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
-    const RuntimeModule* root = static_cast<RuntimeModule*>(module);
-    return dynamic_linker_->LookupSymbol(*root, ref);
+    const RuntimeModule& root = RuntimeModule::FromPtr(module);
+    return dynamic_linker_->LookupSymbol(root, ref);
   }
 
   int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data) {
@@ -164,8 +167,11 @@ class DlImplTests : public Base {
   // Return the `link_map` data structure associated with a module. `handle`
   // should be a valid pointer returned by a successful dlopen() call.
   const link_map* ModuleLinkMap(const void* handle) {
-    return reinterpret_cast<const link_map*>(
-        &static_cast<const RuntimeModule*>(handle)->module().link_map);
+    return RuntimeModule::FromPtr(handle).user_link_map();
+  }
+
+  fit::result<Error, int> DlInfo(void* module, int request, void* info) {
+    return dynamic_linker_->DlInfo(module, request, info);
   }
 
  private:
@@ -179,4 +185,4 @@ using DlImplLoadZirconTests = DlImplTests<DlLoadZirconTestsBase>;
 
 }  // namespace dl::testing
 
-#endif  // LIB_DL_TEST_DL_IMPL_TESTS_H_
+#endif  // LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_

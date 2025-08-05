@@ -8,13 +8,12 @@ use drivers_only_common::sme_helpers::{
 };
 use fullmac_helpers::config::FullmacDriverConfig;
 use fullmac_helpers::recorded_request_stream::FullmacRequest;
-use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::seq::IndexedRandom;
 use wlan_common::assert_variant;
 use wlan_common::ie::rsn::rsne;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 /// Many tests require a started BSS. This helper function creates and starts an AP in the test
@@ -80,10 +79,10 @@ async fn test_start_2ghz_bss_success() {
         ssid: random_ssid(),
         password: random_password(),
         radio_cfg: fidl_sme::RadioConfig {
-            phy: *phy_types.choose(&mut rand::thread_rng()).unwrap(),
-            channel: fidl_common::WlanChannel {
-                primary: *supported_channels.choose(&mut rand::thread_rng()).unwrap(),
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+            phy: *phy_types.choose(&mut rand::rng()).unwrap(),
+            channel: fidl_ieee80211::WlanChannel {
+                primary: *supported_channels.choose(&mut rand::rng()).unwrap(),
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
         },
@@ -167,9 +166,9 @@ async fn test_start_bss_fail_non_ascii_password() {
         password: vec![1, 2, 3],
         radio_cfg: fidl_sme::RadioConfig {
             phy: fidl_common::WlanPhyType::Ofdm,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 1,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
         },
@@ -191,9 +190,9 @@ async fn test_start_bss_fail_bad_channel() {
         password: vec![],
         radio_cfg: fidl_sme::RadioConfig {
             phy: fidl_common::WlanPhyType::Ofdm,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 27,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
         },
@@ -263,7 +262,7 @@ async fn test_remote_client_connected_open() {
     let (ap_sme_proxy, mut fullmac_driver) =
         setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
 
-    let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
+    let remote_sta_address: [u8; 6] = rand::random();
     fullmac_driver
         .ifc_proxy
         .auth_ind(&fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {

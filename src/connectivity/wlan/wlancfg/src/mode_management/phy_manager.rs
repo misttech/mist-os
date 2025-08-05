@@ -820,27 +820,31 @@ impl PhyManagerApi for PhyManager {
                         iface_id
                     );
                 }
-                RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
-                    for recorded_phy_id in self.phys.keys() {
-                        if phy_id == *recorded_phy_id {
-                            if let Err(e) = reset_phy(&self.device_monitor, phy_id).await {
-                                warn!("Resetting PHY {} failed: {:?}", phy_id, e);
-                            }
+                RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: _ }) => {
+                    // TODO(https://fxbug.dev/424173437) - Re-enable PHY recovery once AP state machine
+                    // termination race has been resolved.
+                    info!("PHY reset recovery is currently disabled.");
 
-                            // The phy reset may clear its country code. Re-set it now if we have one.
-                            if let Some(country_code) = self.saved_country_code {
-                                info!("Setting country code after phy reset");
-                                if let Err(e) =
-                                    set_phy_country_code(&self.device_monitor, phy_id, country_code)
-                                        .await
-                                {
-                                    warn!("Proceeding with default country code because we failed to set the cached one: {}", e);
-                                }
-                            };
+                    // for recorded_phy_id in self.phys.keys() {
+                    //     if phy_id == *recorded_phy_id {
+                    //         if let Err(e) = reset_phy(&self.device_monitor, phy_id).await {
+                    //             warn!("Resetting PHY {} failed: {:?}", phy_id, e);
+                    //         }
 
-                            return;
-                        }
-                    }
+                    //         // The phy reset may clear its country code. Re-set it now if we have one.
+                    //         if let Some(country_code) = self.saved_country_code {
+                    //             info!("Setting country code after phy reset");
+                    //             if let Err(e) =
+                    //                 set_phy_country_code(&self.device_monitor, phy_id, country_code)
+                    //                     .await
+                    //             {
+                    //                 warn!("Proceeding with default country code because we failed to set the cached one: {}", e);
+                    //             }
+                    //         };
+
+                    //         return;
+                    //     }
+                    // }
                 }
                 RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id }) => {
                     if let Err(e) = disconnect(&self.device_monitor, iface_id).await {
@@ -890,6 +894,7 @@ async fn destroy_iface(
     destroy_iface_response
 }
 
+#[cfg(test)]
 async fn reset_phy(
     proxy: &fidl_service::DeviceMonitorProxy,
     phy_id: u16,
@@ -4559,6 +4564,8 @@ mod tests {
         assert!(phy_manager.phys[&0].destroyed_ifaces.contains(&2));
     }
 
+    // TODO(https://fxbug.dev/424173437) - Re-enable once IfaceManager deadlock issue has been resolved.
+    #[ignore]
     #[test_case(Some([4, 2]); "Cached country code")]
     #[test_case(None; "No cached country code")]
     #[fuchsia::test(add_test_attr = false)]

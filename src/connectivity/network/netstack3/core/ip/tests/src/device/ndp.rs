@@ -1922,7 +1922,7 @@ fn test_host_generate_temporary_slaac_address(
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().r#gen()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().random()),
         &ctx.core_ctx.ipv6().slaac_temp_secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3154,7 +3154,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().r#gen()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().random()),
         &ctx.core_ctx.ipv6().slaac_temp_secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];

@@ -355,7 +355,7 @@ impl BpfFsDir {
             |_locked, dir, _mount, _name| {
                 Ok(dir.fs().create_node_and_allocate_node_id(
                     BpfFsObject::new(object),
-                    FsNodeInfo::new(mode!(IFREG, 0o600), current_task.as_fscred()),
+                    FsNodeInfo::new(mode!(IFREG, 0o600), current_task.current_fscred()),
                 ))
             },
         )?;

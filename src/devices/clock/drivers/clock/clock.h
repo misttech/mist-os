@@ -7,8 +7,9 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/fidl.h>
-#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+
+class ClockDriver;
 
 class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
  public:
@@ -21,7 +22,7 @@ class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
   zx_status_t Init(const std::shared_ptr<fdf::Namespace>& incoming,
                    const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                    const std::optional<std::string>& node_name, std::optional<int32_t> node_id,
-                   AddChildCallback add_child_callback);
+                   fidl::ClientEnd<fuchsia_driver_framework::Node>& parent);
 
  private:
   // fuchsia.hardware.clock/Clock protocol implementation
@@ -44,12 +45,13 @@ class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
   const uint32_t id_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_node_;
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
-  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 class ClockDriver : public fdf::DriverBase {
  public:
   static constexpr char kDriverName[] = "clock";
+
+  using fdf::DriverBase::AddChild;
 
   ClockDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}

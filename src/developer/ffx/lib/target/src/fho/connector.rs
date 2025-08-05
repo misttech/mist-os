@@ -42,5 +42,5 @@ pub trait DirectConnector {
     fn target_spec(&self) -> Option<String>;
 
     /// Returns the `Connection` (connecting if it is not yet connected)
-    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<std::sync::Mutex<Option<Connection>>>>>;
+    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<Connection>>>;
 }

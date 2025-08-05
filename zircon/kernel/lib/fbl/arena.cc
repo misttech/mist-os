@@ -49,8 +49,8 @@ zx_status_t Arena::Init(const char* name, size_t ob_size, size_t count) {
   //     + Unmapped guard page
   //     + Data pool mapping
   // Both mappings are backed by a single VMO.
-  const size_t control_mem_sz = ROUNDUP(count * sizeof(Node), PAGE_SIZE);
-  const size_t data_mem_sz = ROUNDUP(count * ob_size, PAGE_SIZE);
+  const size_t control_mem_sz = ROUNDUP_PAGE_SIZE(count * sizeof(Node));
+  const size_t data_mem_sz = ROUNDUP_PAGE_SIZE(count * ob_size);
   const size_t guard_sz = PAGE_SIZE;
   const size_t vmo_sz = control_mem_sz + data_mem_sz;
   const size_t vmar_sz = vmo_sz + guard_sz;
@@ -167,8 +167,8 @@ void Arena::Pool::Init(const char* name, fbl::RefPtr<VmObject> vmo, fbl::RefPtr<
     mapping_size = mapping_->size_locked();
   }
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(start_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(end_));
 }
 
 // Pick values that avoid lots of commits + decommits when
@@ -221,7 +221,7 @@ void Arena::Pool::Push(void* p) {
   top_ -= slot_size_;
   if (static_cast<size_t>(committed_ - top_) >= kPoolDecommitThreshold) {
     char* nc = reinterpret_cast<char*>(
-        ROUNDUP(reinterpret_cast<uintptr_t>(top_ + kPoolCommitIncrease), PAGE_SIZE));
+        ROUNDUP_PAGE_SIZE(reinterpret_cast<uintptr_t>(top_ + kPoolCommitIncrease)));
     if (nc > end_) {
       nc = end_;
     }

@@ -20,7 +20,7 @@ open protocol Puppet {
     compose LogPuppet;
 
     /// Returns a LazyInspectPuppet client for recording lazy values.
-    @available(removed=NEXT)
+    @available(removed=28)
     flexible RecordLazyValues(struct {
         key string:MAX;
     }) -> (resource struct {
@@ -114,7 +114,7 @@ open protocol InspectWriter {
     });
 
     /// Returns a LazyInspectPuppet client for recording lazy values.
-    @available(added=NEXT)
+    @available(added=28)
     flexible RecordLazyValues(struct {
         key string:MAX;
     }) -> (resource struct {

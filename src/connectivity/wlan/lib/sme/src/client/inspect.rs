@@ -379,14 +379,14 @@ pub struct ChannelNode {
 }
 
 impl ChannelNode {
-    pub fn new(node: Node, channel: fidl_common::WlanChannel) -> Self {
+    pub fn new(node: Node, channel: fidl_ieee80211::WlanChannel) -> Self {
         let primary = node.create_uint("primary", channel.primary as u64);
         let cbw = node.create_string("cbw", format!("{:?}", channel.cbw));
         let secondary80 = node.create_uint("secondary80", channel.secondary80 as u64);
         Self { _node: node, primary, cbw, secondary80 }
     }
 
-    pub fn update(&mut self, channel: fidl_common::WlanChannel) {
+    pub fn update(&mut self, channel: fidl_ieee80211::WlanChannel) {
         self.primary.set(channel.primary as u64);
         self.cbw.set(&format!("{:?}", channel.cbw));
         self.secondary80.set(channel.secondary80 as u64);

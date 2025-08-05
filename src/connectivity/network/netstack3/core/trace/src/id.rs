@@ -28,4 +28,14 @@ impl<'a> fuchsia_trace::ArgValue for TraceResourceId<'a> {
         let Self { token } = value;
         fuchsia_trace::ArgValue::of(key, token.export_value())
     }
+    fn of_registered<'x>(
+        name_ref: fuchsia_trace::trace_string_ref_t,
+        value: Self,
+    ) -> fuchsia_trace::Arg<'x>
+    where
+        Self: 'x,
+    {
+        let Self { token } = value;
+        fuchsia_trace::ArgValue::of_registered(name_ref, token.export_value())
+    }
 }

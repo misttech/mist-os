@@ -286,7 +286,11 @@ group("default-images") {
 
   if (use_bazel_images_only) {
     if (bazel_product_bundle_target != "") {
-      deps += [ "${bazel_product_bundle_target}_size_targets" ]
+      deps += [
+        # Needed so that 'gerrit_size_reports' and 'detailed_size_checker_data' metadata
+        # can be properly collected form the default-images target.
+        "${bazel_product_bundle_target}_size_targets",
+      ]
     }
   } else if (!bootfs_only) {
     deps += [ "size_checker:size_report.json" ]

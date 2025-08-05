@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <threads.h>
@@ -18,6 +17,8 @@
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace eth {
 

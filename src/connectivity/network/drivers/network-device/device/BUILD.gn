@@ -21,6 +21,10 @@ driver_source_split("banjo_shims") {
     "network_device_shim.cc",
     "network_port_shim.cc",
   ]
+  non_driver_deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/connectivity/network/drivers/network-device/log",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",

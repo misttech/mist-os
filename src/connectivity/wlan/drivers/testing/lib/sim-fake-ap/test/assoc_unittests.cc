@@ -16,7 +16,7 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 }  // namespace
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+    .channel = {.primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 const fuchsia_wlan_ieee80211::Ssid kApSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
                                               'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
@@ -43,7 +43,7 @@ class AssocTest : public ::testing::Test, public simulation::StationIfc {
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 };
 
-void validateChannel(const wlan_common::WlanChannel& channel) {
+void validateChannel(const wlan_ieee80211::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
@@ -144,7 +144,8 @@ TEST_F(AssocTest, RefusedWrongSsid) {
 
 TEST_F(AssocTest, IgnoredRequests) {
   constexpr simulation::WlanTxInfo kWrongChannelTxInfo = {
-      .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+      .channel = {
+          .primary = 10, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 
   static const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 

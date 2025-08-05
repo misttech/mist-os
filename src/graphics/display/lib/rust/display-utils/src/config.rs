@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::types::{Color, DisplayId, EventId, ImageId, LayerId};
-use fidl_fuchsia_hardware_display_types as fdisplay_types;
+use {fidl_fuchsia_hardware_display_types as fdisplay_types, fidl_fuchsia_math as fmath};
 
 /// LayerConfig is a variant type of the two distinct layer configuration types that are
 /// supported by the display driver: Primary and Color.
@@ -14,6 +14,8 @@ pub enum LayerConfig {
     Color {
         /// The layer's color.
         color: Color,
+        /// The destination frame on the display for the color layer.
+        display_destination: fmath::RectU,
     },
 
     /// A primary layer is draws its pixels from a sysmem buffer backed image and supports various

@@ -190,6 +190,7 @@ multiconst!(u32, [
     ZX_VMAR_OP_COMMIT = 1;
     ZX_VMAR_OP_DECOMMIT = 2;
     ZX_VMAR_OP_MAP_RANGE = 3;
+    ZX_VMAR_OP_ZERO = 10;
     ZX_VMAR_OP_DONT_NEED = 12;
     ZX_VMAR_OP_ALWAYS_NEED = 13;
     ZX_VMAR_OP_PREFETCH = 14;
@@ -2651,6 +2652,12 @@ multiconst!(u32, [
 // Options for zx_port_create
 multiconst!(u32, [
     ZX_PORT_BIND_TO_INTERRUPT = 1 << 0;
+]);
+
+// Options for zx_interrupt_create
+multiconst!(u32, [
+    ZX_INTERRUPT_VIRTUAL = 0x10;
+    ZX_INTERRUPT_TIMESTAMP_MONO = 1 << 6;
 ]);
 
 // Options for zx_interrupt_bind

@@ -49,8 +49,6 @@ source_set("lib") {
     "controller/virtio_sound.h",
     "controller/virtio_vsock.cc",
     "controller/virtio_vsock.h",
-    "controller/virtio_wl.cc",
-    "controller/virtio_wl.h",
     "dev_mem.h",
     "guest.cc",
     "guest.h",

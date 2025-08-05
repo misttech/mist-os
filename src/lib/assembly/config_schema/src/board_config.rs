@@ -70,6 +70,13 @@ pub struct BoardInformation {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub provided_features: Vec<String>,
 
+    /// Path to a non-bootable ZBI containing extra items to be included in the generated
+    /// ZBI for the board.
+    #[serde(default)]
+    #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zbi_extra_items: Option<Utf8PathBuf>,
+
     /// Path to the devicetree binary (.dtb) this provided by this board.
     #[serde(default)]
     #[walk_paths]

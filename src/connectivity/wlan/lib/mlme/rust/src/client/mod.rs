@@ -215,7 +215,7 @@ impl<D: DeviceOps> ClientMlme<D> {
 
     pub async fn set_main_channel(
         &mut self,
-        channel: fidl_common::WlanChannel,
+        channel: fidl_ieee80211::WlanChannel,
     ) -> Result<(), zx::Status> {
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).set_main_channel(channel).await
     }
@@ -1488,7 +1488,7 @@ mod tests {
             security_ie: vec![],
         };
 
-        req.selected_bss.channel.cbw = fidl_fuchsia_wlan_common::ChannelBandwidth::unknown();
+        req.selected_bss.channel.cbw = fidl_fuchsia_wlan_ieee80211::ChannelBandwidth::unknown();
         me.on_sme_connect(req)
             .await
             .expect_err("ConnectRequest with unknown channel should be rejected");

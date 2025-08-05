@@ -46,7 +46,7 @@ type RouteReport = table {
     5: service_instances vector<ServiceInstance>:MAX;
 
     /// Metadata about the entries in a dictionary. Populated only for dictionaries.
-    @available(added=NEXT)
+    @available(added=28)
     8: dictionary_entries vector<DictionaryEntry>:MAX;
 
     /// The requested level of availability of the capability.
@@ -89,10 +89,10 @@ type ServiceInstance = table {
 };
 
 /// Metadata about a dictionary entry.
-@available(added=NEXT)
+@available(added=28)
 type DictionaryEntry = table {
     /// The name (key) of the capability in this dictionary.
-    @available(added=NEXT)
+    @available(added=28)
     1: name string:MAX;
 };
 

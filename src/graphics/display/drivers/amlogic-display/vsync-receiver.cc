@@ -155,7 +155,7 @@ void VsyncReceiver::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqB
     return;
   }
 
-  OnVsync(zx::time(interrupt->timestamp));
+  OnVsync(zx::time_monotonic(interrupt->timestamp));
 
   // For interrupts bound to ports (including those bound to async loops), the
   // interrupt must be re-armed using zx_interrupt_ack() for each incoming
@@ -164,6 +164,6 @@ void VsyncReceiver::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqB
   zx::unowned_interrupt(irq->object())->ack();
 }
 
-void VsyncReceiver::OnVsync(zx::time timestamp) { on_vsync_(timestamp); }
+void VsyncReceiver::OnVsync(zx::time_monotonic timestamp) { on_vsync_(timestamp); }
 
 }  // namespace amlogic_display

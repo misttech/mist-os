@@ -1575,9 +1575,9 @@ mod tests {
         fidl_softmac::WlanAssociationConfig {
             bssid: Some(BSSID.to_array()),
             aid: Some(42),
-            channel: Some(fidl_common::WlanChannel {
+            channel: Some(fidl_ieee80211::WlanChannel {
                 primary: 149,
-                cbw: fidl_common::ChannelBandwidth::Cbw40,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                 secondary80: 42,
             }),
             rates: None,
@@ -3256,9 +3256,9 @@ mod tests {
 
         sta.ctx
             .device
-            .set_channel(fidl_common::WlanChannel {
+            .set_channel(fidl_ieee80211::WlanChannel {
                 primary: 42,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
             .await
@@ -3771,7 +3771,7 @@ mod tests {
         let mut rx_info = mock_rx_info(&sta);
         // We deliberately ignore the cbw, since it isn't important and not all
         // drivers report it consistently.
-        rx_info.channel.cbw = fidl_common::ChannelBandwidth::Cbw80;
+        rx_info.channel.cbw = fidl_ieee80211::ChannelBandwidth::Cbw80;
         state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into()).await;
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }

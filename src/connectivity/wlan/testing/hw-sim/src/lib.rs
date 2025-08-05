@@ -22,8 +22,9 @@ use wlan_common::{data_writer, mac, mgmt_writer, TimeUnit};
 use wlan_frame_writer::write_frame_to_vec;
 use wlan_rsn::rsna::UpdateSink;
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
 };
 
 pub mod event;
@@ -121,7 +122,7 @@ fn rx_info_with_valid_rssi(channel: &Channel, rssi_dbm: i8) -> WlanRxInfo {
         },
         phy: fidl_common::WlanPhyType::Dsss,
         data_rate: 0,
-        channel: fidl_common::WlanChannel::from(channel),
+        channel: fidl_ieee80211::WlanChannel::from(channel),
         mcs: 0,
         rssi_dbm,
         snr_dbh: 0,

@@ -415,6 +415,18 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
+                vec![ProgramType::CgroupSockAddr].into(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_get_socket_cookie,
+                    name: "get_socket_cookie",
+                    signature: FunctionSignature {
+                        args: vec![Type::StructParameter { id: BPF_SOCK_ADDR_ID.clone() }],
+                        return_value: Type::UNKNOWN_SCALAR,
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
                 vec![ProgramType::SchedAct, ProgramType::SchedCls].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_redirect,
@@ -646,6 +658,14 @@ fn scalar_u64_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u64>() } }
 }
 
+fn array_start_field(offset: usize, id: MemoryId) -> FieldDescriptor {
+    FieldDescriptor { offset, field_type: FieldType::PtrToArray { id, is_32_bit: false } }
+}
+
+fn array_end_field(offset: usize, id: MemoryId) -> FieldDescriptor {
+    FieldDescriptor { offset, field_type: FieldType::PtrToEndArray { id, is_32_bit: false } }
+}
+
 fn array_start_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::PtrToArray { id, is_32_bit: true } }
 }
@@ -796,8 +816,28 @@ pub static BPF_SOCK_TYPE: LazyLock<Type> =
 pub static BPF_SOCK_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![BPF_SOCK_TYPE.clone()]);
 
 pub static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-pub static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
+pub static BPF_SOCKOPT_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    let optval_id = MemoryId::new();
+    ptr_to_struct_type(
+        BPF_SOCKOPT_ID.clone(),
+        vec![
+            // sk
+            ptr_to_mem_field::<bpf_sock>(
+                offset_of!(bpf_sockopt, __bindgen_anon_1),
+                BPF_SOCK_ID.clone(),
+            ),
+            // optval
+            array_start_field(offset_of!(bpf_sockopt, __bindgen_anon_2), optval_id.clone()),
+            // optval_end
+            array_end_field(offset_of!(bpf_sockopt, __bindgen_anon_3), optval_id),
+            scalar_u32_field(offset_of!(bpf_sockopt, level)),
+            scalar_u32_mut_field(offset_of!(bpf_sockopt, optname)),
+            scalar_u32_mut_field(offset_of!(bpf_sockopt, optlen)),
+            scalar_u32_mut_field(offset_of!(bpf_sockopt, retval)),
+        ],
+    )
+});
+pub static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![BPF_SOCKOPT_TYPE.clone()]);
 
 // Verifier allows access only to some fields of the `bfp_sock_addr` struct
 // depending on the `expected_attach_type` passed when the program is loaded.
@@ -829,6 +869,7 @@ pub static BPF_SOCK_ADDR_INET4_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         BPF_SOCK_ADDR_ID.clone(),
         vec![
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_family)),
             scalar_u32_field(offset_of!(bpf_sock_addr, user_ip4)),
             scalar_u32_field(offset_of!(bpf_sock_addr, user_port)),
             scalar_u32_field(offset_of!(bpf_sock_addr, family)),

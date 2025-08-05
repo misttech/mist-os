@@ -131,6 +131,7 @@ resource("netcfg-netemul-configs") {
     "management/config/duplicate_names.json",
     "management/config/empty.json",
     "management/config/enable_socket_proxy.json",
+    "management/config/enable_socket_proxy_all_delegated.json",
     "management/config/forwarding.json",
     "management/config/iface_prefix.json",
     "management/config/packet_filter_ethernet.json",

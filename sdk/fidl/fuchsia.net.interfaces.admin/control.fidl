@@ -356,6 +356,11 @@ closed protocol Control {
             PORT_CLOSED = 4;
             /// Administrative user action removed the interface.
             USER = 5;
+            /// The netstack managed routes designation is invalid when creating
+            /// the interface.
+            INVALID_NETSTACK_MANAGED_ROUTES_DESIGNATION = 6;
+            /// Cannot create a local route table as requested for the interface.
+            LOCAL_ROUTE_TABLE_UNAVAILABLE = 7;
         };
     });
 };

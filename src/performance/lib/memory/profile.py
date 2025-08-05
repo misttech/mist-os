@@ -45,23 +45,9 @@ class _MemoryProfileMetrics(trace_metrics.MetricsProcessor):
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[trace_metrics.TestCaseResult]:
-        metrics = []
-
-        for group_name, pattern in self._principal_groups.items():
-            digest = self._component_profile["ComponentDigest"]
-            private_populated = sum(
-                principal["populated_private"]
-                for principal in digest["principals"]
-                if fnmatch.fnmatch(principal["name"], pattern)
-            )
-            metrics.append(
-                trace_metrics.TestCaseResult(
-                    label=f"Memory/Principal/{group_name}/PrivatePopulated",
-                    unit=trace_metrics.Unit.bytes,
-                    values=[private_populated],
-                    doc=f"{self.DESCRIPTION_BASE}: {group_name}",
-                )
-            )
+        metrics = process_component_profile(
+            self._principal_groups, self._component_profile
+        )
 
         if self._process_profile:
             for (
@@ -163,6 +149,28 @@ def capture_and_compute_metrics(
     process_groups: Mapping[str, str] | None = None,
 ) -> trace_metrics.MetricsProcessor:
     return capture(dut, principal_groups, process_groups)
+
+
+def process_component_profile(
+    principal_groups: Mapping[str, str], component_profile: Any
+) -> list[trace_metrics.TestCaseResult]:
+    metrics: list[trace_metrics.TestCaseResult] = []
+    for group_name, pattern in principal_groups.items():
+        digest = component_profile["ComponentDigest"]
+        private_populated = sum(
+            principal["populated_private"]
+            for principal in digest["principals"]
+            if fnmatch.fnmatch(principal["name"], pattern)
+        )
+        metrics.append(
+            trace_metrics.TestCaseResult(
+                label=f"Memory/Principal/{group_name}/PrivatePopulated",
+                unit=trace_metrics.Unit.bytes,
+                values=[private_populated],
+                doc=f"{_MemoryProfileMetrics.DESCRIPTION_BASE}: {group_name}",
+            )
+        )
+    return metrics
 
 
 def _simplify_bucket(bucket: JSON) -> dict[str, JSON]:

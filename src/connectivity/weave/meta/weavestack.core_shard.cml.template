@@ -58,7 +58,7 @@
 
                 // TODO(https://fxbug.dev/42062982) Don't use the Root API once
                 // Weavestack no longer needs it.
-                "fuchsia.net.root.Interfaces_OnlyForWeavestack",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.State",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",

@@ -10,9 +10,15 @@ use assembly_container::AssemblyContainer;
 use assembly_release_info::{ProductReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use fuchsia_pkg::{PackageBuilder, PackageManifest};
+use product_input_bundle::ProductInputBundle;
 
 pub fn new(args: &ProductArgs) -> Result<()> {
     let mut config = AssemblyConfig::from_config_path(&args.config)?;
+
+    for path in &args.product_input_bundles {
+        let pib = ProductInputBundle::from_dir(path)?;
+        config.product_input_bundles.insert(pib.release_info.name.clone(), pib);
+    }
 
     config.product.release_info = ProductReleaseInfo {
         info: ReleaseInfo {
@@ -28,7 +34,7 @@ pub fn new(args: &ProductArgs) -> Result<()> {
                 &config.product.build_info.as_ref().map(|b| b.version.clone()),
             )?,
         },
-        pibs: vec![],
+        pibs: config.product_input_bundles.values().map(|p| p.release_info.clone()).collect(),
     };
 
     // Build systems generally don't add package names to the config, so it
@@ -55,6 +61,13 @@ pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
             *path = package_manifest_path.clone();
         }
     }
+
+    // Replace PIBs that match an existing PIB by name.
+    for path in &args.product_input_bundles {
+        let pib = ProductInputBundle::from_dir(path)?;
+        config.product_input_bundles.entry(pib.release_info.name.clone()).and_modify(|e| *e = pib);
+    }
+
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
@@ -152,6 +165,7 @@ mod tests {
             repo_file: None,
             output: product_path.clone(),
             depfile: None,
+            product_input_bundles: vec![],
         };
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();
@@ -183,6 +197,7 @@ mod tests {
             repo_file: None,
             output: product_path.clone(),
             depfile: None,
+            product_input_bundles: vec![],
         };
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();

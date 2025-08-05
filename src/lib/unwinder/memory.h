@@ -5,9 +5,13 @@
 #ifndef SRC_LIB_UNWINDER_MEMORY_H_
 #define SRC_LIB_UNWINDER_MEMORY_H_
 
+#include <stdio.h>
+
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "sdk/lib/fit/include/lib/fit/function.h"
@@ -101,6 +105,25 @@ class LocalMemory : public Memory {
     memcpy(dst, reinterpret_cast<void*>(addr), size);  // NOLINT(performance-no-int-to-ptr)
     return Success();
   }
+};
+
+class FileMemory : public Memory {
+ public:
+  explicit FileMemory(const std::string& path) : file_(fopen(path.c_str(), "rb"), &fclose) {}
+  Error ReadBytes(uint64_t offset, uint64_t size, void* dst) override {
+    if (fseek(file_.get(), static_cast<int64_t>(offset), SEEK_SET) != 0) {
+      return Error("bad fseek: %s", strerror(errno));
+    }
+
+    if (fread(dst, 1, size, file_.get()) != size) {
+      return Error("didn't read full size!");
+    }
+
+    return Success();
+  }
+
+ private:
+  std::unique_ptr<FILE, decltype(&fclose)> file_;
 };
 
 // A memory that fails any reads.

@@ -5,12 +5,14 @@
 use crate::fuchsia::directory::FxDirectory;
 use crate::fuchsia::file::FxFile;
 use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::memory_pressure::MemoryPressureMonitor;
 use crate::fuchsia::pager::PagerBacked;
 use crate::fuchsia::volume::FxVolumeAndRoot;
 use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{Context, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_memorypressure::WatcherProxy;
 use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem, PreCommitHook};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
@@ -30,6 +32,7 @@ struct State {
     volume_out_dir: fio::DirectoryProxy,
     root: fio::DirectoryProxy,
     volumes_directory: Arc<VolumesDirectory>,
+    mem_pressure_proxy: WatcherProxy,
 }
 
 pub struct TestFixture {
@@ -92,6 +95,10 @@ impl TestFixture {
 
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        let (mem_pressure_proxy, watcher_server) = create_proxy();
+        let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
+            .expect("Failed to create MemoryPressureMonitor");
+
         let (filesystem, volume, volumes_directory) = if options.format {
             let mut builder = FxFilesystemBuilder::new().format(true);
             if let Some(pre_commit_hook) = options.pre_commit_hook {
@@ -108,16 +115,25 @@ impl TestFixture {
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();
+
             let volumes_directory =
-                VolumesDirectory::new(root_volume, Weak::new(), None).await.unwrap();
+                VolumesDirectory::new(root_volume, Weak::new(), Some(mem_pressure)).await.unwrap();
             let vol = if options.as_blob {
-                FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
-                    .await
-                    .unwrap()
+                FxVolumeAndRoot::new::<BlobDirectory>(
+                    Arc::downgrade(&volumes_directory),
+                    store,
+                    store_object_id,
+                )
+                .await
+                .unwrap()
             } else {
-                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id)
-                    .await
-                    .unwrap()
+                FxVolumeAndRoot::new::<FxDirectory>(
+                    Arc::downgrade(&volumes_directory),
+                    store,
+                    store_object_id,
+                )
+                .await
+                .unwrap()
             };
             (filesystem, vol, volumes_directory)
         } else {
@@ -129,15 +145,23 @@ impl TestFixture {
                 .unwrap();
             let store_object_id = store.store_object_id();
             let volumes_directory =
-                VolumesDirectory::new(root_volume, Weak::new(), None).await.unwrap();
+                VolumesDirectory::new(root_volume, Weak::new(), Some(mem_pressure)).await.unwrap();
             let vol = if options.as_blob {
-                FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
-                    .await
-                    .unwrap()
+                FxVolumeAndRoot::new::<BlobDirectory>(
+                    Arc::downgrade(&volumes_directory),
+                    store,
+                    store_object_id,
+                )
+                .await
+                .unwrap()
             } else {
-                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id)
-                    .await
-                    .unwrap()
+                FxVolumeAndRoot::new::<FxDirectory>(
+                    Arc::downgrade(&volumes_directory),
+                    store,
+                    store_object_id,
+                )
+                .await
+                .unwrap()
             };
 
             (filesystem, vol, volumes_directory)
@@ -154,7 +178,14 @@ impl TestFixture {
 
         let encrypted = if options.encrypted { Some(crypt.clone()) } else { None };
         Self {
-            state: Some(State { filesystem, volume, volume_out_dir, root, volumes_directory }),
+            state: Some(State {
+                filesystem,
+                volume,
+                volume_out_dir,
+                root,
+                volumes_directory,
+                mem_pressure_proxy,
+            }),
             encrypted,
         }
     }
@@ -167,7 +198,7 @@ impl TestFixture {
     ///   * fsck passes.
     ///   * There are no dangling references to the device or the volume.
     pub async fn close(mut self) -> DeviceHolder {
-        let State { filesystem, volume, volume_out_dir, root, volumes_directory } =
+        let State { filesystem, volume, volume_out_dir, root, volumes_directory, .. } =
             std::mem::take(&mut self.state).unwrap();
         volume_out_dir
             .close()
@@ -249,6 +280,10 @@ impl TestFixture {
 
     pub fn volume_out_dir(&self) -> &fio::DirectoryProxy {
         &self.state.as_ref().unwrap().volume_out_dir
+    }
+
+    pub fn memory_pressure_proxy(&self) -> &WatcherProxy {
+        &self.state.as_ref().unwrap().mem_pressure_proxy
     }
 }
 

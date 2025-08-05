@@ -12,7 +12,7 @@ use crate::logs::shared_buffer::SharedBuffer;
 use crate::logs::stats::LogStreamStats;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
-use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode, StringSelector};
 use fidl_fuchsia_diagnostics_types::Severity as FidlSeverity;
 use flyweights::FlyStr;
 use fuchsia_inspect_derive::WithInspect;
@@ -27,7 +27,7 @@ use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 // LINT.IfChange
@@ -89,8 +89,15 @@ impl FromStr for UrlOrMoniker {
 /// Static ID, used for persistent changes to interest settings.
 pub const STATIC_CONNECTION_ID: usize = 0;
 static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(STATIC_CONNECTION_ID + 1);
-static ARCHIVIST_MONIKER: LazyLock<Moniker> =
-    LazyLock::new(|| Moniker::parse_str("bootstrap/archivist").unwrap());
+
+/// This is set when Archivist first starts. This might not be set for unit tests.
+pub static ARCHIVIST_MONIKER: OnceLock<Moniker> = OnceLock::new();
+
+/// The IOBuffer writer tag used for Archivist logs. We rely on the first container we create having
+/// this tag, so the Archivist container must be the first container created after creating the
+/// shared buffer. This tag is used before we create the container because we want to set up logging
+/// at the earliest possible moment after a binary starts.
+pub const ARCHIVIST_TAG: u64 = 0;
 
 /// LogsRepository holds all diagnostics data and is a singleton wrapped by multiple
 /// [`pipeline::Pipeline`]s in a given Archivist instance.
@@ -102,31 +109,42 @@ pub struct LogsRepository {
 
 impl LogsRepository {
     pub fn new(
-        logs_max_cached_original_bytes: u64,
+        ring_buffer: ring_buffer::Reader,
         initial_interests: impl Iterator<Item = ComponentInitialInterest>,
         parent: &fuchsia_inspect::Node,
         scope: fasync::Scope,
     ) -> Arc<Self> {
         let scope_handle = scope.to_handle();
         Arc::new_cyclic(|me: &Weak<LogsRepository>| {
-            let me = Weak::clone(me);
-            LogsRepository {
-                scope_handle,
-                mutable_state: Mutex::new(LogsRepositoryState::new(
-                    parent,
-                    initial_interests,
-                    scope,
-                )),
-                shared_buffer: SharedBuffer::new(
-                    logs_max_cached_original_bytes as usize,
-                    Box::new(move |identity| {
-                        if let Some(this) = me.upgrade() {
-                            this.on_container_inactive(&identity);
-                        }
-                    }),
-                ),
+            let mut mutable_state = LogsRepositoryState::new(parent, initial_interests, scope);
+            let me_clone = Weak::clone(me);
+            let shared_buffer = SharedBuffer::new(
+                ring_buffer,
+                Box::new(move |identity| {
+                    if let Some(this) = me_clone.upgrade() {
+                        this.on_container_inactive(&identity);
+                    }
+                }),
+                Default::default(),
+            );
+            if let Some(m) = ARCHIVIST_MONIKER.get() {
+                let archivist_container = mutable_state.create_log_container(
+                    Arc::new(ComponentIdentity::new(
+                        ExtendedMoniker::ComponentInstance(m.clone()),
+                        "fuchsia-pkg://UNKNOWN",
+                    )),
+                    &shared_buffer,
+                    Weak::clone(me),
+                );
+                // We rely on the first container we create ending up with the correct tag.
+                assert_eq!(archivist_container.buffer().iob_tag(), ARCHIVIST_TAG);
             }
+            LogsRepository { scope_handle, mutable_state: Mutex::new(mutable_state), shared_buffer }
         })
+    }
+
+    pub async fn flush(&self) {
+        self.shared_buffer.flush().await;
     }
 
     /// Drain the kernel's debug log. The returned future completes once
@@ -271,8 +289,10 @@ impl LogsRepository {
 #[cfg(test)]
 impl LogsRepository {
     pub fn for_test(scope: fasync::Scope) -> Arc<Self> {
+        use crate::logs::shared_buffer::create_ring_buffer;
+
         LogsRepository::new(
-            crate::constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
+            create_ring_buffer(crate::constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES as usize),
             std::iter::empty(),
             &Default::default(),
             scope,
@@ -347,32 +367,38 @@ impl LogsRepositoryState {
         repo: &Arc<LogsRepository>,
     ) -> Arc<LogsArtifactsContainer> {
         match self.logs_data_store.get(&identity) {
-            None => {
-                let initial_interest = self.get_initial_interest(identity.as_ref());
-                let weak_repo = Arc::downgrade(repo);
-                let stats = LogStreamStats::default()
-                    .with_inspect(&self.inspect_node, identity.moniker.to_string())
-                    .expect("failed to attach component log stats");
-                stats.set_url(&identity.url);
-                let stats = Arc::new(stats);
-                let container = Arc::new(LogsArtifactsContainer::new(
-                    Arc::clone(&identity),
-                    self.interest_registrations.values().flat_map(|s| s.iter()),
-                    initial_interest,
-                    Arc::clone(&stats),
-                    shared_buffer.new_container_buffer(Arc::clone(&identity), stats),
-                    Some(Box::new(move |c| {
-                        if let Some(repo) = weak_repo.upgrade() {
-                            repo.on_container_inactive(&c.identity)
-                        }
-                    })),
-                ));
-                self.logs_data_store.insert(identity, Arc::clone(&container));
-                self.logs_multiplexers.send(&container);
-                container
-            }
+            None => self.create_log_container(identity, shared_buffer, Arc::downgrade(repo)),
             Some(existing) => Arc::clone(existing),
         }
+    }
+
+    fn create_log_container(
+        &mut self,
+        identity: Arc<ComponentIdentity>,
+        shared_buffer: &Arc<SharedBuffer>,
+        repo: Weak<LogsRepository>,
+    ) -> Arc<LogsArtifactsContainer> {
+        let initial_interest = self.get_initial_interest(identity.as_ref());
+        let stats = LogStreamStats::default()
+            .with_inspect(&self.inspect_node, identity.moniker.to_string())
+            .expect("failed to attach component log stats");
+        stats.set_url(&identity.url);
+        let stats = Arc::new(stats);
+        let container = Arc::new(LogsArtifactsContainer::new(
+            Arc::clone(&identity),
+            self.interest_registrations.values().flat_map(|s| s.iter()),
+            initial_interest,
+            Arc::clone(&stats),
+            shared_buffer.new_container_buffer(Arc::clone(&identity), stats),
+            Some(Box::new(move |c| {
+                if let Some(repo) = repo.upgrade() {
+                    repo.on_container_inactive(&c.identity)
+                }
+            })),
+        ));
+        self.logs_data_store.insert(identity, Arc::clone(&container));
+        self.logs_multiplexers.send(&container);
+        container
     }
 
     fn get_initial_interest(&self, identity: &ComponentIdentity) -> Option<FidlSeverity> {
@@ -419,10 +445,30 @@ impl LogsRepositoryState {
         selectors: &[LogInterestSelector],
         clear_interest: bool,
     ) {
+        let Some(moniker) = ARCHIVIST_MONIKER.get() else { return };
         let lowest_selector = selectors
             .iter()
             .filter(|selector| {
-                ARCHIVIST_MONIKER.matches_component_selector(&selector.selector).unwrap_or(false)
+                // If this is an embedded archivist, the wildcard selector "**" is used (in
+                // tests at least) to change the interest level on all components. Since
+                // archivist logs to itself, this creates a situation where archivist logs can
+                // get included which is undesirable in the vast majority of cases. To address
+                // this, we prevent the global wildcard pattern "**" and "*" from matching
+                // archivist. This is clearly a bit of a hack, but it is balanced by it being
+                // the behavior that the vast majority of users will want. It is still possible
+                // to change the interest level for archivist by using an exact match. Note that
+                // this will apply to both the embedded and system archivist to keep things
+                // consistent.
+                if selector.selector.moniker_segments.as_ref().is_some_and(|s| {
+                    matches!(
+                        &s[..],
+                        [StringSelector::StringPattern(s)] if s == "**" || s == "*"
+                    )
+                }) {
+                    return false;
+                }
+
+                moniker.matches_component_selector(&selector.selector).unwrap_or(false)
             })
             .min_by_key(|selector| selector.interest.min_severity.unwrap_or(FidlSeverity::Info));
         if let Some(selector) = lowest_selector {
@@ -532,6 +578,7 @@ impl MultiplexerBroker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::logs::shared_buffer::create_ring_buffer;
     use crate::logs::testing::make_message;
     use fidl_fuchsia_logger::LogSinkMarker;
 
@@ -593,7 +640,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_correctly_sets_initial_interests() {
         let repo = LogsRepository::new(
-            100000,
+            create_ring_buffer(100000),
             [
                 ComponentInitialInterest {
                     component: UrlOrMoniker::Url("fuchsia-pkg://bar".into()),
@@ -654,7 +701,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_correctly_handles_partial_matching() {
         let repo = LogsRepository::new(
-            100000,
+            create_ring_buffer(100000),
             [
                 "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm:INFO".parse(),
                 "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm:WARN".parse(),

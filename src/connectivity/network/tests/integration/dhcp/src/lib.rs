@@ -370,7 +370,10 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
 
     let dhcp_objects =
         test_dhcp::<CLIENT::DhcpClient>(name, &sandbox, &mut netstack_config, 1, false).await;
-    let TestDhcpRealmAndInterfaces { realm, client_ifaces, server_ifaces: _ } = &dhcp_objects[0];
+    let TestDhcpRealmAndInterfaces { realm: client_realm, client_ifaces, server_ifaces: _ } =
+        &dhcp_objects[0];
+    let TestDhcpRealmAndInterfaces { realm: server_realm, client_ifaces: _, server_ifaces: _ } =
+        &dhcp_objects[1];
     let client_iface = &client_ifaces[0];
     let client = client_iface.control();
     let (remove_address, timeout) = if remove_dhcp_address {
@@ -384,7 +387,7 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
         .expect("send address removal request")
         .expect("remove DHCP acquired address"),);
     assert!(client.disable().await.expect("send disable request").expect("disable interface"));
-    let socket = realm
+    let socket = client_realm
         .packet_socket(fidl_fuchsia_posix_socket_packet::Kind::Network)
         .await
         .expect("get packet socket");
@@ -436,6 +439,13 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
         Some(())
     };
     assert_eq!(fut.on_timeout(timeout.after_now(), || None).await.is_none(), remove_dhcp_address);
+
+    // Stop the DHCP client server. It will try to respond to the RENEW request
+    // which will fail if it races with interface removal during teardown.
+    let dhcp_server = server_realm
+        .connect_to_protocol::<fidl_fuchsia_net_dhcp::Server_Marker>()
+        .expect("failed to connect to DHCP server");
+    dhcp_server.stop_serving().await.expect("failed to stop DHCP server");
 }
 
 #[netstack_test]

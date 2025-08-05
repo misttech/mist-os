@@ -82,7 +82,6 @@ use super::lock::RwMapLock;
 use super::{MapError, MapImpl, MapKey, MapValueRef};
 use ebpf::MapSchema;
 use linux_uapi::{BPF_EXIST, BPF_NOEXIST};
-use rand::RngCore;
 use siphasher::sip::SipHasher;
 use std::hash::Hasher;
 use std::mem::offset_of;
@@ -588,7 +587,7 @@ impl HashMap {
         let hash_key = unsafe {
             &mut buffer.ptr().get_ptr::<HashTableHeader>(0).unwrap().deref_mut().hash_key
         };
-        rand::thread_rng().fill_bytes(hash_key);
+        rand::fill(hash_key);
 
         Ok(HashMap { buffer, layout })
     }

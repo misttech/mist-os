@@ -11,12 +11,14 @@ use starnix_core::device::DeviceOps;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::{CurrentTask, ThreadGroupKey};
-use starnix_core::vfs::{default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode};
+use starnix_core::vfs::{
+    default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileObjectState, FileOps, NamespaceNode,
+};
 use starnix_core::{
     fileops_impl_dataless, fileops_impl_memory, fileops_impl_noop_sync, fileops_impl_seekless,
 };
 use starnix_logging::{log_debug, log_error, log_warn};
-use starnix_sync::{DeviceOpen, FastrpcInnerState, FileOpsCore, Locked, OrderedMutex, Unlocked};
+use starnix_sync::{FastrpcInnerState, FileOpsCore, Locked, OrderedMutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::device_type::DeviceType;
@@ -737,9 +739,9 @@ impl FileOps for FastRPCFile {
     fileops_impl_dataless!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let inner = self.inner_state.lock(locked);
@@ -921,10 +923,10 @@ impl FastRPCDevice {
 impl DeviceOps for FastRPCDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(FastRPCFile::new(

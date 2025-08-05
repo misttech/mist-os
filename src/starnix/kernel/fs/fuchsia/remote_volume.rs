@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::task::LockedAndTask;
 use fidl::endpoints::{create_sync_proxy, DiscoverableProtocolMarker, SynchronousProxy};
 use fidl_fuchsia_fshost::StarnixVolumeProviderMarker;
 use fidl_fuchsia_fxfs::{CryptMarker, KeyPurpose};
+use fidl_fuchsia_io as fio;
 use starnix_core::fs::fuchsia::{RemoteFs, RemoteNode};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
@@ -16,7 +18,6 @@ use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio, statfs};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t, Zxio};
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const CRYPT_THREAD_ROLE: &str = "fuchsia.starnix.remotevol.crypt";
 // `KEY_FILE_PATH` determines where the volume-wide keys for the Starnix volume will live in the
@@ -213,14 +214,14 @@ pub fn new_remote_vol(
     crypt.set_active_key(metadata_wrapping_key_id, KeyPurpose::Metadata)?;
     crypt.set_active_key(data_wrapping_key_id, KeyPurpose::Data)?;
 
-    kernel.kthreads.spawner().spawn_with_role(CRYPT_THREAD_ROLE, |_, _| {
-        let mut executor = fasync::LocalExecutor::new();
-        executor.run_singlethreaded(async move {
+    kernel.kthreads.spawner().spawn_async_with_role(
+        CRYPT_THREAD_ROLE,
+        async move |_: LockedAndTask<'_>| {
             if let Err(e) = crypt.handle_connection(crypt_proxy.into_stream()).await {
                 log_error!("Error while handling a Crypt request {e}");
             }
-        });
-    });
+        },
+    );
 
     if created_key_file {
         volume_provider

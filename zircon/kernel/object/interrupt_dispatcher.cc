@@ -62,7 +62,7 @@ ktl::optional<zx_status_t> InterruptDispatcher::BeginWaitForInterrupt(zx_time_t*
         return event_.Unsignal();
 
       case InterruptState::NEEDACK:
-        if ((flags_ & INTERRUPT_WAKE_VECTOR)) {
+        if (is_wake_vector()) {
           wake_event_.Acknowledge();
         }
         if (flags_ & INTERRUPT_UNMASK_PREWAIT) {
@@ -136,6 +136,10 @@ zx_status_t InterruptDispatcher::Trigger(zx_time_t timestamp) {
     return ZX_OK;
   }
 
+  if (is_wake_vector()) {
+    wake_event_.Trigger();
+  }
+
   if (port_dispatcher_) {
     SendPacketLocked(timestamp);
     state_ = InterruptState::NEEDACK;
@@ -174,7 +178,7 @@ void InterruptDispatcher::InterruptHandler() {
     Signal();
     state_ = InterruptState::TRIGGERED;
   }
-  if ((flags_ & INTERRUPT_WAKE_VECTOR) &&
+  if (is_wake_vector() &&
       (state_ == InterruptState::TRIGGERED || state_ == InterruptState::NEEDACK)) {
     // Trigger the wake event which will wake the system if suspended and prevent entering suspend
     // until acknowledged.
@@ -289,7 +293,7 @@ zx::result<InterruptDispatcher::PostAckState> InterruptDispatcher::AckInternal()
       return zx::error(ZX_ERR_CANCELED);
     }
     if (state_ == InterruptState::NEEDACK) {
-      if (flags_ & INTERRUPT_WAKE_VECTOR) {
+      if (is_wake_vector()) {
         wake_event_.Acknowledge();
       }
       if (flags_ & INTERRUPT_UNMASK_PREWAIT) {

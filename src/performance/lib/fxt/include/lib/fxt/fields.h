@@ -66,6 +66,10 @@ struct StringArgumentFields : ArgumentFields {
   using Index = Field<32, 47>;
 };
 
+struct BlobArgumentFields : ArgumentFields {
+  using ByteSize = Field<32, 63>;
+};
+
 struct RecordFields {
   static constexpr uint64_t kMaxRecordSizeWords = 0xfff;
   static constexpr uint64_t kMaxRecordSizeBytes = WordSize(kMaxRecordSizeWords).SizeInBytes();

@@ -12,7 +12,7 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use assert_matches::assert_matches;
 use net_types::ip::{GenericOverIp, Ip};
 
-use crate::routes::{NetlinkRouteMessage, UNMANAGED_ROUTE_TABLE_INDEX};
+use crate::routes::{NetlinkRouteMessage, MAIN_ROUTE_TABLE_INDEX};
 
 /// The index of a route table (in netlink's view of indices).
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -26,31 +26,6 @@ impl NetlinkRouteTableIndex {
     pub(crate) const fn get(self) -> u32 {
         let Self(index) = self;
         index
-    }
-}
-
-/// The index of a route table known to be managed by the netlink worker (so, not the main table).
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
-pub(crate) struct ManagedNetlinkRouteTableIndex(NetlinkRouteTableIndex);
-
-impl ManagedNetlinkRouteTableIndex {
-    pub(crate) const fn new(index: NetlinkRouteTableIndex) -> Option<Self> {
-        if index.get() == UNMANAGED_ROUTE_TABLE_INDEX.get() {
-            None
-        } else {
-            Some(Self(index))
-        }
-    }
-
-    pub(crate) const fn get(self) -> NetlinkRouteTableIndex {
-        let Self(index) = self;
-        index
-    }
-}
-
-impl From<ManagedNetlinkRouteTableIndex> for NetlinkRouteTableIndex {
-    fn from(index: ManagedNetlinkRouteTableIndex) -> Self {
-        index.get()
     }
 }
 
@@ -92,38 +67,37 @@ pub(crate) struct TableNeedsCleanup(
     pub(crate) NetlinkRouteTableIndex,
 );
 
-// A `RouteTable` identifier.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum RouteTableKey {
-    // Routing tables that are created and managed by Netlink.
-    NetlinkManaged { table_id: ManagedNetlinkRouteTableIndex },
-    // Routing tables that are not managed by Netlink, but exist on the system.
-    Unmanaged,
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
+pub(crate) enum RouteTable<
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+> {
+    Managed(ManagedRouteTable<I>),
+    Unmanaged(MainRouteTable<I>),
 }
 
-impl RouteTableKey {
-    pub(crate) const fn from(index: NetlinkRouteTableIndex) -> RouteTableKey {
-        match ManagedNetlinkRouteTableIndex::new(index) {
-            Some(table_id) => RouteTableKey::NetlinkManaged { table_id },
-            None => RouteTableKey::Unmanaged,
+impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
+    RouteTable<I>
+{
+    pub(crate) fn fidl_table_id(&self) -> fnet_routes_ext::TableId {
+        match self {
+            RouteTable::Managed(route_table) => route_table.fidl_table_id,
+            RouteTable::Unmanaged(route_table) => route_table.fidl_table_id,
+        }
+    }
+
+    pub(crate) fn route_table_proxy(&self) -> &<I::RouteTableMarker as ProtocolMarker>::Proxy {
+        match self {
+            RouteTable::Managed(route_table) => &route_table.route_table_proxy,
+            RouteTable::Unmanaged(route_table) => &route_table.route_table_proxy,
         }
     }
 }
 
-impl From<NetlinkRouteTableIndex> for RouteTableKey {
-    fn from(index: NetlinkRouteTableIndex) -> RouteTableKey {
-        RouteTableKey::from(index)
-    }
-}
-
-/// Returned as the `Err` variant when an operation expected to act on a managed route table.
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct UnmanagedTableError;
-
 /// State tracked for a route table managed by the netlink worker.
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""))]
-pub(crate) struct RouteTable<
+pub(crate) struct ManagedRouteTable<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
     /// The route table FIDL proxy backing this route table.
@@ -170,38 +144,18 @@ pub(crate) struct MainRouteTable<
     pub(crate) rule_set_authenticated: bool,
 }
 
-/// The result of looking up a route table by [`NetlinkRouteTableIndex`].
-#[derive(derivative::Derivative)]
-#[derivative(Debug(bound = ""))]
-pub(crate) enum RouteTableLookup<
-    'a,
-    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-> {
-    Managed(&'a RouteTable<I>),
-    Unmanaged(&'a MainRouteTable<I>),
-}
+/// Returned as the `Err` variant when the user attempts to remove the main table.
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct AttemptToRemoveMainTableError;
 
-/// The result of looking up a route table by [`NetlinkRouteTableIndex`].
-#[derive(derivative::Derivative)]
-#[derivative(Debug(bound = ""))]
-pub(crate) enum RouteTableLookupMut<
-    'a,
-    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-> {
-    Managed(&'a mut RouteTable<I>),
-    Unmanaged(&'a mut MainRouteTable<I>),
-}
-
-/// Contains the route tables tracked by the netlink worker.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub(crate) struct RouteTableMap<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
-    route_tables: HashMap<ManagedNetlinkRouteTableIndex, RouteTable<I>>,
-    fidl_table_ids: HashMap<fnet_routes_ext::TableId, ManagedNetlinkRouteTableIndex>,
+    route_tables: HashMap<NetlinkRouteTableIndex, RouteTable<I>>,
+    fidl_table_ids: HashMap<fnet_routes_ext::TableId, NetlinkRouteTableIndex>,
     route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
-    pub(crate) main_route_table: MainRouteTable<I>,
 }
 
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
@@ -214,71 +168,44 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     ) -> Self {
         Self {
-            route_tables: HashMap::new(),
-            fidl_table_ids: HashMap::new(),
-            main_route_table: MainRouteTable {
-                route_table_proxy: main_route_table_proxy,
-                fidl_table_id: main_route_table_id,
-                route_set_proxy: unmanaged_route_set_proxy,
-                rule_set_authenticated: false,
-            },
+            route_tables: HashMap::from_iter(std::iter::once((
+                MAIN_ROUTE_TABLE_INDEX,
+                RouteTable::Unmanaged(MainRouteTable {
+                    route_table_proxy: main_route_table_proxy,
+                    fidl_table_id: main_route_table_id,
+                    route_set_proxy: unmanaged_route_set_proxy,
+                    rule_set_authenticated: false,
+                }),
+            ))),
+            fidl_table_ids: HashMap::from_iter(std::iter::once((
+                main_route_table_id,
+                MAIN_ROUTE_TABLE_INDEX,
+            ))),
             route_table_provider,
         }
     }
 
-    /// Maps from FIDL table IDs to their corresponding [`RouteTableKey`].
-    pub(crate) fn lookup_route_table_key_from_fidl_table_id(
+    /// Looks up the [`NetlinkRouteTableIndex`] for a FIDL table ID.
+    pub(crate) fn get_netlink_id(
         &self,
-        fidl_table_id: fnet_routes_ext::TableId,
-    ) -> Option<RouteTableKey> {
-        if fidl_table_id == self.main_route_table.fidl_table_id {
-            Some(RouteTableKey::Unmanaged)
-        } else {
-            Some(RouteTableKey::NetlinkManaged {
-                table_id: self.fidl_table_ids.get(&fidl_table_id).copied()?,
-            })
-        }
+        key: &fnet_routes_ext::TableId,
+    ) -> Option<NetlinkRouteTableIndex> {
+        self.fidl_table_ids.get(key).copied()
     }
 
-    /// Looks up a route table.
-    pub(crate) fn get(&self, key: &NetlinkRouteTableIndex) -> Option<RouteTableLookup<'_, I>> {
-        match RouteTableKey::from(*key) {
-            RouteTableKey::Unmanaged => Some(RouteTableLookup::Unmanaged(&self.main_route_table)),
-            RouteTableKey::NetlinkManaged { table_id } => {
-                self.route_tables.get(&table_id).map(RouteTableLookup::Managed)
-            }
-        }
+    /// Gets a reference to the [`RouteTable`] for the given `key`.
+    pub(crate) fn get(&self, key: &NetlinkRouteTableIndex) -> Option<&RouteTable<I>> {
+        self.route_tables.get(key)
     }
 
-    /// Looks up a route table.
-    pub(crate) fn get_mut(
-        &mut self,
-        key: &NetlinkRouteTableIndex,
-    ) -> Option<RouteTableLookupMut<'_, I>> {
-        match RouteTableKey::from(*key) {
-            RouteTableKey::Unmanaged => {
-                Some(RouteTableLookupMut::Unmanaged(&mut self.main_route_table))
-            }
-            RouteTableKey::NetlinkManaged { table_id } => {
-                self.route_tables.get_mut(&table_id).map(RouteTableLookupMut::Managed)
-            }
-        }
+    /// Gets a mutable reference to the [`RouteTable`] for the given `key`.
+    pub(crate) fn get_mut(&mut self, key: &NetlinkRouteTableIndex) -> Option<&mut RouteTable<I>> {
+        self.route_tables.get_mut(key)
     }
 
-    /// Maps from a [`NetlinkRouteTableIndex`] to the corresponding FIDL table ID.
-    pub(crate) fn get_fidl_table_id(
-        &self,
-        key: &NetlinkRouteTableIndex,
-    ) -> Option<fnet_routes_ext::TableId> {
-        match self.get(key)? {
-            RouteTableLookup::Unmanaged(main_route_table) => Some(main_route_table.fidl_table_id),
-            RouteTableLookup::Managed(route_table) => Some(route_table.fidl_table_id),
-        }
-    }
-
-    /// Inserts a new netlink-managed route table.
-    pub(crate) fn insert(&mut self, key: ManagedNetlinkRouteTableIndex, value: RouteTable<I>) {
-        let fidl_table_id = value.fidl_table_id;
+    /// Inserts a mapping from a [`NetlinkRouteTableIndex`] to a [`RouteTable`].
+    pub(crate) fn insert(&mut self, key: NetlinkRouteTableIndex, value: RouteTable<I>) {
+        let fidl_table_id = value.fidl_table_id();
         let prev = self.route_tables.insert(key, value);
         assert_matches!(prev, None, "{prev:?}");
 
@@ -290,84 +217,63 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         );
     }
 
-    /// Removes a netlink-managed route table.
-    fn remove(&mut self, key: ManagedNetlinkRouteTableIndex) -> Option<RouteTable<I>> {
-        let Self { route_tables, fidl_table_ids, .. } = self;
-        let route_table = route_tables.remove(&key)?;
-        assert_eq!(fidl_table_ids.remove(&route_table.fidl_table_id), Some(key));
-        Some(route_table)
-    }
-
-    /// Removes the table matching the given FIDL table ID, if there is a managed table
-    /// matching it.
+    /// Removes the [`RouteTable`] with the given FIDL table ID.
     pub(crate) fn remove_table_by_fidl_id(
         &mut self,
         table_id: fnet_routes_ext::TableId,
-    ) -> Option<Result<RouteTable<I>, UnmanagedTableError>> {
-        match self.lookup_route_table_key_from_fidl_table_id(table_id) {
-            None => None,
-            Some(RouteTableKey::Unmanaged) => Some(Err(UnmanagedTableError)),
-            Some(RouteTableKey::NetlinkManaged { table_id }) => self.remove(table_id).map(Ok),
+    ) -> Option<Result<RouteTable<I>, AttemptToRemoveMainTableError>> {
+        if self
+            .get_netlink_id(&table_id)
+            .is_some_and(|netlink_id| netlink_id == MAIN_ROUTE_TABLE_INDEX)
+        {
+            return Some(Err(AttemptToRemoveMainTableError));
         }
+
+        let netlink_index = self.fidl_table_ids.remove(&table_id)?;
+        let removed = self.route_tables.remove(&netlink_index)?;
+        assert_eq!(removed.fidl_table_id(), table_id);
+        Some(Ok(removed))
     }
 
-    /// If a table corresponding to `key` is not already being tracked, and `key` does not
-    /// correspond to the main table, initializes a new [`RouteTable`] entry for this key.
-    pub(crate) async fn create_route_table_if_managed_and_not_present(
+    /// If a table corresponding to `key` is not already being tracked,
+    /// creates a new [`ManagedRouteTable`] entry for this key.
+    pub(crate) async fn create_managed_route_table_if_not_present(
         &mut self,
         key: NetlinkRouteTableIndex,
     ) {
-        match RouteTableKey::from(key) {
-            RouteTableKey::Unmanaged => {}
-            RouteTableKey::NetlinkManaged { table_id } => {
-                self.create_route_table_if_not_present(table_id).await;
-            }
+        if self.route_tables.get(&key).is_some() {
+            return;
         }
-    }
-
-    /// If a table corresponding to `key` is not already being tracked, initializes a new
-    /// [`RouteTable`] entry for this key.
-    async fn create_route_table_if_not_present(&mut self, key: ManagedNetlinkRouteTableIndex) {
-        let should_insert = self.route_tables.get(&key).is_none();
 
         // There's nothing graceful we can do if any of these operations fail, so we might as well
         // panic.
-        if should_insert {
-            let route_table_proxy = fnet_routes_ext::admin::new_route_table::<I>(
-                &self.route_table_provider,
-                Some(format!("netlink:{}", key.get().get())),
-            )
-            .expect("error creating new route table");
-            let fidl_table_id = fnet_routes_ext::admin::get_table_id::<I>(&route_table_proxy)
-                .await
-                .expect("error getting table ID");
-            let route_set_proxy = fnet_routes_ext::admin::new_route_set::<I>(&route_table_proxy)
-                .expect("error creating new route set");
-            let route_set_from_main_table_proxy = fnet_routes_ext::admin::new_route_set::<I>(
-                &self.main_route_table.route_table_proxy,
-            )
+        let route_table_proxy = fnet_routes_ext::admin::new_route_table::<I>(
+            &self.route_table_provider,
+            Some(format!("netlink:{}", key.get())),
+        )
+        .expect("error creating new route table");
+        let fidl_table_id = fnet_routes_ext::admin::get_table_id::<I>(&route_table_proxy)
+            .await
+            .expect("error getting table ID");
+        let route_set_proxy = fnet_routes_ext::admin::new_route_set::<I>(&route_table_proxy)
             .expect("error creating new route set");
-            self.insert(
-                key,
-                RouteTable {
-                    route_table_proxy,
-                    route_set_from_main_table_proxy,
-                    route_set_proxy,
-                    fidl_table_id,
-                    rule_set_authenticated: false,
-                },
-            );
-        }
-    }
-}
-
-impl<'a, I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
-    std::ops::Index<&'a ManagedNetlinkRouteTableIndex> for RouteTableMap<I>
-{
-    type Output = RouteTable<I>;
-
-    fn index(&self, index: &'a ManagedNetlinkRouteTableIndex) -> &Self::Output {
-        &self.route_tables[index]
+        let route_set_from_main_table_proxy = fnet_routes_ext::admin::new_route_set::<I>(
+            &self
+                .get(&MAIN_ROUTE_TABLE_INDEX)
+                .expect("the main table must be present")
+                .route_table_proxy(),
+        )
+        .expect("error creating new route set");
+        self.insert(
+            key,
+            RouteTable::Managed(ManagedRouteTable {
+                route_table_proxy,
+                route_set_from_main_table_proxy,
+                route_set_proxy,
+                fidl_table_id,
+                rule_set_authenticated: false,
+            }),
+        );
     }
 }
 
@@ -511,8 +417,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         table_id: NetlinkRouteTableIndex,
     ) -> impl Iterator<Item = NetlinkRouteMessage> + 'a {
         route_table_map
-            .get_fidl_table_id(&table_id)
-            .and_then(|fidl_table_id| {
+            .get(&table_id)
+            .and_then(|table| {
+                let fidl_table_id = table.fidl_table_id();
                 self.by_tables.get(&fidl_table_id).map(|routes| {
                     routes
                         .into_iter()
@@ -555,32 +462,26 @@ mod test {
 
     use super::*;
 
+    impl<I: FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt> RouteTableMap<I> {
+        /// Removes a netlink-managed route table.
+        fn remove(&mut self, key: NetlinkRouteTableIndex) -> Option<RouteTable<I>> {
+            let table_id = self.route_tables.get(&key)?.fidl_table_id();
+            Some(self.remove_table_by_fidl_id(table_id)?.expect("cannot remove the main table"))
+        }
+    }
+
     impl Arbitrary for NetlinkRouteTableIndex {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with((): ()) -> Self::Strategy {
             // NB: use u8 to constrain the space enough to get some collisions.
-            // Note that this still includes the unmanaged route table index, which is 254.
-            let _: u8 = u8::try_from(crate::routes::UNMANAGED_ROUTE_TABLE_INDEX.get())
+            let unwanted = u8::try_from(crate::routes::MAIN_ROUTE_TABLE_INDEX.get())
                 .expect("must be valid u8");
 
             <u8 as Arbitrary>::arbitrary_with(())
+                .prop_filter("not including the main table", move |index| *index != unwanted)
                 .prop_map(|index| NetlinkRouteTableIndex(index.into()))
-                .boxed()
-        }
-    }
-
-    impl Arbitrary for ManagedNetlinkRouteTableIndex {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-
-        fn arbitrary_with((): ()) -> Self::Strategy {
-            <NetlinkRouteTableIndex as Arbitrary>::arbitrary_with(())
-                .prop_filter_map(
-                    "is unmanaged route table index",
-                    ManagedNetlinkRouteTableIndex::new,
-                )
                 .boxed()
         }
     }
@@ -601,8 +502,8 @@ mod test {
 
     #[derive(proptest_derive::Arbitrary, Debug, PartialEq, Eq, Hash)]
     enum RouteTableMapOp {
-        Insert(ManagedNetlinkRouteTableIndex),
-        Remove(ManagedNetlinkRouteTableIndex),
+        Insert(NetlinkRouteTableIndex),
+        Remove(NetlinkRouteTableIndex),
     }
 
     fn collect_and_assert_all_unique(
@@ -675,7 +576,7 @@ mod test {
         })]
 
         // Test that the route table map preserves a 1:1 mapping between
-        // `ManagedNetlinkRouteTableIndex` and `fnet_routes_ext::TableId` after arbitrary
+        // `NetlinkRouteTableIndex` and `fnet_routes_ext::TableId` after arbitrary
         // operations.
         #[test]
         fn route_table_map_is_bijection(ops_to_try: Vec<RouteTableMapOp>) {
@@ -707,14 +608,12 @@ mod test {
                     map.fidl_table_ids
                         .keys()
                         .copied()
-                        .chain(std::iter::once(route_table_map.main_route_table.fidl_table_id)),
                 );
 
                 let used_fidl_ids_according_to_route_tables = collect_and_assert_all_unique(
                     map.route_tables
                         .values()
-                        .map(|table| table.fidl_table_id)
-                        .chain(std::iter::once(route_table_map.main_route_table.fidl_table_id)),
+                        .map(|table| table.fidl_table_id())
                 );
 
                 assert_eq!(
@@ -730,30 +629,30 @@ mod test {
             };
 
             let test_remove =
-                |map: &mut RouteTableMap<Ipv6>, netlink_id: ManagedNetlinkRouteTableIndex| {
+                |map: &mut RouteTableMap<Ipv6>, netlink_id: NetlinkRouteTableIndex| {
                     // Before removing, check for consistency between presence according to
                     // `get_fidl_table_id` and according to `remove`.
-                    let prev_fidl_table_id = map.get_fidl_table_id(&netlink_id.get());
+                    let prev_fidl_table_id = map.get(&netlink_id).map(|table| table.fidl_table_id());
 
                     if let Some(table) = map.remove(netlink_id) {
-                        assert_eq!(Some(table.fidl_table_id), prev_fidl_table_id);
+                        assert_eq!(Some(table.fidl_table_id()), prev_fidl_table_id);
                     } else {
                         assert_eq!(prev_fidl_table_id, None);
                     }
 
                     // Now everything should indicate absence.
-                    assert_eq!(map.get_fidl_table_id(&netlink_id.get()), None);
+                    assert_matches!(map.get(&netlink_id), None);
                     assert_matches!(map.remove(netlink_id), None);
                     if let Some(prev_fidl_table_id) = prev_fidl_table_id {
                         assert_eq!(
-                            map.lookup_route_table_key_from_fidl_table_id(prev_fidl_table_id),
+                            map.get_netlink_id(&prev_fidl_table_id),
                             None
                         );
                     }
                 };
 
             let test_insert =
-                |map: &mut RouteTableMap<Ipv6>, netlink_id: ManagedNetlinkRouteTableIndex| {
+                |map: &mut RouteTableMap<Ipv6>, netlink_id: NetlinkRouteTableIndex| {
                     // Callers are expected to avoid inserting duplicate netlink IDs.
                     // To ensure this, test removal as well first.
                     test_remove(map, netlink_id);
@@ -776,22 +675,25 @@ mod test {
 
                     map.insert(
                         netlink_id,
-                        RouteTable::<Ipv6> {
+                        RouteTable::<Ipv6>::Managed(ManagedRouteTable {
                             route_table_proxy,
                             route_set_proxy,
                             route_set_from_main_table_proxy,
                             fidl_table_id,
                             rule_set_authenticated: false,
-                        },
+                        }),
                     );
 
                     // Now the "reverse" lookup should yield the expected item.
                     assert_eq!(
-                        map.lookup_route_table_key_from_fidl_table_id(fidl_table_id),
-                        Some(RouteTableKey::NetlinkManaged { table_id: netlink_id })
+                        map.get_netlink_id(&fidl_table_id),
+                        Some(netlink_id)
                     );
                     // As should the "forward" lookup.
-                    assert_eq!(map.get_fidl_table_id(&netlink_id.get()), Some(fidl_table_id));
+                    assert_eq!(
+                        map.get(&netlink_id).map(|table| table.fidl_table_id()),
+                        Some(fidl_table_id)
+                    );
                 };
 
             for op in ops_to_try {
@@ -806,15 +708,15 @@ mod test {
 
                 // After each op, check the invariant that the mapping between netlink IDs
                 // and FIDL IDs is bidirectional.
-                let by_route_table: Vec<(ManagedNetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
+                let by_route_table: Vec<(NetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
                     route_table_map
                         .route_tables
                         .iter()
-                        .map(|(netlink_id, table)| (*netlink_id, table.fidl_table_id))
+                        .map(|(netlink_id, table)| (*netlink_id, table.fidl_table_id()))
                         .sorted()
                         .collect::<Vec<_>>();
 
-                let by_fidl_id: Vec<(ManagedNetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
+                let by_fidl_id: Vec<(NetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
                     route_table_map
                         .fidl_table_ids
                         .iter()

@@ -7,6 +7,7 @@
 #include <arch/arm64/asm.h>
 #include <arch/arm64/mmu.h>
 #include <arch/arm64.h>
+#include <lib/thread-stack/abi.h>
 #include <lib/arch/asm.h>
 #include <arch/code-patches/case-id-asm.h>
 #include <arch/defines.h>
@@ -84,10 +85,6 @@ handoff_paddr           .req x21
   dsb sy
   isb
 
-  // set up the boot stack for real
-  adr_global tmp, .Lboot_cpu_kstack_end
-  mov sp, tmp
-
   // Set the thread pointer early so compiler-generated references
   // to the stack-guard and unsafe-sp slots work.  This is not a
   // real 'struct thread' yet, just a pointer to (past, actually)
@@ -97,10 +94,6 @@ handoff_paddr           .req x21
   // path, which (unlike on x86, e.g.) is enough to get annoying.
   adr_global tmp, .Lboot_cpu_fake_thread_pointer_location
   msr tpidr_el1, tmp
-#if __has_feature(shadow_call_stack)
-  // The shadow call stack grows up.
-  adr_global shadow_call_sp, boot_cpu_shadow_call_kstack
-#endif
 
   // set the per cpu pointer for cpu 0
   adr_global percpu_ptr, arm64_percpu_array
@@ -124,23 +117,11 @@ handoff_paddr           .req x21
 .Lboot_cpu_fake_thread_pointer_location:
 .end_object
 
-.object boot_cpu_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
-  .balign 16
-.Lboot_cpu_kstack_end:
-.end_object
-
 #if __has_feature(safe_stack)
 .object boot_cpu_unsafe_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
+  .skip DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_unsafe_kstack_end:
-.end_object
-#endif
-
-#if __has_feature(shadow_call_stack)
-.object boot_cpu_shadow_call_kstack, bss, local, align=8
-  .skip PAGE_SIZE
 .end_object
 #endif
 

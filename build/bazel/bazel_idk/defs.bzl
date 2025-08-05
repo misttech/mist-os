@@ -65,8 +65,14 @@ FuchsiaIdkMoleculeInfo = provider(
     },
 )
 
-def _get_idk_label(label):
-    return label + "_idk"
+def _get_idk_label(label_str):
+    # Ensure the label is relative to the `BUILD` file, not this `.bzl` file
+    # in cases where `label_str` omits the package (e.g., ":target_name").
+    label = native.package_relative_label(label_str)
+
+    # Build the label to handle cases where `label_str` omits the target name
+    # (e.g., "//path/to/package").
+    return "//{}:{}_idk".format(label.package, label.name)
 
 def _get_idk_deps(underlying_deps):
     idk_deps = []
@@ -401,10 +407,8 @@ def idk_cc_source_library(
         api_file_path = None,
         testonly = False,
         visibility = ["//visibility:private"],
-        # TODO(https://fxbug.dev/417305295): Add this argument if there is a way
-        # to tell Bazel to not always compile the source set.
-        # build_as_static = False,
-        # TODO(https://fxbug.dev/425931839): Remove when no longer converting to GN.
+        # TODO(https://fxbug.dev/425931839): Remove these no longer converting to GN.
+        build_as_static = False,  # buildifier: disable=unused-variable - For GN conversion only.
         public_configs = [],  # buildifier: disable=unused-variable - For GN conversion only.
         **kwargs):
     """Defines a C++_source library that can be exported to an IDK.
@@ -462,6 +466,9 @@ def idk_cc_source_library(
             Not allowed when `stable` is false.
         testonly: Standard definition.
         visibility: Standard definition.
+        build_as_static: Unused in Bazel, for GN conversion only.
+            TODO(https://fxbug.dev/417305295): Use this argument if there is a
+             way to tell Bazel to not always compile the source set.
         public_configs: Unused in Bazel, for GN conversion only.
         **kwargs: Additional arguments for the underlying library.
     """

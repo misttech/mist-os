@@ -133,9 +133,9 @@ mod tests {
             valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
             phy: fidl_common::WlanPhyType::Dsss,
             data_rate: 0,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 0,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             mcs: 0,

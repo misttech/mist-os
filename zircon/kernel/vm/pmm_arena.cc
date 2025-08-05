@@ -31,10 +31,10 @@
 KCOUNTER_DECLARE(counter_max_runs_examined, "vm.pmm.max_runs_examined", Max)
 
 void PmmArena::Init(const PmmArenaSelection& selected, PmmNode* node) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.arena.base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.arena.size));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.bookkeeping.base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.bookkeeping.size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(selected.arena.base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(selected.arena.size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(selected.bookkeeping.base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(selected.bookkeeping.size));
 
   size_t page_count = selected.arena.size / PAGE_SIZE;
   DEBUG_ASSERT(selected.bookkeeping.size == ROUNDUP_PAGE_SIZE(page_count * sizeof(vm_page)));

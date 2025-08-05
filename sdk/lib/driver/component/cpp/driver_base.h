@@ -15,6 +15,7 @@
 #include <lib/driver/node/cpp/add_child.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fit/function.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/availability.h>
@@ -129,6 +130,14 @@ class DriverBase {
   // `FDF_LOGL(INFO, driver->logger(), "...");`
   Logger& logger() { return *logger_; }
 
+  using InitMethodCallback = fit::callback<zx::result<>(async_dispatcher_t*, Namespace&)>;
+
+  // Callbacks that are invoked prior to the start hook.
+  void RegisterInitMethods(InitMethodCallback cb);
+
+  // Runs methods registered. Meant to be invoked prior to the start hook.
+  zx::result<> RunInitMethods();
+
  protected:
   // The logger can't be private because the logging macros rely on it.
   // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
@@ -147,6 +156,14 @@ class DriverBase {
     ZX_ASSERT(node.has_value());
     return node.value();
   }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
+  const std::vector<fuchsia_driver_framework::Offer>& node_offers() {
+    auto& node_offers = start_args_.node_offers();
+    ZX_ASSERT(node_offers.has_value());
+    return node_offers.value();
+  }
+#endif
 
   template <typename StructuredConfig>
   StructuredConfig take_config() {
@@ -322,6 +339,8 @@ class DriverBase {
   std::shared_ptr<OutgoingDirectory> outgoing_;
   std::optional<inspect::ComponentInspector> inspector_;
   std::once_flag init_inspector_once_;
+
+  std::vector<InitMethodCallback> init_methods_;
 };
 
 }  // namespace fdf

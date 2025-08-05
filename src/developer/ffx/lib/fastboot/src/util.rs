@@ -11,6 +11,7 @@ pub enum Event {
     Upload(UploadProgress),
     Locked,
     RebootStarted,
+    FlashProduct { product_name: String, partition_count: usize },
     FlashPartition { partition_name: String },
     FlashPartitionFinished { partition_name: String, duration: TimeDelta },
     Rebooted(TimeDelta),

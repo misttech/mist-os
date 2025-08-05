@@ -21,6 +21,9 @@ namespace display {
 //
 // Instances are guaranteed to represent valid enum members.
 //
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
+//
 // Out-of-tree drivers must not use this interface, because it will be reworked.
 class AlphaMode {
  public:

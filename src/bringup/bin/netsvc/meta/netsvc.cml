@@ -38,10 +38,8 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.device.NameProvider",
-                "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.logger.Log",
-                "fuchsia.paver.Paver",
                 "fuchsia.sysinfo.SysInfo",
             ],
         },

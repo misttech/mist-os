@@ -95,6 +95,10 @@ enum class LastRebootReason {
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::RootJobTermination,
   kNetstackMigration =
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::NetstackMigration,
+  kAndroidUnexpectedReason =
+      cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::AndroidUnexpectedReason,
+  kDeveloperRequest =
+      cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::DeveloperRequest,
 };
 
 enum class PreviousBootEncodingVersion {

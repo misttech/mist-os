@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::execution::create_kernel_thread;
-use crate::task::dynamic_thread_spawner::DynamicThreadSpawner;
+use crate::task::dynamic_thread_spawner::{DynamicThreadSpawner, FnScopeHelper};
 use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
 use fuchsia_async as fasync;
@@ -18,6 +18,7 @@ use std::ffi::CString;
 use std::future::Future;
 use std::ops::DerefMut;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::{OnceLock, Weak};
 use std::task::{Context, Poll};
 
@@ -86,7 +87,7 @@ impl KernelThreads {
     ///
     /// Prefer this function to `spawn` for non-blocking work.
     pub fn spawn_future(&self, future: impl Future<Output = ()> + 'static) {
-        self.ehandle.spawn_local_detached(WrappedFuture::new(self.kernel.clone(), future));
+        self.ehandle.spawn_local_detached(WrappedMainFuture::new(self.kernel.clone(), future));
     }
 
     /// Spawn a thread in the main starnix process to run the given function.
@@ -117,6 +118,35 @@ impl KernelThreads {
         F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawner().spawn_with_role(role, f)
+    }
+
+    /// Spawn a thread in the main starnix process to run the given async function.
+    ///
+    /// Use this function to work in the background that involves async functions. Prefer
+    /// `spawn_future` that uses the main starnix thread if possible.
+    ///
+    /// The threads spawned by this function come from the `spawner()` thread pool, which means
+    /// they can be used either for long-lived work or for short-lived work. The thread pool keeps
+    /// a few idle threads around to reduce the overhead for spawning threads for short-lived work.
+    pub fn spawn_async<F>(&self, f: F)
+    where
+        for<'a> F: FnScopeHelper<'a>,
+    {
+        self.spawner().spawn_async(f)
+    }
+
+    /// Spawn a thread in the main starnix process to run the given async function with `role`
+    /// applied if possible.
+    ///
+    /// Use this function to work in the background that involves async functions.
+    ///
+    /// There is some minor IPC overhead to applying thread roles, this method should not be used
+    /// for extremely short-lived tasks.
+    pub fn spawn_async_with_role<F>(&self, role: &'static str, f: F)
+    where
+        for<'a> F: FnScopeHelper<'a>,
+    {
+        self.spawner().spawn_async_with_role(role, f)
     }
 
     /// The dynamic thread spawner used to spawn threads.
@@ -188,6 +218,25 @@ where
     Ok(result)
 }
 
+#[derive(Clone, Debug)]
+pub struct LockedAndTask<'a>(
+    Rc<Fragile<(RefCell<&'a mut Locked<Unlocked>>, RefCell<&'a CurrentTask>)>>,
+);
+
+impl<'a> LockedAndTask<'a> {
+    pub(crate) fn new(locked: &'a mut Locked<Unlocked>, current_task: &'a CurrentTask) -> Self {
+        Self(Rc::new(Fragile::new((RefCell::new(locked), RefCell::new(current_task)))))
+    }
+
+    pub fn unlocked(&self) -> impl DerefMut<Target = &'a mut Locked<Unlocked>> + '_ {
+        self.0.get().0.borrow_mut()
+    }
+
+    pub fn current_task(&self) -> &'a CurrentTask {
+        *self.0.get().1.borrow()
+    }
+}
+
 struct SystemTask {
     /// The system task is bound to the kernel main thread. `Fragile` ensures a runtime crash if it
     /// is accessed from any other thread.
@@ -217,27 +266,36 @@ impl SystemTask {
 // The order is important here. Rust will drop fields in declaration order and we want
 // the future to be dropped before the ScopeGuard runs.
 #[pin_project]
-struct WrappedFuture<F>(#[pin] F, ScopeGuard<Weak<Kernel>, fn(Weak<Kernel>)>);
+pub(crate) struct WrappedFuture<F, C: Clone>(#[pin] F, fn(C), ScopeGuard<C, fn(C)>);
 
-impl<F> WrappedFuture<F> {
-    fn new(kernel: Weak<Kernel>, fut: F) -> Self {
+impl<F, C: Clone> WrappedFuture<F, C> {
+    pub(crate) fn new_with_cleaner(context: C, cleaner: fn(C), fut: F) -> Self {
         // We need the ScopeGuard in case the future queues releasers when dropped.
-        Self(fut, ScopeGuard::with_strategy(kernel, |kernel| trigger_delayed_releaser(&kernel)))
+        Self(fut, cleaner, ScopeGuard::with_strategy(context, cleaner))
     }
 }
 
-impl<F: Future<Output = ()> + 'static> Future for WrappedFuture<F> {
+impl<F: Future<Output = ()>, C: Clone> Future for WrappedFuture<F, C> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         let result = this.0.poll(cx);
-        trigger_delayed_releaser(&this.1);
+
+        this.1(this.2.clone());
         result
     }
 }
 
-fn trigger_delayed_releaser(kernel: &Weak<Kernel>) {
+type WrappedMainFuture<F> = WrappedFuture<F, Weak<Kernel>>;
+
+impl<F> WrappedMainFuture<F> {
+    fn new(kernel: Weak<Kernel>, fut: F) -> Self {
+        Self::new_with_cleaner(kernel, trigger_delayed_releaser, fut)
+    }
+}
+
+fn trigger_delayed_releaser(kernel: Weak<Kernel>) {
     if let Some(kernel) = kernel.upgrade() {
         kernel
             .kthreads

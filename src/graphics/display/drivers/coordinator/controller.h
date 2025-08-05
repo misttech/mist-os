@@ -35,6 +35,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-listener.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
@@ -57,36 +58,32 @@ class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
 class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
-                   public fidl::WireServer<fuchsia_hardware_display::Provider> {
+                   public fidl::WireServer<fuchsia_hardware_display::Provider>,
+                   public EngineListener {
  public:
   // Factory method for production use.
   // Creates and initializes a Controller instance.
   //
   // Asynchronous work that manages the state of the display clients and
   // coordinates the display state between clients and engine drivers runs on
-  // `client_dispatcher`.
+  // `driver_dispatcher`.
   //
   // `engine_driver_client` must not be null.
   //
-  // `client_dispatcher` must be running until `PrepareStop()` is called.
-  // `client_dispatcher` must be shut down when `Stop()` is called.
+  // `driver_dispatcher` must be running until `PrepareStop()` is called.
+  // `driver_dispatcher` must be shut down when `Stop()` is called.
   static zx::result<std::unique_ptr<Controller>> Create(
       std::unique_ptr<EngineDriverClient> engine_driver_client,
-      fdf::UnownedSynchronizedDispatcher client_dispatcher);
+      fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+      fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher);
 
   // Creates a new coordinator Controller instance. It creates a new Inspector
   // which will be solely owned by the Controller instance.
   //
   // `engine_driver_client` must not be null.
   explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                      fdf::UnownedSynchronizedDispatcher client_dispatcher);
-
-  // Creates a new coordinator Controller instance with an injected `inspector`.
-  // The `inspector` and inspect data may be duplicated and shared.
-  //
-  // `engine_driver_client` must not be null.
-  Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-             fdf::UnownedSynchronizedDispatcher dispatcher, inspect::Inspector inspector);
+                      fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                      fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -100,15 +97,25 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // References the `Stop()` method in the DFv2 (fdf::DriverBase) driver
   // lifecycle.
   //
-  // Must be called after `client_dispatcher_` is shut down.
+  // Must be called after `driver_dispatcher_` is shut down.
   void Stop();
 
   // fuchsia.hardware.display.controller/DisplayEngineListener:
+  // Runs on dispatchers owned by the display engine driver.
   void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
-                                           const config_stamp_t* config_stamp);
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                           zx_instant_mono_t banjo_timestamp,
+                                           const config_stamp_t* banjo_config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
+
+  // `EngineListener`:
+  // Must run on `engine_listener_dispatcher_`.
+  void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info) override;
+  void OnDisplayRemoved(display::DisplayId removed_display_id) override;
+  void OnCaptureComplete() override;
+  void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                      display::DriverConfigStamp driver_config_stamp) override;
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
@@ -150,11 +157,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // May only be called after the display engine driver is connected.
   const display::EngineInfo& engine_info() const { return *engine_info_; }
 
-  fdf::UnownedSynchronizedDispatcher client_dispatcher() const {
-    return client_dispatcher_->borrow();
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher() const {
+    return driver_dispatcher_->borrow();
   }
-  bool IsRunningOnClientDispatcher() {
-    return fdf::Dispatcher::GetCurrent()->get() == client_dispatcher_->get();
+  bool IsRunningOnDriverDispatcher() {
+    return fdf::Dispatcher::GetCurrent()->get() == driver_dispatcher_->get();
   }
 
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
@@ -195,22 +202,23 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   // Processes a display addition notification from an engine driver.
   //
-  // Must be called on the client dispatcher.
+  // Must be called on the driver dispatcher.
   void AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info);
 
   // Processes a display removal notification from an engine driver.
   //
-  // Must be called on the client dispatcher.
+  // Must be called on the driver dispatcher.
   void RemoveDisplay(display::DisplayId removed_display_id);
 
-  // Must be called on the client dispatcher.
+  // Must be called on the driver dispatcher.
   void PopulateDisplayTimings(DisplayInfo& info) __TA_EXCLUDES(mtx());
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
 
-  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher_;
 
   VsyncMonitor vsync_monitor_;
 
@@ -246,7 +254,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
-  zx_time_t last_valid_apply_config_timestamp_{};
+  zx_instant_mono_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;

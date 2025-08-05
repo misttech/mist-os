@@ -1634,7 +1634,7 @@ mod tests {
     }
 
     #[test]
-    fn test_received_user_data_is_relayed_to_and_from_profile_client() {
+    fn received_user_data_is_relayed_to_and_from_profile_client() {
         let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
@@ -1664,7 +1664,7 @@ mod tests {
                 Role::Initiator,
                 user_dlci,
                 UserData { information: pattern.clone() },
-                Some(2), // Random amount of credits.
+                Some(2), // Remote gives us some more local credits.
             );
             let mut handle_fut = Box::pin(session.handle_frame(user_data_frame));
             assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
@@ -1685,13 +1685,13 @@ mod tests {
         // Profile client responds with it's own data.
         let response = vec![0x09, 0x08, 0x07, 0x06];
         assert_eq!(profile_client_channel.write(&response), Ok(4));
-        // The data should be processed by the SessionChannel, packed as a user data
-        // frame, and sent as an outgoing frame.
+        // The data should be processed by the SessionChannel, packed as a user data frame, and sent
+        // as an outgoing frame.
         expect_user_data_frame(
             &mut exec,
             &mut outgoing_frames,
             UserData { information: response },
-            Some(10), // HIGH_CREDIT_WATER_MARK - (7 (initial) - 1 (received))
+            None, // Remote has sufficient credits (6)
         );
     }
 

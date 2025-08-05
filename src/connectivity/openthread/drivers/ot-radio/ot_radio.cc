@@ -9,7 +9,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/driver-unit-test/utils.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -112,7 +111,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::GetMaxFrameSize(
 
 void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView request,
                                                           SendFrameCompleter::Sync& completer) {
-  [[maybe_unused]] auto data_count = request->data.count();
+  [[maybe_unused]] auto data_count = request->data.size();
   TRACE_DURATION(kOtRadioTraceCategory, __func__, "ot_radio_obj_.power_status_",
                  ot_radio_obj_.power_status_, "request->data.count()", data_count,
                  "ot_radio_obj_.outbound_allowance", ot_radio_obj_.outbound_allowance_,
@@ -121,7 +120,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
     // TODO(https://fxbug.dev/42176667): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kClosed, false);
-  } else if (request->data.count() > kMaxFrameSize) {
+  } else if (request->data.size() > kMaxFrameSize) {
     // TODO(https://fxbug.dev/42176667): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kOutboundFrameTooLarge, false);
@@ -133,7 +132,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
     completer.Close(ZX_ERR_IO_OVERRUN);
   } else {
     // All good, send out the frame.
-    zx_status_t res = ot_radio_obj_.RadioPacketTx(request->data.begin(), request->data.count());
+    zx_status_t res = ot_radio_obj_.RadioPacketTx(request->data.begin(), request->data.size());
     if (res != ZX_OK) {
       zxlogf(ERROR, "Error in handling send frame req: %s", zx_status_get_string(res));
     } else {
@@ -312,24 +311,6 @@ zx_status_t OtRadioDevice::Init() {
       zxlogf(ERROR, "Failed to configure bootloader gpio to output: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
-    }
-  }
-
-  size_t actual;
-  uint32_t device_id;
-  zx_status_t status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE,
-                                                    &device_id, sizeof(device_id), &actual);
-  if (status != ZX_OK || sizeof(device_id) != actual) {
-    status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_id, sizeof(device_id),
-                                 &actual);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
-      return status;
-    }
-    if (sizeof(device_id) != actual) {
-      zxlogf(ERROR, "ot-radio: Failed to get metadata: Expected %lu but actual is %lu bytes",
-             sizeof(device_id), actual);
-      return ZX_ERR_INTERNAL;
     }
   }
 

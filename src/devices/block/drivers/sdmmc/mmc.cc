@@ -14,6 +14,7 @@
 #include <pretty/hexdump.h>
 
 #include "sdmmc-block-device.h"
+#include "sdmmc-root-device.h"
 
 namespace {
 
@@ -499,6 +500,16 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked() {
 
   if (removable) {
     block_info_.flags |= FLAG_REMOVABLE;
+  }
+
+  if (parent_->config().storage_power_management_enabled()) {
+    // Change the value to POWERED_ON so that the device expects power off notifications.
+    st = MmcDoSwitch(MMC_EXT_CSD_POWER_OFF_NOTIFICATION, MMC_EXT_CSD_POWERED_ON);
+    if (st != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to set POWER_OFF_NOTIFICATION: %s",
+               zx_status_get_string(st));
+      return st;
+    }
   }
 
   auto get_max_packed_commands_effective =

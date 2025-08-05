@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <sys/types.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -22,6 +21,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "alc5663_registers.h"
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace audio::alc5663 {
 

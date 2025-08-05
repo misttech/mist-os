@@ -166,6 +166,8 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         Ok(String::from("false"))
     } else if cfg.starts_with("docsrs") {
         Ok(String::from("false"))
+    } else if cfg.starts_with("getrandom_backend") {
+        Ok(String::from("false"))
     } else {
         // TODO(https://fxbug.dev/42061225) better handling needed for these cases.
         Err(anyhow!("Unknown cfg option used: {}", cfg))

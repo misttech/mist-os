@@ -781,11 +781,6 @@
                 // socket_unix_seqpacket_local_test
                 "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.Sendto/*",
 
-                // socket_unix_unbound_abstract_test
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.AutoBindAddrInUse/*",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.AutoBindSuccess/*",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
-
                 // socket_unix_unbound_stream_test
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassPartialRead/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CredPassPartialRead/*",
@@ -1173,9 +1168,6 @@
                 // TODO(https://fxbug.dev/379165488): deflake
                 "StatTimesTest.DirCreateFile",
                 "StatTimesTest.DirList",
-
-                // TODO(https://fxbug.dev/394338846): Re-enable once roll succeeds.
-                "MountTest.MMapWithExecProtFailsOnNoExecFile",
 
                 // TODO(https://fxbug.dev/397205797): Fix and re-enable
                 "ExecTest.Setpgid",

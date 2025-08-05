@@ -103,6 +103,18 @@ impl FileMode {
     pub const fn is_sock(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFSOCK
     }
+
+    pub fn user_access(&self) -> inner_access::Access {
+        inner_access::Access::try_from((self.bits() & 0o700) >> 6).unwrap()
+    }
+
+    pub fn group_access(&self) -> inner_access::Access {
+        inner_access::Access::try_from((self.bits() & 0o070) >> 3).unwrap()
+    }
+
+    pub fn other_access(&self) -> inner_access::Access {
+        inner_access::Access::try_from(self.bits() & 0o007).unwrap()
+    }
 }
 
 impl ops::BitOr for FileMode {

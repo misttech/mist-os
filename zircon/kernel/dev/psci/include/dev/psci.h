@@ -75,12 +75,33 @@ uint32_t psci_get_feature(uint32_t psci_call);
 zx_status_t psci_cpu_off();
 zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context);
 
+// Specifies whether a requested power state can target more than the calling
+// CPU.
+enum class PsciCpuSuspendMaxScope : bool { CpuOnly, CpuAndMore };
+
+// Returns the PSCI CPU_SUSPEND power_state value for the calling CPU.  This is
+// the value that should be passed to |psci_cpu_suspend|.
+//
+// |max_scope| specifies whether the requested power state must be limited to
+// targeting just the calling CPU or if it can target a larger scope (e.g. the
+// containing cluster).
+//
+// Interrupts must be disabled.
+uint32_t psci_get_cpu_suspend_power_state(PsciCpuSuspendMaxScope max_scope);
+
+// Returns true iff |power_state| is a "powerdown" power_state (as opposed to a
+// standby or retention state).
+bool psci_is_powerdown_power_state(uint32_t power_state);
+
 // Whether or not the CPU powered down (lost state) during a CPU_SUSPEND
 // operation.  See |psci_cpu_suspend|.
 enum class CpuPoweredDown : bool { No, Yes };
 using PsciCpuSuspendResult = zx::result<CpuPoweredDown>;
 
 // Enters a PSCI CPU_SUSPEND state on the calling CPU.
+//
+// |power_state| specifies the target power state.  See
+// |psci_get_cpu_suspend_power_state|.
 //
 // Prior to calling, interrupts must be disabled, preemption must be disabled,
 // and the caller must be pinned to the calling CPU.
@@ -95,11 +116,18 @@ using PsciCpuSuspendResult = zx::result<CpuPoweredDown>;
 //
 // Returns ZX_ERR_NOT_SUPPORTED if CPU_SUSPEND is not supported on this platform.
 //
-// TODO(https://fxbug.dev/414456459): Once we add support for higher-than-core-level
-// power states, be sure to update the docs to discuss the possibility of
-// ZX_ERR_INVALID_ARGS and ZX_ERR_ACCESS_DENIED.  And be sure to update callers to
-// handle those cases.
-PsciCpuSuspendResult psci_cpu_suspend();
+// Returns ZX_ERR_INVALID_PARAMETERS if the requested power_state is invalid, or
+// a low-power state was requested for a higher-than-core-level topology node
+// (e.g. cluster) and at least one of the children in that node is in a local
+// low-power state that is incompatible with the request.  This is a "normal"
+// error that callers must be prepared to handle.
+//
+// Returns ZX_ERR_ACCESS_DENIED if a low-power state was requested for a
+// higher-than-core-level topology node (e.g. cluster) and all the cores that
+// are in an incompatible state with the request are running, as opposed to
+// being in a low-power state.  This is a "normal" error that callers must be
+// prepared to handle.
+PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state);
 
 // Holds register state to be saved/restored across a suspend/resume cycle.
 //

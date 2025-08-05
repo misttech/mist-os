@@ -275,9 +275,9 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   EXPECT_OK(
       engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints.client)));
 
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
   RunLoopUntilIdle();
 
@@ -303,9 +303,9 @@ TEST_F(VirtioGpuTest, SetBufferCollectionConstraints) {
       engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints.client)));
   RunLoopUntilIdle();
 
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
   RunLoopUntilIdle();
 }
@@ -394,9 +394,9 @@ TEST_F(VirtioGpuTest, ImportImage) {
   EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
 
   // Set buffer collection constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
   RunLoopUntilIdle();
 

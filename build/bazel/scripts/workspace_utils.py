@@ -686,11 +686,8 @@ def record_fuchsia_workspace(
 
     # LINT.IfChange
     generated.record_symlink(
-        "workspace/fuchsia_build_generated/prebuilt_python.hash",
-        gn_output_dir
-        / "regenerator_outputs"
-        / "bazel_content_hashes"
-        / "prebuilt_python.hash",
+        "workspace/fuchsia_build_generated/content_hashes",
+        gn_output_dir / "regenerator_outputs" / "bazel_content_hashes",
     )
     # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
@@ -760,6 +757,15 @@ def record_fuchsia_workspace(
         # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
         # LINT.IfChange
         gn_output_dir / "regenerator_outputs/fuchsia_build_info",
+        # LINT.ThenChange(//build/regenerator.py)
+    )
+
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk",
+        # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "regenerator_outputs/fuchsia_in_tree_idk",
         # LINT.ThenChange(//build/regenerator.py)
     )
 
@@ -1131,11 +1137,14 @@ filegroup(
                     f"{build_dir_name}/{dir_link}", build_dir / dir_link
                 )
 
+                # NOTE: allow_empty is necessary when performing queries
+                # before building anything. The glob() might return an empty
+                # list in this case since there is nothing built from Ninja yet.
                 content += """
 # From GN target: {label}
 filegroup(
     name = "{name}",
-    srcs = glob(["{ninja_path}/**"], exclude_directories=1),
+    srcs = glob(["{ninja_path}/**"], exclude_directories=1, allow_empty=True),
 )
 alias(
     name = "{name}.directory",

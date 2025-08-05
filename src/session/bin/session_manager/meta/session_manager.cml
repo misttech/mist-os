@@ -398,7 +398,6 @@
                 "fuchsia.ui.pointerinjector.Registry",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.policy.DisplayBacklight",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "parent",
@@ -571,6 +570,13 @@
                 "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
             ],
+            from: "parent",
+            to: "#session",
+        },
+
+        // Proprietary TEE manager's session capabilitites.
+        {
+            dictionary: "tee_session",
             from: "parent",
             to: "#session",
         },

@@ -15,7 +15,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, Future, StreamExt, TryStreamExt};
 use starnix_core::execution::{create_init_child_process, execute_task_with_prerun_result};
 use starnix_core::fs::devpts::create_main_and_replica;
 use starnix_core::fs::fuchsia::create_fuchsia_pipe;
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel};
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel, LockedAndTask};
 use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
@@ -290,24 +290,21 @@ fn forward_to_pty(
     let mut rx = fuchsia_async::Socket::from_socket(console_in);
     let mut tx = fuchsia_async::Socket::from_socket(console_out);
     let pty_sink = pty.clone();
-    kernel.kthreads.spawn({
-        move |locked, current_task| {
-            let _result: Result<(), Error> =
-                fasync::LocalExecutor::new().run_singlethreaded(async {
-                    let mut buffer = vec![0u8; BUFFER_CAPACITY];
-                    loop {
-                        let bytes = rx.read(&mut buffer[..]).await?;
-                        if bytes == 0 {
-                            return Ok(());
-                        }
-                        pty_sink.write(
-                            locked,
-                            current_task,
-                            &mut VecInputBuffer::new(&buffer[..bytes]),
-                        )?;
-                    }
-                });
-        }
+    kernel.kthreads.spawn_async(async move |locked_and_task: LockedAndTask<'_>| {
+        let _result: Result<(), Error> = (async |locked: &mut Locked<Unlocked>, current_task| {
+            let mut buffer = vec![0u8; BUFFER_CAPACITY];
+            loop {
+                let bytes = rx.read(&mut buffer[..]).await?;
+                if bytes == 0 {
+                    return Ok(());
+                }
+                pty_sink.write(locked, current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
+            }
+        })(
+            &mut locked_and_task.unlocked(),
+            locked_and_task.current_task(),
+        )
+        .await;
     });
 
     let pty_source = pty;

@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <zircon/process.h>
-#include <zircon/syscalls.h>
-#include <zircon/syscalls/object.h>
 #include <lib/zx/event.h>
-#include <lib/zx/thread.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/socket.h>
+#include <lib/zx/thread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <zircon/process.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
+
 #include <zxtest/zxtest.h>
 
 namespace {
@@ -139,6 +139,25 @@ TEST(HandleInfoTest, ReplaceRights) {
             "cannot upgrade rights");
   // event2 should also now be invalid.
   EXPECT_FALSE(event2.is_valid(), "replaced event should be invalid on failure");
+}
+
+TEST(HandleInfoTest, CheckHandleValid) {
+  EXPECT_EQ(zx_handle_check_valid(ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
+
+  // One or both of the low two bits 0.
+  EXPECT_EQ(zx_handle_check_valid(0b01), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(zx_handle_check_valid(0b10), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(zx_handle_check_valid(0b100), ZX_ERR_OUT_OF_RANGE);
+
+  zx::event event;
+  ASSERT_OK(zx::event::create(kEventOption, &event));
+
+  EXPECT_EQ(zx_handle_check_valid(event.get()), ZX_OK);
+
+  zx_handle_t event_handle_value = event.get();
+  event.reset();
+
+  EXPECT_EQ(zx_handle_check_valid(event_handle_value), ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace

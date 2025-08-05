@@ -5,8 +5,8 @@
 use crate::mm::{FaultRegisterMode, MemoryAccessorExt, UserFault, UserFaultFeatures};
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
-    InputBuffer, OutputBuffer,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject,
+    FileObjectState, FileOps, InputBuffer, OutputBuffer,
 };
 use linux_uapi::{UFFDIO_CONTINUE, UFFDIO_COPY, UFFDIO_WAKE, UFFDIO_WRITEPROTECT, UFFDIO_ZEROPAGE};
 use starnix_logging::track_stub;
@@ -258,9 +258,9 @@ impl FileOps for UserFaultFile {
 
     // On closing, clear all the registrations pointing to this userfault object.
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.inner.cleanup();

@@ -7,8 +7,8 @@
 #include <stdint.h>
 
 #include <iterator>
+#include <vector>
 
-#include <fbl/vector.h>
 #include <trace-reader/reader.h>
 #include <zxtest/zxtest.h>
 
@@ -132,8 +132,8 @@ TEST(TraceReader, NonEmptyChunk) {
 }
 
 TEST(TraceReader, InitialState) {
-  fbl::Vector<trace::Record> records;
-  fbl::String error;
+  std::vector<trace::Record> records;
+  std::string_view error;
   trace::TraceReader reader(test::MakeRecordConsumer(&records), test::MakeErrorHandler(&error));
 
   EXPECT_EQ(0, reader.current_provider_id());

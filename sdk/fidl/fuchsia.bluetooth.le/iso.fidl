@@ -271,7 +271,7 @@ open protocol IsochronousStream {
 
 /// The "BIGInfo" parameters describing an LE Audio Broadcast Isochronous Group (BIG).
 /// Missing fields to be added as part of fxbug.dev/429213165.
-@available(added=NEXT)
+@available(added=28)
 type BroadcastIsochronousGroupInfo = table {
     /// The number of Broadcast Isochronous Streams in this group.
     1: streams_count uint8;

@@ -39,7 +39,6 @@
 #ifndef __mist_os__
 #include <ddktl/metadata.h>
 #endif
-#include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
 
@@ -71,21 +70,9 @@
 // |                            |                                                    |
 // | ddk::Unbindable            | void DdkUnbind(ddk::UnbindTxn txn)                 |
 // |                            |                                                    |
-// | ddk::PerformanceTunable    | zx_status_t DdkSetPerformanceState(                |
-// |                            |                           uint32_t requested_state,|
-// |                            |                           uint32_t* out_state)     |
-// |                            |                                                    |
-// | ddk::AutoSuspendable       | zx_status_t DdkConfigureAutoSuspend(bool enable,   |
-// |                            |                      uint8_t requested_sleep_state)|
-// |                            |                                                    |
 // | ddk::Messageable<P>::Mixin | Methods defined by fidl::WireServer<P>             |
 // |                            |                                                    |
 // | ddk::Suspendable           | void DdkSuspend(ddk::SuspendTxn txn)               |
-// |                            |                                                    |
-// | ddk::Resumable             | zx_status_t DdkResume(uint8_t requested_state,     |
-// |                            |                          uint8_t* out_state)       |
-// |                            |                                                    |
-// | ddk::Rxrpcable             | zx_status_t DdkRxrpc(zx_handle_t channel)          |
 // |                            |                                                    |
 // | ddk::MadeVisible           | zx_status_t DdkMadeVisible()                       |
 // +----------------------------+----------------------------------------------------+
@@ -229,50 +216,6 @@ class Suspendable : public base_mixin {
 };
 
 template <typename D>
-class AutoSuspendable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckConfigureAutoSuspend<D>();
-    proto->configure_auto_suspend = Configure_Auto_Suspend;
-  }
-
- private:
-  static zx_status_t Configure_Auto_Suspend(void* ctx, bool enable, uint8_t requested_sleep_state) {
-    return static_cast<D*>(ctx)->DdkConfigureAutoSuspend(enable, requested_sleep_state);
-  }
-};
-
-template <typename D>
-class Resumable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckResumable<D>();
-    proto->resume = Resume_New;
-  }
-
- private:
-  static void Resume_New(void* ctx, uint32_t requested_state) {
-    auto dev = static_cast<D*>(ctx);
-    ResumeTxn txn(dev->zxdev(), requested_state);
-    static_cast<D*>(ctx)->DdkResume(std::move(txn));
-  }
-};
-
-template <typename D>
-class Rxrpcable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckRxrpcable<D>();
-    proto->rxrpc = Rxrpc;
-  }
-
- private:
-  static zx_status_t Rxrpc(void* ctx, zx_handle_t channel) {
-    return static_cast<D*>(ctx)->DdkRxrpc(channel);
-  }
-};
-
-template <typename D>
 class ChildPreReleaseable : public base_mixin {
  protected:
   static constexpr void InitOp(zx_protocol_device_t* proto) {
@@ -322,6 +265,11 @@ class MetadataList {
     data_list_.emplace_back(
         std::make_shared<std::vector<uint8_t>>(metadata_blob->begin(), metadata_blob->end()));
     metadata_list_.push_back({type, data_list_.back()->data(), metadata_blob->size()});
+    return ZX_OK;
+  }
+  zx_status_t AddMetadata(uint32_t type, std::vector<uint8_t> buffer) {
+    data_list_.emplace_back(std::make_shared<std::vector<uint8_t>>(std::move(buffer)));
+    metadata_list_.push_back({type, data_list_.back()->data(), data_list_.back()->size()});
     return ZX_OK;
   }
 
@@ -425,6 +373,14 @@ class DeviceAddArgs {
     }
     return *this;
   }
+  DeviceAddArgs& add_metadata(uint32_t type, std::vector<uint8_t> buffer) {
+    if (ZX_OK == metadata_list_.AddMetadata(type, std::move(buffer))) {
+      args_.metadata_list = metadata_list_.data();
+      args_.metadata_count = metadata_list_.count();
+    }
+    return *this;
+  }
+
   DeviceAddArgs& set_outgoing_dir(zx::channel outgoing_dir) {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
@@ -539,20 +495,10 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return zx::ok();
   }
 
-  zx_status_t DdkGetMetadataSize(uint32_t type, size_t* out_size) {
-    // Uses parent() instead of zxdev() as metadata is usually checked
-    // before DdkAdd(). There are few use cases to actually call it on self.
-    return device_get_metadata_size(parent(), type, out_size);
-  }
-
   zx_status_t DdkGetMetadata(uint32_t type, void* buf, size_t buf_len, size_t* actual) {
     // Uses parent() instead of zxdev() as metadata is usually checked
     // before DdkAdd(). There are few use cases to actually call it on self.
     return device_get_metadata(parent(), type, buf, buf_len, actual);
-  }
-
-  zx_status_t DdkAddMetadata(uint32_t type, const void* data, size_t length) {
-    return device_add_metadata(zxdev(), type, data, length);
   }
 
   zx_status_t DdkGetFragmentMetadata(const char* name, uint32_t type, void* buf, size_t buf_len,
@@ -592,7 +538,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>);
 
-    return DdkConnectFidlProtocol<ServiceMember>(parent());
+    return DdkConnectFragmentFidlProtocol<ServiceMember>(parent(), "default");
   }
 
   template <typename ServiceMember,
@@ -601,19 +547,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
       zx_device_t* parent) {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>);
-
-    auto endpoints = fidl::CreateEndpoints<typename ServiceMember::ProtocolType>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    auto status =
-        device_connect_fidl_protocol2(parent, ServiceMember::ServiceName, ServiceMember::Name,
-                                      endpoints->server.TakeChannel().release());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(endpoints->client));
+    return DdkConnectFragmentFidlProtocol<ServiceMember>(parent, "default");
   }
 
   template <typename ServiceMember,
@@ -654,7 +588,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::DriverTransport>);
 
-    return DdkConnectRuntimeProtocol<ServiceMember>(parent());
+    return DdkConnectFragmentRuntimeProtocol<ServiceMember>(parent(), "default");
   }
 
   template <typename ServiceMember,
@@ -673,19 +607,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(fidl::IsServiceMemberV<ServiceMember>);
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::DriverTransport>);
-
-    auto endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    auto status =
-        device_connect_runtime_protocol(parent, ServiceMember::ServiceName, ServiceMember::Name,
-                                        endpoints->server.TakeChannel().release());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(endpoints->client));
+    return DdkConnectFragmentRuntimeProtocol<ServiceMember>(parent, "default");
   }
 
   template <typename ServiceMember>

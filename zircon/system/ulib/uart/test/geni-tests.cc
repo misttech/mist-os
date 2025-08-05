@@ -34,7 +34,7 @@ void Init(SimpleTestDriver& driver) {
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'1100},
                    0x814)  // RFR Watermark = 12
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'1000}, 0x810)   // RX Watermark = 8
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0100}, 0x80c);  // TX Watermark = 4
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x80c);  // TX Watermark = 1
 
   driver.Init();
   driver.io().mock().VerifyAndClear();
@@ -47,11 +47,14 @@ TEST(GeniTests, HelloWorld) {
 
   driver.io()
       .mock()
+       // TxReady
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x40)    // !busy
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x800)   // free
+       // Write
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0100}, 0x270)  // len=4
       .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x600)  // start_tx
-      .ExpectWrite(uint32_t{0x0A0D6968}, 0x700);                                // Write
+      .ExpectWrite(uint32_t{0x0A0D6968}, 0x700)                                 // Write
+      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x618); // clr_tx_low
 
   EXPECT_EQ(3, driver.Write("hi\n"));
 }
@@ -63,13 +66,18 @@ TEST(GeniTests, HelloWorldBusy) {
 
   driver.io()
       .mock()
+       // TxReady
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x40)    // busy
+       // TxReady
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x40)    // busy
+       // TxReady
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x40)    // !busy
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x800)   // free
+       // Write
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0100}, 0x270)  // len=4
       .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x600)  // start_tx
-      .ExpectWrite(uint32_t{0x0A0D6968}, 0x700);                                // Write
+      .ExpectWrite(uint32_t{0x0A0D6968}, 0x700)                                 // Write
+      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x618); // clr_tx_low
 
   EXPECT_EQ(3, driver.Write("hi\n"));
 }
@@ -135,14 +143,19 @@ TEST(GeniTests, TxIrqOnly) {
 
   driver.io()
       .mock()
-      // Set tx_fifo_watermark on main
-      .ExpectRead(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      //
+      // Simulate a status of "tx low", and EnabledInterrupts == "tx low and cmd done"
+      .ExpectRead(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // tx low
+      .ExpectRead(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // tx low + cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x640)
-      // Mask the tx fifo irq
-      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x620)
-      // Clear set status
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
       .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x648);
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x648)
+      // Clean the fifo watermark bit from the main interrupt enabled register.
+      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x620);
 
   int call_count = 0;
   driver.Interrupt(
@@ -163,17 +176,23 @@ TEST(GeniTests, RxIrqEmptyFifo) {
   // Now actual IRQ Handler expectations.
   driver.io()
       .mock()
-      // irq status valid but empty fifo
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      // Enabled is "cmd done", but no interrupts are asserted.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // none
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
+      //
+      // irq status is "rx_fifo_last"
+      // enabled mask is "rx_fifo_last + rx_fifo_watermark"
       .ExpectRead(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x640)
-      // Read from the fifo status register - 0 bytes
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x804)
-      // Clear what was read on both
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x648);
+      .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x648)
+      // Read from the fifo status register - 0 bytes
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x804);
 
   // Empty Fifo bit is set, so it should just return.
-
   int call_count = 0;
   driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
                    [&](auto& rx_irq) { call_count++; });
@@ -190,16 +209,22 @@ TEST(GeniTests, RxTimeoutIrqWithNonEmptyFifoAndNonFullQueue) {
   // Now actual IRQ Handler expectations.
   driver.io()
       .mock()
-      // Check last and rx watermark.
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      // Enabled is "cmd done", but no interrupts are asserted.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // none
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
+      // irq status is "rx_fifo_watermark"
+      // enabled mask is "rx_fifo_last + rx_fifo_watermark"
       .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register - 1 words * word_width (4)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x804)
       // Read from the fifo
-      .ExpectRead(uint32_t{0b0100'0001'0100'0001'0100'0001'0100'0001}, 0x780)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
+      .ExpectRead(uint32_t{0b0100'0001'0100'0001'0100'0001'0100'0001}, 0x780);
 
   int call_count = 0;
   driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
@@ -221,9 +246,18 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
   // Now actual IRQ Handler expectations.
   driver.io()
       .mock()
-      // Check last and rx watermark.
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      // Enabled is "cmd done", but no interrupts are asserted.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // none
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
+      // irq status is "rx_fifo_last + rx_fifo_watermark"
+      // enabled mask is "rx_fifo_last + rx_fifo_watermark"
       .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x640)
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register - 1 words * word_width (4)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x804)
       // Read fifo once before the call below stops it.
@@ -232,11 +266,8 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
       // Disable on both engines
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x620)
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x650)
-      // Clear from status
+      // Clear on both engines
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
@@ -258,17 +289,23 @@ TEST(GeniTests, RxLastByteInterruptWithAllBytesValidInTheLastWord) {
   // Now actual IRQ Handler expectations.
   driver.io()
       .mock()
-      // Check last and rx watermark.
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      // Enabled is "cmd done", but no interrupts are asserted.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // none
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
+      // irq status is "rx_fifo_watermark"
+      // enabled mask is "rx_fifo_last + rx_fifo_watermark"
       .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register - 2 full words * word_width (4)
       .ExpectRead(uint32_t{0b1000'0000'0000'0000'0000'0000'0000'0010}, 0x804)
       // Read from the fifo
       .ExpectRead(uint32_t{0b0100'0100'0100'0011'0100'0010'0100'0001}, 0x780)
-      .ExpectRead(uint32_t{0b0100'1000'0100'0111'0100'0110'0100'0101}, 0x780)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
+      .ExpectRead(uint32_t{0b0100'1000'0100'0111'0100'0110'0100'0101}, 0x780);
 
   int call_count = 0;
   std::string read_chars;
@@ -292,18 +329,24 @@ TEST(GeniTests, RxLastByteInterruptWithPartialBytesValidInTheLastWord) {
   // Now actual IRQ Handler expectations.
   driver.io()
       .mock()
-      // Check last and rx watermark.
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
-      .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
+      // Read MainIrq status and mask with MainIrqEnabled.
+      // Enabled is "cmd done", but no interrupts are asserted.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)  // none
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x614)  // cmd done
+      // Read SecondaryIrq status and mask with SecondaryIrqEnabled.
+      // irq status is "rx_fifo_last + rx_fifo_watermark"
+      // enabled mask is "rx_fifo_last + rx_fifo_watermark"
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x640)
+      .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x644)
+      // Ack Main and secondary status.
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register -
       // 1 full word * word_width (4) + 1 partial word of 3 bytes
       .ExpectRead(uint32_t{0b1011'0000'0000'0000'0000'0000'0000'0010}, 0x804)
       // Read from the fifo
       .ExpectRead(uint32_t{0b0100'0100'0100'0011'0100'0010'0100'0001}, 0x780)
-      .ExpectRead(uint32_t{0b0000'0000'0100'0111'0100'0110'0100'0101}, 0x780)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
+      .ExpectRead(uint32_t{0b0000'0000'0100'0111'0100'0110'0100'0101}, 0x780);
 
   int call_count = 0;
   std::string read_chars;

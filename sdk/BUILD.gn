@@ -128,7 +128,10 @@ if (current_toolchain == default_toolchain) {
   # TODO(https://fxbug.dev/324656719): Ensure this covers APIs, libraries, etc.
   # that are not present at all levels, especially "PLATFORM".
   group("generate_compatibility_goldens") {
-    visibility += [ "//scripts/versioning:*" ]
+    visibility += [
+      "//:*",
+      "//scripts/versioning:*",
+    ]
     testonly = true
     deps = _all_idk_atoms_affecting_compatibility
   }
@@ -513,7 +516,6 @@ if (is_host) {
     deps = [
       ":non_build_host_tools_required_by_bazel_sdk",
       "//src/developer/debug/zxdb:zxdb_sdk",
-      "//src/developer/ffx/plugins/agis:sdk",
       "//src/developer/ffx/plugins/audio:sdk",
       "//src/developer/ffx/plugins/component:sdk",
       "//src/developer/ffx/plugins/coverage:sdk",

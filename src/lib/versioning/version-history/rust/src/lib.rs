@@ -236,6 +236,16 @@ impl<'de> Deserialize<'de> for AbiRevision {
     }
 }
 
+impl Serialize for AbiRevision {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let string = format!("0x{:016x}", self.0);
+        serializer.serialize_str(&string)
+    }
+}
+
 impl From<u64> for AbiRevision {
     fn from(abi_revision: u64) -> AbiRevision {
         AbiRevision(abi_revision)
@@ -893,6 +903,22 @@ mod tests {
             parse_version_history(&input[..]).unwrap_err().to_string(),
             "Special API level HEAD had unexpected numerical value 1234 (Expected 4292870144)"
         );
+    }
+
+    #[test]
+    fn test_serialize_abi_revision() {
+        {
+            let abi = AbiRevision::from_u64(16);
+            let str = "\"0x0000000000000010\"";
+            assert_eq!(serde_json::to_string(&abi).unwrap(), str);
+            assert_eq!(serde_json::from_str::<AbiRevision>(str).unwrap(), abi);
+        }
+        {
+            let abi = AbiRevision::from_u64(0x58ea445e942a0004);
+            let str = "\"0x58ea445e942a0004\"";
+            assert_eq!(serde_json::to_string(&abi).unwrap(), str);
+            assert_eq!(serde_json::from_str::<AbiRevision>(str).unwrap(), abi);
+        }
     }
 
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory {

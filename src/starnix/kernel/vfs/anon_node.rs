@@ -88,7 +88,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.current_fscred()),
         )
     }
 
@@ -110,7 +110,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.current_fscred()),
         )
     }
 

@@ -75,7 +75,7 @@ impl OutDir {
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
             vfs::directory::serve_on(
                 dir.clone(),
-                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
                 ExecutionScope::new(),
                 server_end,
             );

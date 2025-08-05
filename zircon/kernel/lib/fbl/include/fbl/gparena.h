@@ -157,7 +157,7 @@ class __OWNER(void) GPArena {
     }
 
     // Carve out some memory from the kernel root VMAR
-    const size_t mem_sz = ROUNDUP(max_count * ObjectSize, PAGE_SIZE);
+    const size_t mem_sz = ROUNDUP_PAGE_SIZE(max_count * ObjectSize);
 
     fbl::RefPtr<VmObjectPaged> vmo;
     zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, mem_sz, &vmo);
@@ -205,8 +205,8 @@ class __OWNER(void) GPArena {
     top_ = committed_ = start_ = map_result->base;
     end_ = start_ + mem_sz;
 
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(start_));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(end_));
 
     destroy_vmar.cancel();
 

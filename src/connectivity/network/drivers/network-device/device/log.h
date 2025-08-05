@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_LOG_H_
 
 #ifdef NETDEV_DRIVER
+
 #include <sdk/lib/driver/logging/cpp/logger.h>
 #define LOG_ERROR(msg) FDF_LOG(ERROR, msg)
 #define LOG_WARN(msg) FDF_LOG(WARNING, msg)
@@ -17,18 +18,40 @@
 #define LOGF_INFO(fmt, ...) FDF_LOG(INFO, fmt, ##__VA_ARGS__)
 #define LOGF_TRACE(fmt, ...) FDF_LOG(DEBUG, fmt, ##__VA_ARGS__)
 
-#else
-#include <lib/syslog/global.h>
-#define LOG_ERROR(msg) FX_LOG(ERROR, "network-device", msg)
-#define LOG_WARN(msg) FX_LOG(WARNING, "network-device", msg)
-#define LOG_INFO(msg) FX_LOG(INFO, "network-device", msg)
-#define LOG_TRACE(msg) FX_LOG(DEBUG, "network-device", msg)
+#else  // !NETDEV_DRIVER
 
-#define LOGF_ERROR(fmt, ...) FX_LOGF(ERROR, "network-device", fmt, ##__VA_ARGS__)
-#define LOGF_WARN(fmt, ...) FX_LOGF(WARNING, "network-device", fmt, ##__VA_ARGS__)
-#define LOGF_INFO(fmt, ...) FX_LOGF(INFO, "network-device", fmt, ##__VA_ARGS__)
-#define LOGF_TRACE(fmt, ...) FX_LOGF(DEBUG, "network-device", fmt, ##__VA_ARGS__)
+#include <sdk/lib/syslog/cpp/macros.h>  // nogncheck
 
-#endif
+#include "src/connectivity/network/drivers/network-device/log/log.h"  // nogncheck
+
+inline constexpr const char* kLogTag = "network-device";
+
+#define LOG_ERROR(msg)               \
+  do {                               \
+    FX_LOGST(ERROR, kLogTag) << msg; \
+  } while (0)
+#define LOG_WARN(msg)                  \
+  do {                                 \
+    FX_LOGST(WARNING, kLogTag) << msg; \
+  } while (0)
+#define LOG_INFO(msg)               \
+  do {                              \
+    FX_LOGST(INFO, kLogTag) << msg; \
+  } while (0)
+#define LOG_TRACE(msg)               \
+  do {                               \
+    FX_LOGST(TRACE, kLogTag) << msg; \
+  } while (0)
+
+#define LOGF_ERROR(fmt, ...) \
+  Logf(fuchsia_logging::LogSeverity::Error, kLogTag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOGF_WARN(fmt, ...) \
+  Logf(fuchsia_logging::LogSeverity::Warn, kLogTag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOGF_INFO(fmt, ...) \
+  Logf(fuchsia_logging::LogSeverity::Info, kLogTag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOGF_TRACE(fmt, ...) \
+  Logf(fuchsia_logging::LogSeverity::Trace, kLogTag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+
+#endif  // !NETDEV_DRIVER
 
 #endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_LOG_H_

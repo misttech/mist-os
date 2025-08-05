@@ -29,10 +29,12 @@ fuchsia_rust_driver("driver") {
     "//sdk/lib/driver/runtime/rust",
     "//sdk/rust/zx",
     "//src/devices/bind/fuchsia:fuchsia_rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
+    "//src/lib/trace/rust:trace",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
   ]

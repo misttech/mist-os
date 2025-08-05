@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use errors::ffx_error;
+use ffx_config::EnvironmentContext;
 use ffx_target_remove_args::RemoveCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
-use fho::{bug, return_bug, return_user_error, FfxMain, FfxTool, Result};
+use fho::{bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use manual_targets::{Config, ManualTargets};
 use schemars::JsonSchema;
@@ -26,8 +28,9 @@ pub enum CommandStatus {
 pub struct RemoveTool {
     #[command]
     cmd: RemoveCommand,
-    #[with(daemon_protocol())]
-    target_collection_proxy: ffx::TargetCollectionProxy,
+    #[with(deferred(daemon_protocol()))]
+    target_collection_proxy: Deferred<ffx::TargetCollectionProxy>,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(RemoveTool);
@@ -36,7 +39,12 @@ fho::embedded_plugin!(RemoveTool);
 impl FfxMain for RemoveTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        match Self::remove_impl(self.target_collection_proxy, self.cmd, &mut writer).await {
+        if self.context.get_direct_connection_mode() {
+            return Err(
+                ffx_error!("You cannot remove a target when using direct-connection mode").into()
+            );
+        }
+        match Self::remove_impl(self.target_collection_proxy.await?, self.cmd, &mut writer).await {
             Ok(message) => {
                 if writer.is_machine() {
                     writer.machine(&CommandStatus::Ok { message: Some(message) })?;
@@ -144,6 +152,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_existing_target() {
+        let env = ffx_config::test_init().await.expect("test_init");
         let server = setup_fake_target_collection_proxy(|id| {
             assert_eq!(id, "correct-horse-battery-staple".to_owned());
             true
@@ -153,7 +162,8 @@ mod test {
                 all: false,
                 name_or_addr: Some("correct-horse-battery-staple".to_owned()),
             },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer = VerifiedMachineWriter::<CommandStatus>::new_test(None, &test_buffers);
@@ -163,13 +173,15 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_nonexisting_target() {
+        let env = ffx_config::test_init().await.expect("test_init");
         let server = setup_fake_target_collection_proxy(|_| false);
         let tool = RemoveTool {
             cmd: RemoveCommand {
                 all: false,
                 name_or_addr: Some("incorrect-donkey-battery-jazz".to_owned()),
             },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer = VerifiedMachineWriter::<CommandStatus>::new_test(None, &test_buffers);
@@ -180,13 +192,15 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_machine_nonexisting_target() {
+        let env = ffx_config::test_init().await.expect("test_init");
         let server = setup_fake_target_collection_proxy(|_| false);
         let tool = RemoveTool {
             cmd: RemoveCommand {
                 all: false,
                 name_or_addr: Some("incorrect-donkey-battery-jazz".to_owned()),
             },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -200,18 +214,18 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_all_targets_some() {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.expect("test_init");
         const MANUAL_TARGETS: &'static str = "targets.manual";
         env.context
             .query(MANUAL_TARGETS)
             .level(Some(ConfigLevel::User))
             .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 12345}))
-            .await
             .unwrap();
         let server = setup_fake_target_collection_proxy(|_| true);
         let tool = RemoveTool {
             cmd: RemoveCommand { all: true, name_or_addr: None },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -225,12 +239,13 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_all_targets_none() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.expect("test_init");
 
         let server = setup_fake_target_collection_proxy(|_| panic!("should not be called"));
         let tool = RemoveTool {
             cmd: RemoveCommand { all: true, name_or_addr: None },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -240,5 +255,29 @@ mod test {
         let (actual_stdout, actual_stderr) = test_buffers.into_strings();
         assert_eq!(actual_stderr, "");
         assert_eq!(actual_stdout, "{\"Ok\":{\"message\":\"No manual targets found.\"}}\n");
+    }
+
+    #[fuchsia::test]
+    async fn test_error_in_direct_mode() {
+        let env = ffx_config::test_env()
+            .runtime_config("connectivity.direct", true)
+            .build()
+            .await
+            .expect("test_env build");
+        let server = setup_fake_target_collection_proxy(|_| {
+            unreachable!("proxy should not be used in direct mode");
+        });
+        let tool = RemoveTool {
+            cmd: RemoveCommand { all: false, name_or_addr: None },
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
+        };
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &buffers);
+        let err = tool.main(writer).await.expect_err("target remove");
+        assert_eq!(
+            format!("{err}"),
+            "You cannot remove a target when using direct-connection mode".to_string()
+        );
     }
 }

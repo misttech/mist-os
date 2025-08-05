@@ -356,7 +356,6 @@ mod tests {
             .query(PRODUCT_BUNDLE_PATH_KEY)
             .level(Some(ConfigLevel::User))
             .set(serde_json::Value::String(pb_dir.to_string()))
-            .await
             .expect("set product.path path");
         let pb = load_product_bundle(&None).await.expect("could not load product bundle");
         assert_eq!(pb.loaded_from_path(), pb_dir);

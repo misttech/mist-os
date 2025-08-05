@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
-#include <lib/fdio/vfs.h>
 #include <lib/zx/result.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
@@ -67,7 +66,7 @@ enum class VnodeProtocol : uint8_t {
 };
 
 // Options specified during opening and cloning.
-struct VnodeConnectionOptions {
+struct DeprecatedOptions {
   fuchsia_io::OpenFlags flags;
   fuchsia_io::Rights rights;
 
@@ -89,15 +88,15 @@ struct VnodeConnectionOptions {
     return kSupportedIo1Protocols;
   }
 
-  // Converts from fuchsia.io/Directory.Open1 flags to |VnodeConnectionOptions|. Note that in io1,
+  // Converts from fuchsia.io/Directory.Open1 flags to |DeprecatedOptions|. Note that in io1,
   // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
-  static zx::result<VnodeConnectionOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
+  static zx::result<DeprecatedOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
 
-  // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|.
-  static zx::result<VnodeConnectionOptions> FromCloneFlags(fuchsia_io::OpenFlags flags,
-                                                           VnodeProtocol protocol);
+  // Converts from fuchsia.io/Directory.Clone flags to |DeprecatedOptions|.
+  static zx::result<DeprecatedOptions> FromCloneFlags(fuchsia_io::OpenFlags flags,
+                                                      VnodeProtocol protocol);
 
-  // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
+  // Converts from |DeprecatedOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
 };
 
@@ -239,6 +238,23 @@ enum class CreationMode : uint8_t {
   kAlways,
 };
 
+/// The format of directory entries returned by fuchsia.io/Directory.ReadDirents.
+struct DirectoryEntry {
+  /// The entry's inode number.
+  uint64_t ino;
+  /// Length of the entry's `name` field.
+  uint8_t name_length;
+  /// The entry type for the entry (e.g. DT_REG).
+  fuchsia_io::DirentType type;
+  /// Null-terminated name of the entry of size `name_length`.
+  char name[0];
+} __PACKED;
+
+static_assert(sizeof(DirectoryEntry) == 10);
+static_assert(std::is_standard_layout_v<DirectoryEntry>);
+static_assert(std::is_trivially_copyable_v<DirectoryEntry>);
+static_assert(std::has_unique_object_representations_v<DirectoryEntry>);
+
 namespace internal {
 
 // Downscope |rights| to only include those operations which |protocol| supports, or those which are
@@ -260,7 +276,7 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
                                             fuchsia_io::NodeProtocolKinds supported);
 
 // Synthesizes a set of POSIX mode bits using a node's supported protocols and abilities.
-// This implementation mirrors that of |zxio_get_posix_mode|.
+// This implementation mirrors that of |get_posix_mode| in fdio.
 //
 // Unlike the ZXIO implementation, this function is *only* used for synthesizing the mode bits
 // reported by the io1 GetAttrs method. Callers should use the io2 GetAttributes method to get

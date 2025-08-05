@@ -20,7 +20,6 @@
 
 #include <explicit-memory/bytes.h>
 #include <fbl/algorithm.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 #include <kernel/thread.h>
 #include <ktl/algorithm.h>

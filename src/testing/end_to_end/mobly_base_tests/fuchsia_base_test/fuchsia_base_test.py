@@ -150,6 +150,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST:
             self._collect_snapshot(directory=self.test_case_path)
 
+        _LOGGER.info("Closing any active tracing sessions.")
         for device in self.fuchsia_devices:
             if (
                 device.tracing.is_active()
@@ -161,6 +162,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                         directory=self.test_case_path
                     )
 
+        _LOGGER.info("Completed closing active tracing sessions.")
         self._log_message_to_devices(
             message=f"Finished executing '{self.current_test_info.name}' "
             f"Lacewing test case...",

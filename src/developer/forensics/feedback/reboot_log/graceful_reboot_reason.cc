@@ -32,6 +32,7 @@ constexpr char kReasonZbiSwap[] = "ZBI SWAP";
 constexpr char kOutOfMemory[] = "OUT OF MEMORY";
 constexpr char kReasonNetstackMigration[] = "NETSTACK MIGRATION";
 constexpr char kAndroidUnexpectedReason[] = "ANDROID UNEXPECTED REASON";
+constexpr char kDeveloperRequest[] = "DEVELOPER REQUEST";
 constexpr char kReasonNotSupported[] = "NOT SUPPORTED";
 constexpr char kReasonNotParseable[] = "NOT PARSEABLE";
 
@@ -73,6 +74,8 @@ std::string ToString(const GracefulRebootReason reason) {
       return kReasonNetstackMigration;
     case GracefulRebootReason::kAndroidUnexpectedReason:
       return kAndroidUnexpectedReason;
+    case GracefulRebootReason::kDeveloperRequest:
+      return kDeveloperRequest;
     case GracefulRebootReason::kNotSupported:
       return kReasonNotSupported;
     case GracefulRebootReason::kNotParseable:
@@ -105,6 +108,8 @@ GracefulRebootReason FromString(const std::string_view reason) {
     return GracefulRebootReason::kNetstackMigration;
   } else if (reason == kAndroidUnexpectedReason) {
     return GracefulRebootReason::kAndroidUnexpectedReason;
+  } else if (reason == kDeveloperRequest) {
+    return GracefulRebootReason::kDeveloperRequest;
   } else if (reason == kReasonNotSupported) {
     return GracefulRebootReason::kNotSupported;
   } else if (reason == kOutOfMemory) {
@@ -143,6 +148,7 @@ std::string ToFileContent(const std::vector<GracefulRebootReason>& reasons) {
       case GracefulRebootReason::kOutOfMemory:
       case GracefulRebootReason::kNetstackMigration:
       case GracefulRebootReason::kAndroidUnexpectedReason:
+      case GracefulRebootReason::kDeveloperRequest:
       case GracefulRebootReason::kNotSupported:
         reason_string = ToString(reason);
         break;
@@ -226,6 +232,8 @@ GracefulRebootReason FromReason(
       return GracefulRebootReason::kNetstackMigration;
     case RebootReason2::ANDROID_UNEXPECTED_REASON:
       return GracefulRebootReason::kAndroidUnexpectedReason;
+    case RebootReason2::DEVELOPER_REQUEST:
+      return GracefulRebootReason::kDeveloperRequest;
     default:
       return GracefulRebootReason::kNotSupported;
   }

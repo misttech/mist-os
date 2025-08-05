@@ -68,8 +68,8 @@ uint max_irqs = 0;
 arm_gicv2::CpuMaskTranslator mask_translator;
 DECLARE_SINGLETON_SPINLOCK(gic_lock);
 
-zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                    enum interrupt_polarity pol);
+zx_status_t gic_configure_interrupt(interrupt_vector_t vector, interrupt_trigger_mode tm,
+                                    interrupt_polarity pol);
 
 uint32_t read_gicd_targetsr(int target_reg) { return arm_gicv2_read32(GICD_ITARGETSR(target_reg)); }
 
@@ -153,7 +153,7 @@ zx_status_t arm_gic_init() {
   }
   // Initialize all the SPIs to edge triggered
   for (i = GIC_BASE_SPI; i < max_irqs; i++) {
-    gic_configure_interrupt(i, IRQ_TRIGGER_MODE_EDGE, IRQ_POLARITY_ACTIVE_HIGH);
+    gic_configure_interrupt(i, interrupt_trigger_mode::EDGE, interrupt_polarity::HIGH);
   }
 
   arm_gicv2_write32(GICD_CTLR, 1);  // enable GIC0
@@ -179,7 +179,7 @@ zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned int cpu_m
   return ZX_OK;
 }
 
-zx_status_t gic_mask_interrupt(unsigned int vector) {
+zx_status_t gic_mask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
   if (vector >= max_irqs) {
     return ZX_ERR_INVALID_ARGS;
@@ -190,7 +190,7 @@ zx_status_t gic_mask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_unmask_interrupt(unsigned int vector) {
+zx_status_t gic_unmask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
   if (vector >= max_irqs) {
     return ZX_ERR_INVALID_ARGS;
@@ -201,7 +201,7 @@ zx_status_t gic_unmask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_deactivate_interrupt(unsigned int vector) {
+zx_status_t gic_deactivate_interrupt(interrupt_vector_t vector) {
   if (vector >= max_irqs) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -212,14 +212,14 @@ zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                    enum interrupt_polarity pol) {
+zx_status_t gic_configure_interrupt(interrupt_vector_t vector, interrupt_trigger_mode tm,
+                                    interrupt_polarity pol) {
   // Only configurable for SPI interrupts
   if ((vector >= max_irqs) || (vector < GIC_BASE_SPI)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (pol != IRQ_POLARITY_ACTIVE_HIGH) {
+  if (pol != interrupt_polarity::HIGH) {
     // TODO: polarity should actually be configure through a GPIO controller
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -231,7 +231,7 @@ zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_
   uint32_t reg_ndx = vector >> 4;
   uint32_t bit_shift = ((vector & 0xf) << 1) + 1;
   uint32_t reg_val = arm_gicv2_read32(GICD_ICFGR(reg_ndx));
-  if (tm == IRQ_TRIGGER_MODE_EDGE) {
+  if (tm == interrupt_trigger_mode::EDGE) {
     reg_val |= (1U << bit_shift);
   } else {
     reg_val &= ~(1U << bit_shift);
@@ -245,23 +245,23 @@ zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_
   return ZX_OK;
 }
 
-zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                     enum interrupt_polarity* pol) {
+zx_status_t gic_get_interrupt_config(interrupt_vector_t vector, interrupt_trigger_mode* tm,
+                                     interrupt_polarity* pol) {
   if (vector >= max_irqs) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (tm) {
-    *tm = IRQ_TRIGGER_MODE_EDGE;
+    *tm = interrupt_trigger_mode::EDGE;
   }
   if (pol) {
-    *pol = IRQ_POLARITY_ACTIVE_HIGH;
+    *pol = interrupt_polarity::HIGH;
   }
 
   return ZX_OK;
 }
 
-zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+zx_status_t gic_set_affinity(interrupt_vector_t vector, cpu_mask_t mask) {
   LTRACEF("vector %u, mask %#x\n", vector, mask);
 
   if (vector >= max_irqs) {
@@ -290,7 +290,7 @@ zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
   return ZX_OK;
 }
 
-unsigned int gic_remap_interrupt(unsigned int vector) { return vector; }
+interrupt_vector_t gic_remap_interrupt(interrupt_vector_t vector) { return vector; }
 
 void gic_handle_irq(iframe_t* frame) {
   // get the current vector
@@ -331,7 +331,7 @@ zx_status_t gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
   return ZX_OK;
 }
 
-void arm_ipi_halt_handler(void*) {
+void arm_ipi_halt_handler() {
   LTRACEF("cpu %u\n", arch_curr_cpu_num());
 
   arch_disable_ints();

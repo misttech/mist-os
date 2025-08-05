@@ -12,12 +12,12 @@ mod storage_store;
 
 #[cfg(test)]
 mod tests {
-    use rand::distributions::{Alphanumeric, DistString as _};
-    use rand::thread_rng;
+    use rand::distr::{Alphanumeric, SampleString as _};
+    use rand::rng;
     use wlan_storage_constants::{NetworkIdentifier, SecurityType, StashedSsid};
 
     pub fn rand_string() -> String {
-        Alphanumeric.sample_string(&mut thread_rng(), 20)
+        Alphanumeric.sample_string(&mut rng(), 20)
     }
 
     pub fn network_id(

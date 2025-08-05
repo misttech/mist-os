@@ -557,7 +557,7 @@ zx_status_t Dir::Readdir(fs::VdirCookie *cookie, void *dirents, size_t len, size
                             LeToCpu(de.name_len));
 
       if (de.ino && name != "..") {
-        if ((ret = df.Next(name, d_type, LeToCpu(de.ino))) != ZX_OK) {
+        if ((ret = df.Next(name, fuchsia_io::DirentType{d_type}, LeToCpu(de.ino))) != ZX_OK) {
           *pos_cookie += bit_pos - start_bit_pos;
           done = true;
           ret = ZX_OK;

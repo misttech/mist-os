@@ -4,10 +4,11 @@
 
 use async_trait::async_trait;
 use errors::ffx_error;
+use ffx_config::EnvironmentContext;
 use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
-use fho::{FfxContext, FfxMain, FfxTool};
+use fho::{deferred, Deferred, FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetConnectionError};
 use netext::parse_address_parts;
 use schemars::JsonSchema;
@@ -30,8 +31,9 @@ pub enum CommandStatus {
 pub struct AddTool {
     #[command]
     cmd: AddCommand,
-    #[with(daemon_protocol())]
-    target_collection_proxy: TargetCollectionProxy,
+    #[with(deferred(daemon_protocol()))]
+    target_collection_proxy: Deferred<TargetCollectionProxy>,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(AddTool);
@@ -40,7 +42,12 @@ fho::embedded_plugin!(AddTool);
 impl FfxMain for AddTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        match add_impl(Some(&mut writer), self.target_collection_proxy, self.cmd).await {
+        if self.context.get_direct_connection_mode() {
+            return Err(
+                ffx_error!("You cannot add a target when using direct-connection mode").into()
+            );
+        }
+        match add_impl(Some(&mut writer), self.target_collection_proxy.await?, self.cmd).await {
             Ok(_) => {
                 writer.machine(&CommandStatus::Ok { message: None })?;
                 Ok(())
@@ -265,6 +272,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_machine_output() {
+        let env = ffx_config::test_init().await.expect("test_init");
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
                 addr,
@@ -279,7 +287,8 @@ mod test {
         });
         let tool = AddTool {
             cmd: AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
 
         let buffers = TestBuffers::default();
@@ -293,6 +302,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_machine_output_err() {
+        let env = ffx_config::test_init().await.expect("test_init");
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
                 addr,
@@ -307,7 +317,8 @@ mod test {
         });
         let tool = AddTool {
             cmd: AddCommand { addr: "invalid_address-100".into(), nowait: true },
-            target_collection_proxy: server,
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
         };
 
         let buffers = TestBuffers::default();
@@ -317,5 +328,29 @@ mod test {
         let expected = String::from("{\"UserError\":{\"message\":\"Could not parse 'invalid_address-100'. Invalid address\"}}\n");
         let actual = buffers.into_stdout_str();
         assert_eq!(expected, actual)
+    }
+
+    #[fuchsia::test]
+    async fn test_error_in_direct_mode() {
+        let env = ffx_config::test_env()
+            .runtime_config("connectivity.direct", true)
+            .build()
+            .await
+            .expect("test_env build");
+        let server = setup_fake_target_collection(|_| {
+            unreachable!("proxy should not be used in direct mode");
+        });
+        let tool = AddTool {
+            cmd: AddCommand { addr: "addr".into(), nowait: true },
+            target_collection_proxy: Deferred::from_output(Ok(server)),
+            context: env.context.clone(),
+        };
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &buffers);
+        let err = tool.main(writer).await.expect_err("target add");
+        assert_eq!(
+            format!("{err}"),
+            "You cannot add a target when using direct-connection mode".to_string()
+        );
     }
 }

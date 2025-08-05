@@ -7,19 +7,19 @@ use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::syscalls::SockFProgPtr;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::vfs::socket::socket::ReadFromSockOptValue as _;
 use crate::vfs::socket::{
-    Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
-    SocketProtocol, SocketShutdownFlags, SocketType,
+    SockOptValue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use byteorder::ByteOrder;
 use ebpf::convert_and_verify_cbpf;
 use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use linux_uapi::IP_MULTICAST_ALL;
+use linux_uapi::{IP_MULTICAST_ALL, IP_PASSSEC};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
@@ -84,6 +84,28 @@ impl ServiceConnector for SocketProviderServiceConnector {
     }
 }
 
+// Trait for types that can be converted to a byte vector that contains a
+// `sockaddr` value.
+trait AsSockAddrBytes {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno>;
+}
+
+impl AsSockAddrBytes for &SocketAddress {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno> {
+        match self {
+            SocketAddress::Inet(addr) => Ok(&addr[..]),
+            SocketAddress::Inet6(addr) => Ok(&addr[..]),
+            _ => error!(EAFNOSUPPORT),
+        }
+    }
+}
+
+impl AsSockAddrBytes for &Vec<u8> {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno> {
+        Ok(self.as_slice())
+    }
+}
+
 /// A socket backed by an underlying Zircon I/O object.
 pub struct ZxioBackedSocket {
     /// The underlying Zircon I/O object.
@@ -102,7 +124,7 @@ impl ZxioBackedSocket {
         protocol: SocketProtocol,
     ) -> Result<ZxioBackedSocket, Errno> {
         let marks = if current_task.kernel().features.netstack_mark {
-            &mut [ZxioSocketMark::so_mark(0), ZxioSocketMark::uid(current_task.creds().uid)]
+            &mut [ZxioSocketMark::so_mark(0), ZxioSocketMark::uid(current_task.current_creds().uid)]
         } else {
             &mut [][..]
         };
@@ -140,8 +162,11 @@ impl ZxioBackedSocket {
         ZxioBackedSocket { zxio, cookie: Default::default() }
     }
 
-    pub fn sendmsg(
+    fn sendmsg(
         &self,
+        locked: &mut Locked<FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         addr: &Option<SocketAddress>,
         data: &mut dyn InputBuffer,
         cmsgs: Vec<ControlMessage>,
@@ -157,17 +182,33 @@ impl ZxioBackedSocket {
             None => vec![],
         };
 
+        // Run `CGROUP_UDP[46]_SENDMSG` eBPF programs for `sendto()` and
+        // `sendmsg()` on UDP sockets. Not necessary for `send()` (i.e. when
+        // `addr` is empty).
+        if matches!(
+            (socket.domain, socket.socket_type),
+            (SocketDomain::Inet | SocketDomain::Inet6, SocketType::Datagram)
+        ) && addr.len() > 0
+        {
+            self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::UdpSendMsg, &addr)?;
+        }
+
+        let map_errors = |res: Result<Result<usize, ZxioErrorCode>, zx::Status>| {
+            res.map_err(|status| match status {
+                zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
+                other => from_status_like_fdio!(other),
+            })?
+            .map_err(|out_code| errno_from_zxio_code!(out_code))
+        };
+
         let flags = flags.bits() & !MSG_DONTWAIT;
         let sent_bytes = if UNIFIED_ASPACES_ENABLED {
             match data.peek_all_segments_as_iovecs() {
-                Ok(mut iovecs) => Some(self.zxio.sendmsg(&mut addr, &mut iovecs, &cmsgs, flags)),
-                Err(e) => {
-                    if e.code == ENOTSUP {
-                        None
-                    } else {
-                        return Err(e);
-                    }
+                Ok(mut iovecs) => {
+                    Some(map_errors(self.zxio.sendmsg(&mut addr, &mut iovecs, &cmsgs, flags))?)
                 }
+                Err(e) if e.code == ENOTSUP => None,
+                Err(e) => return Err(e),
             }
         } else {
             None
@@ -175,64 +216,51 @@ impl ZxioBackedSocket {
 
         // If we can't pass the iovecs directly so fallback to reading
         // all the bytes from the input buffer first.
-        let sent_bytes = if let Some(sent_bytes) = sent_bytes {
-            sent_bytes
-        } else {
-            let mut bytes = data.peek_all()?;
-            self.zxio.sendmsg(
-                &mut addr,
-                &mut [syncio::zxio::iovec {
-                    iov_base: bytes.as_mut_ptr() as *mut starnix_uapi::c_void,
-                    iov_len: bytes.len(),
-                }],
-                &cmsgs,
-                flags,
-            )
-        }
-        .map_err(|status| match status {
-            zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
-            other => from_status_like_fdio!(other),
-        })?
-        .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+        let sent_bytes = match sent_bytes {
+            Some(sent_bytes) => sent_bytes,
+            None => {
+                let mut bytes = data.peek_all()?;
+                map_errors(self.zxio.sendmsg(
+                    &mut addr,
+                    &mut [syncio::zxio::iovec {
+                        iov_base: bytes.as_mut_ptr() as *mut starnix_uapi::c_void,
+                        iov_len: bytes.len(),
+                    }],
+                    &cmsgs,
+                    flags,
+                ))?
+            }
+        };
         data.advance(sent_bytes)?;
         Ok(sent_bytes)
     }
 
-    pub fn recvmsg(
+    fn recvmsg(
         &self,
+        locked: &mut Locked<FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<RecvMessageInfo, Errno> {
         let flags = flags.bits() & !MSG_DONTWAIT & !MSG_WAITALL;
 
-        fn with_res<F: FnOnce(&RecvMessageInfo) -> Result<(), Errno>>(
-            res: Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status>,
-            f: F,
-        ) -> Result<RecvMessageInfo, Errno> {
-            let info = res
-                .map_err(|status| from_status_like_fdio!(status))?
-                .map_err(|out_code| errno_from_zxio_code!(out_code))?;
-            f(&info)?;
-            Ok(info)
-        }
+        let map_errors = |res: Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status>| {
+            res.map_err(|status| from_status_like_fdio!(status))?
+                .map_err(|out_code| errno_from_zxio_code!(out_code))
+        };
 
-        let res = if UNIFIED_ASPACES_ENABLED {
+        let info = if UNIFIED_ASPACES_ENABLED {
             match data.peek_all_segments_as_iovecs() {
                 Ok(mut iovecs) => {
-                    let res = self.zxio.recvmsg(&mut iovecs, flags);
-                    Some(with_res(res, |info| {
-                        // SAFETY: we successfully read `info.bytes_read` bytes
-                        // directly to the user's buffer segments.
-                        unsafe { data.advance(info.bytes_read) }
-                    }))
+                    let info = map_errors(self.zxio.recvmsg(&mut iovecs, flags))?;
+                    // SAFETY: we successfully read `info.bytes_read` bytes
+                    // directly to the user's buffer segments.
+                    (unsafe { data.advance(info.bytes_read) })?;
+                    Some(info)
                 }
-                Err(e) => {
-                    if e.code == ENOTSUP {
-                        None
-                    } else {
-                        return Err(e);
-                    }
-                }
+                Err(e) if e.code == ENOTSUP => None,
+                Err(e) => return Err(e),
             }
         } else {
             None
@@ -241,22 +269,37 @@ impl ZxioBackedSocket {
         // If we can't pass the segments directly, fallback to receiving
         // all the bytes in an intermediate buffer and writing that
         // to our output buffer.
-        res.unwrap_or_else(|| {
-            // TODO: use MaybeUninit
-            let mut buf = vec![0; data.available()];
-            let res = self.zxio.recvmsg(
-                &mut [syncio::zxio::iovec {
+        let info = match info {
+            Some(info) => info,
+            None => {
+                // TODO: use MaybeUninit
+                let mut buf = vec![0; data.available()];
+                let iovec = &mut [syncio::zxio::iovec {
                     iov_base: buf.as_mut_ptr() as *mut starnix_uapi::c_void,
                     iov_len: buf.len(),
-                }],
-                flags,
-            );
-            with_res(res, |info| {
+                }];
+                let info = map_errors(self.zxio.recvmsg(iovec, flags))?;
                 let written = data.write_all(&buf[..info.bytes_read])?;
                 debug_assert_eq!(written, info.bytes_read);
-                Ok(())
-            })
-        })
+                info
+            }
+        };
+
+        // Run eBPF programs for UDP sockets.
+        if matches!(
+            (socket.domain, socket.socket_type),
+            (SocketDomain::Inet | SocketDomain::Inet6, SocketType::Datagram)
+        ) {
+            self.run_sockaddr_ebpf(
+                locked,
+                socket,
+                current_task,
+                SockAddrOp::UdpRecvMsg,
+                &info.address,
+            )?;
+        }
+
+        Ok(info)
     }
 
     fn attach_cbpf_filter(&self, _task: &Task, code: Vec<sock_filter>) -> Result<(), Errno> {
@@ -300,8 +343,13 @@ impl ZxioBackedSocket {
         socket: &Socket,
         current_task: &CurrentTask,
         op: SockAddrOp,
-        socket_address: &SocketAddress,
+        socket_address: impl AsSockAddrBytes,
     ) -> Result<(), Errno> {
+        // BPF_PROG_TYPE_CGROUP_SOCK_ADDR programs are executed only for IPv4 and IPv6 sockets.
+        if !matches!(socket.domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            return Ok(());
+        }
+
         let ebpf_result =
             current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_addr_prog(
                 locked,
@@ -310,7 +358,8 @@ impl ZxioBackedSocket {
                 socket.domain,
                 socket.socket_type,
                 socket.protocol,
-                socket_address,
+                socket_address.as_sockaddr_bytes()?,
+                self,
             )?;
         match ebpf_result {
             SockAddrProgramResult::Allow => Ok(()),
@@ -448,9 +497,9 @@ impl SocketOps for ZxioBackedSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
@@ -460,7 +509,7 @@ impl SocketOps for ZxioBackedSocket {
             return error!(EAGAIN);
         }
 
-        let mut info = self.recvmsg(data, flags)?;
+        let mut info = self.recvmsg(locked, socket, current_task, data, flags)?;
 
         let bytes_read = info.bytes_read;
 
@@ -480,9 +529,9 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
@@ -498,7 +547,15 @@ impl SocketOps for ZxioBackedSocket {
         // Ignore destination address if this is a stream socket.
         let dest_address =
             if socket.socket_type == SocketType::Stream { &None } else { dest_address };
-        self.sendmsg(dest_address, data, cmsgs, SocketMessageFlags::empty())
+        self.sendmsg(
+            locked,
+            socket,
+            current_task,
+            dest_address,
+            data,
+            cmsgs,
+            SocketMessageFlags::empty(),
+        )
     }
 
     fn wait_async(
@@ -583,12 +640,11 @@ impl SocketOps for ZxioBackedSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog_ptr = SockFProgPtr::new_with_ref(current_task, user_opt)?;
-                let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
+                let fprog = SockFProgPtr::read_from_sockopt_value(current_task, &optval)?;
                 if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);
                 }
@@ -604,8 +660,12 @@ impl SocketOps for ZxioBackedSocket {
                 track_stub!(TODO("https://fxbug.dev/404596095"), "SOL_IP.IP_MULTICAST_ALL");
                 Ok(())
             }
+            (SOL_IP, IP_PASSSEC) if current_task.kernel().features.selinux_test_suite => {
+                track_stub!(TODO("https://fxbug.dev/398663317"), "SOL_IP.IP_PASSSEC");
+                Ok(())
+            }
             (SOL_SOCKET, SO_MARK) => {
-                let mark = current_task.read_object::<u32>(user_opt.try_into()?)?;
+                let mark: u32 = optval.read(current_task)?;
                 let socket_mark = ZxioSocketMark::so_mark(mark);
                 let optval: &[u8; size_of::<zxio_socket_mark>()] =
                     zerocopy::transmute_ref!(&socket_mark);
@@ -615,7 +675,7 @@ impl SocketOps for ZxioBackedSocket {
                     .map_err(|out_code| errno_from_zxio_code!(out_code))
             }
             _ => {
-                let optval = current_task.read_buffer(&user_opt)?;
+                let optval = optval.to_vec(current_task)?;
                 self.zxio
                     .setsockopt(level as i32, optname as i32, &optval)
                     .map_err(|status| from_status_like_fdio!(status))?

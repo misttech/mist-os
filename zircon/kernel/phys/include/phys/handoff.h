@@ -356,9 +356,9 @@ struct PhysHandoff {
   // ZBI_TYPE_HW_REBOOT_REASON payload.
   std::optional<zbi_hw_reboot_reason_t> reboot_reason;
 
-  // ZBI_TYPE_NVRAM payload.
+  // A mapped ZBI_TYPE_NVRAM payload.
   // A physical memory region that will persist across warm boots.
-  std::optional<zbi_nvram_t> nvram;
+  std::optional<MappedRange<std::byte>> nvram;
 
   // ZBI_TYPE_PLATFORM_ID payload.
   std::optional<zbi_platform_id_t> platform_id;

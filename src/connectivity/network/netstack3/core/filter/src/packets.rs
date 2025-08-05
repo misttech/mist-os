@@ -13,10 +13,11 @@ use net_types::ip::{
 use netstack3_base::{Options, PayloadLen, SegmentHeader};
 use packet::records::options::OptionSequenceBuilder;
 use packet::{
-    Buf, Buffer, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
-    GrowBufferMut, InnerSerializer, Nested, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseBuffer, ParseMetadata, PartialSerializeResult, PartialSerializer, ReusableBuffer,
-    SerializeError, Serializer, SliceBufViewMut, TruncatingSerializer,
+    Buf, Buffer, BufferMut, BufferProvider, BufferViewMut, DynSerializer, DynamicSerializer,
+    EitherSerializer, EmptyBuf, GrowBufferMut, InnerSerializer, LayoutBufferAlloc, Nested,
+    PacketBuilder, PacketConstraints, ParsablePacket, ParseBuffer, ParseMetadata,
+    PartialSerializeResult, PartialSerializer, SerializeError, Serializer, SliceBufViewMut,
+    TruncatingSerializer,
 };
 use packet_formats::icmp::mld::{
     MulticastListenerDone, MulticastListenerQuery, MulticastListenerQueryV2,
@@ -294,6 +295,19 @@ pub trait MaybeTransportPacketMut<I: IpExt> {
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>>;
 }
 
+/// An equivalent of [`MaybeTransportPacketMut`] that yields dynamic references
+/// to the inner transport packet.
+///
+/// This is hand-rolled for each implementer of `MaybeTransportPacketMut`
+/// because we don't quite have a trait to blanket impl this automatically for
+/// things that need it.
+///
+/// Perhaps after unsize is stabilized this can be blanket implemented. See
+/// https://github.com/rust-lang/rust/issues/18598.
+pub trait DynamicMaybeTransportPacketMut<I: IpExt> {
+    fn dyn_transport_packet_mut(&mut self) -> Option<&mut dyn TransportPacketMut<I>>;
+}
+
 /// A payload of an ICMP error packet that may contain an IP packet.
 ///
 /// See also the note on [`MaybeTransportPacket`].
@@ -311,6 +325,19 @@ pub trait MaybeIcmpErrorMut<I: FilterIpExt> {
         Self: 'a;
 
     fn icmp_error_mut<'a>(&'a mut self) -> Option<Self::IcmpErrorMut<'a>>;
+}
+
+/// An equivalent of [`MaybeIcmpErrorMut`] that yields dynamic references
+/// to the inner ICMP packet.
+///
+/// This is hand-rolled for each implementer of `MaybeIcmpErrorMut`
+/// because we don't quite have a trait to blanket impl this automatically for
+/// things that need it.
+///
+/// Perhaps after unsize is stabilized this can be blanket implemented. See
+/// https://github.com/rust-lang/rust/issues/18598.
+pub trait DynamicMaybeIcmpErrorMut<I: IpExt> {
+    fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<I>>;
 }
 
 /// A serializer that may also be a valid transport layer packet.
@@ -334,6 +361,109 @@ where
         + MaybeIcmpErrorPayload<I>
         + MaybeIcmpErrorMut<I>,
 {
+}
+
+/// A trait allowing transport serializers to be put behind a dyn reference.
+///
+/// This is dynamic-dispatch equivalent of [`TransportPacketSerializer`]. Used
+/// in conjunction with [`DynTransportSerializer`] it allows dynamic dispatch
+/// for slow-path protocols.
+pub trait DynamicTransportSerializer<I: FilterIpExt>:
+    DynamicSerializer
+    + PartialSerializer
+    + MaybeTransportPacket
+    + DynamicMaybeTransportPacketMut<I>
+    + DynamicMaybeIcmpErrorMut<I>
+    + MaybeIcmpErrorPayload<I>
+{
+}
+
+impl<O, I> DynamicTransportSerializer<I> for O
+where
+    O: TransportPacketSerializer<I>
+        + DynamicMaybeTransportPacketMut<I>
+        + DynamicMaybeIcmpErrorMut<I>,
+    I: FilterIpExt,
+{
+}
+
+/// A concrete type around a dynamic reference to a
+/// [`DynamicTransportSerializer`].
+pub struct DynTransportSerializer<'a, I: FilterIpExt>(&'a mut dyn DynamicTransportSerializer<I>);
+
+impl<'a, I: FilterIpExt> DynTransportSerializer<'a, I> {
+    /// Creates a new [`DynTransportSerializer`] with a dynamic mutable borrow
+    /// to a serializer.
+    pub fn new(inner: &'a mut dyn DynamicTransportSerializer<I>) -> Self {
+        Self(inner)
+    }
+}
+
+impl<I: FilterIpExt> Serializer for DynTransportSerializer<'_, I> {
+    type Buffer = EmptyBuf;
+
+    fn serialize<B: GrowBufferMut, P: BufferProvider<Self::Buffer, B>>(
+        self,
+        outer: PacketConstraints,
+        provider: P,
+    ) -> Result<B, (SerializeError<P::Error>, Self)> {
+        match DynSerializer::new_dyn(self.0).serialize(outer, provider) {
+            Ok(r) => Ok(r),
+            Err((e, _)) => Err((e, self)),
+        }
+    }
+
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<B, SerializeError<A::Error>> {
+        DynSerializer::new_dyn(self.0).serialize_new_buf(outer, alloc)
+    }
+}
+
+impl<'a, I: FilterIpExt> PartialSerializer for DynTransportSerializer<'a, I> {
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        (*self.0).partial_serialize(outer, buffer)
+    }
+}
+
+impl<'a, I: FilterIpExt> MaybeTransportPacket for DynTransportSerializer<'a, I> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        (*self.0).transport_packet_data()
+    }
+}
+
+impl<'a, I: FilterIpExt> MaybeIcmpErrorPayload<I> for DynTransportSerializer<'a, I> {
+    fn icmp_error_payload(&self) -> Option<ParsedIcmpErrorPayload<I>> {
+        (*self.0).icmp_error_payload()
+    }
+}
+
+impl<'a, I: FilterIpExt> MaybeIcmpErrorMut<I> for DynTransportSerializer<'a, I> {
+    type IcmpErrorMut<'b>
+        = &'b mut dyn DynamicIcmpErrorMut<I>
+    where
+        Self: 'b;
+
+    fn icmp_error_mut(&mut self) -> Option<Self::IcmpErrorMut<'_>> {
+        (*self.0).dyn_icmp_error_mut()
+    }
+}
+
+impl<'a, I: FilterIpExt> MaybeTransportPacketMut<I> for DynTransportSerializer<'a, I> {
+    type TransportPacketMut<'b>
+        = &'b mut dyn TransportPacketMut<I>
+    where
+        Self: 'b;
+
+    fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+        (*self.0).dyn_transport_packet_mut()
+    }
 }
 
 impl<T: ?Sized> MaybeTransportPacket for &T
@@ -519,6 +649,31 @@ pub trait IcmpErrorMut<I: FilterIpExt> {
     /// Returns an [`IpPacket`] of the packet contained within this error, if
     /// one is present.
     fn inner_packet<'a>(&'a mut self) -> Option<Self::InnerPacket<'a>>;
+}
+
+/// An equivalent of [`IcmpErrorMut`] that provides a `dyn-compatible` API for
+/// ICMP errors.
+///
+/// This has the same shape as [`IcmpErrorMut`] except for the associated type,
+/// forcing the inner packet type to something that is workable for all
+/// implementations.
+pub trait DynamicIcmpErrorMut<I: FilterIpExt> {
+    fn dyn_recalculate_checksum(&mut self) -> bool;
+    fn dyn_inner_packet(&mut self) -> Option<I::FilterIpPacketRaw<&mut [u8]>>;
+}
+
+impl<'a, I: FilterIpExt> IcmpErrorMut<I> for dyn DynamicIcmpErrorMut<I> + 'a {
+    type InnerPacket<'b>
+        = I::FilterIpPacketRaw<&'b mut [u8]>
+    where
+        Self: 'b;
+
+    fn recalculate_checksum(&mut self) -> bool {
+        self.dyn_recalculate_checksum()
+    }
+    fn inner_packet<'b>(&'b mut self) -> Option<Self::InnerPacket<'b>> {
+        self.dyn_inner_packet()
+    }
 }
 
 impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
@@ -1092,7 +1247,7 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
         })
     }
 
-    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: packet::PacketConstraints,
         alloc: A,
@@ -1592,6 +1747,14 @@ impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacketMut<I>
     }
 }
 
+impl<I: IpExt, Inner, M: IcmpMessage<I>> DynamicMaybeTransportPacketMut<I>
+    for Nested<Inner, IcmpPacketBuilder<I, M>>
+{
+    fn dyn_transport_packet_mut(&mut self) -> Option<&mut dyn TransportPacketMut<I>> {
+        MaybeTransportPacketMut::transport_packet_mut(self).map(|x| x as _)
+    }
+}
+
 impl<I: IpExt, M: IcmpMessage<I>> TransportPacketMut<I> for IcmpPacketBuilder<I, M> {
     fn set_src_port(&mut self, id: NonZeroU16) {
         if M::IS_REWRITABLE {
@@ -1635,6 +1798,14 @@ impl<Inner, I: FilterIpExt> MaybeIcmpErrorMut<I>
     }
 }
 
+impl<Inner, I: FilterIpExt> DynamicMaybeIcmpErrorMut<I>
+    for Nested<Inner, IcmpPacketBuilder<I, IcmpEchoRequest>>
+{
+    fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<I>> {
+        MaybeIcmpErrorMut::<I>::icmp_error_mut(self).map(|x| match x {})
+    }
+}
+
 impl<Inner, I: IpExt> MaybeIcmpErrorPayload<I>
     for Nested<Inner, IcmpPacketBuilder<I, IcmpEchoReply>>
 {
@@ -1653,6 +1824,14 @@ impl<Inner, I: FilterIpExt> MaybeIcmpErrorMut<I>
 
     fn icmp_error_mut<'a>(&'a mut self) -> Option<Self::IcmpErrorMut<'a>> {
         None
+    }
+}
+
+impl<Inner, I: FilterIpExt> DynamicMaybeIcmpErrorMut<I>
+    for Nested<Inner, IcmpPacketBuilder<I, IcmpEchoReply>>
+{
+    fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<I>> {
+        MaybeIcmpErrorMut::<I>::icmp_error_mut(self).map(|x| match x {})
     }
 }
 
@@ -1767,6 +1946,14 @@ macro_rules! non_error_icmp_message_type {
                 None
             }
         }
+
+        impl<Inner> DynamicMaybeIcmpErrorMut<$ip>
+            for Nested<Inner, IcmpPacketBuilder<$ip, $message>>
+        {
+            fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<$ip>> {
+                MaybeIcmpErrorMut::icmp_error_mut(self).map(|x| match x {})
+            }
+        }
     };
 }
 
@@ -1830,6 +2017,14 @@ macro_rules! icmpv4_error_message {
             }
         }
 
+        impl<Inner: BufferMut> DynamicMaybeIcmpErrorMut<Ipv4>
+            for Nested<Inner, IcmpPacketBuilder<Ipv4, $message>>
+        {
+            fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<Ipv4>> {
+                MaybeIcmpErrorMut::icmp_error_mut(self).map(|x| x as _)
+            }
+        }
+
         impl<Inner: BufferMut> IcmpErrorMut<Ipv4>
             for Nested<Inner, IcmpPacketBuilder<Ipv4, $message>>
         {
@@ -1849,6 +2044,18 @@ macro_rules! icmpv4_error_message {
                         .ok()?;
 
                 Some(packet)
+            }
+        }
+
+        impl<Inner: BufferMut> DynamicIcmpErrorMut<Ipv4>
+            for Nested<Inner, IcmpPacketBuilder<Ipv4, $message>>
+        {
+            fn dyn_recalculate_checksum(&mut self) -> bool {
+                self.recalculate_checksum()
+            }
+
+            fn dyn_inner_packet(&mut self) -> Option<Ipv4PacketRaw<&mut [u8]>> {
+                self.inner_packet()
             }
         }
     };
@@ -1882,6 +2089,14 @@ macro_rules! icmpv6_error_message {
             }
         }
 
+        impl<Inner: BufferMut> DynamicMaybeIcmpErrorMut<Ipv6>
+            for Nested<TruncatingSerializer<Inner>, IcmpPacketBuilder<Ipv6, $message>>
+        {
+            fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<Ipv6>> {
+                MaybeIcmpErrorMut::icmp_error_mut(self).map(|x| x as _)
+            }
+        }
+
         impl<Inner: BufferMut> IcmpErrorMut<Ipv6>
             for Nested<TruncatingSerializer<Inner>, IcmpPacketBuilder<Ipv6, $message>>
         {
@@ -1905,6 +2120,18 @@ macro_rules! icmpv6_error_message {
                 Some(packet)
             }
         }
+
+        impl<Inner: BufferMut> DynamicIcmpErrorMut<Ipv6>
+            for Nested<TruncatingSerializer<Inner>, IcmpPacketBuilder<Ipv6, $message>>
+        {
+            fn dyn_recalculate_checksum(&mut self) -> bool {
+                self.recalculate_checksum()
+            }
+
+            fn dyn_inner_packet(&mut self) -> Option<Ipv6PacketRaw<&mut [u8]>> {
+                self.inner_packet()
+            }
+        }
     };
 }
 
@@ -1913,7 +2140,7 @@ icmpv6_error_message!(Icmpv6PacketTooBig);
 icmpv6_error_message!(IcmpTimeExceeded);
 icmpv6_error_message!(Icmpv6ParameterProblem);
 
-impl<I: FilterIpExt, M: igmp::MessageType<EmptyBuf>> MaybeIcmpErrorMut<I>
+impl<M: igmp::MessageType<EmptyBuf>> MaybeIcmpErrorMut<Ipv4>
     for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
 {
     type IcmpErrorMut<'a>
@@ -1926,11 +2153,27 @@ impl<I: FilterIpExt, M: igmp::MessageType<EmptyBuf>> MaybeIcmpErrorMut<I>
     }
 }
 
+impl<M: igmp::MessageType<EmptyBuf>> DynamicMaybeIcmpErrorMut<Ipv4>
+    for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
+{
+    fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<Ipv4>> {
+        self.icmp_error_mut().map(|x| match x {})
+    }
+}
+
 impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacket
     for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
 {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
         None
+    }
+}
+
+impl<M: igmp::MessageType<EmptyBuf>> DynamicMaybeTransportPacketMut<Ipv4>
+    for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
+{
+    fn dyn_transport_packet_mut(&mut self) -> Option<&mut dyn TransportPacketMut<Ipv4>> {
+        self.transport_packet_mut().map(|x| match x {})
     }
 }
 
@@ -1974,6 +2217,14 @@ impl<I> MaybeTransportPacketMut<Ipv4>
     }
 }
 
+impl<I> DynamicMaybeTransportPacketMut<Ipv4>
+    for InnerSerializer<IgmpMembershipReportV3Builder<I>, EmptyBuf>
+{
+    fn dyn_transport_packet_mut(&mut self) -> Option<&mut dyn TransportPacketMut<Ipv4>> {
+        self.transport_packet_mut().map(|x| match x {})
+    }
+}
+
 impl<I: IpExt, II, B> MaybeIcmpErrorPayload<I>
     for InnerSerializer<IgmpMembershipReportV3Builder<II>, B>
 {
@@ -1982,9 +2233,7 @@ impl<I: IpExt, II, B> MaybeIcmpErrorPayload<I>
     }
 }
 
-impl<I: FilterIpExt, II, B> MaybeIcmpErrorMut<I>
-    for InnerSerializer<IgmpMembershipReportV3Builder<II>, B>
-{
+impl<I, B> MaybeIcmpErrorMut<Ipv4> for InnerSerializer<IgmpMembershipReportV3Builder<I>, B> {
     type IcmpErrorMut<'a>
         = Never
     where
@@ -1992,6 +2241,12 @@ impl<I: FilterIpExt, II, B> MaybeIcmpErrorMut<I>
 
     fn icmp_error_mut<'a>(&'a mut self) -> Option<Self::IcmpErrorMut<'a>> {
         None
+    }
+}
+
+impl<I, B> DynamicMaybeIcmpErrorMut<Ipv4> for InnerSerializer<IgmpMembershipReportV3Builder<I>, B> {
+    fn dyn_icmp_error_mut(&mut self) -> Option<&mut dyn DynamicIcmpErrorMut<Ipv4>> {
+        self.icmp_error_mut().map(|x| match x {})
     }
 }
 
@@ -2107,7 +2362,7 @@ impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
         })
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,

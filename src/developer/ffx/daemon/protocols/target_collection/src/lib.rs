@@ -984,7 +984,6 @@ mod tests {
         query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(temp_dir.display().to_string()))
-            .await
             .unwrap();
     }
 
@@ -999,7 +998,6 @@ mod tests {
             .query("discovery.mdns.autoconnect")
             .level(Some(ConfigLevel::User))
             .set(json!(false))
-            .await
             .unwrap();
 
         const NAME: &'static str = "foo";
@@ -1121,15 +1119,16 @@ mod tests {
         let tc_clone = Rc::clone(&tc);
         let local_node = overnet_core::Router::new(None).unwrap();
 
-        let usbv::TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope,
-        } = usbv::TestConnection::new();
+        let (
+            usbv::TestHost { host, event_receiver: _ },
+            usbv::TestConnection {
+                cid,
+                connection,
+                mut incoming_requests,
+                abort_transfer: _,
+                scope,
+            },
+        ) = usbv::TestConnection::new();
 
         let handled = scope.compute_local(async move {
             handle_usb_target_impl(cid, &tc_clone, &local_node, host).await

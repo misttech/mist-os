@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
+use assembly_api::{create_system, product_assembly};
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_assembly_args::*;
@@ -27,13 +28,13 @@ impl FfxMain for AssemblyTool {
         // an error.
         match self.cmd.op_class {
             OperationClass::CreateSystem(args) => {
-                operations::create_system::create_system(args).await.context("Create System")
+                create_system(args.into()).context("Create System").map(|_| ())
             }
             OperationClass::CreateUpdate(args) => {
                 operations::create_update::create_update(args).context("Create Update Package")
             }
             OperationClass::Product(args) => {
-                operations::product::assemble(args).context("Product Assembly")
+                product_assembly(args.into()).context("Product Assembly").map(|_| ())
             }
             OperationClass::SizeCheck(args) => match args.op_class {
                 SizeCheckOperationClass::Package(args) => {

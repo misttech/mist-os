@@ -55,7 +55,7 @@ void VsyncMonitor::UpdateStatistics() {
     return;
   }
 
-  zx::time now = zx::clock::get_monotonic();
+  zx::time_monotonic now = zx::clock::get_monotonic();
   zx::duration since_last_vsync = now - last_vsync_timestamp_.load();
 
   if (since_last_vsync > kVsyncStallThreshold) {
@@ -69,7 +69,7 @@ void VsyncMonitor::UpdateStatistics() {
   }
 }
 
-void VsyncMonitor::OnVsync(zx::time vsync_timestamp,
+void VsyncMonitor::OnVsync(zx::time_monotonic vsync_timestamp,
                            display::DriverConfigStamp vsync_config_stamp) {
   last_vsync_ns_property_.Set(vsync_timestamp.get());
 

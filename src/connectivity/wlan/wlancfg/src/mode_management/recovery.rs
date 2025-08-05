@@ -575,37 +575,37 @@ mod tests {
 
     #[fuchsia::test]
     fn test_recovery_action_equality() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         assert_eq!(
             RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
             RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
         );
         assert_eq!(
             RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy {
-                phy_id: rng.gen::<u16>()
+                phy_id: rng.random::<u16>()
             }),
             RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy {
-                phy_id: rng.gen::<u16>()
+                phy_id: rng.random::<u16>()
             }),
         );
         assert_eq!(
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
         );
         assert_eq!(
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp {
-                iface_id: rng.gen::<u16>()
+                iface_id: rng.random::<u16>()
             }),
         );
     }

@@ -13,7 +13,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #
 # Parameters
 #
-#   additional_base_packages
+#   additional_cache_packages
 #     Additional package labels to include in the product assembly
 #     configuration.  These must not be groups, but labels of fuchsia_package()
 #     targets.
@@ -59,7 +59,7 @@ template("assemble_network_conformance_system") {
         }
       }
     }
-    base_packages = [
+    cache_packages = [
       {
         package_target = "//src/connectivity/network/net-cli"
       },
@@ -68,9 +68,9 @@ template("assemble_network_conformance_system") {
       },
     ]
   }
-  if (defined(invoker.additional_base_packages)) {
-    foreach(_package, invoker.additional_base_packages) {
-      product_assembly_base.base_packages += [
+  if (defined(invoker.additional_cache_packages)) {
+    foreach(_package, invoker.additional_cache_packages) {
+      product_assembly_base.cache_packages += [
         {
           package_target = _package
         },

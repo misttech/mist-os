@@ -34,6 +34,7 @@ func affectedShard(env build.Environment, os string, ids ...int) *Shard {
 		Tests:      tests,
 		Env:        env,
 		ExpectsSSH: true,
+		HostCPU:    GetHostCPU(env, false),
 	}
 }
 
@@ -45,20 +46,21 @@ func isolatedShard(env build.Environment, os string, id int) *Shard {
 		Tests:      []Test{test},
 		Env:        env,
 		ExpectsSSH: true,
+		HostCPU:    GetHostCPU(env, false),
 	}
 }
 
 func TestSplitOutMultipliers(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{"device_type": "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU", "cpu": "x64"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{"device_type": "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC", "cpu": "x64"},
 		Tags:       []string{},
 	}
 	env3 := build.Environment{
-		Dimensions: build.DimensionSet{"os": "linux"},
+		Dimensions: build.DimensionSet{"os": "linux", "cpu": "x64"},
 		Tags:       []string{},
 	}
 
@@ -91,6 +93,7 @@ func TestSplitOutMultipliers(t *testing.T) {
 			Env:         env,
 			ExpectsSSH:  true,
 			TimeoutSecs: int(computeShardTimeout(subshard{time.Duration(timeoutSecs) * time.Second, tests}).Seconds()),
+			HostCPU:     GetHostCPU(env, false),
 		}
 	}
 

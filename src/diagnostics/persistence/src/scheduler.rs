@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fetcher::{FetchCommand, Fetcher};
-use fuchsia_async::{self as fasync, TaskGroup};
+use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct Scheduler {
+    scope: fasync::ScopeHandle,
     // This is a global lock. Scheduler only does schedule() which is synchronous and quick.
     state: Arc<Mutex<State>>,
 }
@@ -23,7 +24,6 @@ pub(crate) struct Scheduler {
 struct State {
     fetcher: Fetcher,
     services: HashMap<ServiceName, HashMap<Tag, TagState>>,
-    tasks: TaskGroup,
 }
 
 struct TagState {
@@ -33,7 +33,7 @@ struct TagState {
 }
 
 impl Scheduler {
-    pub(crate) fn new(fetcher: Fetcher, config: &Config) -> Self {
+    pub(crate) fn new(scope: fasync::ScopeHandle, fetcher: Fetcher, config: &Config) -> Self {
         let mut services = HashMap::new();
         for (service, tags) in config {
             let mut tag_states = HashMap::new();
@@ -49,14 +49,17 @@ impl Scheduler {
             }
             services.insert(service.clone(), tag_states);
         }
-        let state = State { fetcher, services, tasks: TaskGroup::new() };
-        Scheduler { state: Arc::new(Mutex::new(state)) }
+        Scheduler { scope, state: Arc::new(Mutex::new(State { fetcher, services })) }
     }
 
     /// Gets a service name and a list of valid tags, and queues any fetches that are not already
     /// pending. Updates the last-fetched time on any tag it queues, setting it equal to the later
     /// of the current time and the time the fetch becomes possible.
     pub(crate) fn schedule(&self, service: &ServiceName, tags: Vec<Tag>) {
+        if tags.is_empty() {
+            return;
+        }
+
         // Every tag we process should use the same Now
         let now = zx::MonotonicInstant::get();
         let mut state = self.state.lock();
@@ -93,26 +96,20 @@ impl Scheduler {
 
         // Schedule tags that need to be fetch later.
         while let Some((next_fetch, tags)) = later_tags.pop_first() {
-            self.enqueue(&mut state, next_fetch, FetchCommand { service: service.clone(), tags });
-        }
-    }
-
-    fn enqueue(&self, state: &mut State, time: zx::MonotonicInstant, command: FetchCommand) {
-        let this = self.clone();
-        let mut fetcher = state.fetcher.clone();
-        state.tasks.spawn(async move {
-            fasync::Timer::new(time).await;
-            {
-                let mut state = this.state.lock();
-                let Some(tag_states) = state.services.get_mut(&command.service) else {
+            let state = self.state.clone();
+            let service = service.clone();
+            self.scope.spawn(async move {
+                fasync::Timer::new(next_fetch).await;
+                let mut state = state.lock();
+                let Some(tag_states) = state.services.get_mut(&service.clone()) else {
                     return;
                 };
-                for tag in command.tags.iter() {
+                for tag in tags.iter() {
                     tag_states.get_mut(tag).unwrap().state = FetchState::Idle;
                 }
-            }
-            fetcher.send(command);
-        });
+                state.fetcher.send(FetchCommand { service: service.clone(), tags });
+            });
+        }
     }
 }
 

@@ -152,9 +152,9 @@ static zx_status_t machina_board_bind(void* ctx, zx_device_t* parent) {
     return endpoints.error_value();
   }
 
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
+  zx_status_t status = device_connect_fragment_runtime_protocol(
+      parent, "default", fpbus::Service::PlatformBus::ServiceName,
+      fpbus::Service::PlatformBus::Name, endpoints->server.TakeHandle().release());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to connect to platform bus: %s", zx_status_get_string(status));
     return status;

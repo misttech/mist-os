@@ -145,6 +145,10 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             Config::new(ConfigValueType::Int32, refresh_rate_max.into()),
         )?;
         builder.set_config_capability(
+            "fuchsia.scenic.FrameCounterOverlay",
+            Config::new(ConfigValueType::Bool, ui_config.scenic_frame_counter_overlay.into()),
+        )?;
+        builder.set_config_capability(
             "fuchsia.ui.SupportedInputDevices",
             Config::new(
                 ConfigValueType::Vector {

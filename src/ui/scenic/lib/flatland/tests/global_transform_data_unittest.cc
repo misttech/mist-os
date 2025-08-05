@@ -37,7 +37,8 @@ ImageRect GetImageRectForMatrix(const glm::mat3& matrix, ImageFlip image_flip = 
   allocation::ImageMetadata image = {
       .width = kImageWidth, .height = kImageHeight, .flip = image_flip};
   const auto rectangles = ComputeGlobalRectangles(
-      {matrix}, {ImageSampleRegion{0, 0, kImageWidth, kImageHeight}}, {kUnclippedRegion}, {image});
+      {matrix}, {ImageSampleRegion({.x = 0, .y = 0, .width = kImageWidth, .height = kImageHeight})},
+      {kUnclippedRegion}, {image});
   EXPECT_EQ(rectangles.size(), 1ul);
   return rectangles[0];
 }
@@ -50,7 +51,8 @@ ImageRect GetImageRectForMatrixAndClip(const glm::mat3& matrix, const TransformC
   allocation::ImageMetadata image = {
       .width = kImageWidth, .height = kImageHeight, .flip = image_flip};
   const auto rectangles = ComputeGlobalRectangles(
-      {matrix}, {ImageSampleRegion{0, 0, kImageWidth, kImageHeight}}, {clip}, {image});
+      {matrix}, {ImageSampleRegion({.x = 0, .y = 0, .width = kImageWidth, .height = kImageHeight})},
+      {clip}, {image});
   EXPECT_EQ(rectangles.size(), 1ul);
   return rectangles[0];
 }
@@ -844,8 +846,8 @@ TEST(ImageRectTest, MultipleParentTest) {
 
   // Set up the uber struct with the above topology. Set the doubly-parented child (1,4) up
   // with an image, hit region and clip region to make sure those get duplicated properly.
-  constexpr TransformClipRegion kClipRegion({5, 10, 30, 40});
-  const flatland::HitRegion kHitRegion({1, 2, 10, 20});
+  constexpr TransformClipRegion kClipRegion({.x = 5, .y = 10, .width = 30, .height = 40});
+  const flatland::HitRegion kHitRegion({.x = 1, .y = 2, .width = 10, .height = 20});
   const float kScale = 2.0f;
 
   const uint32_t kImageId = 7;
@@ -918,16 +920,10 @@ TEST(ImageRectTest, MultipleParentTest) {
     const auto second = vec[1];
 
     // The first clip region should match exactly the hit region above.
-    EXPECT_EQ(first.region().x, kHitRegion.region().x);
-    EXPECT_EQ(first.region().y, kHitRegion.region().y);
-    EXPECT_EQ(first.region().width, kHitRegion.region().width);
-    EXPECT_EQ(first.region().height, kHitRegion.region().height);
+    EXPECT_EQ(first.region(), kHitRegion.region());
 
     // The second one should be magnified by the scale factor.
-    EXPECT_EQ(second.region().x, kScale * kHitRegion.region().x);
-    EXPECT_EQ(second.region().y, kScale * kHitRegion.region().y);
-    EXPECT_EQ(second.region().width, kScale * kHitRegion.region().width);
-    EXPECT_EQ(second.region().height, kScale * kHitRegion.region().height);
+    EXPECT_EQ(second.region(), kHitRegion.region().ScaledBy(kScale));
   }
 }
 
@@ -1000,10 +996,7 @@ TEST(GlobalImageDataTest, EmptySampleRegionsAreInvalid) {
       ComputeGlobalImageSampleRegions(topology_vector, parent_indices, uber_structs);
   EXPECT_EQ(expected_sample_regions.size(), global_sample_regions.size());
   for (uint32_t i = 0; i < global_sample_regions.size(); i++) {
-    EXPECT_EQ(expected_sample_regions[i].x, global_sample_regions[i].x);
-    EXPECT_EQ(expected_sample_regions[i].y, global_sample_regions[i].y);
-    EXPECT_EQ(expected_sample_regions[i].width, global_sample_regions[i].width);
-    EXPECT_EQ(expected_sample_regions[i].height, global_sample_regions[i].height);
+    EXPECT_EQ(expected_sample_regions[i], global_sample_regions[i]);
   }
 }
 
@@ -1023,7 +1016,9 @@ TEST(GlobalImageDataTest, ComplicatedGraphImageSampleRegions) {
   auto uber_struct = std::make_unique<UberStruct>();
 
   GlobalImageSampleRegionVector expected_sample_regions = {
-      {0, 0, 81, 15}, {5, 18, 100, 145}, {10, 4, 10, 667}, {33, 99, 910, 783}, {90, 76, 392, 991},
+      ImageSampleRegion({0, 0, 81, 15}),     ImageSampleRegion({5, 18, 100, 145}),
+      ImageSampleRegion({10, 4, 10, 667}),   ImageSampleRegion({33, 99, 910, 783}),
+      ImageSampleRegion({90, 76, 392, 991}),
   };
 
   uber_struct->local_image_sample_regions[{1, 0}] = expected_sample_regions[0];
@@ -1040,10 +1035,7 @@ TEST(GlobalImageDataTest, ComplicatedGraphImageSampleRegions) {
       ComputeGlobalImageSampleRegions(topology_vector, parent_indices, uber_structs);
   EXPECT_EQ(expected_sample_regions.size(), global_sample_regions.size());
   for (uint32_t i = 0; i < global_sample_regions.size(); i++) {
-    EXPECT_EQ(expected_sample_regions[i].x, global_sample_regions[i].x);
-    EXPECT_EQ(expected_sample_regions[i].y, global_sample_regions[i].y);
-    EXPECT_EQ(expected_sample_regions[i].width, global_sample_regions[i].width);
-    EXPECT_EQ(expected_sample_regions[i].height, global_sample_regions[i].height);
+    EXPECT_EQ(expected_sample_regions[i], global_sample_regions[i]);
   }
 }
 
@@ -1451,7 +1443,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
   uint64_t display_height = 500;
 
   auto transparent_image_data = allocation::ImageMetadata();
-  transparent_image_data.blend_mode = fuchsia_ui_composition::BlendMode::kSrcOver;
+  transparent_image_data.blend_mode = BlendMode::kPremultipliedAlpha();
 
   // There are full screen rects at indices [1, 3, and 6]. Indices 3 and 6 are transparent,
   // but 1 is not. So we should ultimately only cull the rect at index 0, leaving 7 output

@@ -435,7 +435,7 @@ where
                 // best effort to avoid collisions, but it guarantees that
                 // fragment IDs can't be tracked as an attack vector.
                 // We avoid a zero fragment ID like netstack2 does.
-                WrapFragmentationId(rng.rng().gen_range(1..=u32::MAX))
+                WrapFragmentationId(rng.rng().random_range(1..=u32::MAX))
             },
         );
         identifier

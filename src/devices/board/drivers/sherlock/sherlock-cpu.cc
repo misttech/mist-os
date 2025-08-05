@@ -25,7 +25,7 @@ const std::vector<fpbus::Mmio> cpu_mmios{
     {{
         // AOBUS
         .base = T931_AOBUS_BASE,
-        .length = T931_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
 };
 

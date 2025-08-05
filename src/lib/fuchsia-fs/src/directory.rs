@@ -360,9 +360,10 @@ pub async fn create_randomly_named_file(
     prefix: &str,
     flags: fio::Flags,
 ) -> Result<(String, fio::FileProxy), OpenError> {
-    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::distr::{Alphanumeric, SampleString as _};
+    use rand::rngs::SmallRng;
     use rand::SeedableRng as _;
-    let mut rng = rand::rngs::SmallRng::from_entropy();
+    let mut rng = SmallRng::from_os_rng();
 
     let flags = flags | fio::Flags::FLAG_MUST_CREATE;
 

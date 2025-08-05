@@ -6,7 +6,6 @@ use crate::diagnostics::TRACE_CATEGORY;
 use crate::identity::ComponentIdentity;
 use crate::logs::multiplex::PinStream;
 use crate::logs::shared_buffer::{self, ContainerBuffer, LazyItem};
-use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use derivative::Derivative;
@@ -19,7 +18,7 @@ use futures::future::{Fuse, FusedFuture};
 use futures::prelude::*;
 use futures::select;
 use futures::stream::StreamExt;
-use log::{debug, error, warn};
+use log::{debug, error};
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -55,10 +54,6 @@ pub struct LogsArtifactsContainer {
 
 #[derive(Debug)]
 struct ContainerState {
-    /// Number of legacy sockets currently being drained for this component.  Sockets that use
-    /// structured messages use the buffer's socket handling.
-    num_active_legacy_sockets: u64,
-
     /// Number of LogSink channels currently being listened to for this component.
     num_active_channels: u64,
 
@@ -107,7 +102,6 @@ impl LogsArtifactsContainer {
             buffer,
             state: Arc::new(Condition::new(ContainerState {
                 num_active_channels: 0,
-                num_active_legacy_sockets: 0,
                 interests,
                 is_initializing: true,
             })),
@@ -229,15 +223,11 @@ impl LogsArtifactsContainer {
             guard.num_active_channels += 1;
             guard.is_initializing = false;
         }
-        scope.spawn(Arc::clone(self).actually_handle_log_sink(stream, scope.clone()));
+        scope.spawn(Arc::clone(self).actually_handle_log_sink(stream));
     }
 
     /// This function does not return until the channel is closed.
-    async fn actually_handle_log_sink(
-        self: Arc<Self>,
-        mut stream: LogSinkRequestStream,
-        scope: fasync::ScopeHandle,
-    ) {
+    async fn actually_handle_log_sink(self: Arc<Self>, mut stream: LogSinkRequestStream) {
         let mut previous_interest_sent = None;
         debug!(identity:% = self.identity; "Draining LogSink channel.");
 
@@ -249,13 +239,9 @@ impl LogsArtifactsContainer {
                 next = stream.next() => {
                     let Some(next) = next else { break };
                     match next {
-                        Ok(LogSinkRequest::Connect { socket, .. }) => {
-                            // TODO(https://fxbug.dev/378977533): Add support for ingesting
-                            // the legacy log format directly to the shared buffer.
-                            let socket = fasync::Socket::from_socket(socket);
-                            let log_stream = LogMessageSocket::new(socket, Arc::clone(&self.stats));
-                            self.state.lock().num_active_legacy_sockets += 1;
-                            scope.spawn(Arc::clone(&self).drain_messages(log_stream));
+                        Ok(LogSinkRequest::Connect { .. }) => {
+                            error!("Received unexpected Connect message from {:?}", self.identity);
+                            return;
                         }
                         Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
                             self.buffer.add_socket(socket);
@@ -304,31 +290,8 @@ impl LogsArtifactsContainer {
         self.check_inactive();
     }
 
-    /// Drain a `LogMessageSocket` which wraps a socket from a component
-    /// generating logs.
-    pub async fn drain_messages<E>(self: Arc<Self>, mut log_stream: LogMessageSocket<E>)
-    where
-        E: Encoding + Unpin,
-    {
-        debug!(identity:% = self.identity; "Draining messages from a socket.");
-        loop {
-            match log_stream.next().await {
-                Some(Ok(message)) => self.ingest_message(message),
-                Some(Err(err)) => {
-                    warn!(source:% = self.identity, err:%; "closing socket");
-                    break;
-                }
-                None => break,
-            }
-        }
-        debug!(identity:% = self.identity; "Socket closed.");
-        self.state.lock().num_active_legacy_sockets -= 1;
-        self.check_inactive();
-    }
-
     /// Updates log stats in inspect and push the message onto the container's buffer.
     pub fn ingest_message(&self, message: StoredMessage) {
-        self.stats.ingest_message(message.size(), message.severity());
         self.buffer.push_back(message.bytes());
     }
 
@@ -411,10 +374,7 @@ impl LogsArtifactsContainer {
     /// objects to drain.
     pub fn is_active(&self) -> bool {
         let state = self.state.lock();
-        state.is_initializing
-            || state.num_active_legacy_sockets > 0
-            || state.num_active_channels > 0
-            || self.buffer.is_active()
+        state.is_initializing || state.num_active_channels > 0 || self.buffer.is_active()
     }
 
     /// Called whenever there's a transition that means the component might no longer be active.
@@ -436,6 +396,10 @@ impl LogsArtifactsContainer {
     pub fn mark_stopped(&self) {
         self.state.lock().is_initializing = false;
         self.check_inactive();
+    }
+
+    pub fn buffer(&self) -> &ContainerBuffer {
+        &self.buffer
     }
 }
 
@@ -519,7 +483,7 @@ impl PartialOrd for Interest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::shared_buffer::SharedBuffer;
+    use crate::logs::shared_buffer::{create_ring_buffer, SharedBuffer};
     use fidl_fuchsia_diagnostics::{ComponentSelector, StringSelector};
     use fidl_fuchsia_diagnostics_types::Severity;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
@@ -541,7 +505,11 @@ mod tests {
                 .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
                 .expect("failed to attach component log stats"),
         );
-        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}));
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(1024 * 1024),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container = Arc::new(LogsArtifactsContainer::new(
             identity,
             std::iter::empty(),

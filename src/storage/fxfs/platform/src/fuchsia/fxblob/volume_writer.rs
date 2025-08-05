@@ -129,8 +129,8 @@ async fn new_temporary_handle(
 }
 
 async fn write_data(handle: &DataObjectHandle<FxVolume>, payload: zx::Vmo) -> Result<(), Error> {
-    let size = payload.get_stream_size()?;
-    let mut reader = SparseReader::new(VmoReader { vmo: payload, size, offset: 0 })?;
+    let stream = zx::Stream::create(zx::StreamOptions::MODE_READ, &payload, 0)?;
+    let mut reader = SparseReader::new(stream)?;
 
     // Pre-allocate enough space for the image.
     let unsparsed_size = {
@@ -376,38 +376,6 @@ async fn copy_blob(
     Ok(())
 }
 
-struct VmoReader {
-    vmo: zx::Vmo,
-    size: u64,
-    offset: u64,
-}
-
-// TODO(https://fxbug.dev/397515768): Propagate read errors, don't unwrap.
-impl std::io::Read for VmoReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.offset >= self.size || buf.len() == 0 {
-            return Ok(0);
-        }
-        let bytes_available = (self.size - self.offset) as usize;
-        let bytes_read = std::cmp::min(buf.len(), bytes_available);
-        self.vmo.read(&mut buf[..bytes_read], self.offset).unwrap();
-        self.offset += bytes_read as u64;
-        Ok(bytes_read)
-    }
-}
-
-// TODO(https://fxbug.dev/397515768): Propagate seek errors, don't unwrap.
-impl std::io::Seek for VmoReader {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        self.offset = match pos {
-            SeekFrom::Current(offset) => self.offset.checked_add_signed(offset).unwrap(),
-            SeekFrom::Start(offset) => offset,
-            SeekFrom::End(offset) => self.size.checked_add_signed(offset).unwrap(),
-        };
-        Ok(self.offset)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,40 +406,6 @@ mod tests {
     const NUM_BLOCKS: u64 = 8192;
     const DEVICE_SIZE: u64 = BLOCK_SIZE as u64 * NUM_BLOCKS;
 
-    struct VmoWriter {
-        vmo: zx::Vmo,
-        size: u64,
-        offset: u64,
-    }
-
-    impl std::io::Seek for VmoWriter {
-        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-            self.offset = match pos {
-                SeekFrom::Current(offset) => self.offset.checked_add_signed(offset).unwrap(),
-                SeekFrom::Start(offset) => offset,
-                SeekFrom::End(offset) => self.size.checked_add_signed(offset).unwrap(),
-            };
-            Ok(self.offset)
-        }
-    }
-
-    impl std::io::Write for VmoWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            if self.offset >= self.size || buf.len() == 0 {
-                return Ok(0);
-            }
-            let bytes_available = (self.size - self.offset) as usize;
-            let bytes_written = std::cmp::min(buf.len(), bytes_available);
-            self.vmo.write(&buf[..bytes_written], self.offset).unwrap();
-            self.offset += bytes_written as u64;
-            Ok(bytes_written)
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
     async fn create_sparse_fxblob_image() -> zx::Vmo {
         let fxblob_vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
         let used_space = {
@@ -500,20 +434,16 @@ mod tests {
             fxblob.finalize().await.unwrap()
         };
 
-        let builder = sparse::builder::SparseImageBuilder::new()
+        sparse::builder::SparseImageBuilder::new()
             .set_block_size(BLOCK_SIZE)
             .add_source(sparse::builder::DataSource::Vmo {
                 vmo: fxblob_vmo,
                 size: used_space,
                 offset: 0,
             })
-            .add_source(sparse::builder::DataSource::Skip(DEVICE_SIZE - used_space));
-        let size = builder.built_size();
-        let vmo = zx::Vmo::create(size).unwrap();
-        let mut writer = VmoWriter { vmo, size, offset: 0 };
-        builder.build(&mut writer).unwrap();
-        let VmoWriter { vmo, .. } = writer;
-        vmo
+            .add_source(sparse::builder::DataSource::Skip(DEVICE_SIZE - used_space))
+            .build_vmo()
+            .unwrap()
     }
 
     #[fasync::run(10, test)]

@@ -16,7 +16,6 @@ use fidl_fuchsia_update_installer_ext::{
     UpdateAttemptError,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_url::AbsolutePackageUrl;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::BoxStream;
@@ -75,7 +74,7 @@ trait UpdateInstaller {
 
     fn start_update(
         &mut self,
-        update_url: AbsolutePackageUrl,
+        update_url: url::Url,
         options: Options,
         reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
     ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>>;
@@ -90,7 +89,7 @@ impl UpdateInstaller for RealUpdateInstaller {
 
     fn start_update(
         &mut self,
-        update_url: AbsolutePackageUrl,
+        update_url: url::Url,
         options: Options,
         reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
     ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
@@ -117,11 +116,10 @@ async fn apply_system_update_impl(
         should_write_recovery: true,
         allow_attach_to_existing_attempt: true,
     };
-    let update_url = AbsolutePackageUrl::parse(
-        &target_channel_updater
-            .get_target_channel_update_url()
-            .unwrap_or_else(|| default_update_url.to_owned()),
-    )?;
+    let update_url = target_channel_updater
+        .get_target_channel_update_url()
+        .unwrap_or_else(|| default_update_url.to_owned())
+        .parse()?;
     let (reboot_controller, reboot_controller_server_end) =
         fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
@@ -211,7 +209,7 @@ mod test_apply_system_update_impl {
 
         fn start_update(
             &mut self,
-            _update_url: AbsolutePackageUrl,
+            _update_url: url::Url,
             _options: Options,
             _reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
@@ -239,7 +237,7 @@ mod test_apply_system_update_impl {
 
     #[derive(Default)]
     struct ArgumentCapturingUpdateInstaller {
-        update_url: Option<AbsolutePackageUrl>,
+        update_url: Option<url::Url>,
         options: Option<Options>,
         reboot_controller_server_end: Option<Option<ServerEnd<RebootControllerMarker>>>,
         state: Option<State>,
@@ -250,7 +248,7 @@ mod test_apply_system_update_impl {
 
         fn start_update(
             &mut self,
-            update_url: AbsolutePackageUrl,
+            update_url: url::Url,
             options: Options,
             reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
@@ -279,10 +277,7 @@ mod test_apply_system_update_impl {
         .await
         .unwrap();
 
-        assert_eq!(
-            update_installer.update_url,
-            Some(AbsolutePackageUrl::parse(TEST_DEFAULT_UPDATE_URL).unwrap())
-        );
+        assert_eq!(update_installer.update_url, Some(TEST_DEFAULT_UPDATE_URL.parse().unwrap()));
         assert_eq!(
             update_installer.options,
             Some(Options {
@@ -308,10 +303,7 @@ mod test_apply_system_update_impl {
         .await
         .unwrap();
 
-        assert_eq!(
-            update_installer.update_url,
-            Some(AbsolutePackageUrl::parse(target_url).unwrap())
-        );
+        assert_eq!(update_installer.update_url, Some(target_url.parse().unwrap()));
         assert_eq!(
             update_installer.options,
             Some(Options {
@@ -359,7 +351,7 @@ mod test_apply_system_update_impl {
 
         fn start_update(
             &mut self,
-            _update_url: AbsolutePackageUrl,
+            _update_url: url::Url,
             _options: Options,
             reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
@@ -399,7 +391,7 @@ mod test_apply_system_update_impl {
 
         fn start_update(
             &mut self,
-            _update_url: AbsolutePackageUrl,
+            _update_url: url::Url,
             _options: Options,
             _reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
@@ -491,7 +483,7 @@ mod test_apply_system_update_impl {
 
         fn start_update(
             &mut self,
-            _update_url: AbsolutePackageUrl,
+            _update_url: url::Url,
             _options: Options,
             reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {

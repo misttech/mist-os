@@ -11,7 +11,6 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
@@ -25,6 +24,7 @@
 
 #include "lib/inspect/cpp/hierarchy.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "tcs3400-regs.h"
 

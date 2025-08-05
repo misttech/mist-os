@@ -96,7 +96,7 @@ IommuImpl::~IommuImpl() {
 
   DisableFaultsLocked();
   if (irq_block_.allocated) {
-    msi_register_handler(&irq_block_, 0, nullptr, nullptr);
+    msi_register_handler(&irq_block_, 0, nullptr);
     msi_free_block(&irq_block_);
   }
 
@@ -268,7 +268,7 @@ bool IommuImpl::IsValidBusTxnId(uint64_t bus_txn_id) const {
 
 zx::result<uint64_t> IommuImpl::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
                                     uint64_t vmo_offset, size_t size, uint32_t perms) {
-  if (!IS_PAGE_ALIGNED(vmo_offset) || size == 0) {
+  if (!IS_PAGE_ROUNDED(vmo_offset) || size == 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
@@ -304,7 +304,7 @@ zx_status_t IommuImpl::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmObj
                                     dev_vaddr_t* vaddr, size_t* mapped_len) {
   DEBUG_ASSERT(vaddr);
   DEBUG_ASSERT(mapped_len);
-  if (!IS_PAGE_ALIGNED(map_token) || !IS_PAGE_ALIGNED(map_offset)) {
+  if (!IS_PAGE_ROUNDED(map_token) || !IS_PAGE_ROUNDED(map_offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
@@ -317,7 +317,7 @@ zx_status_t IommuImpl::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmObj
 
 zx_status_t IommuImpl::Unmap(uint64_t bus_txn_id, uint64_t map_token, size_t size) {
   const dev_vaddr_t vaddr = map_token;
-  if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
@@ -459,7 +459,7 @@ zx_status_t IommuImpl::EnableBiosReservedMappingsLocked() {
 
       LTRACEF("Enabling region [%lx, %lx) for %02x:%02x.%02x\n", mem->base_addr,
               mem->base_addr + mem->len, bdf.bus(), bdf.dev(), bdf.func());
-      size_t size = ROUNDUP(mem->len, PAGE_SIZE);
+      size_t size = ROUNDUP_PAGE_SIZE(mem->len);
       const uint32_t perms = IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE;
       status = dev->SecondLevelMapIdentity(mem->base_addr, size, perms);
       if (status != ZX_OK) {
@@ -475,7 +475,7 @@ zx_status_t IommuImpl::EnableBiosReservedMappingsLocked() {
 
 // Sets the root table pointer and invalidates the context-cache and IOTLB.
 zx_status_t IommuImpl::SetRootTablePointerLocked(paddr_t pa) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(pa));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(pa));
 
   auto root_table_addr = reg::RootTableAddress::Get().FromValue(0);
   // If we support extended contexts, use it.
@@ -573,7 +573,7 @@ void IommuImpl::InvalidateIotlbDomainAllLocked(uint32_t domain_id) {
 
 void IommuImpl::InvalidateIotlbPageLocked(uint32_t domain_id, dev_vaddr_t vaddr, uint pages_pow2) {
   DEBUG_ASSERT(lock_.lock().IsHeld());
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
   DEBUG_ASSERT(pages_pow2 < 64);
   DEBUG_ASSERT(pages_pow2 <= caps_.max_addr_mask_value());
   ASSERT(!caps_.required_write_buf_flushing());
@@ -712,7 +712,7 @@ zx_status_t IommuImpl::ConfigureFaultEventInterruptLocked() {
   auto fault_status_ctl = reg::FaultStatus::Get().ReadFrom(&mmio_);
   fault_status_ctl.WriteTo(&mmio_);
 
-  msi_register_handler(&irq_block_, 0, FaultHandler, this);
+  msi_register_handler(&irq_block_, 0, [this]() { FaultHandler(this); });
 
   // Unmask interrupts
   auto fault_event_ctl = reg::FaultEventControl::Get().ReadFrom(&mmio_);

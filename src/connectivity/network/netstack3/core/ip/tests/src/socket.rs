@@ -31,8 +31,8 @@ use netstack3_ip::device::IpDeviceIpExt;
 use netstack3_ip::marker::OptionDelegationMarker;
 use netstack3_ip::socket::{
     DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
-    DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketHandler,
-    MmsError, RouteResolutionOptions, SendOptions,
+    DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketArgs,
+    IpSocketHandler, MmsError, RouteResolutionOptions, SendOptions,
 };
 use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
@@ -327,11 +327,13 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let res = IpSocketHandler::<I, _>::new_ip_socket(
         &mut core_ctx.context(),
         bindings_ctx,
-        weak_local_device.as_ref().map(EitherDeviceId::Weak),
-        from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
-        SocketIpAddr::try_from(to_ip).unwrap(),
-        proto,
-        &WithTransparent(transparent),
+        IpSocketArgs {
+            device: weak_local_device.as_ref().map(EitherDeviceId::Weak),
+            local_ip: from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
+            remote_ip: SocketIpAddr::try_from(to_ip).unwrap(),
+            proto,
+            options: &WithTransparent(transparent),
+        },
     );
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
@@ -396,11 +398,13 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
     let sock = IpSocketHandler::<I, _>::new_ip_socket(
         &mut core_ctx.context(),
         bindings_ctx,
-        None,
-        from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
-        SocketIpAddr::try_from(to_ip).unwrap(),
-        I::ICMP_IP_PROTO,
-        &DefaultIpSocketOptions,
+        IpSocketArgs {
+            device: None,
+            local_ip: from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
+            remote_ip: SocketIpAddr::try_from(to_ip).unwrap(),
+            proto: I::ICMP_IP_PROTO,
+            options: &DefaultIpSocketOptions,
+        },
     )
     .unwrap();
 
@@ -473,11 +477,13 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
     let sock = IpSocketHandler::<I, _>::new_ip_socket(
         &mut core_ctx.context(),
         &mut bindings_ctx,
-        None,
-        None,
-        SocketIpAddr::try_from(remote_ip).unwrap(),
-        proto,
-        &socket_options,
+        IpSocketArgs {
+            device: None,
+            local_ip: None,
+            remote_ip: SocketIpAddr::try_from(remote_ip).unwrap(),
+            proto,
+            options: &socket_options,
+        },
     )
     .unwrap();
 
@@ -631,11 +637,13 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut core_ctx,
             bindings_ctx,
-            None,
-            None,
-            destination_ip,
-            I::ICMP_IP_PROTO,
-            &options,
+            IpSocketArgs {
+                device: None,
+                local_ip: None,
+                remote_ip: destination_ip,
+                proto: I::ICMP_IP_PROTO,
+                options: &options,
+            },
         )
         .unwrap();
 
@@ -712,11 +720,13 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
     let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
         &mut core_ctx,
         bindings_ctx,
-        None,
-        None,
-        SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
-        I::ICMP_IP_PROTO,
-        &DefaultIpSocketOptions,
+        IpSocketArgs {
+            device: None,
+            local_ip: None,
+            remote_ip: SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
+            proto: I::ICMP_IP_PROTO,
+            options: &DefaultIpSocketOptions,
+        },
     )
     .unwrap();
 

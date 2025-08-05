@@ -152,7 +152,7 @@ type CapturedFrameResult = struct {
 /// Non-IEEE custom structure to inform a SoftMAC device about the association negotiation outcome.
 // TODO(https://fxbug.dev/42119326): Remove if we are able to intersect the capabilities with beacon before associating
 type NegotiatedCapabilities = struct {
-    channel fuchsia.wlan.common.WlanChannel;
+    channel ieee80211.WlanChannel;
     capability_info fuchsia.wlan.common.CapabilityInfo;
     rates vector<uint8>:internal.MAX_ASSOC_BASIC_RATES;
     wmm_param box<WmmParameter>;

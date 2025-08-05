@@ -94,10 +94,9 @@ class PciePlatformInterface {
    * @param msi_id The ID (indexed from 0) with the block of MSIs to register a
    *        handler for.
    * @param handler A pointer to the handler to register, or NULL to unregister.
-   * @param ctx A context pointer to be supplied when the handler is invoked.
    */
-  virtual void RegisterMsiHandler(const msi_block_t* block, uint msi_id, int_handler handler,
-                                  void* ctx) {
+  virtual void RegisterMsiHandler(const msi_block_t* block, uint msi_id,
+                                  interrupt_handler_t handler) {
     // Bus driver code should not be calling this if the platform does not
     // indicate support for MSI.
     DEBUG_ASSERT(false);

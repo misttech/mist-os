@@ -33,7 +33,7 @@ arbitrary = { version = "1.0.3", features = ["derive"] }
 arc-swap = "1.7.1"
 argh = "0.1.12"
 arrayref = "0.3.9"
-arrayvec = "0.7.4"
+arrayvec = "0.7.6"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
 async-channel = "1.8.0"
@@ -89,7 +89,7 @@ crossbeam-utils = "0.8.21"
 crypto-common = "0.1.6"
 csv = "1.3.1"
 darling = "0.20.11"
-data-encoding = "2.1.2"
+data-encoding = "2.9.0"
 derivative = { version = "2.2.0", features = ["use_core"] }
 derive_builder = "0.11.1"
 difference = "2.0.0"
@@ -119,7 +119,7 @@ futures-io = "=0.3.30"
 futures-lite = "1.11.3"
 futures-test = "=0.3.30"
 futures-util = "=0.3.30"
-getrandom = { version = "0.2.10" }
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
 glob = "0.3.2"
 gpt = "3.0.0"
 half = "2.4.1"
@@ -180,18 +180,21 @@ pin-project = "1.0.11"
 pin-project-lite = "0.2.13"
 pin-weak = "1.1.0"
 pkcs8 = "0.10.2"
-png = "0.14" # saved for future use
+png = "0.17" # saved for future use
 pretty = "0.5.2"
 pretty_assertions = "1.2.1"
 prettytable-rs = "0.8.0"
-proptest = "1.5.0"
+proptest = "1.7.0"
 proptest-derive = "0.4.0"
 prost = "0.11.0"
 prost-build = "0.11.1"
 prost-types = "0.11.1"
-rand = { version = "0.8", features = ["small_rng"] }
-rand_core = "0.6.4"
-rand_xorshift = "0.3"
+rand = { version = "0.9.1", features = ["small_rng"] }
+rand_core = "0.9.3"
+rand_xorshift = "0.4"
+# NOTE: Use caution when updating to a new major version of `rapidhash` as this may cause hash
+# values to change. We rely on this crate for stable hashes.
+rapidhash = { version = "1.4.0", features = ["unsafe"] }
 rayon = "1.10.0"
 ref-cast = "1.0.24"
 regex = "1.7.3"
@@ -219,7 +222,7 @@ signature =  "1.4.0"
 simplelog = "0.10.2"
 siphasher = "0.3.11"
 slab = "0.4.9"
-smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
+smallvec = {version= "1.15.1", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.9", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"
@@ -249,7 +252,7 @@ unicode-segmentation = "1.12"
 unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
 untrusted = "0.9"
-url = "2.3"
+url = { version = "2.3", features = ["serde"] }
 utf8parse = "0.2.2"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = "2.4.2"
@@ -306,7 +309,7 @@ zeroize = "1.8.1"
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
 # keep-sorted start
-askama = { version = "0.12.1", default-features = false, features = ["config"] }
+askama = "0.14.0"
 async-fs = "1.6.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"
@@ -389,9 +392,11 @@ miow = { path = "empty/miow" }
 ntapi = { path = "empty/ntapi" }
 output_vt100 = { path = "empty/output_vt100" }
 pkg-config = { path = "empty/pkg-config" }
+r-efi = { path = "empty/r-efi" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
 vcpkg = { path = "empty/vcpkg" }
+wasi = { path = "empty/wasi" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0-wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
 winapi = { path = "empty/winapi" }
@@ -408,14 +413,12 @@ windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-ta
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 # keep-sorted start
-askama_derive = { path = "forks/askama_derive" }
 bt-common = { path = "forks/bluetooth/bt-common" }
 bt-gatt = { path = "forks/bluetooth/bt-gatt" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 libm = { path = "forks/libm" }
 nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
-nom-7_1_3 = { package = "nom", path = "forks/nom" }
 nom-language = { package = "nom-language", path = "forks/nom-language-0.1.0" }
 notify = { path = "forks/notify" }
 num-bigint-dig = { path = "forks/num-bigint-dig" }
@@ -426,6 +429,8 @@ openssl = { path = "forks/openssl-0.10.71" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
+# Fork of `rapidhash` has quality benchmarks removed; see forks/rapidhash-1.4.0/README.fuchsia.
+rapidhash = { path = "forks/rapidhash-1.4.0" }
 ring = { path = "forks/ring-0.17.8" }
 rustyline = { path = "forks/rustyline" }
 security-framework = { path = "forks/security-framework" }
@@ -537,7 +542,7 @@ env_vars = [
 visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
 reviewed_features = ["default"]
 
-[gn.package.bitflags."2.8.0"]
+[gn.package.bitflags."2.9.1"]
 reviewed_features = ["serde"]
 
 [gn.package.bssl-sys."0.1.0"]
@@ -630,6 +635,10 @@ rustflags = [ "--cfg=relaxed_coherence" ]
 env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.10", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.10" ]
 rustflags = []
 
+[gn.package.getrandom."0.3.3"]
+env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.3.3", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.3.3" ]
+rustflags = []
+
 [gn.package.group."0.12.1"]
 license_files = ["LICENSE-APACHE"]
 
@@ -694,9 +703,6 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 
 [gn.package.memoffset."0.9.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
-
-[gn.package.mime_guess."2.0.5"]
-env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
 [gn.package.mock-omaha-server."0.3.5"]
 rustflags = ["--cfg=fasync"]
@@ -860,9 +866,6 @@ rustflags = ["--cfg=rustc_1_26"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_xorshift."0.1.1"]
-license_files = ["LICENSE-APACHE"]
-
-[gn.package.rand_xorshift."0.3.0"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_xoshiro."0.1.0"]
@@ -1148,7 +1151,7 @@ env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-ucd-blo
 [gn.package.unicode-bidi."0.3.18"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.unicode-normalization."0.1.19"]
+[gn.package.unicode-normalization."0.1.24"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-segmentation."1.12.0"]

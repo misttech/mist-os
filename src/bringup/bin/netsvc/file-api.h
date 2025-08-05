@@ -12,7 +12,6 @@
 
 #include "src/bringup/bin/netsvc/netboot.h"
 #include "src/bringup/bin/netsvc/netcp.h"
-#include "src/bringup/bin/netsvc/paver.h"
 
 namespace netsvc {
 
@@ -44,12 +43,10 @@ class FileApiInterface {
 
 class FileApi : public FileApiInterface {
  public:
-  // FileApi does *not* take ownership of |paver|.
   explicit FileApi(bool is_zedboot,
                    std::unique_ptr<NetCopyInterface> netcp = std::make_unique<NetCopy>(),
                    fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo =
-                       fidl::ClientEnd<fuchsia_sysinfo::SysInfo>(),
-                   PaverInterface& paver = Paver::Get());
+                       fidl::ClientEnd<fuchsia_sysinfo::SysInfo>());
 
   ssize_t OpenRead(const char* filename, zx::duration timeout) final;
   tftp_status OpenWrite(const char* filename, size_t size, zx::duration timeout) final;
@@ -69,7 +66,6 @@ class FileApi : public FileApiInterface {
     kUnknown,    // No reads/writes currently in progress.
     kNetCopy,    // A file in /data
     kNetboot,    // A bootfs file
-    kPaver,      // A disk image which should be paved to disk
     kBoardInfo,  // A file containing the board name.
                  // Expected to return error if it doesn't match the current board name.
   };
@@ -88,9 +84,6 @@ class FileApi : public FileApiInterface {
 
   // Only valid when type_ == NetfileType::kNetboot.
   nbfile_t* netboot_file_ = nullptr;
-
-  // Used when type_ == NetfileType::kPaver.
-  PaverInterface& paver_;
 };
 
 }  // namespace netsvc

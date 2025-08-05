@@ -25,7 +25,7 @@ pub mod {{ module_name }} {
     }
 
     {% for method in protocol.methods %}
-        {% let method_name = filters::camel(method.name)? %}
+        {% let method_name = filters::escape_camel(method.name) %}
         pub struct {{ method_name }};
 
         impl ::fidl_next::Method for {{ method_name }} {
@@ -97,7 +97,7 @@ pub mod {{ module_name }} {
     mod ___detail {
         {% for method in protocol.methods %}
             {% if let Some(args) = self.get_method_args_struct(method) %}
-                {% let method_type_name = filters::camel(method.name)? %}
+                {% let method_type_name = filters::escape_camel(method.name) %}
                 {% let is_static = args.shape.max_out_of_line == 0 %}
 
                 pub struct {{ method_type_name }}<
@@ -164,7 +164,7 @@ pub mod {{ module_name }} {
                         }
 
                         {% for member in args.members %}
-                            {% let member_name = filters::snake(member.name)? %}
+                            {% let member_name = filters::escape_snake(member.name) %}
                             ::fidl_next::Encode::encode(self.{{ member_name }}, encoder, {{ member_name }})?;
                         {% endfor %}
                         Ok(())
@@ -192,8 +192,8 @@ pub mod {{ module_name }} {
             ___T: ::fidl_next::Transport,
         {
             {% for method in protocol.methods %}
-                {% let method_name = filters::snake(method.name)? %}
-                {% let method_type_name = filters::camel(method.name)? %}
+                {% let method_name = filters::escape_snake(method.name) %}
+                {% let method_type_name = filters::escape_camel(method.name) %}
 
                 {% match method.kind %}
                     {% when ProtocolMethodKind::OneWay %}
@@ -327,8 +327,8 @@ pub mod {{ module_name }} {
             ___T: ::fidl_next::Transport,
         {
             {% for method in protocol.methods %}
-                {% let method_name = filters::snake(method.name)? %}
-                {% let method_type_name = filters::camel(method.name)? %}
+                {% let method_name = filters::escape_snake(method.name) %}
+                {% let method_type_name = filters::escape_camel(method.name) %}
 
                 {% if method.kind == ProtocolMethodKind::Event %}
                     {% if let Some(args) = self.get_method_args_struct(method) %}
@@ -363,7 +363,7 @@ pub mod {{ module_name }} {
 
                     {{ self.doc_string(method.attributes) -}}
                     {% if method.maybe_response_payload.is_some() %}
-                        {% let method_type_name = filters::camel(method.name)? %}
+                        {% let method_type_name = filters::escape_camel(method.name) %}
                         pub fn {{ method_name }}_with<___R>(
                             &self,
                             request: ___R,
@@ -395,8 +395,8 @@ pub mod {{ module_name }} {
 pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
     {% for method in protocol.methods %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% let method_name = filters::snake(method.name)? %}
-            {% let method_type_name = filters::camel(method.name)? %}
+            {% let method_name = filters::escape_snake(method.name) %}
+            {% let method_type_name = filters::escape_camel(method.name) %}
 
             {{ self.doc_string(method.attributes) -}}
             fn {{ method_name }}(
@@ -428,7 +428,7 @@ where
     ___T: ::fidl_next::Transport,
     {% for method in protocol.methods %}
         {% if method.maybe_response_payload.is_some() %}
-            {% let method_type_name = filters::camel(method.name)? %}
+            {% let method_type_name = filters::escape_camel(method.name) %}
             <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response:
                 ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
         {% endif %}
@@ -442,7 +442,7 @@ where
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::snake(method.name)? %}
+                {% let method_name = filters::escape_snake(method.name) %}
                 {% if method.kind == ProtocolMethodKind::Event %}
                     {{ method.ordinal }} => {
                         {% if method.maybe_response_payload.is_some() %}
@@ -476,8 +476,8 @@ where
 /// See [`{{ protocol_name }}`] for more details.
 pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
     {% for method in protocol.methods %}
-        {% let method_name = filters::snake(method.name)? %}
-        {% let method_type_name = filters::camel(method.name)? %}
+        {% let method_name = filters::escape_snake(method.name) %}
+        {% let method_type_name = filters::escape_camel(method.name) %}
 
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
@@ -522,7 +522,7 @@ where
     ___T: ::fidl_next::Transport,
     {% for method in protocol.methods %}
         {% if method.maybe_request_payload.is_some() %}
-            {% let method_type_name = filters::camel(method.name)? %}
+            {% let method_type_name = filters::escape_camel(method.name) %}
             <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Request:
                 ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
         {% endif %}
@@ -536,7 +536,7 @@ where
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::snake(method.name)? %}
+                {% let method_name = filters::escape_snake(method.name) %}
                 {% if method.kind == ProtocolMethodKind::OneWay %}
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
@@ -573,7 +573,7 @@ where
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::snake(method.name)? %}
+                {% let method_name = filters::escape_snake(method.name) %}
                 {% if method.kind == ProtocolMethodKind::TwoWay %}
                     {{ method.ordinal }} => {
                         let responder = ::fidl_next::Responder::from_untyped(responder);

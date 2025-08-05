@@ -12,13 +12,12 @@ use crate::args::{
     RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
 };
 use anyhow::{bail, format_err, Context as _};
-use fidl_fuchsia_net_http::{self as http};
+use fetch_url::fetch_url;
 use fidl_fuchsia_pkg_rewrite::EngineMarker;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule as RewriteRule, RuleConfig};
 use fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::RepositoryUrl;
-use futures::io::copy;
 use futures::stream::TryStreamExt;
 use std::fs::File;
 use std::io;
@@ -177,7 +176,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                             let () = res.map_err(zx::Status::from_raw)?;
                         }
                         RepoAddSubCommand::Url(RepoAddUrlCommand { persist, name, repo_url }) => {
-                            let res = fetch_url(repo_url).await?;
+                            let res = fetch_url(repo_url, None).await?;
                             let mut repo: pkg::RepositoryConfig = serde_json::from_slice(&res)?;
                             // If a name is specified via the command line, override the
                             // automatically derived name.
@@ -336,45 +335,4 @@ async fn fetch_repos(
         .into_iter()
         .map(|repo| pkg::RepositoryConfig::try_from(repo).map_err(anyhow::Error::from))
         .collect()
-}
-
-async fn fetch_url<T: Into<String>>(url_string: T) -> Result<Vec<u8>, anyhow::Error> {
-    let http_svc = connect_to_protocol::<http::LoaderMarker>()
-        .context("Unable to connect to fuchsia.net.http.Loader")?;
-
-    let url_request = http::Request {
-        url: Some(url_string.into()),
-        method: Some(String::from("GET")),
-        headers: None,
-        body: None,
-        deadline: None,
-        ..Default::default()
-    };
-
-    let response =
-        http_svc.fetch(url_request).await.context("Error while calling Loader::Fetch")?;
-
-    if let Some(e) = response.error {
-        return Err(format_err!("LoaderProxy error - {:?}", e));
-    }
-
-    let socket = match response.body {
-        Some(s) => fasync::Socket::from_socket(s),
-        _ => {
-            return Err(format_err!("failed to read UrlBody from the stream"));
-        }
-    };
-
-    let mut body = Vec::new();
-    let bytes_received =
-        copy(socket, &mut body).await.context("Failed to read bytes from the socket")?;
-
-    if bytes_received < 1 {
-        return Err(format_err!(
-            "Failed to download data from url! bytes_received = {}",
-            bytes_received
-        ));
-    }
-
-    Ok(body)
 }

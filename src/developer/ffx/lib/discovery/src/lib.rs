@@ -307,35 +307,27 @@ impl Stream for TargetStream {
         let Some(event) = ready!(Pin::new(&mut self.queue).poll_next(cx)) else {
             return Poll::Ready(None);
         };
-
         let event = event?;
-
         if let Some(ref mut filter) = self.filter {
-            // TODO(colnnelson): This destructure feels odd. Can this be done
-            // better or differently?
-            let handle = match event {
-                TargetEvent::Added(ref handle) => handle,
-                TargetEvent::Removed(ref handle) => handle,
-            };
-
+            let handle = event.as_handle();
             if !filter.filter_target(handle) {
                 log::trace!(
                     "Skipping event for target handle: {} as it did not match our filter",
                     handle
                 );
-                // Schedule the future for this to be woken up again.
+                // Important: must schedule the future for this to be woken up again.
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
             }
         }
 
-        if matches!(event, TargetEvent::Added(_)) && self.notify_added
-            || matches!(event, TargetEvent::Removed(_)) && self.notify_removed
-        {
+        let should_notify_added = event.is_added() && self.notify_added;
+        let should_notify_removed = event.is_removed() && self.notify_removed;
+        let should_notify = should_notify_added || should_notify_removed;
+        if should_notify {
             return Poll::Ready(Some(Ok(event)));
         }
-
-        // Schedule the future for this to be woken up again.
+        // Important: must schedule the future for this to be woken up again.
         cx.waker().wake_by_ref();
         return Poll::Pending;
     }
@@ -399,13 +391,9 @@ pub mod test {
             TargetEvent::Removed(_) => "-",
         };
 
-        let handle = match event {
-            TargetEvent::Added(handle) => handle,
-            TargetEvent::Removed(handle) => handle,
-        };
-
-        let node_name = handle.node_name.unwrap_or(target_errors::UNKNOWN_TARGET_NAME.to_string());
-        let state = handle.state;
+        let handle = event.as_handle();
+        let node_name = handle.node_name.as_ref().map_or(target_errors::UNKNOWN_TARGET_NAME, |v| v);
+        let state = &handle.state;
 
         writeln!(writer, "{symbol}  {node_name}  {state}")?;
         Ok(())

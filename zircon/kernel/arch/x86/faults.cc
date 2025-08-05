@@ -477,22 +477,22 @@ static void handle_exception_types(iframe_t* frame) {
       break;
     }
     case X86_INT_IPI_GENERIC: {
-      mp_mbx_generic_irq(nullptr);
+      mp_mbx_generic_irq();
       apic_issue_eoi();
       break;
     }
     case X86_INT_IPI_RESCHEDULE: {
-      mp_mbx_reschedule_irq(nullptr);
+      mp_mbx_reschedule_irq();
       apic_issue_eoi();
       break;
     }
     case X86_INT_IPI_INTERRUPT: {
-      mp_mbx_interrupt_irq(nullptr);
+      mp_mbx_interrupt_irq();
       apic_issue_eoi();
       break;
     }
     case X86_INT_IPI_HALT: {
-      x86_ipi_halt_handler(nullptr);
+      x86_ipi_halt_handler();
       /* no return */
       break;
     }

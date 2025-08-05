@@ -340,8 +340,10 @@ impl CpuManager {
                             stats.last_time_in_suspend = res.suspend_duration;
                             stats.last_time_in_suspend_operations = res.suspend_overhead;
 
-                            if stats.last_time_in_suspend.is_some() {
+                            if let Some(time_in_suspend) = stats.last_time_in_suspend {
                                 stats.success_count = stats.success_count.map(|c| c + 1);
+                                stats.total_time_in_suspend =
+                                    stats.total_time_in_suspend.map(|t| t + time_in_suspend);
                             } else {
                                 log::warn!("Failed to suspend in Suspender");
                                 suspend_failed = true;

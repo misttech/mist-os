@@ -178,20 +178,13 @@ zx_status_t Nelson::Start() {
 void Nelson::DdkRelease() { delete this; }
 
 zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    return status;
+  zx::result client = DdkConnectRuntimeProtocol<fpbus::Service::PlatformBus>(parent);
+  if (client.is_error()) {
+    return client.status_value();
   }
 
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<Nelson>(&ac, parent, std::move(endpoints->client));
+  auto board = fbl::make_unique_checked<Nelson>(&ac, parent, std::move(client.value()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -230,11 +223,12 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
   };
 
   const char* fidl_service_offers[] = {fuchsia_hardware_platform_bus::Service::Name};
-  status = board->DdkAdd(ddk::DeviceAddArgs("nelson")
-                             .set_str_props(kBoardDriverProps)
-                             .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .set_runtime_service_offers({fidl_service_offers, 1})
-                             .forward_metadata(parent, DEVICE_METADATA_BOARD_PRIVATE));
+  zx_status_t status =
+      board->DdkAdd(ddk::DeviceAddArgs("nelson")
+                        .set_str_props(kBoardDriverProps)
+                        .set_outgoing_dir(directory_endpoints->client.TakeChannel())
+                        .set_runtime_service_offers({fidl_service_offers, 1})
+                        .forward_metadata(parent, DEVICE_METADATA_BOARD_PRIVATE));
   if (status != ZX_OK) {
     return status;
   }

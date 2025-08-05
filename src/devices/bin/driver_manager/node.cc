@@ -1136,7 +1136,7 @@ void Node::OnNodeServerUnbound(fidl::UnbindInfo info) {
     return;
   }
 
-  // IF the driver fails to bind to the node, don't remove the node.
+  // If the driver fails to bind to the node, don't remove the node.
   if (driver_component_.has_value() && driver_component_->state == DriverState::kBinding) {
     LOGF(WARNING, "The driver for node %s failed to bind.", name().c_str());
     return;
@@ -1570,6 +1570,12 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
     LOGF(WARNING, "Restarting node %s because of unexpected driver channel shutdown.",
          name().c_str());
     RestartNode();
+    return;
+  }
+
+  // If the driver fails to bind to the node, don't remove the node.
+  if (driver_component_.has_value() && driver_component_->state == DriverState::kBinding) {
+    LOGF(DEBUG, "Node: %s: driver channel closed during binding.", MakeComponentMoniker().c_str());
     return;
   }
 

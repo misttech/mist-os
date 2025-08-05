@@ -122,6 +122,40 @@ impl<OT: openthread::ot::BorderRouter> DriverState<OT> {
     }
 }
 
+impl<OT: openthread::ot::BorderAgent> DriverState<OT> {
+    // SAFETY: In general this is safe to call because `bool`s are
+    //         safe to write to or read from multiple threads.
+    //         This code happens to always be called from a single
+    //         thread anyway, so it is going to be safe regardless.
+    unsafe fn epskc_enabled_ref() -> &'static mut bool {
+        static mut EPSKC_ENABLED: bool = false;
+        #[allow(static_mut_refs)]
+        &mut EPSKC_ENABLED
+    }
+
+    pub fn is_epskc_enabled(&self) -> bool {
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `epskc_enabled_ref()`.
+        unsafe { *Self::epskc_enabled_ref() }
+    }
+
+    pub fn set_epskc_enabled(&mut self, enabled: bool) {
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `epskc_enabled_ref()`.
+        unsafe {
+            *Self::epskc_enabled_ref() = enabled;
+        }
+
+        info!("ePSKc has been {}.", if self.is_epskc_enabled() { "ENABLED" } else { "DISABLED" });
+
+        self.epskc_set_enabled_in_ot();
+    }
+
+    pub fn epskc_set_enabled_in_ot(&self) {
+        self.ot_instance.border_agent_ephemeral_key_set_enabled(self.is_epskc_enabled());
+    }
+}
+
 impl<OT: AsRef<ot::Instance>> DriverState<OT> {
     pub fn is_discovery_proxy_enabled(&self) -> bool {
         self.srp_discovery_proxy.is_some()

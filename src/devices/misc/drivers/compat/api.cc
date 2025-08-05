@@ -34,9 +34,6 @@ __EXPORT void device_suspend_reply(zx_device_t* dev, zx_status_t status, uint8_t
   dev->CompleteSuspend();
 }
 
-__EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t out_power_state,
-                                  uint32_t out_perf_state) {}
-
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
   if (device == nullptr) {
@@ -108,15 +105,6 @@ __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* 
   return dev->GetMetadata(type, buf, buflen, actual);
 }
 
-__EXPORT zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* out_size) {
-  return dev->GetMetadataSize(type, out_size);
-}
-
-__EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data,
-                                         size_t size) {
-  return dev->AddMetadata(type, data, size);
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return dev->AddCompositeNodeSpec(name, spec);
@@ -168,11 +156,6 @@ __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* hand
                                     service_name, instance_name, member_name);
 }
 
-__EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request) {
-  return device->ConnectFragmentFidl("default", service_name, protocol_name, zx::channel(request));
-}
-
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* service_name,
@@ -180,12 +163,6 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            zx_handle_t request) {
   return device->ConnectFragmentFidl(fragment_name, service_name, protocol_name,
                                      zx::channel(request));
-}
-
-__EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request) {
-  return dev->ConnectFragmentRuntime("default", service_name, protocol_name, fdf::Channel(request));
 }
 
 __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,

@@ -78,6 +78,17 @@ fn build_aac_source(bitrate: u32) -> MediaCodecConfig {
         .unwrap()
 }
 
+async fn test_encodable(config: &MediaCodecConfig) -> Result<(), MediaTaskError> {
+    // all sinks must support these options for audio input
+    let required_format = PcmFormat {
+        pcm_mode: AudioPcmMode::Linear,
+        bits_per_sample: 16,
+        frames_per_second: 48000,
+        channel_map: vec![AudioChannelId::Lf],
+    };
+    EncodedStream::test(required_format, config).await
+}
+
 impl MediaTaskBuilder for Builder {
     fn configure(
         &self,
@@ -110,8 +121,20 @@ impl MediaTaskBuilder for Builder {
 impl Builder {
     /// Make a new builder that will source audio from `source_type`.  See `sources::build_stream`
     /// for documentation on the types of streams that are available.
-    pub fn new(source_type: sources::AudioSourceType, aac_available: bool) -> Self {
-        Self { source_type, aac_available }
+    pub async fn new(
+        source_type: sources::AudioSourceType,
+        mut aac_available: bool,
+    ) -> Result<Self, MediaTaskError> {
+        // Check to see that we can encode SBC audio.
+        // This is a requirement of A2DP 1.3: Section 4.2
+        test_encodable(&MediaCodecConfig::min_sbc()).await?;
+        if aac_available {
+            if let Err(e) = test_encodable(&build_aac_source(0)).await {
+                warn!("AAC enabled by configuration but is not encodable: {e:?}, disabling");
+                aac_available = false;
+            }
+        }
+        Ok(Self { source_type, aac_available })
     }
 
     pub(crate) fn configure_task(
@@ -326,85 +349,105 @@ impl MediaTask for RunningTask {
     }
 }
 
-#[cfg(all(test, feature = "test_encoding"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    use bt_a2dp::media_types::*;
-    use bt_avdtp::MediaCodecType;
-    use fuchsia_bluetooth::types::Channel;
-    use fuchsia_inspect as inspect;
-    use fuchsia_sync::Mutex;
-    use futures::StreamExt;
-    use std::sync::{Arc, RwLock};
-    use test_util::assert_gt;
-
+    #[cfg(not(feature = "test_encoding"))]
     #[fuchsia::test]
-    fn configures_source_from_codec_config() {
-        let _exec = fasync::TestExecutor::new();
-        let builder = Builder::new(sources::AudioSourceType::BigBen, false);
+    async fn test_encoding_fails_in_non_encoding_test_environment() {
+        let builder_result = Builder::new(sources::AudioSourceType::BigBen, false).await;
 
-        // Minimum SBC requirements are mono, 48kHz
-        let mono_config = MediaCodecConfig::min_sbc();
-        let task = builder.configure_task(&PeerId(1), &mono_config).expect("should build okay");
-        assert_eq!(48000, task.pcm_format.frames_per_second);
-        assert_eq!(1, task.pcm_format.channel_map.len());
-
-        // A standard SBC audio config which is stereo and 44.1kHz
-        let sbc_codec_info = SbcCodecInfo::new(
-            SbcSamplingFrequency::FREQ44100HZ,
-            SbcChannelMode::JOINT_STEREO,
-            SbcBlockCount::SIXTEEN,
-            SbcSubBands::EIGHT,
-            SbcAllocation::LOUDNESS,
-            SbcCodecInfo::BITPOOL_MIN,
-            SbcCodecInfo::BITPOOL_MAX,
-        )
-        .unwrap();
-        let stereo_config =
-            MediaCodecConfig::build(MediaCodecType::AUDIO_SBC, &sbc_codec_info.to_bytes().to_vec())
-                .unwrap();
-
-        let task = builder.configure_task(&PeerId(1), &stereo_config).expect("should build okay");
-        assert_eq!(44100, task.pcm_format.frames_per_second);
-        assert_eq!(2, task.pcm_format.channel_map.len());
+        assert!(builder_result.is_err());
     }
 
-    #[fuchsia::test]
-    fn source_media_stream_stats() {
-        let mut exec = fasync::TestExecutor::new();
-        let builder = Builder::new(sources::AudioSourceType::BigBen, false);
+    #[cfg(feature = "test_encoding")]
+    mod encoding {
+        use super::*;
 
-        let inspector = inspect::component::inspector();
-        let root = inspector.root();
+        use bt_a2dp::media_types::*;
+        use bt_avdtp::MediaCodecType;
+        use fuchsia_bluetooth::types::Channel;
+        use fuchsia_inspect as inspect;
+        use fuchsia_sync::Mutex;
+        use futures::StreamExt;
+        use std::sync::{Arc, RwLock};
+        use test_util::assert_gt;
 
-        // Minimum SBC requirements are mono, 48kHz
-        let mono_config = MediaCodecConfig::min_sbc();
-        let mut task = builder.configure_task(&PeerId(1), &mono_config).expect("should build okay");
-        MediaTaskRunner::iattach(&mut task, &root, "source_task").expect("should attach okay");
+        #[fuchsia::test]
+        async fn configures_source_from_codec_config() {
+            let builder =
+                Builder::new(sources::AudioSourceType::BigBen, false).await.expect("can encode");
 
-        let (mut remote, local) = Channel::create();
-        let local = Arc::new(RwLock::new(local));
-        let weak_local = Arc::downgrade(&local);
-        let stream = MediaStream::new(Arc::new(Mutex::new(true)), weak_local);
+            // Minimum SBC requirements are mono, 48kHz
+            let mono_config = MediaCodecConfig::min_sbc();
+            let task = builder.configure_task(&PeerId(1), &mono_config).expect("should build okay");
+            assert_eq!(48000, task.pcm_format.frames_per_second);
+            assert_eq!(1, task.pcm_format.channel_map.len());
 
-        let _running_task = task.start(stream, None).expect("media should start");
+            // A standard SBC audio config which is stereo and 44.1kHz
+            let sbc_codec_info = SbcCodecInfo::new(
+                SbcSamplingFrequency::FREQ44100HZ,
+                SbcChannelMode::JOINT_STEREO,
+                SbcBlockCount::SIXTEEN,
+                SbcSubBands::EIGHT,
+                SbcAllocation::LOUDNESS,
+                SbcCodecInfo::BITPOOL_MIN,
+                SbcCodecInfo::BITPOOL_MAX,
+            )
+            .unwrap();
+            let stereo_config = MediaCodecConfig::build(
+                MediaCodecType::AUDIO_SBC,
+                &sbc_codec_info.to_bytes().to_vec(),
+            )
+            .unwrap();
 
-        let _ = exec.run_singlethreaded(remote.next()).expect("some packet");
+            let task =
+                builder.configure_task(&PeerId(1), &stereo_config).expect("should build okay");
+            assert_eq!(44100, task.pcm_format.frames_per_second);
+            assert_eq!(2, task.pcm_format.channel_map.len());
+        }
 
-        let hierarchy =
-            exec.run_singlethreaded(inspect::reader::read(inspector)).expect("got hierarchy");
+        #[fuchsia::test]
+        async fn source_media_stream_stats() {
+            let builder =
+                Builder::new(sources::AudioSourceType::BigBen, false).await.expect("can encode");
 
-        // We don't know exactly how many were sent at this point, but make sure we got at
-        // least some recorded.
-        let total_bytes = hierarchy
-            .get_property_by_path(&vec!["source_task", "data_stream", "total_bytes"])
-            .expect("missing property");
-        assert_gt!(total_bytes.uint().expect("uint"), 0);
+            let inspector = inspect::component::inspector();
+            let root = inspector.root();
 
-        let bytes_per_second_current = hierarchy
-            .get_property_by_path(&vec!["source_task", "data_stream", "bytes_per_second_current"])
-            .expect("missing property");
-        assert_gt!(bytes_per_second_current.uint().expect("uint"), 0);
+            // Minimum SBC requirements are mono, 48kHz
+            let mono_config = MediaCodecConfig::min_sbc();
+            let mut task =
+                builder.configure_task(&PeerId(1), &mono_config).expect("should build okay");
+            MediaTaskRunner::iattach(&mut task, &root, "source_task").expect("should attach okay");
+
+            let (mut remote, local) = Channel::create();
+            let local = Arc::new(RwLock::new(local));
+            let weak_local = Arc::downgrade(&local);
+            let stream = MediaStream::new(Arc::new(Mutex::new(true)), weak_local);
+
+            let _running_task = task.start(stream, None).expect("media should start");
+
+            let _ = remote.next().await;
+
+            let hierarchy = inspect::reader::read(inspector).await.expect("read the inspect");
+
+            // We don't know exactly how many were sent at this point, but make sure we got at
+            // least some recorded.
+            let total_bytes = hierarchy
+                .get_property_by_path(&vec!["source_task", "data_stream", "total_bytes"])
+                .expect("missing property");
+            assert_gt!(total_bytes.uint().expect("uint"), 0);
+
+            let bytes_per_second_current = hierarchy
+                .get_property_by_path(&vec![
+                    "source_task",
+                    "data_stream",
+                    "bytes_per_second_current",
+                ])
+                .expect("missing property");
+            assert_gt!(bytes_per_second_current.uint().expect("uint"), 0);
+        }
     }
 }

@@ -452,7 +452,7 @@ pub fn new_memfd(
         current_task,
         &MountInfo::detached(),
         mode!(IFREG, 0o600),
-        current_task.as_fscred(),
+        current_task.current_fscred(),
         FsNodeLinkBehavior::Disallowed,
     )?;
     fs_node.write_guard_state.lock().enable_sealing(seals);

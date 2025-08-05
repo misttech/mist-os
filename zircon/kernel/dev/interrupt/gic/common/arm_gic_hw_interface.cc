@@ -11,6 +11,8 @@
 #include <dev/interrupt/arm_gic_common.h>
 #include <dev/interrupt/arm_gic_hw_interface.h>
 
+#include <ktl/enforce.h>
+
 namespace {
 const arm_gic_hw_interface_ops* gic_ops = nullptr;
 }  // anonymous namespace

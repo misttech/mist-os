@@ -5,82 +5,39 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_HOST_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_HOST_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
-#include <lib/ddk/device.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
-#include <ddktl/device.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/test/platform/cpp/bind.h>
 #include <fbl/macros.h>
 #include <usb/descriptors.h>
 #include <usb/request-fidl.h>
+
+#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-endpoint.h"
 
 namespace usb_virtual_bus {
 
 class UsbVirtualBus;
 class UsbVirtualHost;
-using UsbVirtualHostType = ddk::Device<UsbVirtualHost>;
-
-class UsbVirtualEp;
 
 // This class implements the virtual USB host controller protocol.
-class UsbVirtualHost : public UsbVirtualHostType,
-                       public ddk::UsbHciProtocol<UsbVirtualHost, ddk::base_protocol>,
+class UsbVirtualHost : public ddk::UsbHciProtocol<UsbVirtualHost>,
                        public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
  public:
-  ~UsbVirtualHost();
-  class UsbEpServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> {
-   public:
-    UsbEpServer(UsbVirtualEp* ep, async_dispatcher_t* dispatcher,
-                fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server)
-        : ep_(ep),
-          binding_(dispatcher, std::move(server), this,
-                   fit::bind_member(this, &UsbEpServer::OnFidlClosed)) {}
-    void OnFidlClosed(fidl::UnbindInfo);
+  using Service = fuchsia_hardware_usb_hci::UsbHciService;
+  static constexpr std::string kName = "usb-virtual-host";
+  static std::vector<fuchsia_driver_framework::NodeProperty> GetProperties() {
+    return {fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_BUS),
+            fdf::MakeProperty(bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_USB_HCI))};
+  }
 
-    // fuchsia_hardware_usb_new.Endpoint protocol implementation.
-    void GetInfo(GetInfoCompleter::Sync& completer) override {
-      completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-    }
-    void RegisterVmos(RegisterVmosRequest& request,
-                      RegisterVmosCompleter::Sync& completer) override;
-    void UnregisterVmos(UnregisterVmosRequest& request,
-                        UnregisterVmosCompleter::Sync& completer) override;
-    void QueueRequests(QueueRequestsRequest& request,
-                       QueueRequestsCompleter::Sync& completer) override;
-    void CancelAll(CancelAllCompleter::Sync& completer) override;
-
-    void RequestComplete(zx_status_t status, size_t actual, usb::FidlRequest request);
-    zx::result<std::optional<usb::MappedVmo>> GetMapped(
-        const fuchsia_hardware_usb_request::Buffer& buffer) {
-      if (buffer.Which() == fuchsia_hardware_usb_request::Buffer::Tag::kData) {
-        return zx::ok(std::nullopt);
-      }
-      return zx::ok(registered_vmos_.at(buffer.vmo_id().value()));
-    }
-    usb::MappedVmo& registered_vmo(uint64_t i) { return registered_vmos_[i]; }
-
-   private:
-    UsbVirtualEp* ep_;
-    // binding_ must be created, used, and destroyed on bus_->device_dispatcher_. There is no check
-    // for this, but `RequestComplete` in this class will only be called when it supports FIDL and
-    // that will happen on device_dispatcher_. When we've moved away from Banjo, it maybe worth
-    // putting this in async_patterns::DispatcherBound.
-    fidl::ServerBinding<fuchsia_hardware_usb_endpoint::Endpoint> binding_;
-
-    // completions_: Holds on to request completions that are completed, but have not been replied
-    // to due to  defer_completion == true.
-    std::vector<fuchsia_hardware_usb_endpoint::Completion> completions_;
-
-    // registered_vmos_: All pre-registered VMOs registered through RegisterVmos(). Mapping from
-    // vmo_id to usb::MappedVmo.
-    std::map<uint64_t, usb::MappedVmo> registered_vmos_;
-  };
-
-  explicit UsbVirtualHost(zx_device_t* parent, UsbVirtualBus* bus)
-      : UsbVirtualHostType(parent), bus_(bus) {}
-
-  // Device protocol implementation.
-  void DdkRelease();
+  explicit UsbVirtualHost(UsbVirtualBus* bus) : bus_(bus) {}
 
   // USB host controller protocol implementation.
   void UsbHciRequestQueue(usb_request_t* usb_request,
@@ -105,16 +62,31 @@ class UsbVirtualHost : public UsbVirtualHostType,
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
 
-  UsbEpServer* ep(uint8_t index) {
-    ZX_ASSERT(eps_[index].has_value());
-    return &*eps_[index];
+  fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+  }
+  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_USB_HCI] = banjo_server_.callback();
+    return banjo_config;
+  }
+  compat::SyncInitializedDeviceServer& compat_server() { return compat_server_; }
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController>& controller() {
+    return controller_;
   }
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualHost);
 
   UsbVirtualBus* bus_;
-  std::optional<UsbEpServer> eps_[USB_MAX_EPS];
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_USB_HCI, this, &usb_hci_protocol_ops_};
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_hci::UsbHci> bindings_;
 };
 
 }  // namespace usb_virtual_bus

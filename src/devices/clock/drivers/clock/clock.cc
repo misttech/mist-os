@@ -5,8 +5,8 @@
 #include "clock.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fdf/dispatcher.h>
 #include <zircon/errors.h>
@@ -188,7 +188,8 @@ void ClockDevice::handle_unknown_method(
 zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
                               const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                               const std::optional<std::string>& node_name,
-                              std::optional<int32_t> node_id, AddChildCallback add_child_callback) {
+                              std::optional<int32_t> node_id,
+                              fidl::ClientEnd<fuchsia_driver_framework::Node>& parent) {
   zx::result clock_impl = incoming->Connect<fuchsia_hardware_clockimpl::Service::Device>();
   if (clock_impl.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to the clock-impl FIDL protocol: %s",
@@ -204,15 +205,9 @@ zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
     snprintf(child_node_name, sizeof(child_node_name), "clock-%u_%u", id_, node_id.value());
   }
 
-  zx::result compat_result =
-      compat_server_.Initialize(incoming, outgoing, node_name, child_node_name);
-  if (compat_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize compat server: %s", compat_result.status_string());
-    return compat_result.status_value();
-  }
-
-  auto node_offers = compat_server_.CreateOffers2();
-  node_offers.emplace_back(fdf::MakeOffer2<fuchsia_hardware_clock::Service>(child_node_name));
+  auto node_offers = std::vector{
+      fdf::MakeOffer2<fuchsia_hardware_clock::Service>(child_node_name),
+  };
 
   std::vector<fuchsia_driver_framework::NodeProperty> node_properties{
       fdf::MakeProperty(bind_fuchsia::CLOCK_ID, id_)};
@@ -222,9 +217,11 @@ zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
         fdf::MakeProperty(bind_fuchsia::CLOCK_NODE_ID, static_cast<uint32_t>(node_id.value())));
   }
 
-  zx_status_t status = add_child_callback(child_node_name, node_properties, node_offers);
-  if (status != ZX_OK) {
-    return status;
+  zx::result node = fdf::AddChild(parent, *fdf::Logger::GlobalInstance(), child_node_name,
+                                  node_properties, node_offers);
+  if (node.is_error()) {
+    FDF_LOG(ERROR, "Failed to create child node: %s", node.status_string());
+    return node.status_value();
   }
 
   fuchsia_hardware_clock::Service::InstanceHandler instance_handler{
@@ -311,19 +308,8 @@ zx_status_t ClockDriver::CreateClockDevices() {
     // ClockDevice must be dynamically allocated because it has a ServerBindingGroup and compat
     // server property which cannot be moved.
     auto clock_device = std::make_unique<ClockDevice>(clock_id);
-    zx_status_t status = clock_device->Init(
-        incoming(), outgoing(), node_name(), node.node_id(),
-        [this](std::string_view child_node_name,
-               const fuchsia_driver_framework::NodePropertyVector& node_properties,
-               const std::vector<fuchsia_driver_framework::Offer>& node_offers) {
-          zx::result node = AddChild(child_node_name, node_properties, node_offers);
-          if (node.is_error()) {
-            FDF_LOG(ERROR, "Failed to create child node: %s", node.status_string());
-            return node.status_value();
-          }
-
-          return ZX_OK;
-        });
+    zx_status_t status =
+        clock_device->Init(incoming(), outgoing(), node_name(), node.node_id(), this->node());
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to initialize clock device: %s", zx_status_get_string(status));
       return status;

@@ -50,7 +50,7 @@ type QueryId = flexible enum : uint64 {
 /// of higher priority tasks.
 /// Requesting a priority above MEDIUM is only allowed for trusted clients.
 /// MEDIUM is considered to be the default priority.
-@available(added=NEXT)
+@available(added=28)
 type Priority = flexible enum : uint64 {
     LOW = 128;
     MEDIUM = 256;
@@ -286,7 +286,7 @@ closed protocol Primary {
 
     /// Creates context `context_id` for use in command execution.  A context may be associated
     /// with hardware state.
-    @available(added=NEXT)
+    @available(added=28)
     strict CreateContext2(struct {
         context_id ContextId;
         priority Priority;

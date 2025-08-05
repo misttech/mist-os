@@ -94,6 +94,8 @@ def main() -> int:
         inputs.update([entry.source for entry in config.bootfs_files])
         if config.kernel.path:
             inputs.add(config.kernel.path)
+        if config.zbi_extra_items:
+            inputs.add(config.zbi_extra_items)
         if config.devicetree:
             inputs.add(config.devicetree)
         if config.devicetree_overlay:

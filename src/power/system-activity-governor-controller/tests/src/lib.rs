@@ -221,6 +221,7 @@ async fn test_system_activity_control() -> Result<()> {
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
                 ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
                 ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
             },
@@ -250,6 +251,7 @@ async fn test_system_activity_control() -> Result<()> {
                ref fobs::SUSPEND_FAIL_COUNT: NonZeroUintProperty,
                ref fobs::SUSPEND_LAST_FAILED_ERROR: zx::sys::ZX_ERR_NOT_SUPPORTED as i64,
                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+               ref fobs::SUSPEND_CUMULATIVE_DURATION: 0u64,
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: contains {

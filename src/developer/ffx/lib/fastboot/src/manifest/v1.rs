@@ -19,6 +19,10 @@ use futures::try_join;
 use tokio::sync::mpsc::{self, Sender};
 
 impl ProductTrait<Partition> for Product {
+    fn name(&self) -> &String {
+        &self.name
+    }
+
     fn bootloader_partitions(&self) -> &Vec<Partition> {
         &self.bootloader_partitions
     }

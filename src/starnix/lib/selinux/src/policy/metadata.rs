@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::error::ValidateError;
-use super::parser::ParseStrategy;
+use super::parser::PolicyCursor;
 use super::{
-    array_type, array_type_validate_deref_both, Array, Counted, Parse, ParseError, Validate,
-    ValidateArray,
+    array_type, array_type_validate_deref_both, Array, Counted, Parse, Validate, ValidateArray,
 };
+use crate::policy::error::{ParseError, ValidateError};
 
 use std::fmt::Debug;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
@@ -43,11 +42,11 @@ impl Validate for Magic {
     }
 }
 
-array_type!(Signature, PS, PS::Output<SignatureMetadata>, PS::Slice<u8>);
+array_type!(Signature, SignatureMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(Signature);
 
-impl<PS: ParseStrategy> ValidateArray<SignatureMetadata, u8> for Signature<PS> {
+impl ValidateArray<SignatureMetadata, u8> for Signature {
     type Error = ValidateError;
 
     fn validate_array<'a>(
@@ -111,32 +110,33 @@ impl Validate for PolicyVersion {
     }
 }
 
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 #[derive(Debug)]
-pub(super) struct Config<PS: ParseStrategy> {
+pub(super) struct Config {
     handle_unknown: HandleUnknown,
-    config: PS::Output<le::U32>,
+
+    #[allow(dead_code)]
+    config: le::U32,
 }
 
-impl<PS: ParseStrategy> Config<PS> {
+impl Config {
     pub fn handle_unknown(&self) -> HandleUnknown {
         self.handle_unknown
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Config<PS> {
+impl Parse for Config {
     type Error = ParseError;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let num_bytes = bytes.len();
-        let (config, tail) = PS::parse::<le::U32>(bytes).ok_or(ParseError::MissingData {
-            type_name: "Config",
-            type_size: std::mem::size_of::<le::U32>(),
-            num_bytes,
-        })?;
+        let (config, tail) =
+            PolicyCursor::parse::<le::U32>(bytes).ok_or(ParseError::MissingData {
+                type_name: "Config",
+                type_size: std::mem::size_of::<le::U32>(),
+                num_bytes,
+            })?;
 
-        let found_config = PS::deref(&config).get();
+        let found_config = config.get();
         if found_config & CONFIG_MLS_FLAG == 0 {
             return Err(ParseError::ConfigMissingMlsFlag { found_config });
         }
@@ -146,7 +146,7 @@ impl<PS: ParseStrategy> Parse<PS> for Config<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for Config<PS> {
+impl Validate for Config {
     type Error = anyhow::Error;
 
     /// All validation for [`Config`] is necessary to parse it correctly. No additional validation
@@ -194,36 +194,19 @@ impl Validate for Counts {
 mod tests {
     use super::*;
 
-    use crate::policy::parser::{ByRef, ByValue};
+    use crate::policy::parser::PolicyCursor;
     use crate::policy::testing::{as_parse_error, as_validate_error};
 
     macro_rules! validate_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
-            fn check_by_ref<'a>(
-                $result: Result<
-                    (),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Validate>::Error,
-                >,
-            ) {
-                $check_impl;
-            }
-
             fn check_by_value(
-                $result: Result<
-                    (),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Validate>::Error,
-                >,
+                $result: Result<(), <$parse_output as crate::policy::Validate>::Error>,
             ) {
                 $check_impl
             }
 
-            let by_ref = ByRef::new(data.as_slice());
-            let (by_ref_parsed, _) =
-                $parse_output::parse(by_ref).expect("successful parse for validate test");
-            let by_ref_result = by_ref_parsed.validate();
-            check_by_ref(by_ref_result);
-            let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
+            let (by_value_parsed, _) = $parse_output::parse(PolicyCursor::new(data))
                 .expect("successful parse for validate test");
             let by_value_result = by_value_parsed.validate();
             check_by_value(by_value_result);
@@ -237,8 +220,7 @@ mod tests {
         // One byte short of magic.
         bytes.pop();
         let bytes = bytes;
-        assert_eq!(None, ByRef::parse::<Magic>(ByRef::new(bytes.as_slice())),);
-        assert_eq!(None, ByValue::parse::<Magic>(ByValue::new(bytes)),);
+        assert_eq!(None, PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)),);
     }
 
     #[test]
@@ -250,14 +232,7 @@ mod tests {
         let expected_invalid_magic =
             u32::from_le_bytes(bytes.clone().as_slice().try_into().unwrap());
 
-        let (magic, tail) = ByRef::parse::<Magic>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
-            magic.validate()
-        );
-
-        let (magic, tail) = ByValue::parse::<Magic>(ByValue::new(bytes)).expect("magic");
+        let (magic, tail) = PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
@@ -287,15 +262,10 @@ mod tests {
     #[test]
     fn missing_signature() {
         let bytes = [(1 as u32).to_le_bytes().as_slice()].concat();
-        match Signature::parse(ByRef::new(bytes.as_slice())).err().map(as_parse_error) {
-            Some(ParseError::MissingSliceData {
-                type_name: "u8",
-                type_size: 1,
-                num_items: 1,
-                num_bytes: 0,
-            }) => {}
+        match Signature::parse(PolicyCursor::new(bytes)).err().map(as_parse_error) {
+            Some(ParseError::MissingData { type_name: "u8", type_size: 1, num_bytes: 0 }) => {}
             parse_err => {
-                assert!(false, "Expected Some(MissingSliceData...), but got {:?}", parse_err);
+                assert!(false, "Expected Some(MissingData...), but got {:?}", parse_err);
             }
         }
     }
@@ -322,17 +292,7 @@ mod tests {
     fn invalid_policy_version() {
         let bytes = [(POLICYDB_VERSION_MIN - 1).to_le_bytes().as_slice()].concat();
         let (policy_version, tail) =
-            ByRef::parse::<PolicyVersion>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidPolicyVersion {
-                found_policy_version: POLICYDB_VERSION_MIN - 1
-            }),
-            policy_version.validate()
-        );
-
-        let (policy_version, tail) =
-            ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
@@ -343,17 +303,7 @@ mod tests {
 
         let bytes = [(POLICYDB_VERSION_MAX + 1).to_le_bytes().as_slice()].concat();
         let (policy_version, tail) =
-            ByRef::parse::<PolicyVersion>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidPolicyVersion {
-                found_policy_version: POLICYDB_VERSION_MAX + 1
-            }),
-            policy_version.validate()
-        );
-
-        let (policy_version, tail) =
-            ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
@@ -366,7 +316,7 @@ mod tests {
     #[test]
     fn config_missing_mls_flag() {
         let bytes = [(!CONFIG_MLS_FLAG).to_le_bytes().as_slice()].concat();
-        match Config::parse(ByRef::new(bytes.as_slice())).err() {
+        match Config::parse(PolicyCursor::new(bytes)).err() {
             Some(ParseError::ConfigMissingMlsFlag { .. }) => {}
             parse_err => {
                 assert!(false, "Expected Some(ConfigMissingMlsFlag...), but got {:?}", parse_err);
@@ -386,7 +336,7 @@ mod tests {
             Some(ParseError::InvalidHandleUnknownConfigurationBits {
                 masked_bits: CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG | CONFIG_HANDLE_UNKNOWN_REJECT_FLAG
             }),
-            Config::parse(ByRef::new(bytes.as_slice())).err()
+            Config::parse(PolicyCursor::new(bytes)).err()
         );
     }
 }

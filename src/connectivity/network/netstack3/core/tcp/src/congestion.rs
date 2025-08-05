@@ -559,7 +559,7 @@ impl FastRecovery {
         // Elect fast retransmit sequence number or snd_nxt if we don't have
         // one.
         let (next_seg, loss_recovery, congestion_limit) = match fast_retransmit.take() {
-            // From RFC 5861:
+            // From RFC 5681:
             //
             //  3. The lost segment starting at SND.UNA MUST be retransmitted
             //     [...].

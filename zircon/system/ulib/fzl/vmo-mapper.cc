@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>
 #include <zircon/features.h>
 
@@ -109,7 +110,7 @@ zx_status_t VmoMapper::CreateAndMap(uint64_t size, zx_vm_option_t map_flags,
     }
   }
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(ZX_IS_PAGE_ALIGNED(size));
   status = vmo->CommitRangePinned(0, size, true);
   if (status != ZX_OK) {
     // LTRACEF("vmo->CommitRange failed: %d\n", status);

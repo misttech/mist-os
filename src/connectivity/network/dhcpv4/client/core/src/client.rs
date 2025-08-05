@@ -776,7 +776,7 @@ impl Init {
         clock: &C,
     ) -> Selecting<C::Instant> {
         let discover_options = DiscoverOptions {
-            xid: TransactionId(NonZeroU32::new(rng.get_rng().gen_range(1..=u32::MAX)).unwrap()),
+            xid: TransactionId(NonZeroU32::new(rng.get_rng().random_range(1..=u32::MAX)).unwrap()),
         };
         Selecting {
             discover_options,
@@ -922,7 +922,7 @@ fn retransmit_schedule_during_acquisition(
         // retransmission delay SHOULD be doubled with subsequent
         // retransmissions up to a maximum of 64 seconds."
         .zip(std::iter::from_fn(|| {
-            Some(rng.gen_range((-MILLISECONDS_PER_SECOND)..=MILLISECONDS_PER_SECOND))
+            Some(rng.random_range((-MILLISECONDS_PER_SECOND)..=MILLISECONDS_PER_SECOND))
         }))
         .map(|(base_seconds, jitter_millis)| {
             let millis = u64::try_from(base_seconds * MILLISECONDS_PER_SECOND + jitter_millis)

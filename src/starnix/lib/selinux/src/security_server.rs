@@ -8,7 +8,7 @@ use crate::access_vector_cache::{
 use crate::exceptions_config::ExceptionsConfig;
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
-use crate::policy::parser::ByValue;
+
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
     ClassPermissionId, FsUseLabelAndType, FsUseType, IoctlAccessDecision, Policy,
@@ -30,7 +30,7 @@ const ROOT_PATH: &'static str = "/";
 
 struct ActivePolicy {
     /// Parsed policy structure.
-    parsed: Arc<Policy<ByValue<Vec<u8>>>>,
+    parsed: Arc<Policy>,
 
     /// The binary policy that was previously passed to `load_policy()`.
     binary: Vec<u8>,

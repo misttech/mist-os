@@ -86,13 +86,13 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   zx_status_t GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out);
   zx_status_t AddMetadata(uint32_t type, const void* data, size_t size);
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
-  zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
   zx_status_t RegisterServiceMember(component::AnyHandler handler, const char* service_name,
                                     const char* instance_name, const char* member_name);
 
   void InitReply(zx_status_t status);
   zx_status_t ConnectFragmentFidl(const char* fragment_name, const char* service_name,
-                                  const char* protocol_name, zx::channel request);
+                                  const char* protocol_name, zx::channel request,
+                                  bool zircon_transport = true);
   zx_status_t AddCompositeNodeSpec(const char* name, const composite_node_spec_t* spec);
   // Connects to the runtime service using the v2 protocol discovery with tokens.
   zx_status_t ConnectFragmentRuntime(const char* fragment_name, const char* service_name,

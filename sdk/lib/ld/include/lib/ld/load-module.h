@@ -5,6 +5,7 @@
 #ifndef LIB_LD_LOAD_MODULE_H_
 #define LIB_LD_LOAD_MODULE_H_
 
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/tls-layout.h>
 
 #include <cassert>
@@ -17,6 +18,8 @@
 #include "tls.h"
 
 namespace ld {
+
+constexpr elfldltl::ResolverPolicy kResolverPolicy = elfldltl::ResolverPolicy::kStrongOverWeak;
 
 // Forward declaration for a helper class defined below.
 // See the name_ref() and soname_ref() methods in ld::LoadModule, below.

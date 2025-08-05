@@ -63,7 +63,7 @@ use crate::filesystem::MAX_BLOCK_SIZE;
 use crate::log::*;
 use crate::lsm_tree::bloom_filter::{BloomFilterReader, BloomFilterStats, BloomFilterWriter};
 use crate::lsm_tree::types::{
-    BoxedLayerIterator, FuzzyHash, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerValue,
+    BoxedLayerIterator, FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerValue,
     LayerWriter,
 };
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes};
@@ -75,7 +75,6 @@ use async_trait::async_trait;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use fprint::TypeFingerprint;
 use fuchsia_sync::Mutex;
-use rand::Rng as _;
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert;
 use std::cmp::Ordering;
@@ -116,22 +115,7 @@ pub struct LayerInfoV39 {
     /// The seed for the nonces used in the bloom filter.
     bloom_filter_seed: u64,
     /// How many nonces to use for bloom filter hashing.
-    bloom_filter_num_nonces: usize,
-}
-
-/// Prior to V39, the old layer file format is used.  The LayerInfo was stored in the first block.
-pub type OldLayerInfo = OldLayerInfoV32;
-
-#[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub struct OldLayerInfoV32 {
-    /// The version of the key and value structs serialized in this layer.
-    key_value_version: Version,
-    /// The block size used within this layer file. This is typically set at compaction time to the
-    /// same block size as the underlying object handle.
-    ///
-    /// (Each block starts with a 2 byte item count so there is a 64k item limit per block,
-    /// regardless of block size).
-    block_size: u64,
+    bloom_filter_num_hashes: usize,
 }
 
 /// A handle to a persistent layer.
@@ -148,7 +132,7 @@ pub struct PersistentLayer<K, V> {
     block_size: u64,
     data_size: u64,
     seek_table: Vec<u64>,
-    num_items: Option<usize>,
+    num_items: usize,
     bloom_filter: Option<BloomFilterReader<K>>,
     bloom_filter_stats: Option<BloomFilterStats>,
     close_event: Mutex<Option<Arc<DropEvent>>>,
@@ -446,7 +430,7 @@ async fn load_bloom_filter<K: FuzzyHash>(
     Ok(Some(BloomFilterReader::read(
         buffer.as_slice(),
         layer_info.bloom_filter_seed,
-        layer_info.bloom_filter_num_nonces,
+        layer_info.bloom_filter_num_hashes,
     )?))
 }
 
@@ -549,7 +533,7 @@ impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
             block_size: header.block_size,
             data_size: layer_info.num_data_blocks * header.block_size,
             seek_table,
-            num_items: Some(layer_info.num_items),
+            num_items: layer_info.num_items,
             bloom_filter,
             bloom_filter_stats,
             close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
@@ -695,17 +679,8 @@ impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
         return Ok(Box::new(Iterator::new(left)?));
     }
 
-    fn estimated_len(&self) -> ItemCount {
-        match self.num_items {
-            Some(num_items) => ItemCount::Precise(num_items),
-            None => {
-                // Older layer files didn't have the exact number, so guess it.  Precision doesn't
-                // matter too much here, as the impact of getting this wrong is mis-sizing the bloom
-                // filter, which will be corrected during later compactions anyways.
-                const ITEM_SIZE_ESTIMATE: usize = 32;
-                ItemCount::Estimate(self.object_handle.get_size() as usize / ITEM_SIZE_ESTIMATE)
-            }
-        }
+    fn len(&self) -> usize {
+        self.num_items
     }
 
     fn maybe_contains_key(&self, key: &K) -> bool {
@@ -726,17 +701,15 @@ impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
     }
 
     fn record_inspect_data(self: Arc<Self>, node: &fuchsia_inspect::Node) {
+        node.record_uint("num_items", self.num_items as u64);
         node.record_bool("persistent", true);
         node.record_uint("size", self.object_handle.get_size());
         if let Some(stats) = self.bloom_filter_stats.as_ref() {
             node.record_child("bloom_filter", move |node| {
                 node.record_uint("size", stats.size as u64);
-                node.record_uint("num_nonces", stats.num_nonces as u64);
+                node.record_uint("num_hashes", stats.num_hashes as u64);
                 node.record_uint("fill_percentage", stats.fill_percentage as u64);
             });
-        }
-        if let Some(items) = self.num_items {
-            node.record_uint("num_items", items as u64);
         }
     }
 }
@@ -761,22 +734,13 @@ pub struct PersistentLayerWriter<W: WriteBytes, K: Key, V: LayerValue> {
 impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
     /// Creates a new writer that will serialize items to the object accessible via |object_handle|
     /// (which provides a write interface to the object).
-    /// `estimated_num_items` is an estimate for the number of items that we expect to write into
-    /// the layer.  This need not be exact; it is used for estimating the size of bloom filter to
-    /// create.  In general this is likely to be an over-count, as during compaction items might be
-    /// merged.  That results in bloom filters that are slightly bigger than necessary, which isn't
-    /// a significant problem.
-    pub async fn new(
-        writer: W,
-        estimated_num_items: usize,
-        block_size: u64,
-    ) -> Result<Self, Error> {
-        Self::new_with_version(writer, estimated_num_items, block_size, LATEST_VERSION).await
+    pub async fn new(writer: W, num_items: usize, block_size: u64) -> Result<Self, Error> {
+        Self::new_with_version(writer, num_items, block_size, LATEST_VERSION).await
     }
 
     async fn new_with_version(
         mut writer: W,
-        estimated_num_items: usize,
+        num_items: usize,
         block_size: u64,
         version: Version,
     ) -> Result<Self, Error> {
@@ -793,7 +757,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
         }
         writer.write_bytes(&buf[..]).await?;
 
-        let nonce: u64 = rand::thread_rng().gen();
+        let seed: u64 = rand::random();
         Ok(PersistentLayerWriter {
             writer,
             block_size,
@@ -802,7 +766,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
             item_count: 0,
             block_offsets: Vec::new(),
             block_keys: Vec::new(),
-            bloom_filter: BloomFilterWriter::new(nonce, estimated_num_items),
+            bloom_filter: BloomFilterWriter::new(seed, num_items),
             _value: PhantomData,
         })
     }
@@ -865,7 +829,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
             num_data_blocks,
             bloom_filter_size_bytes,
             bloom_filter_seed: self.bloom_filter.seed(),
-            bloom_filter_num_nonces: self.bloom_filter.num_nonces(),
+            bloom_filter_num_hashes: self.bloom_filter.num_hashes(),
         };
         let actual_len = {
             let mut cursor = std::io::Cursor::new(&mut self.buf);

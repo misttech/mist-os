@@ -13,7 +13,7 @@ use super::{filters, CompatTemplate};
 #[derive(Template)]
 #[template(path = "compat/union.askama")]
 pub struct UnionCompatTemplate<'a> {
-    union: &'a Union,
+    union_: &'a Union,
     compat: &'a CompatTemplate<'a>,
 
     name: String,
@@ -30,11 +30,11 @@ impl<'a> Contextual<'a> for UnionCompatTemplate<'a> {
 impl<'a> UnionCompatTemplate<'a> {
     pub fn new(union: &'a Union, compat: &'a CompatTemplate<'a>) -> Self {
         Self {
-            union,
+            union_: union,
             compat,
 
             name: union.name.decl_name().camel(),
-            compat_name: filters::compat_camel(union.name.decl_name()).unwrap(),
+            compat_name: filters::escape_compat_camel(union.name.decl_name()),
             denylist: compat.rust_or_rust_next_denylist(&union.name),
         }
     }

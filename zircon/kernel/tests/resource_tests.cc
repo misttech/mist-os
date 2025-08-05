@@ -134,11 +134,8 @@ static bool out_of_allocator_range() {
   END_TEST;
 }
 
-static bool root_resource_filter() {
+static bool root_resource_filter_default() {
   BEGIN_TEST;
-  // Instantiate our own filter so we can test it in isolation from the
-  // global singleton filter used by validate_ranged_resource.  It will start
-  // life approving any request for resources.
   RootResourceFilter filter;
 
   // Start with asking for access to all of the various resource range kinds.
@@ -157,6 +154,13 @@ static bool root_resource_filter() {
     EXPECT_TRUE(filter.IsRegionAllowed(0, 1, kind));
   }
 
+  END_TEST;
+}
+
+static bool root_resource_filter_non_mmio() {
+  BEGIN_TEST;
+  RootResourceFilter filter;
+
   // Now manually add some ranges to the set of ranges to be denied.  Test both
   // before and after to make sure that the ranges are allowed before they have
   // been added to the filter, and are properly denied afterwards.
@@ -167,9 +171,6 @@ static bool root_resource_filter() {
     zx_rsrc_kind_t kind;
   };
   ktl::array kTestVectors = {
-      TestVector{0x0AFF000000003400, kRangeSize, ZX_RSRC_KIND_MMIO},
-      TestVector{0x0AFF000000007abd, kRangeSize, ZX_RSRC_KIND_MMIO},
-      TestVector{0x0AFF000000004000, kRangeSize, ZX_RSRC_KIND_MMIO},
       TestVector{0x0040, kRangeSize, ZX_RSRC_KIND_IOPORT},
       TestVector{0x01c0, kRangeSize, ZX_RSRC_KIND_IOPORT},
       TestVector{0x70ef, kRangeSize, ZX_RSRC_KIND_IOPORT},
@@ -215,6 +216,50 @@ static bool root_resource_filter() {
   END_TEST;
 }
 
+static bool root_resource_filter_mmio() {
+  BEGIN_TEST;
+  RootResourceFilter filter;
+
+  // By default, [0, 0x4000) should be allowed.
+  EXPECT_TRUE(filter.IsRegionAllowed(0, 0x4000, ZX_RSRC_KIND_MMIO));
+
+  // Check that we can indeed deny [0, 0x1000)
+  filter.AddDenyRegion(0, 0x1000, ZX_RSRC_KIND_MMIO);
+  EXPECT_FALSE(filter.IsRegionAllowed(0, 0x1000, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x800, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_TRUE(filter.IsRegionAllowed(0x1000, 0x3000, ZX_RSRC_KIND_MMIO));
+
+  // With page rounding, denying [0x1100, 0x2000) should be the same as denying
+  // [0x1000, 0x2000), after which [0x2000, 0x4000) should still be allowed.
+  filter.AddDenyRegion(0x1100, 0xf00, ZX_RSRC_KIND_MMIO);
+  EXPECT_FALSE(filter.IsRegionAllowed(0x1000, 0x1000, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x1000, 0x100, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x1000, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x1800, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_TRUE(filter.IsRegionAllowed(0x2000, 0x2000, ZX_RSRC_KIND_MMIO));
+
+  // With page rounding, denying [0x2000, 0x2f00) should be the same as denying
+  // [0x2000, 0x3000), after which [0x3000, 0x4000) should still be allowed.
+  filter.AddDenyRegion(0x2000, 0xf00, ZX_RSRC_KIND_MMIO);
+  EXPECT_FALSE(filter.IsRegionAllowed(0x2000, 0x0f00, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x2f00, 0x100, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x2000, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x2800, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_TRUE(filter.IsRegionAllowed(0x3000, 0x1000, ZX_RSRC_KIND_MMIO));
+
+  // With page rounding, denying [0x3100, 0x3f00) should be the same as denying
+  // [0x3000, 0x4000), after which all of [0x0, 0x4000) should still be denied.
+  filter.AddDenyRegion(0x3100, 0xe00, ZX_RSRC_KIND_MMIO);
+  EXPECT_FALSE(filter.IsRegionAllowed(0x3000, 0x0100, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x3f00, 0x0100, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x3000, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x3800, 0x800, ZX_RSRC_KIND_MMIO));
+  EXPECT_FALSE(filter.IsRegionAllowed(0x0, 0x3000, ZX_RSRC_KIND_MMIO));
+
+  END_TEST;
+}
+
 static bool create_root_ranged() {
   BEGIN_TEST;
 
@@ -242,6 +287,8 @@ UNITTEST("test setting up allocators", allocators_configured)
 UNITTEST("test exclusive then shared overlap", exclusive_then_shared)
 UNITTEST("test shared then exclusive overlap", shared_then_exclusive)
 UNITTEST("test allocating out of range", out_of_allocator_range)
-UNITTEST("test root_resource_filter", root_resource_filter)
+UNITTEST("test root_resource_filter default behaviour", root_resource_filter_default)
+UNITTEST("test root_resource_filter (non-MMIO)", root_resource_filter_non_mmio)
+UNITTEST("test root_resource_filter (MMIO)", root_resource_filter_mmio)
 UNITTEST("test root ranged resource creation", create_root_ranged)
 UNITTEST_END_TESTCASE(resources, "resource", "Tests for Resource bookkeeping")

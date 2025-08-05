@@ -22,13 +22,10 @@ enum class OptionStatus {
   ERROR,
 };
 
-bool BeginsWith(const std::string_view& str, const std::string_view& prefix,
-                std::string_view* rest);
-
 OptionStatus ParseBooleanOption(const fxl::CommandLine& command_line, const char* name,
                                 bool* out_value);
 
-std::unique_ptr<std::ostream> OpenOutputStream(const std::string& output_file_name, bool compress);
+std::unique_ptr<std::ofstream> OpenOutputStream(const std::string& output_file_name);
 
 }  // namespace tracing
 

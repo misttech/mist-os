@@ -15,7 +15,6 @@
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 
 KCOUNTER(dispatcher_interrupt_event_create_count, "dispatcher.interrupt_event.create")
@@ -34,8 +33,8 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   }
 
   bool default_mode = false;
-  enum interrupt_trigger_mode tm = IRQ_TRIGGER_MODE_EDGE;
-  enum interrupt_polarity pol = IRQ_POLARITY_ACTIVE_LOW;
+  enum interrupt_trigger_mode tm = interrupt_trigger_mode::EDGE;
+  enum interrupt_polarity pol = interrupt_polarity::LOW;
   switch (options & ZX_INTERRUPT_MODE_MASK) {
     case ZX_INTERRUPT_MODE_DEFAULT:
       default_mode = true;
@@ -45,20 +44,20 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
       }
       break;
     case ZX_INTERRUPT_MODE_EDGE_LOW:
-      tm = IRQ_TRIGGER_MODE_EDGE;
-      pol = IRQ_POLARITY_ACTIVE_LOW;
+      tm = interrupt_trigger_mode::EDGE;
+      pol = interrupt_polarity::LOW;
       break;
     case ZX_INTERRUPT_MODE_EDGE_HIGH:
-      tm = IRQ_TRIGGER_MODE_EDGE;
-      pol = IRQ_POLARITY_ACTIVE_HIGH;
+      tm = interrupt_trigger_mode::EDGE;
+      pol = interrupt_polarity::HIGH;
       break;
     case ZX_INTERRUPT_MODE_LEVEL_LOW:
-      tm = IRQ_TRIGGER_MODE_LEVEL;
-      pol = IRQ_POLARITY_ACTIVE_LOW;
+      tm = interrupt_trigger_mode::LEVEL;
+      pol = interrupt_polarity::LOW;
       break;
     case ZX_INTERRUPT_MODE_LEVEL_HIGH:
-      tm = IRQ_TRIGGER_MODE_LEVEL;
-      pol = IRQ_POLARITY_ACTIVE_HIGH;
+      tm = interrupt_trigger_mode::LEVEL;
+      pol = interrupt_polarity::HIGH;
       break;
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -70,7 +69,7 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
     interrupt_flags = Flags(interrupt_flags | INTERRUPT_TIMESTAMP_MONO);
   }
 
-  if (tm == IRQ_TRIGGER_MODE_LEVEL) {
+  if (tm == interrupt_trigger_mode::LEVEL) {
     interrupt_flags = Flags(interrupt_flags | INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT);
   }
 
@@ -131,12 +130,6 @@ void InterruptEventDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnosti
   diagnostics_out.PrintExtra("IRQ %" PRIu32, vector_);
 }
 
-void InterruptEventDispatcher::IrqHandler(void* ctx) {
-  InterruptEventDispatcher* self = reinterpret_cast<InterruptEventDispatcher*>(ctx);
-
-  self->InterruptHandler();
-}
-
 InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, Flags flags, uint32_t options)
     : InterruptDispatcher(flags, options), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
@@ -160,9 +153,9 @@ void InterruptEventDispatcher::DeactivateInterrupt() {
 }
 
 zx_status_t InterruptEventDispatcher::RegisterInterruptHandler() {
-  return register_int_handler(vector_, IrqHandler, this);
+  return register_int_handler(vector_, [this]() { InterruptHandler(); });
 }
 
 void InterruptEventDispatcher::UnregisterInterruptHandler() {
-  register_int_handler(vector_, nullptr, nullptr);
+  register_int_handler(vector_, nullptr);
 }

@@ -30,11 +30,11 @@ pub fn serve(
                         component_output,
                         program_input,
                         program_output_dict,
-                        framework_dict,
                         capability_sourced_capabilities_dict,
                         declared_dictionaries,
                         child_inputs,
                         collection_inputs,
+                        ..
                     } = source
                         .upgrade()
                         .map_err(|e| format_err!("failed to upgrade component: {:?}", e))?
@@ -59,7 +59,6 @@ pub fn serve(
                         component_output: Some(Dict::from(component_output).into()),
                         program_input: Some(Dict::from(program_input).into()),
                         program_output: Some(program_output_dict.into()),
-                        framework_output: Some(framework_dict.into()),
                         capability_sourced: Some(capability_sourced_capabilities_dict.into()),
                         declared_dictionaries: Some(declared_dictionaries.into()),
                         child_inputs: Some(child_inputs.enumerate().map(to_fidl).collect()),

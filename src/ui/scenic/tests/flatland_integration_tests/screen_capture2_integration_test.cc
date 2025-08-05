@@ -6,6 +6,7 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <sys/types.h>
@@ -17,7 +18,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
@@ -165,8 +165,7 @@ TEST_F(ScreenCapture2IntegrationTest, SingleColorCapture) {
   const uint32_t render_target_height = display_height_;
 
   // Create buffer collection for image to add to scene graph.
-  allocation::BufferCollectionImportExportTokens ref_pair =
-      allocation::BufferCollectionImportExportTokens::New();
+  auto ref_pair = allocation::BufferCollectionImportExportTokens::New();
 
   fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
       CreateBufferCollectionInfoWithConstraints(
@@ -378,8 +377,7 @@ TEST_F(ScreenCapture2IntegrationTest, ClientReleaseBufferCapture) {
   const uint32_t render_target_width = display_width_;
   const uint32_t render_target_height = display_height_;
 
-  allocation::BufferCollectionImportExportTokens ref_pair =
-      allocation::BufferCollectionImportExportTokens::New();
+  auto ref_pair = allocation::BufferCollectionImportExportTokens::New();
 
   fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
       CreateBufferCollectionInfoWithConstraints(

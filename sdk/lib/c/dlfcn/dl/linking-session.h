@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_LINKING_SESSION_H_
-#define LIB_DL_LINKING_SESSION_H_
+#ifndef LIB_C_DLFCN_DL_LINKING_SESSION_H_
+#define LIB_C_DLFCN_DL_LINKING_SESSION_H_
 
 #include <lib/elfldltl/init-fini.h>
 #include <lib/elfldltl/resolve.h>
@@ -333,8 +333,8 @@ class LinkingSession<Loader>::SessionModule
     TlsDescResolver tls_desc_resolver =
         TlsDescResolver(max_static_tls_modid, runtime_module_.tls_desc_indirect_list());
     ld::ModuleMemory memory = ld::ModuleMemory{module()};
-    auto resolver =
-        elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, tls_desc_resolver);
+    auto resolver = elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag,
+                                                 tls_desc_resolver, ld::kResolverPolicy);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);
@@ -364,4 +364,4 @@ class LinkingSession<Loader>::SessionModule
 
 }  // namespace dl
 
-#endif  // LIB_DL_LINKING_SESSION_H_
+#endif  // LIB_C_DLFCN_DL_LINKING_SESSION_H_

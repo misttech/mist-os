@@ -6,7 +6,17 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
+#include <type_traits>
+
 namespace display {
+
+static_assert(std::is_standard_layout_v<ConfigCheckResult>);
+static_assert(std::is_trivially_assignable_v<ConfigCheckResult, ConfigCheckResult>);
+static_assert(std::is_trivially_copyable_v<ConfigCheckResult>);
+static_assert(std::is_trivially_copy_constructible_v<ConfigCheckResult>);
+static_assert(std::is_trivially_destructible_v<ConfigCheckResult>);
+static_assert(std::is_trivially_move_assignable_v<ConfigCheckResult>);
+static_assert(std::is_trivially_move_constructible_v<ConfigCheckResult>);
 
 // Ensure that the Banjo constants match the FIDL constants.
 static_assert(ConfigCheckResult::kOk.ToBanjo() == CONFIG_CHECK_RESULT_OK);

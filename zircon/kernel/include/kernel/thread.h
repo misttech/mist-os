@@ -587,13 +587,6 @@ typedef void (*thread_trampoline_routine)() __NO_RETURN;
 #define DEFAULT_PRIORITY (NUM_PRIORITIES / 2)
 #define HIGH_PRIORITY ((NUM_PRIORITIES / 4) * 3)
 
-// stack size
-#ifdef CUSTOM_DEFAULT_STACK_SIZE
-#define DEFAULT_STACK_SIZE CUSTOM_DEFAULT_STACK_SIZE
-#else
-#define DEFAULT_STACK_SIZE ARCH_DEFAULT_STACK_SIZE
-#endif
-
 class PreemptionState {
  public:
   // Counters contained in state_ are limited to 15 bits.

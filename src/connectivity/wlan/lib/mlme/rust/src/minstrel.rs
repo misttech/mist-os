@@ -14,12 +14,12 @@ use wlan_common::tx_vector::{
     TxVecIdx, TxVector, ERP_NUM_TX_VECTOR, ERP_START_IDX, HT_NUM_MCS, HT_NUM_UNIQUE_MCS,
 };
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_softmac as fidl_softmac,
 };
 
 // TODO(https://fxbug.dev/42103418): Enable CBW40 support once its information is available from AssocCtx.
-const ASSOC_CHAN_WIDTH: fidl_common::ChannelBandwidth = fidl_common::ChannelBandwidth::Cbw20;
+const ASSOC_CHAN_WIDTH: fidl_ieee80211::ChannelBandwidth = fidl_ieee80211::ChannelBandwidth::Cbw20;
 
 const MCS_MASK_0_31: u128 = 0xFFFFFFFF;
 const MINSTREL_FRAME_LENGTH: u32 = 1400; // bytes
@@ -215,7 +215,7 @@ impl Peer {
         if sgi_20 {
             max_size += HT_NUM_MCS;
         }
-        if ASSOC_CHAN_WIDTH == fidl_common::ChannelBandwidth::Cbw40 {
+        if ASSOC_CHAN_WIDTH == fidl_ieee80211::ChannelBandwidth::Cbw40 {
             max_size += HT_NUM_MCS;
             if sgi_40 {
                 max_size += HT_NUM_MCS;
@@ -226,26 +226,26 @@ impl Peer {
         self.tx_stats_map.reserve(max_size as usize);
         let mcs_set = ht_cap.mcs_set;
         self.add_supported_ht(
-            fidl_common::ChannelBandwidth::Cbw20,
+            fidl_ieee80211::ChannelBandwidth::Cbw20,
             WlanGi::G_800NS,
             mcs_set.rx_mcs(),
         );
         if sgi_20 {
             self.add_supported_ht(
-                fidl_common::ChannelBandwidth::Cbw20,
+                fidl_ieee80211::ChannelBandwidth::Cbw20,
                 WlanGi::G_400NS,
                 mcs_set.rx_mcs(),
             );
         }
-        if ASSOC_CHAN_WIDTH == fidl_common::ChannelBandwidth::Cbw40 {
+        if ASSOC_CHAN_WIDTH == fidl_ieee80211::ChannelBandwidth::Cbw40 {
             self.add_supported_ht(
-                fidl_common::ChannelBandwidth::Cbw40,
+                fidl_ieee80211::ChannelBandwidth::Cbw40,
                 WlanGi::G_800NS,
                 mcs_set.rx_mcs(),
             );
             if sgi_40 {
                 self.add_supported_ht(
-                    fidl_common::ChannelBandwidth::Cbw40,
+                    fidl_ieee80211::ChannelBandwidth::Cbw40,
                     WlanGi::G_400NS,
                     mcs_set.rx_mcs(),
                 );
@@ -259,7 +259,7 @@ impl Peer {
     // In reality, devices implement MCS 0-31, sometimes 32, almost never beyond 32.
     fn add_supported_ht(
         &mut self,
-        channel_bandwidth: fidl_common::ChannelBandwidth,
+        channel_bandwidth: fidl_ieee80211::ChannelBandwidth,
         gi: WlanGi,
         mcs_set: RxMcsBitmask,
     ) {
@@ -613,7 +613,7 @@ fn tx_vec_idx_opt_to_u16(tx_vec_idx: &Option<TxVecIdx>) -> u16 {
 }
 
 fn tx_time_ht(
-    channel_bandwidth: fidl_common::ChannelBandwidth,
+    channel_bandwidth: fidl_ieee80211::ChannelBandwidth,
     gi: WlanGi,
     relative_mcs_idx: u8,
 ) -> Duration {
@@ -631,7 +631,7 @@ fn header_tx_time_ht() -> Duration {
 // 64-QAM, 3/4 7: 64-QAM, 5/6 8: 256-QAM, 3/4 (since VHT) 9: 256-QAM, 5/6 (since
 // VHT)
 fn payload_tx_time_ht(
-    channel_bandwidth: fidl_common::ChannelBandwidth,
+    channel_bandwidth: fidl_ieee80211::ChannelBandwidth,
     gi: WlanGi,
     mcs_idx: u8,
 ) -> Duration {
@@ -648,7 +648,7 @@ fn payload_tx_time_ht(
 
     let nss = 1 + mcs_idx / HT_NUM_UNIQUE_MCS;
     let relative_mcs_idx = mcs_idx % HT_NUM_UNIQUE_MCS;
-    let bits_per_symbol = if channel_bandwidth == fidl_common::ChannelBandwidth::Cbw40 {
+    let bits_per_symbol = if channel_bandwidth == fidl_ieee80211::ChannelBandwidth::Cbw40 {
         BITS_PER_SYMBOL_LIST[relative_mcs_idx as usize] * DATA_SUB_CARRIERS_40
             / DATA_SUB_CARRIERS_20
     } else {
@@ -748,9 +748,9 @@ mod tests {
             bssid: Some(TEST_MAC_ADDR.to_array()),
             aid: Some(42),
             listen_interval: Some(0),
-            channel: Some(fidl_common::WlanChannel {
+            channel: Some(fidl_ieee80211::WlanChannel {
                 primary: 149,
-                cbw: fidl_common::ChannelBandwidth::Cbw40,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                 secondary80: 0,
             }),
             qos: Some(true),
@@ -1132,7 +1132,7 @@ mod tests {
 
     #[track_caller]
     fn assert_data_rate(
-        channel_bandwidth: fidl_common::ChannelBandwidth,
+        channel_bandwidth: fidl_ieee80211::ChannelBandwidth,
         gi: WlanGi,
         relative_mcs_idx: u8,
         expected_mbit_per_second: f64,
@@ -1153,22 +1153,22 @@ mod tests {
     #[test]
     fn tx_time_ht_approx_values_cbw20() {
         // IEEE 802.11-2016 Tables 19-27 through 19-30 list data rates for CBW20. We test a sample here.
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 0, 6.5);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 0, 7.2);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 8, 13.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 8, 14.4);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 31, 260.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 31, 288.9);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 0, 6.5);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 0, 7.2);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 8, 13.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 8, 14.4);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 31, 260.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 31, 288.9);
     }
 
     #[test]
     fn tx_time_ht_approx_values_cbw40() {
         // IEEE 802.11-2016 Tables 19-32 through 19-34 list data rates for CBW40. We test a sample here.
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 0, 13.5);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 0, 15.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 8, 27.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 8, 30.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 31, 540.0);
-        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 31, 600.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 0, 13.5);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 0, 15.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 8, 27.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 8, 30.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 31, 540.0);
+        assert_data_rate(fidl_ieee80211::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 31, 600.0);
     }
 }

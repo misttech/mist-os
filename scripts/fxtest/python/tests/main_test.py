@@ -241,7 +241,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             json.dump(
                 {
                     "content": {
-                        "manifests": test_packages,
+                        "names": test_packages,
                     }
                 },
                 f,

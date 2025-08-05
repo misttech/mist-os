@@ -97,8 +97,6 @@ class CommandBufferPipelineState {
   // big switch statement.
   enum class DefaultState {
     kOpaque,
-    // TODO(47918): Add command buffer state for non-premultiplied alpha.
-    //
     // The intuition is more clearly expressed in terms of "transparency"
     // instead of "alpha", where the former is defined as 1-alpha.
     // If the transparencies of the fragment and destination pixel are,
@@ -120,7 +118,16 @@ class CommandBufferPipelineState {
     // We express this with the following blend-factors:
     //   src_color_blend == src_alpha_blend == ONE
     //   dst_color_blend == dst_alpha_blend == ONE_MINUS_SRC_ALPHA
-    kTranslucent,
+    kPremultipliedAlpha,
+    // Same as kPremultipliedAlpha but we assume src colors are not premultiplied,
+    // so the blended output should be
+    //    RGB = A(src) * RGB(src) + (1-A(src)) * RGB(dst)
+    //    A = A(src) + (1 - A(src)) A(dst)
+    // We express this with the following blend-factors:
+    //   src_color_blend == SRC_ALPHA
+    //   src_alpha_blend == ONE
+    //   dst_color_blend == dst_alpha_blend == ONE_MINUS_SRC_ALPHA
+    kStraightAlpha,
     kWireframe
   };
   void SetToDefaultState(DefaultState state);

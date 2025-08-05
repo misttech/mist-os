@@ -31,7 +31,7 @@ use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::route_tables::{
-    MainRouteTable, NetlinkRouteTableIndex, RouteTable, RouteTableLookupMut, RouteTableMap,
+    MainRouteTable, ManagedRouteTable, NetlinkRouteTableIndex, RouteTable, RouteTableMap,
     TableNeedsCleanup,
 };
 
@@ -484,17 +484,17 @@ impl<I: IpExt> RulesWorker<I> {
         let action = match action {
             conversions::Action::Unreachable => fnet_routes_ext::rules::RuleAction::Unreachable,
             conversions::Action::ToTable(table_index) => {
-                route_table_map.create_route_table_if_managed_and_not_present(table_index).await;
+                route_table_map.create_managed_route_table_if_not_present(table_index).await;
                 let (table, fidl_table_id, rule_set_authenticated) =
                     match route_table_map.get_mut(&table_index).expect("should have just inserted")
                     {
-                        RouteTableLookupMut::Unmanaged(MainRouteTable {
+                        RouteTable::Unmanaged(MainRouteTable {
                             route_table_proxy,
                             fidl_table_id,
                             rule_set_authenticated,
                             ..
                         }) => (&*route_table_proxy, *fidl_table_id, rule_set_authenticated),
-                        RouteTableLookupMut::Managed(RouteTable {
+                        RouteTable::Managed(ManagedRouteTable {
                             route_table_proxy,
                             fidl_table_id,
                             rule_set_authenticated,
@@ -700,9 +700,9 @@ impl<I: IpExt> RulesWorker<I> {
             }
             RuleRequestArgs::Del(del_pattern) => {
                 let rule_message = self.del_rule(&del_pattern).await.map_err(|e| e.errno())?;
-                if let Some(table) = conversions::get_referenced_table(&rule_message) {
-                    if let Some(table_id) = route_table_map.get_fidl_table_id(&table) {
-                        return Ok(Some(TableNeedsCleanup(table_id, table)));
+                if let Some(netlink_id) = conversions::get_referenced_table(&rule_message) {
+                    if let Some(table) = route_table_map.get(&netlink_id) {
+                        return Ok(Some(TableNeedsCleanup(table.fidl_table_id(), netlink_id)));
                     }
                 }
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
@@ -729,9 +729,7 @@ mod tests {
     use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 
     use crate::messaging::testutil::{FakeSender, FakeSenderSink, SentMessage};
-    use crate::route_tables::{
-        ManagedNetlinkRouteTableIndex, NetlinkRouteTableIndex, RouteTable, TableNeedsCleanup,
-    };
+    use crate::route_tables::{NetlinkRouteTableIndex, RouteTable, TableNeedsCleanup};
 
     const DUMP_SEQUENCE_NUM: u32 = 999;
     const EMPTY_INTERFACE_PROPERTIES: BTreeMap<
@@ -982,14 +980,14 @@ mod tests {
 
         // We should pre-populate the table so that we don't need to create a new one.
         route_table_map.insert(
-            ManagedNetlinkRouteTableIndex::new(MANAGED_NETLINK_TABLE_ID).unwrap(),
-            RouteTable {
+            MANAGED_NETLINK_TABLE_ID,
+            RouteTable::Managed(ManagedRouteTable {
                 route_table_proxy: own_route_table_proxy,
                 route_set_proxy,
                 route_set_from_main_table_proxy,
                 fidl_table_id: MANAGED_FIDL_TABLE_ID,
                 rule_set_authenticated: true,
-            },
+            }),
         );
 
         // Add a new rule and expect success.

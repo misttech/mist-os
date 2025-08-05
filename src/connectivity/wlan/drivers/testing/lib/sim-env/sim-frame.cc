@@ -91,7 +91,7 @@ void SimManagementFrame::AddSsidIe(const fuchsia_wlan_ieee80211::Ssid& ssid) {
   AddIe(InformationElement::IE_TYPE_SSID, ie);
 }
 
-void SimManagementFrame::AddCsaIe(const wlan_common::WlanChannel& channel,
+void SimManagementFrame::AddCsaIe(const wlan_ieee80211_wire::WlanChannel& channel,
                                   uint8_t channel_switch_count) {
   // for nonmesh STAs, this field either is set to the number of TBTTs until the STA sending the
   // Channel Switch Announcement element switches to the new channel or is set to 0.

@@ -31,7 +31,7 @@ pub enum CommandStatus {
 
 /// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct PbGetImagePathTool {
     #[command]
     pub cmd: GetImagePathCommand,
@@ -546,7 +546,6 @@ mod tests {
             .query("product.path")
             .level(Some(ConfigLevel::User))
             .set(pb_path.to_string_lossy().into())
-            .await
             .expect("setting default path");
 
         let pb = ProductBundle::V2(ProductBundleV2 {

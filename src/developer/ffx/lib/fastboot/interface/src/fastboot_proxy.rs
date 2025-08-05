@@ -1076,7 +1076,7 @@ mod test {
         let tmpdir = TempDir::new().unwrap();
         // Generate a large temporary file
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_os_rng();
         let mut buf = Vec::<u8>::new();
         buf.resize(1 * 4096, 0);
         rng.fill_bytes(&mut buf);
@@ -1115,7 +1115,7 @@ mod test {
 
         // Generate a large temporary file
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_os_rng();
         let mut buf = Vec::<u8>::new();
         buf.resize(1 * 4096, 0);
         rng.fill_bytes(&mut buf);
@@ -1152,7 +1152,7 @@ mod test {
 
         // Generate a large temporary file
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_os_rng();
         let mut buf = Vec::<u8>::new();
         buf.resize(1 * 4096, 0);
         rng.fill_bytes(&mut buf);
@@ -1195,7 +1195,7 @@ mod test {
 
         // Generate a large temporary file
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_os_rng();
         let mut buf = Vec::<u8>::new();
         buf.resize(1 * 4096, 0);
         rng.fill_bytes(&mut buf);

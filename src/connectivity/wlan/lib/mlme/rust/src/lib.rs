@@ -102,7 +102,7 @@ impl WlanTxPacketExt for fidl_softmac::WlanTxPacket {
                 valid_fields: 0,
                 tx_vector_idx: 0,
                 phy: fidl_common::WlanPhyType::Dsss,
-                channel_bandwidth: fidl_common::ChannelBandwidth::Cbw20,
+                channel_bandwidth: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 mcs: 0,
             },
         }
@@ -488,14 +488,14 @@ pub mod test_utils {
         pub valid_fields: fidl_softmac::WlanRxInfoValid,
         pub phy: fidl_common::WlanPhyType,
         pub data_rate: u32,
-        pub channel: fidl_common::WlanChannel,
+        pub channel: fidl_ieee80211::WlanChannel,
         pub mcs: u8,
         pub rssi_dbm: i8,
         pub snr_dbh: i16,
     }
 
     impl MockWlanRxInfo {
-        pub(crate) fn with_channel(channel: fidl_common::WlanChannel) -> Self {
+        pub(crate) fn with_channel(channel: fidl_ieee80211::WlanChannel) -> Self {
             Self {
                 valid_fields: fidl_softmac::WlanRxInfoValid::CHAN_WIDTH
                     | fidl_softmac::WlanRxInfoValid::RSSI

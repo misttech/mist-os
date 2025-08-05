@@ -47,9 +47,9 @@ const (
 type BitsAlias = Bits
 
 type Struct struct {
-	X uint64
-	Y uint64
-	E EnumAlias
+	X uint64    `json:"x"`
+	Y uint64    `json:"y"`
+	E EnumAlias `json:"e"`
 }
 
 type StructAlias = Struct

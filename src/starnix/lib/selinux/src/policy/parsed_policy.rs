@@ -15,7 +15,7 @@ use super::arrays::{
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
-use super::parser::ParseStrategy;
+use super::parser::PolicyCursor;
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
     Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, MlsLevel, Role,
@@ -34,65 +34,65 @@ use zerocopy::little_endian as le;
 
 /// A parsed binary policy.
 #[derive(Debug)]
-pub struct ParsedPolicy<PS: ParseStrategy> {
+pub struct ParsedPolicy {
     /// A distinctive number that acts as a binary format-specific header for SELinux binary policy
     /// files.
-    magic: PS::Output<Magic>,
+    magic: Magic,
     /// A length-encoded string, "SE Linux", which identifies this policy as an SE Linux policy.
-    signature: Signature<PS>,
+    signature: Signature,
     /// The policy format version number. Different version may support different policy features.
-    policy_version: PS::Output<PolicyVersion>,
+    policy_version: PolicyVersion,
     /// Whole-policy configuration, such as how to handle queries against unknown classes.
-    config: Config<PS>,
+    config: Config,
     /// High-level counts of subsequent policy elements.
-    counts: PS::Output<Counts>,
-    policy_capabilities: ExtensibleBitmap<PS>,
-    permissive_map: ExtensibleBitmap<PS>,
+    counts: Counts,
+    policy_capabilities: ExtensibleBitmap,
+    permissive_map: ExtensibleBitmap,
     /// Common permissions that can be mixed in to classes.
-    common_symbols: SymbolList<PS, CommonSymbol<PS>>,
+    common_symbols: SymbolList<CommonSymbol>,
     /// The set of classes referenced by this policy.
-    classes: SymbolList<PS, Class<PS>>,
+    classes: SymbolList<Class>,
     /// The set of roles referenced by this policy.
-    roles: SymbolList<PS, Role<PS>>,
+    roles: SymbolList<Role>,
     /// The set of types referenced by this policy.
-    types: SymbolList<PS, Type<PS>>,
+    types: SymbolList<Type>,
     /// The set of users referenced by this policy.
-    users: SymbolList<PS, User<PS>>,
+    users: SymbolList<User>,
     /// The set of dynamically adjustable booleans referenced by this policy.
-    conditional_booleans: SymbolList<PS, ConditionalBoolean<PS>>,
+    conditional_booleans: SymbolList<ConditionalBoolean>,
     /// The set of sensitivity levels referenced by this policy.
-    sensitivities: SymbolList<PS, Sensitivity<PS>>,
+    sensitivities: SymbolList<Sensitivity>,
     /// The set of categories referenced by this policy.
-    categories: SymbolList<PS, Category<PS>>,
+    categories: SymbolList<Category>,
     /// The set of access vector rules referenced by this policy.
-    access_vector_rules: SimpleArray<PS, AccessVectorRules<PS>>,
-    conditional_lists: SimpleArray<PS, ConditionalNodes<PS>>,
+    access_vector_rules: SimpleArray<AccessVectorRules>,
+    conditional_lists: SimpleArray<ConditionalNodes>,
     /// The set of role transitions to apply when instantiating new objects.
-    role_transitions: RoleTransitions<PS>,
+    role_transitions: RoleTransitions,
     /// The set of role transitions allowed by policy.
-    role_allowlist: RoleAllows<PS>,
-    filename_transition_list: FilenameTransitionList<PS>,
-    initial_sids: SimpleArray<PS, InitialSids<PS>>,
-    filesystems: SimpleArray<PS, NamedContextPairs<PS>>,
-    ports: SimpleArray<PS, Ports<PS>>,
-    network_interfaces: SimpleArray<PS, NamedContextPairs<PS>>,
-    nodes: SimpleArray<PS, Nodes<PS>>,
-    fs_uses: SimpleArray<PS, FsUses<PS>>,
-    ipv6_nodes: SimpleArray<PS, IPv6Nodes<PS>>,
-    infinitiband_partition_keys: Option<SimpleArray<PS, InfinitiBandPartitionKeys<PS>>>,
-    infinitiband_end_ports: Option<SimpleArray<PS, InfinitiBandEndPorts<PS>>>,
+    role_allowlist: RoleAllows,
+    filename_transition_list: FilenameTransitionList,
+    initial_sids: SimpleArray<InitialSids>,
+    filesystems: SimpleArray<NamedContextPairs>,
+    ports: SimpleArray<Ports>,
+    network_interfaces: SimpleArray<NamedContextPairs>,
+    nodes: SimpleArray<Nodes>,
+    fs_uses: SimpleArray<FsUses>,
+    ipv6_nodes: SimpleArray<IPv6Nodes>,
+    infinitiband_partition_keys: Option<SimpleArray<InfinitiBandPartitionKeys>>,
+    infinitiband_end_ports: Option<SimpleArray<InfinitiBandEndPorts>>,
     /// A set of labeling statements to apply to given filesystems and/or their subdirectories.
     /// Corresponds to the `genfscon` labeling statement in the policy.
-    generic_fs_contexts: SimpleArray<PS, GenericFsContexts<PS>>,
-    range_transitions: SimpleArray<PS, RangeTransitions<PS>>,
+    generic_fs_contexts: SimpleArray<GenericFsContexts>,
+    range_transitions: SimpleArray<RangeTransitions>,
     /// Extensible bitmaps that encode associations between types and attributes.
-    attribute_maps: Vec<ExtensibleBitmap<PS>>,
+    attribute_maps: Vec<ExtensibleBitmap>,
 }
 
-impl<PS: ParseStrategy> ParsedPolicy<PS> {
+impl ParsedPolicy {
     /// The policy version stored in the underlying binary policy.
     pub fn policy_version(&self) -> u32 {
-        PS::deref(&self.policy_version).policy_version()
+        self.policy_version.policy_version()
     }
 
     /// The way "unknown" policy decisions should be handed according to the underlying binary
@@ -116,7 +116,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self,
         source_context: &SecurityContext,
         target_context: &SecurityContext,
-        target_class: &Class<PS>,
+        target_class: &Class,
     ) -> AccessDecision {
         let mut access_decision = self.compute_explicitly_allowed(
             source_context.type_(),
@@ -136,7 +136,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self,
         source_type: TypeId,
         target_type: TypeId,
-        target_class: &Class<PS>,
+        target_class: &Class,
     ) -> AccessDecision {
         let target_class_id = target_class.id();
 
@@ -171,7 +171,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
             // `[source-type]` is associated with `source_type_id`.
-            let source_attribute_bitmap: &ExtensibleBitmap<PS> =
+            let source_attribute_bitmap: &ExtensibleBitmap =
                 &self.attribute_maps[(source_type.0.get() - 1) as usize];
             if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
                 continue;
@@ -179,7 +179,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
             // statements where `[target-type]` is associated with `target_type_id`.
-            let target_attribute_bitmap: &ExtensibleBitmap<PS> =
+            let target_attribute_bitmap: &ExtensibleBitmap =
                 &self.attribute_maps[(target_type.0.get() - 1) as usize];
             if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
                 continue;
@@ -220,7 +220,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self,
         source_context: &SecurityContext,
         target_context: &SecurityContext,
-        target_class: &Class<PS>,
+        target_class: &Class,
     ) -> AccessVector {
         let mut denied = AccessVector::NONE;
         for constraint in target_class.constraints().iter() {
@@ -248,7 +248,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self,
         source_context: &SecurityContext,
         target_context: &SecurityContext,
-        target_class: &Class<PS>,
+        target_class: &Class,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         let target_class_id = target_class.id();
@@ -267,12 +267,12 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             if access_vector_rule.target_class() != target_class_id {
                 continue;
             }
-            let source_attribute_bitmap: &ExtensibleBitmap<PS> =
+            let source_attribute_bitmap: &ExtensibleBitmap =
                 &self.attribute_maps[(source_context.type_().0.get() - 1) as usize];
             if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
                 continue;
             }
-            let target_attribute_bitmap: &ExtensibleBitmap<PS> =
+            let target_attribute_bitmap: &ExtensibleBitmap =
                 &self.attribute_maps[(target_context.type_().0.get() - 1) as usize];
             if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
                 continue;
@@ -314,7 +314,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     }
 
     /// Returns the policy entry for the specified initial Security Context.
-    pub(super) fn initial_context(&self, id: crate::InitialSid) -> &Context<PS> {
+    pub(super) fn initial_context(&self, id: crate::InitialSid) -> &Context {
         let id = le::U32::from(id as u32);
         // [`InitialSids`] validates that all `InitialSid` values are defined by the policy.
         &self.initial_sids.data.iter().find(|initial| initial.id() == id).unwrap().context()
@@ -322,101 +322,98 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// Returns the `User` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(super) fn user(&self, id: UserId) -> &User<PS> {
+    pub(super) fn user(&self, id: UserId) -> &User {
         self.users.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named user, if present in the policy.
-    pub(super) fn user_by_name(&self, name: &str) -> Option<&User<PS>> {
+    pub(super) fn user_by_name(&self, name: &str) -> Option<&User> {
         self.users.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Role` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(super) fn role(&self, id: RoleId) -> &Role<PS> {
+    pub(super) fn role(&self, id: RoleId) -> &Role {
         self.roles.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named role, if present in the policy.
-    pub(super) fn role_by_name(&self, name: &str) -> Option<&Role<PS>> {
+    pub(super) fn role_by_name(&self, name: &str) -> Option<&Role> {
         self.roles.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Type` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(super) fn type_(&self, id: TypeId) -> &Type<PS> {
+    pub(super) fn type_(&self, id: TypeId) -> &Type {
         self.types.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named type, if present in the policy.
-    pub(super) fn type_by_name(&self, name: &str) -> Option<&Type<PS>> {
+    pub(super) fn type_by_name(&self, name: &str) -> Option<&Type> {
         self.types.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the extensible bitmap describing the set of types/domains for which permission
     /// checks are permissive.
-    pub(super) fn permissive_types(&self) -> &ExtensibleBitmap<PS> {
+    pub(super) fn permissive_types(&self) -> &ExtensibleBitmap {
         &self.permissive_map
     }
 
     /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(super) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity<PS> {
+    pub(super) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity {
         self.sensitivities.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named sensitivity level, if present in the policy.
-    pub(super) fn sensitivity_by_name(&self, name: &str) -> Option<&Sensitivity<PS>> {
+    pub(super) fn sensitivity_by_name(&self, name: &str) -> Option<&Sensitivity> {
         self.sensitivities.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Category` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(super) fn category(&self, id: CategoryId) -> &Category<PS> {
+    pub(super) fn category(&self, id: CategoryId) -> &Category {
         self.categories.data.iter().find(|y| y.id() == id).unwrap()
     }
 
     /// Returns the named category, if present in the policy.
-    pub(super) fn category_by_name(&self, name: &str) -> Option<&Category<PS>> {
+    pub(super) fn category_by_name(&self, name: &str) -> Option<&Category> {
         self.categories.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
-    pub(super) fn classes(&self) -> &Classes<PS> {
+    pub(super) fn classes(&self) -> &Classes {
         &self.classes.data
     }
 
-    pub(super) fn common_symbols(&self) -> &CommonSymbols<PS> {
+    pub(super) fn common_symbols(&self) -> &CommonSymbols {
         &self.common_symbols.data
     }
 
-    pub(super) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean<PS>> {
+    pub(super) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean> {
         &self.conditional_booleans.data
     }
 
-    pub(super) fn fs_uses(&self) -> &FsUses<PS> {
+    pub(super) fn fs_uses(&self) -> &FsUses {
         &self.fs_uses.data
     }
 
-    pub(super) fn generic_fs_contexts(&self) -> &GenericFsContexts<PS> {
+    pub(super) fn generic_fs_contexts(&self) -> &GenericFsContexts {
         &self.generic_fs_contexts.data
     }
 
-    #[allow(dead_code)]
-    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
-    // SID calculation.
     pub(super) fn role_allowlist(&self) -> &[RoleAllow] {
-        PS::deref_slice(&self.role_allowlist.data)
+        &self.role_allowlist.data
     }
 
     pub(super) fn role_transitions(&self) -> &[RoleTransition] {
-        PS::deref_slice(&self.role_transitions.data)
+        &self.role_transitions.data
     }
 
-    pub(super) fn range_transitions(&self) -> &RangeTransitions<PS> {
+    pub(super) fn range_transitions(&self) -> &RangeTransitions {
         &self.range_transitions.data
     }
 
-    pub(super) fn access_vector_rules(&self) -> &AccessVectorRules<PS> {
+    pub(super) fn access_vector_rules(&self) -> &AccessVectorRules {
         &self.access_vector_rules.data
     }
 
@@ -461,8 +458,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     //   dominates the low level.
     fn validate_mls_range(
         &self,
-        low_level: &MlsLevel<PS>,
-        high_level: &Option<MlsLevel<PS>>,
+        low_level: &MlsLevel,
+        high_level: &Option<MlsLevel>,
         sensitivity_ids: &HashSet<SensitivityId>,
         category_ids: &HashSet<CategoryId>,
     ) -> Result<(), anyhow::Error> {
@@ -487,15 +484,15 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     }
 }
 
-impl<PS: ParseStrategy> ParsedPolicy<PS>
+impl ParsedPolicy
 where
-    Self: Parse<PS>,
+    Self: Parse,
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub(super) fn parse(bytes: PS) -> Result<(Self, PS::Input), anyhow::Error> {
+    pub(super) fn parse(bytes: PolicyCursor) -> Result<(Self, Vec<u8>), anyhow::Error> {
         let (policy, tail) =
-            <ParsedPolicy<PS> as Parse<PS>>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
+            <ParsedPolicy as Parse>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();
         if num_bytes > 0 {
             return Err(ParseError::TrailingBytes { num_bytes }.into());
@@ -505,59 +502,58 @@ where
 }
 
 /// Parse a data structure from a prefix of a [`ParseStrategy`].
-impl<PS: ParseStrategy> Parse<PS> for ParsedPolicy<PS>
+impl Parse for ParsedPolicy
 where
-    Signature<PS>: Parse<PS>,
-    ExtensibleBitmap<PS>: Parse<PS>,
-    SymbolList<PS, CommonSymbol<PS>>: Parse<PS>,
-    SymbolList<PS, Class<PS>>: Parse<PS>,
-    SymbolList<PS, Role<PS>>: Parse<PS>,
-    SymbolList<PS, Type<PS>>: Parse<PS>,
-    SymbolList<PS, User<PS>>: Parse<PS>,
-    SymbolList<PS, ConditionalBoolean<PS>>: Parse<PS>,
-    SymbolList<PS, Sensitivity<PS>>: Parse<PS>,
-    SymbolList<PS, Category<PS>>: Parse<PS>,
-    SimpleArray<PS, AccessVectorRules<PS>>: Parse<PS>,
-    SimpleArray<PS, ConditionalNodes<PS>>: Parse<PS>,
-    RoleTransitions<PS>: Parse<PS>,
-    RoleAllows<PS>: Parse<PS>,
-    SimpleArray<PS, FilenameTransitions<PS>>: Parse<PS>,
-    SimpleArray<PS, DeprecatedFilenameTransitions<PS>>: Parse<PS>,
-    SimpleArray<PS, InitialSids<PS>>: Parse<PS>,
-    SimpleArray<PS, NamedContextPairs<PS>>: Parse<PS>,
-    SimpleArray<PS, Ports<PS>>: Parse<PS>,
-    SimpleArray<PS, NamedContextPairs<PS>>: Parse<PS>,
-    SimpleArray<PS, Nodes<PS>>: Parse<PS>,
-    SimpleArray<PS, FsUses<PS>>: Parse<PS>,
-    SimpleArray<PS, IPv6Nodes<PS>>: Parse<PS>,
-    SimpleArray<PS, InfinitiBandPartitionKeys<PS>>: Parse<PS>,
-    SimpleArray<PS, InfinitiBandEndPorts<PS>>: Parse<PS>,
-    SimpleArray<PS, GenericFsContexts<PS>>: Parse<PS>,
-    SimpleArray<PS, RangeTransitions<PS>>: Parse<PS>,
+    Signature: Parse,
+    ExtensibleBitmap: Parse,
+    SymbolList<CommonSymbol>: Parse,
+    SymbolList<Class>: Parse,
+    SymbolList<Role>: Parse,
+    SymbolList<Type>: Parse,
+    SymbolList<User>: Parse,
+    SymbolList<ConditionalBoolean>: Parse,
+    SymbolList<Sensitivity>: Parse,
+    SymbolList<Category>: Parse,
+    SimpleArray<AccessVectorRules>: Parse,
+    SimpleArray<ConditionalNodes>: Parse,
+    RoleTransitions: Parse,
+    RoleAllows: Parse,
+    SimpleArray<FilenameTransitions>: Parse,
+    SimpleArray<DeprecatedFilenameTransitions>: Parse,
+    SimpleArray<InitialSids>: Parse,
+    SimpleArray<NamedContextPairs>: Parse,
+    SimpleArray<Ports>: Parse,
+    SimpleArray<Nodes>: Parse,
+    SimpleArray<FsUses>: Parse,
+    SimpleArray<IPv6Nodes>: Parse,
+    SimpleArray<InfinitiBandPartitionKeys>: Parse,
+    SimpleArray<InfinitiBandEndPorts>: Parse,
+    SimpleArray<GenericFsContexts>: Parse,
+    SimpleArray<RangeTransitions>: Parse,
 {
     /// A [`Policy`] may add context to underlying [`ParseError`] values.
     type Error = anyhow::Error;
 
     /// Parses an entire binary policy.
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
-        let (magic, tail) = PS::parse::<Magic>(tail).context("parsing magic")?;
+        let (magic, tail) = PolicyCursor::parse::<Magic>(tail).context("parsing magic")?;
 
         let (signature, tail) = Signature::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing signature")?;
 
         let (policy_version, tail) =
-            PS::parse::<PolicyVersion>(tail).context("parsing policy version")?;
-        let policy_version_value = PS::deref(&policy_version).policy_version();
+            PolicyCursor::parse::<PolicyVersion>(tail).context("parsing policy version")?;
+        let policy_version_value = policy_version.policy_version();
 
         let (config, tail) = Config::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing policy config")?;
 
-        let (counts, tail) =
-            PS::parse::<Counts>(tail).context("parsing high-level policy object counts")?;
+        let (counts, tail) = PolicyCursor::parse::<Counts>(tail)
+            .context("parsing high-level policy object counts")?;
 
         let (policy_capabilities, tail) = ExtensibleBitmap::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -567,120 +563,119 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing permissive map")?;
 
-        let (common_symbols, tail) = SymbolList::<PS, CommonSymbol<PS>>::parse(tail)
+        let (common_symbols, tail) = SymbolList::<CommonSymbol>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing common symbols")?;
 
-        let (classes, tail) = SymbolList::<PS, Class<PS>>::parse(tail)
+        let (classes, tail) = SymbolList::<Class>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing classes")?;
 
-        let (roles, tail) = SymbolList::<PS, Role<PS>>::parse(tail)
+        let (roles, tail) = SymbolList::<Role>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing roles")?;
 
-        let (types, tail) = SymbolList::<PS, Type<PS>>::parse(tail)
+        let (types, tail) = SymbolList::<Type>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing types")?;
 
-        let (users, tail) = SymbolList::<PS, User<PS>>::parse(tail)
+        let (users, tail) = SymbolList::<User>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing users")?;
 
-        let (conditional_booleans, tail) = SymbolList::<PS, ConditionalBoolean<PS>>::parse(tail)
+        let (conditional_booleans, tail) = SymbolList::<ConditionalBoolean>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional booleans")?;
 
-        let (sensitivities, tail) = SymbolList::<PS, Sensitivity<PS>>::parse(tail)
+        let (sensitivities, tail) = SymbolList::<Sensitivity>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing sensitivites")?;
 
-        let (categories, tail) = SymbolList::<PS, Category<PS>>::parse(tail)
+        let (categories, tail) = SymbolList::<Category>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing categories")?;
 
-        let (access_vector_rules, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
+        let (access_vector_rules, tail) = SimpleArray::<AccessVectorRules>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing access vector rules")?;
 
-        let (conditional_lists, tail) = SimpleArray::<PS, ConditionalNodes<PS>>::parse(tail)
+        let (conditional_lists, tail) = SimpleArray::<ConditionalNodes>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional lists")?;
 
-        let (role_transitions, tail) = RoleTransitions::<PS>::parse(tail)
+        let (role_transitions, tail) = RoleTransitions::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing role transitions")?;
 
-        let (role_allowlist, tail) = RoleAllows::<PS>::parse(tail)
+        let (role_allowlist, tail) = RoleAllows::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing role allow rules")?;
 
         let (filename_transition_list, tail) = if policy_version_value >= 33 {
-            let (filename_transition_list, tail) =
-                SimpleArray::<PS, FilenameTransitions<PS>>::parse(tail)
-                    .map_err(Into::<anyhow::Error>::into)
-                    .context("parsing standard filename transitions")?;
+            let (filename_transition_list, tail) = SimpleArray::<FilenameTransitions>::parse(tail)
+                .map_err(Into::<anyhow::Error>::into)
+                .context("parsing standard filename transitions")?;
             (FilenameTransitionList::PolicyVersionGeq33(filename_transition_list), tail)
         } else {
             let (filename_transition_list, tail) =
-                SimpleArray::<PS, DeprecatedFilenameTransitions<PS>>::parse(tail)
+                SimpleArray::<DeprecatedFilenameTransitions>::parse(tail)
                     .map_err(Into::<anyhow::Error>::into)
                     .context("parsing deprecated filename transitions")?;
             (FilenameTransitionList::PolicyVersionLeq32(filename_transition_list), tail)
         };
 
-        let (initial_sids, tail) = SimpleArray::<PS, InitialSids<PS>>::parse(tail)
+        let (initial_sids, tail) = SimpleArray::<InitialSids>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing initial sids")?;
 
-        let (filesystems, tail) = SimpleArray::<PS, NamedContextPairs<PS>>::parse(tail)
+        let (filesystems, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing filesystem contexts")?;
 
-        let (ports, tail) = SimpleArray::<PS, Ports<PS>>::parse(tail)
+        let (ports, tail) = SimpleArray::<Ports>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing ports")?;
 
-        let (network_interfaces, tail) = SimpleArray::<PS, NamedContextPairs<PS>>::parse(tail)
+        let (network_interfaces, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing network interfaces")?;
 
-        let (nodes, tail) = SimpleArray::<PS, Nodes<PS>>::parse(tail)
+        let (nodes, tail) = SimpleArray::<Nodes>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing nodes")?;
 
-        let (fs_uses, tail) = SimpleArray::<PS, FsUses<PS>>::parse(tail)
+        let (fs_uses, tail) = SimpleArray::<FsUses>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing fs uses")?;
 
-        let (ipv6_nodes, tail) = SimpleArray::<PS, IPv6Nodes<PS>>::parse(tail)
+        let (ipv6_nodes, tail) = SimpleArray::<IPv6Nodes>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing ipv6 nodes")?;
 
-        let (infinitiband_partition_keys, infinitiband_end_ports, tail) =
-            if policy_version_value >= MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY {
-                let (infinity_band_partition_keys, tail) =
-                    SimpleArray::<PS, InfinitiBandPartitionKeys<PS>>::parse(tail)
-                        .map_err(Into::<anyhow::Error>::into)
-                        .context("parsing infiniti band partition keys")?;
-                let (infinitiband_end_ports, tail) =
-                    SimpleArray::<PS, InfinitiBandEndPorts<PS>>::parse(tail)
-                        .map_err(Into::<anyhow::Error>::into)
-                        .context("parsing infiniti band end ports")?;
-                (Some(infinity_band_partition_keys), Some(infinitiband_end_ports), tail)
-            } else {
-                (None, None, tail)
-            };
+        let (infinitiband_partition_keys, infinitiband_end_ports, tail) = if policy_version_value
+            >= MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY
+        {
+            let (infinity_band_partition_keys, tail) =
+                SimpleArray::<InfinitiBandPartitionKeys>::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing infiniti band partition keys")?;
+            let (infinitiband_end_ports, tail) = SimpleArray::<InfinitiBandEndPorts>::parse(tail)
+                .map_err(Into::<anyhow::Error>::into)
+                .context("parsing infiniti band end ports")?;
+            (Some(infinity_band_partition_keys), Some(infinitiband_end_ports), tail)
+        } else {
+            (None, None, tail)
+        };
 
-        let (generic_fs_contexts, tail) = SimpleArray::<PS, GenericFsContexts<PS>>::parse(tail)
+        let (generic_fs_contexts, tail) = SimpleArray::<GenericFsContexts>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem contexts")?;
 
-        let (range_transitions, tail) = SimpleArray::<PS, RangeTransitions<PS>>::parse(tail)
+        let (range_transitions, tail) = SimpleArray::<RangeTransitions>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing range transitions")?;
 
-        let primary_names_count = PS::deref(&types.metadata).primary_names_count();
+        let primary_names_count = types.metadata.primary_names_count();
         let mut attribute_maps = Vec::with_capacity(primary_names_count as usize);
         let mut tail = tail;
 
@@ -734,28 +729,22 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
+impl Validate for ParsedPolicy {
     /// A [`Policy`] may add context to underlying [`ValidateError`] values.
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
-        PS::deref(&self.magic)
-            .validate()
-            .map_err(Into::<anyhow::Error>::into)
-            .context("validating magic")?;
+        self.magic.validate().map_err(Into::<anyhow::Error>::into).context("validating magic")?;
         self.signature
             .validate()
             .map_err(Into::<anyhow::Error>::into)
             .context("validating signature")?;
-        PS::deref(&self.policy_version)
+        self.policy_version
             .validate()
             .map_err(Into::<anyhow::Error>::into)
             .context("validating policy_version")?;
         self.config.validate().map_err(Into::<anyhow::Error>::into).context("validating config")?;
-        PS::deref(&self.counts)
-            .validate()
-            .map_err(Into::<anyhow::Error>::into)
-            .context("validating counts")?;
+        self.counts.validate().map_err(Into::<anyhow::Error>::into).context("validating counts")?;
         self.policy_capabilities
             .validate()
             .map_err(Into::<anyhow::Error>::into)
@@ -853,6 +842,7 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         // Collate the sets of user, role, type, sensitivity and category Ids.
         let user_ids: HashSet<UserId> = self.users.data.iter().map(|x| x.id()).collect();
         let role_ids: HashSet<RoleId> = self.roles.data.iter().map(|x| x.id()).collect();
+        let class_ids: HashSet<ClassId> = self.classes.data.iter().map(|x| x.id()).collect();
         let type_ids: HashSet<TypeId> = self.types.data.iter().map(|x| x.id()).collect();
         let sensitivity_ids: HashSet<SensitivityId> =
             self.sensitivities.data.iter().map(|x| x.id()).collect();
@@ -904,10 +894,14 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         }
 
         // Validate that roles output by role- transitions & allows are defined.
-        for transition in PS::deref_slice(&self.role_transitions.data) {
+        for transition in &self.role_transitions.data {
+            validate_id(&role_ids, transition.current_role(), "current_role")?;
+            validate_id(&type_ids, transition.type_(), "type")?;
+            validate_id(&class_ids, transition.class(), "class")?;
             validate_id(&role_ids, transition.new_role(), "new_role")?;
         }
-        for allow in PS::deref_slice(&self.role_allowlist.data) {
+        for allow in &self.role_allowlist.data {
+            validate_id(&role_ids, allow.source_role(), "source_role")?;
             validate_id(&role_ids, allow.new_role(), "new_role")?;
         }
 

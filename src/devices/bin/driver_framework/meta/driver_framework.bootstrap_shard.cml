@@ -132,6 +132,11 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.diagnostics.LogFlusher",
+            from: "#archivist",
+            to: "#driver_manager",
+        },
+        {
             protocol: "fuchsia.component.resolution.Resolver",
             from: "parent",
             as: "fuchsia.component.resolution.Resolver-boot",
@@ -388,6 +393,7 @@
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.backlight.Service",
                 "fuchsia.hardware.bluetooth.Service",
+                "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.hrtimer.Service",
@@ -429,6 +435,7 @@
                 "fuchsia.gpu.magma.TestService",
                 "fuchsia.gpu.magma.TrustedService",
                 "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.google.nanohub.DisplayService",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.nfc.Service",

@@ -45,6 +45,12 @@ impl TaskState {
     }
 }
 
+impl Clone for TaskState {
+    fn clone(&self) -> Self {
+        TaskState(self.0.lock().clone().into())
+    }
+}
+
 /// Opaque structure encapsulating the effective security state saved from a task.
 #[derive(Clone, Debug)]
 pub struct SavedEffectiveState(SecurityId);

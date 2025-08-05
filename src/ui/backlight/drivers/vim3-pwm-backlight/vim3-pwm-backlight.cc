@@ -5,10 +5,7 @@
 #include "src/ui/backlight/drivers/vim3-pwm-backlight/vim3-pwm-backlight.h"
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fit/defer.h>
 #include <zircon/assert.h>
 
@@ -52,8 +49,6 @@ constexpr struct Vim3PwmBacklight::State kInitialState = {
 
 }  // namespace
 
-void Vim3PwmBacklight::DdkRelease() { delete this; }
-
 void Vim3PwmBacklight::GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) {
   fuchsia_hardware_backlight::wire::State state = {
       .backlight_on = state_.power,
@@ -65,14 +60,14 @@ void Vim3PwmBacklight::GetStateNormalized(GetStateNormalizedCompleter::Sync& com
 void Vim3PwmBacklight::SetStateNormalized(SetStateNormalizedRequestView request,
                                           SetStateNormalizedCompleter::Sync& completer) {
   if (request->state.brightness > kMaxNormalizedBrightness) {
-    zxlogf(ERROR, "target brightness %0.3f exceeds the maximum brightness limit %0.3f",
-           request->state.brightness, kMaxNormalizedBrightness);
+    fdf::error("target brightness {:.3} exceeds the maximum brightness limit {:.3}",
+               request->state.brightness, kMaxNormalizedBrightness);
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
   if (request->state.brightness < kMinNormalizedBrightness) {
-    zxlogf(ERROR, "target brightness %0.3f is lower than the brightness limit %0.3f",
-           request->state.brightness, kMinNormalizedBrightness);
+    fdf::error("target brightness {:.3} is lower than the brightness limit {:.3}",
+               request->state.brightness, kMinNormalizedBrightness);
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -109,11 +104,11 @@ zx_status_t Vim3PwmBacklight::SetPwmConfig(bool enabled, float duty_cycle) {
 
   auto result = pwm_proto_client_->SetConfig(config);
   if (!result.ok()) {
-    zxlogf(ERROR, "Cannot set PWM config: %s", result.status_string());
+    fdf::error("Cannot set PWM config: {}", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Cannot set PWM config: %s", zx_status_get_string(result.value().error_value()));
+    fdf::error("Cannot set PWM config: {}", zx_status_get_string(result.value().error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -124,12 +119,12 @@ zx_status_t Vim3PwmBacklight::SetGpioBacklightPower(bool enabled) {
       gpio_backlight_power_->SetBufferMode(enabled ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
                                                    : fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio: %s", result.status_string());
+    fdf::error("Failed to send SetBufferMode request to gpio: {}", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to configure gpio to output: %s",
-           zx_status_get_string(result->error_value()));
+    fdf::error("Failed to configure gpio to output: {}",
+               zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -144,14 +139,13 @@ void Vim3PwmBacklight::StoreState(State state) {
 zx_status_t Vim3PwmBacklight::Initialize() {
   if (zx_status_t status = SetGpioBacklightPower(/*enabled=*/kInitialState.power);
       status != ZX_OK) {
-    zxlogf(ERROR, "Cannot initialize LCD-backlight-enable GPIO pin: %s",
-           zx_status_get_string(status));
+    fdf::error("Cannot initialize LCD-backlight-enable GPIO pin: {}", zx_status_get_string(status));
     return status;
   }
   const float duty_cycle = NormalizedBrightnessToDutyCycle(kInitialState.brightness);
   if (zx_status_t status = SetPwmConfig(/*enabled=*/kInitialState.power, duty_cycle);
       status != ZX_OK) {
-    zxlogf(ERROR, "Cannot initialize PWM device: %s", zx_status_get_string(status));
+    fdf::error("Cannot initialize PWM device: {}", zx_status_get_string(status));
     return status;
   }
   StoreState(kInitialState);
@@ -169,23 +163,23 @@ zx_status_t Vim3PwmBacklight::SetState(State target) {
 
   auto bailout_gpio = fit::defer([this, power = state_.power] {
     if (zx_status_t status = SetGpioBacklightPower(/*enabled=*/power); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to bailout GPIO: %s", zx_status_get_string(status));
+      fdf::error("Failed to bailout GPIO: {}", zx_status_get_string(status));
     }
   });
   if (zx_status_t status = SetGpioBacklightPower(/*enabled=*/target.power); status != ZX_OK) {
-    zxlogf(ERROR, "Cannot set LCD-backlight-enable GPIO pin: %s", zx_status_get_string(status));
+    fdf::error("Cannot set LCD-backlight-enable GPIO pin: {}", zx_status_get_string(status));
     return status;
   }
 
   auto bailout_pwm = fit::defer([this, power = state_.power, brightness = state_.brightness] {
     const float duty_cycle = NormalizedBrightnessToDutyCycle(brightness);
     if (zx_status_t status = SetPwmConfig(/*enabled=*/power, duty_cycle); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to bailout PWM config: %s", zx_status_get_string(status));
+      fdf::error("Failed to bailout PWM config: {}", zx_status_get_string(status));
     }
   });
   const float duty_cycle = NormalizedBrightnessToDutyCycle(target.brightness);
   if (zx_status_t status = SetPwmConfig(/*enabled=*/target.power, duty_cycle); status != ZX_OK) {
-    zxlogf(ERROR, "Cannot set PWM config: %s", zx_status_get_string(status));
+    fdf::error("Cannot set PWM config: {}", zx_status_get_string(status));
     return status;
   }
   StoreState(target);
@@ -194,72 +188,45 @@ zx_status_t Vim3PwmBacklight::SetState(State target) {
   return ZX_OK;
 }
 
-zx_status_t Vim3PwmBacklight::Bind() {
-  root_ = inspector_.GetRoot().CreateChild("vim3-pwm-backlight");
+zx::result<> Vim3PwmBacklight::Start() {
+  root_ = inspector().root().CreateChild("vim3-pwm-backlight");
 
-  zx::result pwm_client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>("pwm");
+  zx::result pwm_client_end = incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>("pwm");
   if (pwm_client_end.is_error()) {
-    zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s",
-           pwm_client_end.status_string());
-    return pwm_client_end.status_value();
+    fdf::error("Unable to connect to fidl protocol - status: {}", pwm_client_end);
+    return pwm_client_end.take_error();
   }
   pwm_proto_client_.Bind(std::move(pwm_client_end.value()));
 
-  const char* kGpioLcdBacklightEnableFragmentName = "gpio-lcd-backlight-enable";
-  zx::result gpio_client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-          kGpioLcdBacklightEnableFragmentName);
+  const char* kGpioLcdBacklightEnableParentName = "gpio-lcd-backlight-enable";
+  zx::result gpio_client_end = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(
+      kGpioLcdBacklightEnableParentName);
   if (gpio_client_end.is_error()) {
-    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s",
-           kGpioLcdBacklightEnableFragmentName, gpio_client_end.status_string());
-    return gpio_client_end.status_value();
+    fdf::error("Failed to get gpio protocol from fragment {}: {}",
+               kGpioLcdBacklightEnableParentName, gpio_client_end);
+    return gpio_client_end.take_error();
   }
   gpio_backlight_power_.Bind(std::move(gpio_client_end.value()));
 
   if (zx_status_t status = Initialize(); status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   brightness_property_ = root_.CreateDouble("brightness", state_.brightness);
   power_property_ = root_.CreateBool("power", state_.power);
 
-  zx_status_t status =
-      DdkAdd(ddk::DeviceAddArgs("vim3-pwm-backlight").set_inspect_vmo(InspectVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot add device: %s", zx_status_get_string(status));
-    return status;
+  fuchsia_hardware_backlight::Service::InstanceHandler backlight_instance_handler{
+      {.backlight = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure)}};
+  if (zx::result result = outgoing()->AddService<fuchsia_hardware_backlight::Service>(
+          std::move(backlight_instance_handler));
+      result.is_error()) {
+    fdf::error("Failed to add backlight service: {}", result);
+    return result.take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
-
-// static
-zx_status_t Vim3PwmBacklight::Create(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<Vim3PwmBacklight>(&ac, parent);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  if (zx_status_t status = dev->Bind(); status != ZX_OK) {
-    return status;
-  }
-
-  // devmgr is now in charge of releasing memory for dev
-  [[maybe_unused]] auto ptr = dev.release();
-
-  return ZX_OK;
-}
-
-static constexpr zx_driver_ops_t vim3_pwm_backlight_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = Vim3PwmBacklight::Create;
-  return ops;
-}();
 
 }  // namespace vim3_pwm_backlight
 
-ZIRCON_DRIVER(vim3_pwm_backlight, vim3_pwm_backlight::vim3_pwm_backlight_driver_ops, "Khadas",
-              "0.1");
+FUCHSIA_DRIVER_EXPORT(vim3_pwm_backlight::Vim3PwmBacklight);

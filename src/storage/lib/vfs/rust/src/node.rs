@@ -187,23 +187,23 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::NodeRequest::DeprecatedGetAttr { responder } => {
                 let (status, attrs) =
                     crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
                 responder.send(status.into_raw(), &attrs)?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::NodeRequest::GetAttr { responder } => {
                 let (status, attrs) =
                     crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
                 responder.send(status.into_raw(), &attrs)?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::NodeRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }

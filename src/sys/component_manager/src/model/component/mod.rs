@@ -137,8 +137,6 @@ impl fmt::Display for StartReason {
 /// Component information returned by the resolver.
 #[derive(Clone, Debug)]
 pub struct Component {
-    /// The URL of the resolved component.
-    pub resolved_url: String,
     /// The context to be used to resolve a component from a path
     /// relative to this component (for example, a component in a subpackage).
     /// If `None`, the resolver cannot resolve relative path component URLs.
@@ -157,7 +155,6 @@ impl Component {
     #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     pub fn resolve_with_config(
         ResolvedComponent {
-            resolved_url,
             context_to_resolve_children,
             decl,
             package,
@@ -184,7 +181,7 @@ impl Component {
         };
 
         let package = package.map(|p| p.try_into()).transpose()?;
-        Ok(Self { resolved_url, context_to_resolve_children, decl, package, config, abi_revision })
+        Ok(Self { context_to_resolve_children, decl, package, config, abi_revision })
     }
 }
 
@@ -201,14 +198,13 @@ impl From<&Component> for fresolution::Component {
             ),
         ));
         let package = component.package.as_ref().map(|package| fresolution::Package {
-            url: Some(package.package_url.clone()),
             directory: fuchsia_fs::directory::clone(&package.package_dir)
                 .ok()
                 .and_then(|proxy| proxy.into_client_end().ok()),
             ..Default::default()
         });
         fresolution::Component {
-            url: Some(component.resolved_url.clone()),
+            url: None,
             decl,
             package,
             config_values: component
@@ -225,8 +221,6 @@ impl From<&Component> for fresolution::Component {
 /// Package information possibly returned by the resolver.
 #[derive(Clone, Debug)]
 pub struct Package {
-    /// The URL of the package itself.
-    pub package_url: String,
     /// The package that this resolved component belongs to
     pub package_dir: fio::DirectoryProxy,
 }
@@ -235,7 +229,7 @@ impl TryFrom<ResolvedPackage> for Package {
     type Error = ResolveActionError;
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
-        Ok(Self { package_url: package.url, package_dir: package.directory.into_proxy() })
+        Ok(Self { package_dir: package.directory.into_proxy() })
     }
 }
 
@@ -1560,7 +1554,6 @@ pub mod tests {
         ComponentInfo,
     };
     use ::routing::bedrock::structured_dict::ComponentInput;
-    use ::routing::resolving::ComponentAddress;
     use assert_matches::assert_matches;
     use cm_rust::{
         Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
@@ -1657,9 +1650,7 @@ pub mod tests {
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
-        test.runner
-            .wait_for_urls(&["test:///root_resolved", "test:///a_resolved", "test:///b_resolved"])
-            .await;
+        test.runner.wait_for_urls(&["test:///root", "test:///a", "test:///b"]).await;
 
         // Check that the eager 'b' has started.
         assert!(component_b.is_started().await);
@@ -1749,7 +1740,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
 
-        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let instance_id = InstanceId::new_random(&mut rand::rng());
         let index = {
             let mut index = component_id_index::Index::default();
             index.insert(Moniker::root(), instance_id.clone()).unwrap();
@@ -2251,7 +2242,6 @@ pub mod tests {
         let comp = new_component().await;
         let decl = ComponentDeclBuilder::new().build();
         let resolved_component = Component {
-            resolved_url: "".to_string(),
             context_to_resolve_children: None,
             decl,
             package: None,
@@ -2261,7 +2251,7 @@ pub mod tests {
         let ris = ResolvedInstanceState::new(
             &comp,
             resolved_component,
-            ComponentAddress::from_url(&comp.component_url, &comp).await.unwrap(),
+            ComponentAddress::from_url(&comp.component_url, &comp).await.unwrap().into(),
             Default::default(),
             Default::default(),
         )
@@ -2359,7 +2349,7 @@ pub mod tests {
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
-        test.runner.wait_for_urls(&["test:///root_resolved"]).await;
+        test.runner.wait_for_urls(&["test:///root"]).await;
 
         let collection_decl = root
             .lock_resolved_state()
@@ -2522,7 +2512,7 @@ pub mod tests {
         // Serve LogSink from the root component.
         let mut root_out_dir = OutDir::new();
         root_out_dir.add_entry("/svc/fuchsia.logger.LogSink".parse().unwrap(), host(serve_logsink));
-        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+        test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
         let child = test_topology.look_up([TEST_CHILD_NAME].try_into().unwrap()).await;
 
@@ -2620,7 +2610,7 @@ pub mod tests {
                 open_request_tx.unbounded_send(channel).unwrap();
             }),
         );
-        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+        test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
         let root = test_topology.look_up(Moniker::default()).await;
         assert!(!root.is_started().await);
@@ -2661,7 +2651,7 @@ pub mod tests {
                 unreachable!();
             }),
         );
-        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+        test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
         let root = test_topology.look_up(Moniker::default()).await;
         assert!(!root.is_started().await);
@@ -2699,12 +2689,12 @@ pub mod tests {
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 
         let root_out_dir = OutDir::new();
-        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+        test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
         // Configure the component runner to take 3 seconds to stop the component.
         let response_delay = zx::MonotonicDuration::from_seconds(3);
         test_topology.runner.add_controller_response(
-            "test:///root_resolved",
+            "test:///root",
             Box::new(move || ControllerActionResponse {
                 close_channel: true,
                 delay: Some(response_delay),
@@ -2721,7 +2711,7 @@ pub mod tests {
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
-        test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
+        test_topology.runner.wait_for_urls(&["test:///root"]).await;
 
         // Start to stop the component. This will stall because the framework will be
         // waiting the controller to respond.

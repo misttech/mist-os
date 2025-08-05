@@ -5,24 +5,24 @@
 //! At a high level, the primary element of this module is the `Calls` struct.
 //! This is a container for a number of `Call` structs.
 //!
-//! Each `Call` is a `Stream` of `ProcedureInputs` which are used to drive the
-//! current running procedure or initiate a new one.  Internally, the `Call`
-//! wraps a request stream for the `Call` protocol which allows FIDL clients to
-//! control the call.
+//! Each `Call` is a `Stream` of `CallOutput` which are used to drive the
+//! current running procedure, initiate a new procedure, or do other things like
+//! tear down SCO.  Internally, the `Call` wraps a request stream for the `Call`
+//! protocol which allows FIDL clients to control the call.
 //!
-//!  For example, a headset or carkit may send a FIDL request to hang up an in
-//!  progress call, and this would eventually cause the corresponding `Call`
-//!  stream to yield the appropriate `ProcedureInput`,
-//!  `ProcedureInput::CommandFromHf(CommandFromHf::HangupCall)`.  Additionally
-//!  `Call` has several methods on it that allow the `ProcedureManager` to
-//!  manipulate it, such as by setting the phone number associated with the
-//!  call.
+//! For example, a headset or carkit may send a FIDL request to hang up an in
+//! progress call, and this would eventually cause the corresponding `Call`
+//! stream to yield the appropriate `CallOutput`,
+//! `CallOutput::ProcedureInput(ProcedureInput::CommandFromHf(CommandFromHf::HangupCall))`.
+//! Additionally `Call` has several methods on it that allow the
+//! `ProcedureManager` to manipulate it, such as by setting the phone number
+//! associated with the call.
 //!
-//!  However, the `Call` struct is not public--instead it is accessed through
-//!  the `Calls` struct, which contains zero or more `Call` structs. The `Calls`
-//!  struct also is a `Stream`.  It multiplexes the `Stream`s of the internal
-//!  `Call` structs.  Similarly, the `Calls` struct has several public methods
-//!  to set `Call` state that are routed to the proper `Call`.
+//! However, the `Call` struct is not public--instead it is accessed through the
+//! `Calls` struct, which contains zero or more `Call` structs. The `Calls`
+//! struct also is a `Stream`.  It multiplexes the `Stream`s of the internal
+//! `Call` structs.  Similarly, the `Calls` struct has several public methods to
+//! set `Call` state that are routed to the proper `Call`.
 
 use anyhow::{format_err, Error};
 use async_helpers::maybe_stream::MaybeStream;
@@ -124,8 +124,14 @@ mod shutdown_state {
     }
 }
 
+#[derive(Debug)]
+pub enum CallOutput {
+    ProcedureInput(ProcedureInput),
+    TransferCallToAg,
+}
+
 /// This struct contains information about individual calls and methods to
-/// manipulate that state.  Additionally, it acts as a stream of `ProcedureInput`
+/// manipulate that state.  Additionally, it acts as a stream of `CallOutput`
 /// which translate incoming FIDL requests to change the call's state.
 struct Call {
     peer_id: PeerId,               // Used for logging
@@ -135,7 +141,7 @@ struct Call {
     // For incoming calls, set to Some when we get a +CLIP.  For incoming calls,
     // set to Some initially.
     number: Option<Number>,
-    direction: Direction,
+    direction: Option<Direction>,
 
     // This is set to None when creating a Call, and then set to Some when a
     // request stream is created when creating the NextCall to yield to a
@@ -160,20 +166,15 @@ fn respond_to_watch_call_state(
 }
 
 impl Call {
-    pub fn new(
-        peer_id: PeerId,
-        state_option: Option<CallState>,
-        number_option: Option<Number>,
-        direction: Direction,
-    ) -> Self {
+    pub fn new(peer_id: PeerId) -> Self {
         let watch_state_hanging_get_matcher = OneToOneMatcher::new(respond_to_watch_call_state);
 
         Self {
             peer_id,
             call_index: None,
-            state: state_option,
-            number: number_option,
-            direction,
+            state: None, // We never know the state when a call is created
+            number: None,
+            direction: None,
             request_stream: MaybeStream::default(),
             watch_state_hanging_get_matcher,
             waker: None,
@@ -198,7 +199,84 @@ impl Call {
         self.number = Some(number);
     }
 
-    pub fn set_state(&mut self, new_state: CallState) {
+    // Returns true iff the state is set to Terminated.
+    pub fn set_state_by_indicator(
+        &mut self,
+        indicator: CallIndicator,
+        sco_connected: bool,
+    ) -> bool {
+        info!(
+            "Setting call state by indicator {:?}, sco connected {} for peer {} for call {:?}.",
+            indicator, sco_connected, self.peer_id, self
+        );
+        let call_state_option = match indicator {
+            CallIndicator::Call(call_indicators::Call::None) => Some(CallState::Terminated),
+            CallIndicator::Call(call_indicators::Call::Some) if sco_connected => {
+                Some(CallState::OngoingActive)
+            }
+            CallIndicator::Call(call_indicators::Call::Some) =>
+            /* if !sco_connected */
+            {
+                Some(CallState::TransferredToAg)
+            }
+            // TODO(https://fxbug.dev/135119) Handle multiple calls.
+            CallIndicator::CallHeld(_) => {
+                error!(
+                    "Received indicator {:?} for peer {:} but call holding unimplemented.",
+                    indicator, self.peer_id
+                );
+                None
+            }
+            // CallSetup::None indicates the end of the call setup and not a new state, which
+            // should be set by a Call or CallHeld indicator.
+            CallIndicator::CallSetup(call_indicators::CallSetup::None) => None,
+            CallIndicator::CallSetup(call_indicators::CallSetup::Incoming) => {
+                Some(CallState::IncomingRinging)
+            }
+            CallIndicator::CallSetup(call_indicators::CallSetup::OutgoingDialing) => {
+                Some(CallState::OutgoingDialing)
+            }
+            CallIndicator::CallSetup(call_indicators::CallSetup::OutgoingAlerting) => {
+                Some(CallState::OutgoingAlerting)
+            }
+        };
+
+        if let Some(call_state) = call_state_option {
+            self.set_and_report_state(call_state);
+        }
+
+        return call_state_option == Some(CallState::Terminated);
+    }
+
+    pub fn set_sco_connected(&mut self, sco_connected: bool) {
+        info!(
+            "Toggling sco connection call state {:?}, sco connected {} for peer {} for call {:?}.",
+            self.state, sco_connected, self.peer_id, self
+        );
+        let new_state = match self.state {
+            Some(CallState::OngoingActive) if !sco_connected => CallState::TransferredToAg,
+            Some(CallState::TransferredToAg) if sco_connected => CallState::OngoingActive,
+            Some(CallState::OngoingActive) | Some(CallState::TransferredToAg) => {
+                // This is probably a bug in the peer task.
+                error!(
+                    "Toggling call sco connection state for peer {}, call {:?}, \
+                            when new sco state and old call state are inconsistent: \
+                            old call state: {:?}, \
+                            new sco connection state: {}",
+                    self.peer_id, self.call_index, self.state, sco_connected
+                );
+                return;
+            }
+            _ => {
+                // Nothing to do
+                return;
+            }
+        };
+
+        self.set_and_report_state(new_state);
+    }
+
+    fn set_and_report_state(&mut self, new_state: CallState) {
         info!("Setting call state {:?} for peer {:} for call {:?}.", new_state, self.peer_id, self);
 
         self.state = Some(new_state);
@@ -227,7 +305,7 @@ impl Call {
         // Stream impl poll_next which immediately pumps the matcher.
     }
 
-    fn maybe_hang_up(&mut self) -> Poll<Option<Result<ProcedureInput, Error>>> {
+    fn maybe_hang_up(&mut self) -> Poll<Option<CallOutput>> {
         let mut shutdown_state = self.shutdown_state.lock();
         if !shutdown_state.can_send_hang_up() {
             debug!(
@@ -241,54 +319,61 @@ impl Call {
                 self.peer_id, self, shutdown_state
             );
             shutdown_state.sent_hang_up();
-            Poll::Ready(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall))))
+            Poll::Ready(Some(CallOutput::ProcedureInput(ProcedureInput::CommandFromHf(
+                CommandFromHf::HangUpCall,
+            ))))
         }
     }
 
-    // Must not be called with a WatchStater or a SendDtmfCode request.
-    fn call_request_to_procedure_input(
+    // Must not be called with a WatchState or a SendDtmfCode request.
+    fn call_request_to_call_output(
         &mut self,
         call_request: CallRequest,
-    ) -> Poll<Option<Result<ProcedureInput, Error>>> {
+    ) -> Poll<Option<CallOutput>> {
         match call_request {
             // TODO(https://fxbug.dev/135119) Handle multiple calls
             CallRequest::RequestHold { control_handle: _ } => unimplemented!(),
             // TODO(https://fxbug.dev/135119) Handle multiple calls
             CallRequest::RequestActive { control_handle: _ } => {
-                Poll::Ready(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::AnswerIncoming))))
+                Poll::Ready(Some(CallOutput::ProcedureInput(ProcedureInput::CommandFromHf(
+                    CommandFromHf::AnswerIncoming,
+                ))))
             }
             CallRequest::RequestTerminate { control_handle: _ } => self.maybe_hang_up(),
-            // TODO(https://fxbug.dev/134161) Implement transfers.
-            CallRequest::RequestTransferAudio { control_handle: _ } => unimplemented!(),
+            CallRequest::RequestTransferAudio { control_handle: _ } => {
+                Poll::Ready(Some(CallOutput::TransferCallToAg))
+            }
             _ => panic!("Unexpected Call request {:?}", call_request),
         }
     }
 
-    /// Generate a NextCall if possible. This is possible if the number and
+    /// Generate a NextCall if possible. This is possible if the number, direction and
     /// state fields have been set and the request_stream field has not yet been
     /// set when creating a previous NextCall.
     ///
-    /// Failure to generate a NextCall is indicated by the Err branch of a
+    /// Failure to generate a NextCall is indicated by the Err variant of a
     /// Result but is not a true error; it just means the information needed to
     /// generate a NextCall hasn't been provided yet or that a NextCall has
     /// already been crated for this Call.
     pub fn possibly_generate_next_call(&mut self) -> Result<NextCall, Error> {
         // TODO (https://fxbug.dev/135158) It's not clear we will always have a number for all calls, so handle,
         // that case.
-        let result = match (self.state.is_some(), self.number.is_some(), !self.request_stream.is_some()) {
-            (false, _, _) => Err(format_err!("Call {:?} does not yet have a state.", self )),
-            (true, false, _) => Err(format_err!("Call {:?} does not yet have a number.", self)),
-            (true, true, false) =>
+        let result = match (self.state.is_some(), self.number.is_some(), self.direction.is_some(), !self.request_stream.is_some()) {
+            (false, _, _, _) => Err(format_err!("Call {:?} does not yet have a state.", self )),
+            (true, false, _, _) => Err(format_err!("Call {:?} does not yet have a number.", self)),
+            (true, true, false, _) =>  Err(format_err!("Call {:?} does not yet have a direction.", self)),
+            (true, true, true, false) => {
                 Err(format_err!(
                     "(Not an error) Call {:?} already has a request stream, indicating that this call has already been converted to a NextCall",
-                    self)),
-            (true, true, true) => {
+                    self))
+            }
+            (true, true, true, true) => {
                 let (client_end, server_end) = fidl::endpoints::create_endpoints::<CallMarker>();
                 self.request_stream.set(server_end.into_stream());
 
                 let number = String::from(self.number.clone().expect("Number should be set."));
                 let state = self.state.expect("State should be set.");
-                let direction = CallDirection::from(self.direction);
+                let direction = CallDirection::from(self.direction.expect("Direction should be set"));
                 Ok(NextCall {
                     call: Some(client_end),
                     remote: Some(number),
@@ -322,7 +407,7 @@ impl fmt::Debug for Call {
 /// that was requested.  This will also drive reporting state changes for a given
 /// call on a WatchNextCall hanging get request.
 impl Stream for Call {
-    type Item = Result<ProcedureInput, Error>;
+    type Item = CallOutput;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let call_request = self.request_stream.poll_next_unpin(context);
@@ -357,7 +442,7 @@ impl Stream for Call {
                 Poll::Pending
             }
             Poll::Ready(Some(Ok(state_update_request))) => {
-                self.call_request_to_procedure_input(state_update_request)
+                self.call_request_to_call_output(state_update_request)
             }
         };
 
@@ -388,11 +473,12 @@ type NextCallMatcher =
     OneToOneMatcher<NextCall, PeerHandlerWatchNextCallResponder, ResponderResult>;
 
 /// This struct contains a list of `Call`s and methods to manipulate their
-/// state.  Additionally, it acts as a stream of `ProcedureInput` by
+/// state.  Additionally, it acts as a stream of `CallOutput` by
 /// multiplexing the underlying Call`s' streams.
 pub struct Calls {
     peer_id: PeerId,
     call_list: CallList<Call>,
+    sco_connected: bool,
     // Calls for which a +CIEV(call = 0) has been received but which are still responding to a
     // WatchCallState request.
     terminated_calls: VecDeque<Call>,
@@ -413,6 +499,7 @@ impl Calls {
         Self {
             peer_id,
             call_list: CallList::default(),
+            sco_connected: false,
             terminated_calls: VecDeque::new(),
             watch_next_call_hanging_get_matcher,
             waker: None,
@@ -425,12 +512,7 @@ impl Calls {
         }
     }
 
-    pub fn insert_new_call(
-        &mut self,
-        state_option: Option<CallState>,
-        number_option: Option<Number>,
-        direction: Direction,
-    ) -> CallIndex {
+    pub fn insert_new_call(&mut self) -> CallIndex {
         // TODO(https://fxbug.dev/135119) Handle multiple calls
         if self.call_list.len() > 0 {
             unimplemented!(
@@ -440,7 +522,7 @@ impl Calls {
             );
         }
 
-        let call = Call::new(self.peer_id, state_option, number_option, direction);
+        let call = Call::new(self.peer_id);
         let call_index = self.call_list.insert(call);
 
         let call = self.call_list.get_mut(call_index);
@@ -449,13 +531,13 @@ impl Calls {
 
         info!("Inserted call {:?} for peer {:}.", call, self.peer_id);
 
-        self.possibly_respond_to_watch_next_call(call_index);
+        // We can't have the state, number or direction here, so no need to
+        // possibly_respond_to_watch_next_call
 
         call_index
 
-        // TODO(https://fxbug.dev/135158) Cause the stream to yield a phone
-        // number fetch procedure input if no number is known. Or do that at the
-        // call site for this method
+        // TODO(b/432243006) Cause the stream to yield an hanced call status
+        // fetch procedure input to get number and direction
     }
 
     pub fn set_call_state_by_indicator(&mut self, indicator: CallIndicator) {
@@ -469,67 +551,39 @@ impl Calls {
         // to and compute the state update it causes for that call.  The calls module in the AG
         // component has several methods to help with with that; these should be factored out into
         // the bt_hfp crate.
-        let call_index = 1; // Calls are 1-indexed
 
-        let call_state_option = match indicator {
-            CallIndicator::Call(call_indicators::Call::None) => Some(CallState::Terminated),
-            CallIndicator::Call(call_indicators::Call::Some) => Some(CallState::OngoingActive),
-            // TODO(https://fxbug.dev/135119) Handle multiple calls.
-            CallIndicator::CallHeld(_) => {
+        // Calls are 1-indexed
+        let call_index = 1;
+
+        // This is a new call
+        if let CallIndicator::CallSetup(call_indicators::CallSetup::Incoming)
+        | CallIndicator::CallSetup(call_indicators::CallSetup::OutgoingDialing) = indicator
+        {
+            let _index = self.insert_new_call();
+        }
+
+        debug!(
+            "Setting call state for peer {:} for call {:?} with indicator {:?}",
+            self.peer_id,
+            self.call_list.get(call_index),
+            indicator
+        );
+
+        let call = match self.call_list.get_mut(call_index) {
+            Some(call) => call,
+            None => {
                 error!(
-                    "Received indicator {:?} for peer {:} but call holding unimplemented.",
-                    indicator, self.peer_id
+                    "No call found for for peer {:} at index {:} while setting state with indicators {:?}",
+                    self.peer_id, call_index, indicator
                 );
-                None
-            }
-            // CallSetup::None indicates the end of the call setup and not a new state, which
-            // should be set by a Call or CallHeld indicator.
-            CallIndicator::CallSetup(call_indicators::CallSetup::None) => None,
-            CallIndicator::CallSetup(call_indicators::CallSetup::Incoming) => {
-                Some(CallState::IncomingRinging)
-            }
-            CallIndicator::CallSetup(call_indicators::CallSetup::OutgoingDialing) => {
-                Some(CallState::OutgoingDialing)
-            }
-            CallIndicator::CallSetup(call_indicators::CallSetup::OutgoingAlerting) => {
-                Some(CallState::OutgoingAlerting)
+                return;
             }
         };
 
-        debug!(
-            "Setting call state for peer {:} for call {:?} to {:?}",
-            self.peer_id,
-            self.call_list.get(call_index),
-            call_state_option
-        );
-        call_state_option.into_iter().for_each(|s| self.set_state_for_call(call_index, s));
-    }
+        let terminated = call.set_state_by_indicator(indicator, self.sco_connected);
+        self.possibly_respond_to_watch_next_call(call_index);
 
-    fn set_state_for_call(&mut self, call_index: CallIndex, new_state: CallState) {
-        let call_option = self.call_list.get_mut(call_index);
-        debug!(
-            "Setting call {} -> {:?} for peer {:} state to {:?}",
-            call_index, call_option, self.peer_id, new_state
-        );
-        match call_option {
-            Some(call) => {
-                call.set_state(new_state);
-                self.possibly_respond_to_watch_next_call(call_index);
-            }
-            None => {
-                info!(
-                    "No call found for for peer {:} at index {:} while setting state to {:?}",
-                    self.peer_id, call_index, new_state
-                );
-                let _index = self.insert_new_call(
-                    Some(new_state),
-                    None, // Number
-                    Direction::MobileOriginated,
-                );
-            }
-        }
-
-        if new_state == CallState::Terminated {
+        if terminated {
             self.handle_state_terminated(call_index);
         }
     }
@@ -593,11 +647,27 @@ impl Calls {
             }
         }
     }
+
+    pub fn set_sco_connected(&mut self, sco_connected: bool) {
+        self.sco_connected = sco_connected;
+
+        // TODO(https://fxbug.dev/135119) This already handles multiple calls, but remove this log
+        if self.call_list.len() > 1 {
+            error!(
+                "Setting SCO connected to {} for peer {:} when more than one call exists: {:?}",
+                sco_connected, self.peer_id, self.call_list
+            );
+        }
+
+        for (_index, call) in self.call_list.calls_mut().into_iter() {
+            call.set_sco_connected(sco_connected);
+        }
+    }
 }
 
 /// Produces a single stream by selecting over all the streams for each call.
 impl Stream for Calls {
-    type Item = Result<ProcedureInput, Error>;
+    type Item = CallOutput;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // Respond to any outstanding WatchNextCall requests if we can.
@@ -605,14 +675,14 @@ impl Stream for Calls {
             self.watch_next_call_hanging_get_matcher.poll_next_unpin(context)
         {
             if let Err(err) = result {
-                return Poll::Ready(Some(Err(err.into())));
+                warn!("Error responding to WatchNextCall for peer {}: {:?}", self.peer_id, err);
             }
         }
 
         for call in &mut self.terminated_calls {
             // Pump the stream for the terminated call.  This will cause the Terminated state to be
             // sent to the FIDL client if there is a WatchNextState hanging get outstanding.  Since
-            // the peer believes the call is terminated, we can ignore any ProcedureInputs yielded
+            // the peer believes the call is terminated, we can ignore any CallOutput yielded
             // by this stream caused by incoming FIDL requests.
             while let Poll::Ready(_) = call.poll_next_unpin(context) {}
         }
@@ -651,7 +721,6 @@ impl FusedStream for Calls {
 #[cfg(test)]
 mod test {
     // TODO(https://https://fxbug.dev.dev/410610394) Add more tests.
-
     use super::*;
 
     use assert_matches::assert_matches;
@@ -659,13 +728,14 @@ mod test {
     use futures::future::{select, Either, FutureExt};
 
     static PEER_ID: PeerId = PeerId(1);
-    fn phone_number() -> Number {
-        Number::from("8005550100")
-    }
 
+    // TODO(https://fxbug.dev/135158, b/432243006). Reactivate this test when we  can set the
+    // direction and number of a call.
+    #[ignore]
     #[fuchsia::test]
     async fn call_created_with_phone_number() {
         let mut calls = Calls::new(PEER_ID);
+        calls.set_sco_connected(true);
 
         let (peer_handler_proxy, mut peer_handler_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
@@ -690,17 +760,17 @@ mod test {
             req => panic!("Unexpected PeerHandler request {req:?}."),
         };
 
-        let _call_index =
-            calls.insert_new_call(None, Some(phone_number()), Direction::MobileOriginated);
+        let _call_index = calls.insert_new_call();
+        // TODO(https://fxbug.dev/135158, b/432243006). Set the direction and number
 
         calls.handle_watch_next_call(watch_next_call_responder);
 
         calls.set_call_state_by_indicator(CallIndicator::Call(call_indicators::Call::Some));
 
         // Pump stream to respond to WatchNextCall
-        let procedure_input_option = calls.next().now_or_never();
+        let call_output_option = calls.next().now_or_never();
         // No calls have been returned to client yet with WatchNextCall
-        assert_matches!(procedure_input_option, None);
+        assert_matches!(call_output_option, None);
 
         let next_call = watch_next_call_continue_fut
             .now_or_never()
@@ -711,9 +781,9 @@ mod test {
         let watch_state_fut = call_proxy.watch_state();
 
         // Pump stream to respond to WatchState
-        let procedure_input_option = calls.next().now_or_never();
+        let call_output_option = calls.next().now_or_never();
         // No FIDL calls causing a procedure update have happened yet.
-        assert_matches!(procedure_input_option, None);
+        assert_matches!(call_output_option, None);
 
         let state = watch_state_fut
             .now_or_never()
@@ -721,27 +791,58 @@ mod test {
             .expect("FIDL error on watch_state");
         assert_eq!(state, CallState::OngoingActive);
 
+        // test transferring to AG
+        call_proxy.request_transfer_audio().expect("Request transfer audio");
+
+        let call_output_option = calls.next().now_or_never();
+        assert_matches!(call_output_option, Some(Some(CallOutput::TransferCallToAg)));
+
+        let watch_state_fut = call_proxy.watch_state();
+        calls.set_sco_connected(false);
+
+        // Pump stream to respond to WatchState
+        let call_output_option = calls.next().now_or_never();
+        // No FIDL calls causing a procedure update have happened yet.
+        assert_matches!(call_output_option, None);
+
+        let state = watch_state_fut
+            .now_or_never()
+            .expect("watch_state hanging")
+            .expect("FIDL error on watch_state");
+        assert_eq!(state, CallState::TransferredToAg);
+
+        let call_output_option = calls.next().now_or_never();
+        assert_matches!(call_output_option, Some(Some(CallOutput::TransferCallToAg)));
+
+        // test transferring to AG
+        call_proxy.request_transfer_audio().expect("Request transfer audio");
+
+        let call_output_option = calls.next().now_or_never();
+        assert_matches!(call_output_option, Some(Some(CallOutput::TransferCallToAg)));
+
         // Pass through hang up indicator
         call_proxy.request_terminate().expect("Request terminated");
 
         // Get hangup input
-        let procedure_input_option = calls.next().now_or_never();
+        let call_output_option = calls.next().now_or_never();
         assert_matches!(
-            procedure_input_option,
-            Some(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall))))
+            call_output_option,
+            Some(Some(CallOutput::ProcedureInput(ProcedureInput::CommandFromHf(
+                CommandFromHf::HangUpCall
+            ))))
         );
 
         // Try again, but this time it shouldn't go through, since we've already requested a hangup
         call_proxy.request_terminate().expect("Request terminated");
-        let procedure_input_option = calls.next().now_or_never();
-        assert_matches!(procedure_input_option, None);
+        let call_output_option = calls.next().now_or_never();
+        assert_matches!(call_output_option, None);
 
         // Hang up
         calls.set_call_state_by_indicator(CallIndicator::Call(call_indicators::Call::None));
 
         let watch_state_fut = call_proxy.watch_state();
         // Pump stream to respond to WatchState
-        let _procedure_input_option = calls.next().now_or_never();
+        let _call_output_option = calls.next().now_or_never();
         let state = watch_state_fut
             .now_or_never()
             .expect("watch_state second call hanging")
@@ -750,7 +851,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn call_created_without_phone_number() {
+    async fn call_created_without_phone_number_or_direction() {
         let mut calls = Calls::new(PEER_ID);
 
         let (peer_handler_proxy, mut peer_handler_request_stream) =
@@ -776,16 +877,16 @@ mod test {
             req => panic!("Unexpected PeerHandler request {req:?}."),
         };
 
-        let _call_index = calls.insert_new_call(None, None, Direction::MobileOriginated);
+        let _call_index = calls.insert_new_call();
 
         calls.handle_watch_next_call(watch_next_call_responder);
 
         calls.set_call_state_by_indicator(CallIndicator::Call(call_indicators::Call::Some));
 
         // Pump stream to respond to WatchNextCall
-        let procedure_input_option = calls.next().now_or_never();
+        let call_output_option = calls.next().now_or_never();
         // No calls have been returned to client yet with WatchNextCall
-        assert_matches!(procedure_input_option, None);
+        assert_matches!(call_output_option, None);
 
         let next_call_hang = watch_next_call_continue_fut.now_or_never();
         // The NextcCall is never ready to be sent to clients.

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/time.h>
 
 #include <fbl/unique_fd.h>
@@ -10,6 +11,7 @@
 
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
+#include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 extern std::string DoPrePolicyLoadWork() { return "inherit_policy.pp"; }
 
@@ -24,6 +26,11 @@ fit::result<int, std::string> CreateTmpFile() {
     return fit::error(errno);
   }
   return fit::ok(std::move(file_path));
+}
+
+// Returns the path to a binary under the test package's `data` directory.
+std::string PathForExec(std::string_view binary_name) {
+  return "data/bin/" + std::string(binary_name);
 }
 
 // Try to execute a binary in a situation where the post-exec domain does not
@@ -45,12 +52,10 @@ TEST(InheritTest, ExecutableFdRemappedToNull) {
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());
 
-    std::string path_for_exec = "data/bin/true_bin";
-    char* args[] = {basename(path_for_exec.data()), NULL};
-    if (execv(path_for_exec.data(), args) < 0) {
-      perror("exec into child domain failed");
-      FAIL();
-    }
+    std::string binary_name = "true_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    char* const args[] = {binary_name.data(), NULL};
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
   } else {
     int wstatus;
     ASSERT_TRUE(waitpid(pid, &wstatus, 0));
@@ -72,12 +77,10 @@ TEST(InheritTest, ExecutableFdUseAllowed) {
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());
 
-    std::string path_for_exec = "data/bin/true_bin";
-    char* args[] = {basename(path_for_exec.data()), NULL};
-    if (execv(path_for_exec.data(), args) < 0) {
-      perror("exec into child domain failed");
-      FAIL();
-    }
+    std::string binary_name = "true_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    char* const args[] = {binary_name.data(), NULL};
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
   }));
 }
 
@@ -101,18 +104,15 @@ TEST(InheritTest, FdUseDeniedFdRemappedToNull) {
 
     ASSERT_TRUE(RunSubprocessAs(kBridgeSecurityContext, [&] {
       // Exec the `is_selinux_null_inode` binary and expect that `no_use_fd` is remapped.
-      std::string path_for_exec = "data/bin/is_selinux_null_inode_bin";
+      std::string binary_name = "is_selinux_null_inode_bin";
+      std::string path_for_exec = PathForExec(binary_name);
       std::string expect_null_inode = std::to_string(int(true));
-      char* args[] = {basename(path_for_exec.data()), no_use_fd_str.data(),
-                      expect_null_inode.data(), NULL};
+      char* const args[] = {binary_name.data(), no_use_fd_str.data(), expect_null_inode.data(),
+                            NULL};
 
       auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
       ASSERT_TRUE(set_exec_context.is_ok());
-
-      if (execv(path_for_exec.data(), args) < 0) {
-        perror("exec into child domain failed");
-        FAIL();
-      }
+      SAFE_SYSCALL(execv(path_for_exec.data(), args));
     }));
   }));
 }
@@ -144,18 +144,15 @@ TEST(InheritTest, NullFileDescriptorIsDuplicated) {
     ASSERT_TRUE(RunSubprocessAs(kBridgeSecurityContext, [&] {
       // Exec the `is_duplicated_fd` binary and expect that `no_use_fd_1` and
       // `no_use_fd_2` are remapped to the same file description (for the null node).
-      std::string path_for_exec = "data/bin/is_duplicated_fd_bin";
+      std::string binary_name = "is_duplicated_fd_bin";
+      std::string path_for_exec = PathForExec(binary_name);
       std::string expect_null_inode = std::to_string(int(true));
-      char* args[] = {basename(path_for_exec.data()), no_use_fd_1_str.data(),
-                      no_use_fd_2_str.data(), NULL};
+      char* const args[] = {binary_name.data(), no_use_fd_1_str.data(), no_use_fd_2_str.data(),
+                            NULL};
 
       auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
       ASSERT_TRUE(set_exec_context.is_ok());
-
-      if (execv(path_for_exec.data(), args) < 0) {
-        perror("exec into child domain failed");
-        FAIL();
-      }
+      SAFE_SYSCALL(execv(path_for_exec.data(), args));
     }));
   }));
 }
@@ -178,18 +175,14 @@ TEST(InheritTest, FsNodePermissionDeniedFdRemappedToNull) {
     std::string no_use_fd_str = std::to_string(no_use_fd);
 
     // Exec the `is_selinux_null_inode` binary and expect that `no_use_fd` is remapped.
-    std::string path_for_exec = "data/bin/is_selinux_null_inode_bin";
+    std::string binary_name = "is_selinux_null_inode_bin";
+    std::string path_for_exec = PathForExec(binary_name);
     std::string expect_null_inode = std::to_string(int(true));
-    char* args[] = {basename(path_for_exec.data()), no_use_fd_str.data(), expect_null_inode.data(),
-                    NULL};
+    char* const args[] = {binary_name.data(), no_use_fd_str.data(), expect_null_inode.data(), NULL};
 
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());
-
-    if (execv(path_for_exec.data(), args) < 0) {
-      perror("exec into child domain failed");
-      FAIL();
-    }
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
   }));
 }
 
@@ -211,18 +204,15 @@ TEST(InheritTest, FdUseAllowed) {
     std::string allow_use_fd_str = std::to_string(allow_use_fd);
 
     // Exec the `is_selinux_null_inode` binary and expect that `allow_use_fd` is not remapped.
-    std::string path_for_exec = "data/bin/is_selinux_null_inode_bin";
+    std::string binary_name = "is_selinux_null_inode_bin";
+    std::string path_for_exec = PathForExec(binary_name);
     std::string expect_null_inode = std::to_string(int(false));
-    char* args[] = {basename(path_for_exec.data()), allow_use_fd_str.data(),
-                    expect_null_inode.data(), NULL};
+    char* const args[] = {binary_name.data(), allow_use_fd_str.data(), expect_null_inode.data(),
+                          NULL};
 
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());
-
-    if (execv(path_for_exec.data(), args) < 0) {
-      perror("exec into child domain failed");
-      FAIL();
-    }
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
   }));
 }
 
@@ -242,17 +232,14 @@ TEST(InheritTest, SiginhDeniedItimerRealReset) {
 
     ASSERT_THAT(setitimer(ITIMER_REAL, &parent_val, nullptr), SyscallSucceeds());
 
-    std::string path_for_exec = "data/bin/is_itimer_real_reset_bin";
+    std::string binary_name = "is_itimer_real_reset_bin";
+    std::string path_for_exec = PathForExec(binary_name);
     std::string expect_itimer_real_reset = std::to_string(int(true));
-    char* args[] = {basename(path_for_exec.data()), expect_itimer_real_reset.data(), NULL};
+    char* const args[] = {binary_name.data(), expect_itimer_real_reset.data(), NULL};
 
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());
-
-    if (execv(path_for_exec.data(), args) < 0) {
-      perror("exec into child domain failed");
-      FAIL();
-    }
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
   }));
 }
 
@@ -272,9 +259,203 @@ TEST(InheritTest, SiginhAllowedItimerRealInherited) {
 
     ASSERT_THAT(setitimer(ITIMER_REAL, &parent_val, nullptr), SyscallSucceeds());
 
-    std::string path_for_exec = "data/bin/is_itimer_real_reset_bin";
+    std::string binary_name = "is_itimer_real_reset_bin";
+    std::string path_for_exec = PathForExec(binary_name);
     std::string expect_itimer_real_reset = std::to_string(int(false));
-    char* args[] = {basename(path_for_exec.data()), expect_itimer_real_reset.data(), NULL};
+    char* const args[] = {binary_name.data(), expect_itimer_real_reset.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
+  }));
+}
+
+// When the `siginh` permission is denied, the parent's pending non-fatal signals are cleared during
+// `exec`.
+TEST(InheritTest, SiginhDeniedPendingNonFatalSignalsCleared) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    ASSERT_THAT(raise(SIGCONT), SyscallSucceeds());
+
+    std::string binary_name = "has_pending_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect no pending signals for the child program.
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
+  }));
+}
+
+// When the `siginh` permission is denied, the parent's pending fatal signals are cleared during
+// `exec`.
+TEST(InheritTest, SiginhDeniedPendingFatalSignalsCleared) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGABRT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    ASSERT_THAT(raise(SIGABRT), SyscallSucceeds());
+
+    std::string binary_name = "has_pending_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect no pending signals for the child program..
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
+  }));
+}
+
+// When the `siginh` permission is allowed, the parent's pending signals are preserved across
+// `exec`.
+TEST(InheritTest, SiginhAllowedPendingSignalsInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    ASSERT_THAT(raise(SIGCONT), SyscallSucceeds());
+
+    std::string binary_name = "has_pending_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that SIGCONT is pending for the child program.
+    std::string expect_sigcont = std::to_string(SIGCONT);
+    char* const args[] = {binary_name.data(), expect_sigcont.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+    SAFE_SYSCALL(execv(path_for_exec.data(), args));
+  }));
+}
+
+// When the `siginh` permission is denied, the signal mask is cleared during `exec`.
+TEST(InheritTest, SiginhDeniedSignalMaskReset) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_blocked_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect no blocked signals for the child program.
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is allowed, the signal mask is inherited during `exec`.
+TEST(InheritTest, SiginhAllowedSignalMaskInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_blocked_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that SIGCONT is blocked for the child program.
+    std::string expect_sigcont = std::to_string(SIGCONT);
+    char* const args[] = {binary_name.data(), expect_sigcont.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is denied, signal dispositions are reset to the default during
+// `exec`.
+TEST(InheritTest, SiginhDeniedSignalDispositionsReset) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct sigaction action;
+    action.sa_handler = SIG_IGN;
+    ASSERT_THAT(sigaction(SIGCONT, &action, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_ignored_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that the child process has only default signal handlers.
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is allowed, dispositions for ignored signals are inherited
+// across `exec`. (Any dispositions other than `SIG_IGN` or `SIG_DFL` are assumed to have
+// been reset to the default at an earlier point in `exec`.)
+TEST(InheritTest, SiginhAllowedIgnoredSignalDispositionsInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct sigaction action;
+    action.sa_handler = SIG_IGN;
+    ASSERT_THAT(sigaction(SIGCONT, &action, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_ignored_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that the child process ignores SIGCONT.
+    std::string expect_sigcont = std::to_string(SIGCONT);
+    char* const args[] = {binary_name.data(), expect_sigcont.data(), NULL};
 
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());

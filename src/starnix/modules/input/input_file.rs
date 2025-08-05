@@ -7,7 +7,7 @@ use starnix_core::fileops_impl_nonseekable;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
+use starnix_core::vfs::{fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps};
 use starnix_logging::{log_info, trace_duration, trace_flow_begin, trace_flow_end, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -367,6 +367,8 @@ impl InputFile {
 // request.
 const EVIOCGNAME_MASK: u32 = 0b11_00_0000_0000_0000_1111_1111_1111_1111;
 
+/// `InputFile` doesn't implement the `close` method.
+impl CloseFreeSafe for InputFile {}
 impl FileOps for InputFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();

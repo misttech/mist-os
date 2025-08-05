@@ -199,9 +199,6 @@ func TestGetBotanistConfig(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			buildDir := t.TempDir()
-			test := makeTest(1, "")
-			test.CPU = tc.targetCPU
-			tc.shard.Tests = []Test{test}
 			tc.shard.Env.Netboot = tc.netboot
 			if tc.uefi {
 				tc.shard.Env.GptUefiDisk = build.GptUefiDiskInfo{
@@ -215,6 +212,7 @@ func TestGetBotanistConfig(t *testing.T) {
 					Name: tc.virtualDeviceSpec,
 				}
 			}
+			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.shard.UseTCG)
 			tc.shard.Name = environmentName(tc.shard.Env)
 			if err := GetBotanistConfig(tc.shard, buildDir, tools); err != nil {
 				t.Fatalf("failed to get botanist config: %s", err)
@@ -354,6 +352,7 @@ func TestGetBotDimensions(t *testing.T) {
 				Env:        tc.env,
 				ExpectsSSH: tc.expectsSSH,
 				UseTCG:     tc.params.UseTcg,
+				HostCPU:    GetHostCPU(tc.env, tc.params.UseTcg),
 			}
 			GetBotDimensions(shard, tc.params)
 			if diff := cmp.Diff(tc.want, shard.BotDimensions); diff != "" {
@@ -466,7 +465,7 @@ func TestConstructBaseCommand(t *testing.T) {
 				TimeoutSecs:   600,
 			},
 			targetCPU: "x64",
-			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-images", "images.json", "-timeout", "600s",
+			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-timeout", "600s",
 				"-ffx", "./host_x64/ffx", "-product-bundles", "product_bundles.json", "-product-bundle-name", "core.x64",
 				"-local-repo", "repo", "-expects-ssh"},
 			wantDeps: []string{"host_x64/botanist", "host_x64/ffx"},
@@ -479,7 +478,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			},
 			netboot:   true,
 			targetCPU: "x64",
-			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-images", "images.json", "-timeout", "0s",
+			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-timeout", "0s",
 				"-ffx", "./host_x64/ffx", "-product-bundles", "product_bundles.json", "-product-bundle-name",
 				"core.x64", "-use-serial", "-netboot"},
 			wantDeps: []string{"host_x64/botanist", "host_x64/ffx"},
@@ -494,7 +493,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			},
 			netboot:   true,
 			targetCPU: "arm64",
-			wantCmd: []string{"./host_arm64/botanist", "-level", "debug", "run", "-images", "images.json", "-timeout", "0s",
+			wantCmd: []string{"./host_arm64/botanist", "-level", "debug", "run", "-timeout", "0s",
 				"-ffx", "./host_arm64/ffx", "-product-bundles", "product_bundles.json", "-product-bundle-name", "arm64_boot_test",
 				"-boot-test", "-bootup-timeout", "60s", "-use-serial", "-netboot"},
 			wantDeps: []string{"host_arm64/botanist", "host_arm64/ffx"},
@@ -508,7 +507,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			},
 			params:    &proto.Params{UseTcg: true},
 			targetCPU: "arm64",
-			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-images", "images.json", "-timeout", "0s",
+			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-timeout", "0s",
 				"-ffx", "./host_x64/ffx", "-product-bundles", "product_bundles.json", "-product-bundle-name", "core.arm64",
 				"-expects-ssh", "-test-timeout-scale-factor", "2"},
 			wantDeps: []string{"host_x64/botanist", "host_x64/ffx"},
@@ -523,7 +522,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			targetCPU: "x64",
 			variants:  []string{"coverage"},
 			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-llvm-profdata", "host_x64/llvm-profdata=clang",
-				"-images", "images.json", "-timeout", "0s", "-ffx", "./host_x64/ffx", "-product-bundles", "product_bundles.json",
+				"-timeout", "0s", "-ffx", "./host_x64/ffx", "-product-bundles", "product_bundles.json",
 				"-product-bundle-name", "core.x64", "-expects-ssh"},
 			wantDeps: []string{"host_x64/botanist", "host_x64/ffx", "host_x64/llvm-profdata"},
 		},
@@ -537,7 +536,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			targetCPU:   "arm64",
 			params:      &proto.Params{ZirconArgs: []string{"arg1", "arg2"}},
 			experiments: []string{"exp1", "exp2"},
-			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-images", "images.json", "-timeout", "0s",
+			wantCmd: []string{"./host_x64/botanist", "-level", "debug", "run", "-timeout", "0s",
 				"-ffx", "./host_x64/ffx", "-experiment", "exp1", "-experiment", "exp2", "-product-bundles", "product_bundles.json",
 				"-product-bundle-name", "core.vim3", "-expects-ssh", "-zircon-args", "arg1", "-zircon-args", "arg2"},
 			wantDeps: []string{"host_x64/botanist", "host_x64/ffx"},
@@ -563,6 +562,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			}
 			tc.shard.UseTCG = tc.params.UseTcg
 			tc.shard.Env.Netboot = tc.netboot
+			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.params.UseTcg)
 			if err := ConstructBaseCommand(tc.shard, checkoutDir, buildDir, tools, tc.params, tc.variants, tc.experiments); err != nil {
 				if tc.wantErr {
 					return

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_hardware_interconnect as icc;
+use fuchsia_inspect::ArrayProperty;
 use log::error;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use zx::Status;
@@ -34,6 +35,28 @@ struct InterconnectNode {
     initial_peak_bandwidth_bps: u64,
 }
 
+impl InterconnectNode {
+    pub fn record_inspect(&self, inspect: &fuchsia_inspect::Node) {
+        inspect.record_string("name", &self.name);
+        let edges = self.incoming_edges.keys();
+        let array = inspect.create_uint_array("incoming_edges", edges.len());
+        for (i, edge) in edges.enumerate() {
+            array.set(i, edge.0);
+        }
+        inspect.record(array);
+        inspect.record_child("path_bandwidth_requests", |inspect| {
+            for (path_id, request) in &self.path_bandwidth_requests {
+                inspect.record_child(path_id.0.to_string(), |inspect| {
+                    inspect.record_uint("average_bandwidth_bps", request.average_bandwidth_bps);
+                    inspect.record_uint("peak_bandwidth_bps", request.peak_bandwidth_bps);
+                });
+            }
+        });
+        inspect.record_uint("initial_average_bandwidth_bps", self.initial_avg_bandwidth_bps);
+        inspect.record_uint("initial_peak_bandwidth_bps", self.initial_peak_bandwidth_bps);
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathId(pub u32);
 
@@ -57,6 +80,15 @@ impl Path {
 
     pub fn id(&self) -> PathId {
         self.id
+    }
+
+    pub fn record_inspect(&self, inspect: &fuchsia_inspect::Node) {
+        inspect.record_uint("id", self.id.0.into());
+        let array = inspect.create_uint_array("nodes", self.nodes.len());
+        for i in 0..self.nodes.len() {
+            array.set(i, self.nodes[i].0);
+        }
+        inspect.record(array);
     }
 }
 
@@ -156,6 +188,14 @@ impl NodeGraph {
         }
 
         Ok(NodeGraph { nodes: graph })
+    }
+
+    pub fn record_inspect(&self, inspect: &fuchsia_inspect::Node) {
+        for (id, node) in &self.nodes {
+            inspect.record_child(id.0.to_string(), |inspect| {
+                node.record_inspect(inspect);
+            });
+        }
     }
 
     /// Sets the edge from |dst_node_id| to |src_node_id| to the provided bandwidth values.

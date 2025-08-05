@@ -16,7 +16,7 @@
 namespace bootpart {
 
 class BootPartition;
-using DeviceType = ddk::Device<BootPartition, ddk::Initializable, ddk::GetProtocolable>;
+using DeviceType = ddk::Device<BootPartition, ddk::GetProtocolable>;
 class BootPartition : public DeviceType,
                       public ddk::BlockImplProtocol<BootPartition, ddk::base_protocol>,
                       public ddk::BlockPartitionProtocol<BootPartition> {
@@ -40,7 +40,6 @@ class BootPartition : public DeviceType,
   zx_status_t AddBootPartition();
   fbl::String PartitionName() const { return fbl::StringPrintf("part-%03lu", partition_index_); }
 
-  void DdkInit(ddk::InitTxn txn);
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
   void DdkRelease();
 

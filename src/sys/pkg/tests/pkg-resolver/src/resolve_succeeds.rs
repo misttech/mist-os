@@ -17,6 +17,7 @@ use {
         test_package_cml, TestEnv, TestEnvBuilder, EMPTY_REPO_PATH,
     },
     rand::prelude::*,
+    rand::TryRngCore as _,
     std::{
         collections::HashSet,
         io::{self, Read},
@@ -231,15 +232,14 @@ async fn large_uncompressible_blobs() {
     let s = "large-uncompressible-blobs";
 
     let mut rng = StdRng::from_seed([0u8; 32]);
-    let rng = &mut rng as &mut dyn RngCore;
 
     verify_resolve(
         PackageBuilder::new(s)
-            .add_resource_at("data/1mb/1", rng.take(1 * 1024 * 1024))
-            .add_resource_at("data/1mb/2", rng.take(1 * 1024 * 1024))
-            .add_resource_at("data/1mb/3", rng.take(1 * 1024 * 1024))
-            .add_resource_at("data/2mb", rng.take(2 * 1024 * 1024))
-            .add_resource_at("data/3mb", rng.take(3 * 1024 * 1024))
+            .add_resource_at("data/1mb/1", rng.read_adapter().take(1 * 1024 * 1024))
+            .add_resource_at("data/1mb/2", rng.read_adapter().take(1 * 1024 * 1024))
+            .add_resource_at("data/1mb/3", rng.read_adapter().take(1 * 1024 * 1024))
+            .add_resource_at("data/2mb", rng.read_adapter().take(2 * 1024 * 1024))
+            .add_resource_at("data/3mb", rng.read_adapter().take(3 * 1024 * 1024))
             .build()
             .await
             .unwrap(),

@@ -2,43 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("scenic") {
-  sources = [
-    "forward_declarations.h",
-    "scenic.cc",
-    "scenic.h",
-  ]
-
-  public_deps = [
-    ":command_dispatcher",
-    ":event_reporter",
-    ":system",
-    "//sdk/fidl/fuchsia.ui.annotation:fuchsia.ui.annotation_hlcpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input.accessibility:fuchsia.ui.input.accessibility_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/lib/fit",
-    "//src/lib/fxl",
-    "//src/ui/lib/escher",
-    "//src/ui/scenic/lib/scenic/util",
-    "//zircon/system/ulib/inspect",
-  ]
-
-  deps = [
-    "//sdk/lib/fidl/hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fostr/fidl/fuchsia.ui.input",
-    "//src/lib/fostr/fidl/fuchsia.ui.scenic",
-    "//src/lib/fsl",
-    "//src/ui/lib/escher",
-    "//src/ui/scenic/lib/focus",
-    "//src/ui/scenic/lib/scheduling:frame_scheduler",
-    "//src/ui/scenic/lib/utils",
-    "//zircon/system/ulib/trace",
-  ]
-}
-
 source_set("event_reporter") {
   sources = [
     "event_reporter.cc",
@@ -50,31 +13,5 @@ source_set("event_reporter") {
     "//src/lib/fostr/fidl/fuchsia.ui.scenic",
     "//src/lib/fxl",
     "//src/ui/scenic/lib/scenic/util:util",
-  ]
-}
-
-source_set("command_dispatcher") {
-  sources = [ "command_dispatcher.h" ]
-  deps = [ "//src/lib/fxl" ]
-  public_deps = [ "//src/ui/scenic/lib/scheduling:id" ]
-}
-
-source_set("system") {
-  sources = [
-    "system.cc",
-    "system.h",
-  ]
-  public_deps = [
-    ":command_dispatcher",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/inspect",
-  ]
-  deps = [
-    ":event_reporter",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//src/lib/fxl",
-    "//src/ui/scenic/lib/scenic/util:util",
-    "//src/ui/scenic/lib/scheduling:frame_scheduler",
-    "//src/ui/scenic/lib/scheduling:id",
   ]
 }

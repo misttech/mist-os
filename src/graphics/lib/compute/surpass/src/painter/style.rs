@@ -1390,7 +1390,7 @@ mod tests {
         // Error for the 256 values of u8 alpha is low.
         let alpha_mse = (0u8..=255u8)
             .map(|u| f32::from(u) / 255.0)
-            .map(|v| (v - f16::from(v).to_f32()))
+            .map(|v| v - f16::from(v).to_f32())
             .map(|d| d * d)
             .sum::<f32>()
             / 256.0;
@@ -1404,7 +1404,7 @@ mod tests {
         // Error for the 256 value of u8 sRGB is low.
         let component_mse = (0u8..=255u8)
             .map(to_linear)
-            .map(|v| (v - f16::from(v).to_f32()))
+            .map(|v| v - f16::from(v).to_f32())
             .map(|d| d * d)
             .sum::<f32>()
             / 256.0;

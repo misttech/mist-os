@@ -118,7 +118,7 @@ async fn do_resolve(
         let resolved_state = ResolvedInstanceState::new(
             component,
             component_info.clone(),
-            component_address,
+            component_address.into(),
             instance_token_state,
             component_input_dict,
         )

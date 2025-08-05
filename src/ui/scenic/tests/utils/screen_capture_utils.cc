@@ -4,17 +4,19 @@
 
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/testing/util/buffers_helper.h"
 
 namespace integration_tests {
-using flatland::MapHostPointer;
 using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::TransformId;
+using ui_testing::MapHostPointer;
 
 bool PixelEquals(const uint8_t* a, const uint8_t* b) { return memcmp(a, b, kBytesPerPixel) == 0; }
 
@@ -22,12 +24,11 @@ void AppendPixel(std::vector<uint8_t>* values, const uint8_t* pixel) {
   values->insert(values->end(), pixel, pixel + kBytesPerPixel);
 }
 
-void GenerateImageForFlatlandInstance(uint32_t buffer_collection_index,
-                                      fuchsia::ui::composition::FlatlandPtr& flatland,
-                                      TransformId parent_transform,
-                                      allocation::BufferCollectionImportToken import_token,
-                                      SizeU size, Vec translation, uint32_t image_id,
-                                      uint32_t transform_id) {
+void GenerateImageForFlatlandInstance(
+    uint32_t buffer_collection_index, fuchsia::ui::composition::FlatlandPtr& flatland,
+    TransformId parent_transform,
+    fuchsia::ui::composition::BufferCollectionImportToken import_token, SizeU size, Vec translation,
+    uint32_t image_id, uint32_t transform_id) {
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};
   image_properties.set_size(size);
@@ -60,7 +61,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                           fuchsia::sysmem2::CoherencyDomain::RAM;
 
   MapHostPointer(
-      buffer_collection_info, buffer_collection_idx, flatland::HostPointerAccessMode::kReadWrite,
+      buffer_collection_info, buffer_collection_idx, ui_testing::HostPointerAccessMode::kReadWrite,
       [&write_values, pixels_per_row, kBytesPerPixel, image_width, image_height, need_flush](
           uint8_t* vmo_host, uint32_t num_bytes) {
         uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
@@ -92,7 +93,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage) {
   RegisterBufferCollectionArgs rbc_args = {};
@@ -156,7 +157,7 @@ std::vector<uint8_t> ExtractScreenCapture(
                      kBytesPerPixel);
 
   MapHostPointer(
-      buffer_collection_info, buffer_id, flatland::HostPointerAccessMode::kReadOnly,
+      buffer_collection_info, buffer_id, ui_testing::HostPointerAccessMode::kReadOnly,
       [&read_values, kBytesPerPixel, pixels_per_row, render_target_width, render_target_height](
           const uint8_t* vmo_host, uint32_t num_bytes) {
         uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;

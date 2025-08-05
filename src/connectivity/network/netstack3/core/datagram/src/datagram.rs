@@ -41,7 +41,7 @@ use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use netstack3_hashmap::{HashMap, HashSet};
 use netstack3_ip::socket::{
     DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSock, IpSockCreateAndSendError,
-    IpSockCreationError, IpSockSendError, IpSocketHandler, RouteResolutionOptions,
+    IpSockCreationError, IpSockSendError, IpSocketArgs, IpSocketHandler, RouteResolutionOptions,
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
@@ -2808,11 +2808,13 @@ fn connect_inner<
     let ip_sock = IpSocketHandler::<WireI, _>::new_ip_socket(
         core_ctx,
         bindings_ctx,
-        socket_device.as_ref().map(|d| d.as_ref()),
-        local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
-        remote_ip,
-        S::ip_proto::<WireI>(),
-        &ip_options.common,
+        IpSocketArgs {
+            device: socket_device.as_ref().map(|d| d.as_ref()),
+            local_ip: local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
+            remote_ip,
+            proto: S::ip_proto::<WireI>(),
+            options: &ip_options.common,
+        },
     )?;
 
     let local_port = match local_port {
@@ -3653,11 +3655,13 @@ fn send_oneshot<
     core_ctx
         .send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
-            device.as_ref().map(|d| d.as_ref()),
-            local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
-            remote_ip,
-            S::ip_proto::<WireI>(),
-            &options,
+            IpSocketArgs {
+                device: device.as_ref().map(|d| d.as_ref()),
+                local_ip: local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
+                remote_ip,
+                proto: S::ip_proto::<WireI>(),
+                options: &options,
+            },
             tx_metadata,
             |local_ip| {
                 S::make_packet::<WireI, _>(
@@ -3779,11 +3783,13 @@ fn set_bound_device_single_stack<
             let new_socket = core_ctx
                 .new_ip_socket(
                     bindings_ctx,
-                    new_device.map(EitherDeviceId::Strong),
-                    IpDeviceAddr::new_from_socket_ip_addr(local_ip.clone()),
-                    remote_ip.clone(),
-                    socket.proto(),
-                    &ip_options.common,
+                    IpSocketArgs {
+                        device: new_device.map(EitherDeviceId::Strong),
+                        local_ip: IpDeviceAddr::new_from_socket_ip_addr(local_ip.clone()),
+                        remote_ip: remote_ip.clone(),
+                        proto: socket.proto(),
+                        options: &ip_options.common,
+                    },
                 )
                 .map_err(|_: IpSockCreationError| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
@@ -4238,7 +4244,7 @@ where
             let BoundSocketState { socket_type, original_bound_addr } = inner_state;
             let conn_state = match socket_type {
                 BoundSocketStateType::Listener { state: _, sharing: _ } => {
-                    return Err(ExpectedConnError)
+                    return Err(ExpectedConnError);
                 }
                 BoundSocketStateType::Connected { state, sharing: _ } => state,
             };
@@ -4315,7 +4321,7 @@ where
                 SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                     match socket_type {
                         BoundSocketStateType::Listener { state: _, sharing: _ } => {
-                            return Err(ExpectedConnError)
+                            return Err(ExpectedConnError);
                         }
                         BoundSocketStateType::Connected { state, sharing: _ } => state,
                     }
@@ -4345,7 +4351,7 @@ where
                 SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                     match socket_type {
                         BoundSocketStateType::Listener { state: _, sharing: _ } => {
-                            return Err(SendError::NotConnected)
+                            return Err(SendError::NotConnected);
                         }
                         BoundSocketStateType::Connected { state, sharing: _ } => state,
                     }
@@ -4539,7 +4545,7 @@ where
                 DualStackRemoteIp::<I, _>::new(remote_ip.clone()),
             ) {
                 (MaybeDualStack::NotDualStack(_), DualStackRemoteIp::OtherStack(_)) => {
-                    return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
+                    return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped));
                 }
                 (MaybeDualStack::NotDualStack(nds), DualStackRemoteIp::ThisStack(remote_ip)) => {
                     match state {
@@ -4695,7 +4701,9 @@ where
                                 DualStackConnState::OtherStack(_),
                                 DualStackRemoteIp::ThisStack(_),
                             ) => {
-                                return Err(Either::Right(SendToError::RemoteUnexpectedlyNonMapped))
+                                return Err(Either::Right(
+                                    SendToError::RemoteUnexpectedlyNonMapped,
+                                ));
                             }
                             (
                                 DualStackConnState::ThisStack(state),

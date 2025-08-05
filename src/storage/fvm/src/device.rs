@@ -216,7 +216,6 @@ mod tests {
     use fuchsia_async::{self as fasync, TestExecutor};
     use futures::future::select_all;
     use futures::FutureExt;
-    use rand::Rng;
     use std::iter::repeat_with;
     use std::sync::Arc;
     use std::task::Poll;
@@ -265,7 +264,7 @@ mod tests {
         // Popping the buffer should have woken one of the tasks, but we don't know which one.
         // Randomly drop one of the tasks to test that dropping it still causes the other task to
         // wake up.
-        let mut task = tasks.into_iter().skip(rand::thread_rng().gen_range(0..2)).next().unwrap();
+        let mut task = tasks.into_iter().skip(rand::random_range(0..2)).next().unwrap();
 
         assert_matches!(
             TestExecutor::poll_until_stalled(&mut task).await,

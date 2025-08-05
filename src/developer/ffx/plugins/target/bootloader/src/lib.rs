@@ -354,6 +354,9 @@ async fn handle_upload(
     let mut start_time: Option<DateTime<Utc>> = None;
     loop {
         match prog_server.recv().await {
+            Some(UploadProgress::OnReady { partition, files }) => {
+                log::info!("Uploading partition {} ({} files)", partition, files);
+            }
             Some(UploadProgress::OnStarted { size, .. }) => {
                 start_time.replace(Utc::now());
                 log::debug!("Upload started: {}", size);
@@ -429,9 +432,12 @@ async fn handle_events(
                 writeln!(writer, "Rebooted")?;
             }
             Some(Event::Oem { oem_command }) => {
-                writeln!(writer, "settnt oem command: {}", oem_command)?;
+                writeln!(writer, "Sending oem command: {}", oem_command)?;
             }
             Some(Event::Upload(upload)) => match upload {
+                UploadProgress::OnReady { partition, files } => {
+                    log::info!("Uploading partition {} ({} files)", partition, files);
+                }
                 UploadProgress::OnStarted { size, .. } => {
                     start_time.replace(Utc::now());
                     log::debug!("Upload started: {}", size);
@@ -459,7 +465,9 @@ async fn handle_events(
                     log::trace!("Upload progress: {}", bytes_written);
                 }
             },
-            Some(Event::FlashPartition { .. }) | Some(Event::FlashPartitionFinished { .. }) => {
+            Some(Event::FlashProduct { .. })
+            | Some(Event::FlashPartition { .. })
+            | Some(Event::FlashPartitionFinished { .. }) => {
                 ffx_bail!("Should not get flash partition events in this bootloader command.");
             }
             Some(Event::Variable(_)) => {

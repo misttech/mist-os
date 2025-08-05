@@ -7461,7 +7461,7 @@ pub const audit_nlgrps_AUDIT_NLGRP_READLOG: audit_nlgrps = 1;
 pub const audit_nlgrps___AUDIT_NLGRP_MAX: audit_nlgrps = 2;
 pub type audit_nlgrps = crate::types::arch32::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct audit_status {
     pub mask: __u32,
     pub enabled: __u32,
@@ -7476,7 +7476,7 @@ pub struct audit_status {
     pub backlog_wait_time_actual: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union audit_status__bindgen_ty_1 {
     pub version: __u32,
     pub feature_bitmap: __u32,
@@ -12749,7 +12749,6 @@ pub struct perf_event_attr {
     pub __bindgen_anon_1: perf_event_attr__bindgen_ty_1,
     pub sample_type: __u64,
     pub read_format: __u64,
-    pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
     pub __bindgen_anon_2: perf_event_attr__bindgen_ty_2,
     pub bp_type: __u32,
@@ -14343,7 +14342,7 @@ pub union perf_event_mmap_page__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct perf_event_mmap_page__bindgen_ty_1__bindgen_ty_1 {
-    pub _bitfield_align_1: [u64; 0],
+    pub _bindgen_align: [u64; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl perf_event_mmap_page__bindgen_ty_1__bindgen_ty_1 {
@@ -14711,10 +14710,9 @@ pub union perf_mem_data_src {
     pub __bindgen_anon_1: perf_mem_data_src__bindgen_ty_1,
 }
 #[repr(C)]
-#[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct perf_mem_data_src__bindgen_ty_1 {
-    pub _bitfield_align_1: [u32; 0],
+    pub _bindgen_align: [u64; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl perf_mem_data_src__bindgen_ty_1 {
@@ -15157,7 +15155,6 @@ impl Default for perf_mem_data_src {
 pub struct perf_branch_entry {
     pub from: __u64,
     pub to: __u64,
-    pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl perf_branch_entry {

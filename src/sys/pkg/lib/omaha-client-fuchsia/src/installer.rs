@@ -155,7 +155,7 @@ where
 {
     async fn perform_install_system_update<'a>(
         &'a mut self,
-        url: &'a PinnedAbsolutePackageUrl,
+        url: &'a url::Url,
         install_source: &'a InstallSource,
         observer: Option<&'a dyn ProgressObserver>,
     ) -> Result<(), FuchsiaInstallError> {
@@ -179,8 +179,7 @@ where
         }
 
         let mut update_attempt =
-            start_update(&url.clone().into(), options, &proxy, Some(reboot_controller_server_end))
-                .await?;
+            start_update(url, options, &proxy, Some(reboot_controller_server_end)).await?;
 
         while let Some(state) = update_attempt.try_next().await? {
             info!("Installer entered state: {}", state.name());
@@ -414,22 +413,19 @@ fn try_create_install_plan_impl(
 
         let full_url = url.to_owned() + &package.name;
 
-        let pkg_url = match PinnedAbsolutePackageUrl::parse(&full_url) {
-            Ok(pkg_url) => pkg_url,
-            Err(err) => {
-                return Err(FuchsiaInstallError::Failure(anyhow!(
-                    "Failed to parse {} to PinnedAbsolutePackageUrl: {}",
-                    full_url,
-                    err
-                )))
-            }
-        };
-
         update_package_urls.push(if app.id == system_app_id {
             // If urgent_update is present, assume true.
             urgent_update = is_update_urgent(update_check);
+            let pkg_url = full_url
+                .parse()
+                .with_context(|| format!("Failed to parse {full_url} to Url"))
+                .map_err(FuchsiaInstallError::Failure)?;
             UpdatePackageUrl::System(pkg_url)
         } else {
+            let pkg_url = full_url
+                .parse()
+                .with_context(|| format!("Failed to parse {full_url} to PinnedAbsolutePackageUrl"))
+                .map_err(FuchsiaInstallError::Failure)?;
             UpdatePackageUrl::Package(pkg_url)
         });
     }

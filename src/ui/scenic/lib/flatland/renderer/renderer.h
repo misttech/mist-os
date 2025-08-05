@@ -41,6 +41,9 @@ class Renderer : public allocation::BufferCollectionImporter {
     // If true, instructs the renderer to apply color conversion using the values specified by
     // |SetColorConversionValues|.
     bool apply_color_conversion = false;
+
+    // If present, the renderer should render the frame number above the other content.
+    std::optional<uint64_t> display_frame_number;
   };
 
   // This function is responsible for rendering a single batch of Flatland rectangles into a

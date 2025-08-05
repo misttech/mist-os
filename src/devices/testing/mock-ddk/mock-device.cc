@@ -139,15 +139,6 @@ void MockDevice::SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t
   Dispatch(ctx_, ops_->suspend, requested_state, enable_wake, suspend_reason);
 }
 
-zx_status_t MockDevice::ConfigureAutoSuspendOp(bool enable, uint8_t requested_state) {
-  return Dispatch(ctx_, ops_->configure_auto_suspend, ZX_ERR_NOT_SUPPORTED, enable,
-                  requested_state);
-}
-
-void MockDevice::ResumeNewOp(uint32_t requested_state) {
-  Dispatch(ctx_, ops_->resume, requested_state);
-}
-
 bool MockDevice::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) {
   if (ops_->message) {
     Dispatch(ctx_, ops_->message, std::move(msg).ReleaseToEncodedCMessage(), txn);
@@ -180,16 +171,6 @@ zx_status_t MockDevice::GetMetadata(uint32_t type, void* buf, size_t buflen, siz
     }
 
     memcpy(buf, metadata.data(), metadata.size());
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_FOUND;
-}
-
-zx_status_t MockDevice::GetMetadataSize(uint32_t type, size_t* out_size) {
-  auto itr = metadata_.find(type);
-  if (itr != metadata_.end()) {
-    auto metadata = itr->second;
-    *out_size = metadata.size();
     return ZX_OK;
   }
   return ZX_ERR_NOT_FOUND;

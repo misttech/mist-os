@@ -596,6 +596,15 @@ class AsyncMain:
             recorder.emit_end()
             return 0
 
+        # Check if we have a running package server. We do this here so that we
+        # can fail early before running a full build.
+        if not (
+            flags.list_runtime_deps or flags.list
+        ) and not await self._check_if_package_server_needed(
+            selections, exec_env, recorder
+        ):
+            return 1
+
         # If enabled, try to build and update the selected tests.
         if flags.build and not await self._do_build(selections):
             recorder.emit_end("Failed to build.")
@@ -1176,11 +1185,11 @@ class AsyncMain:
             "base_packages.list", base_file
         )
 
-        manifests: list[str]
+        base_package_names: list[str]
         try:
             with open(base_file) as f:
                 contents = json.load(f)
-            manifests = contents["content"]["manifests"]
+            base_package_names = contents["content"]["names"]
         except (json.JSONDecodeError, KeyError) as e:
             recorder.emit_end(f"Parsing file failed: {e}", id=parse_id)
             raise e
@@ -1189,27 +1198,26 @@ class AsyncMain:
             recorder.emit_end(id=parse_id)
             return False
 
-        manifest_ends = {m.split("/")[-1] for m in manifests}
-        in_base = [
+        test_packagess_in_base = [
             name
             for t in tests.selected
-            if (name := t.package_name()) in manifest_ends
+            if (name := t.package_name()) in base_package_names
         ]
 
-        if in_base:
-            names = ", ".join(in_base[:3])
+        if test_packagess_in_base:
+            names = ", ".join(test_packagess_in_base[:3])
             tests_are_in_base_including = (
                 "tests are in base, including"
-                if len(in_base) > 1
+                if len(test_packagess_in_base) > 1
                 else "test is in base:"
             )
             recorder.emit_info_message(
-                f"\n{len(in_base)} {tests_are_in_base_including} {names}"
+                f"\n{len(test_packagess_in_base)} {tests_are_in_base_including} {names}"
             )
 
         recorder.emit_end(id=parse_id)
 
-        return bool(in_base)
+        return bool(test_packagess_in_base)
 
     async def _post_build_checklist(
         self,
@@ -1248,6 +1256,24 @@ class AsyncMain:
 
         return True
 
+    async def _check_if_package_server_needed(
+        self,
+        tests: selection_types.TestSelections,
+        exec_env: environment.ExecutionEnvironment,
+        recorder: event.EventRecorder,
+    ) -> bool:
+        if tests.has_device_test() and not await has_device_connected(
+            exec_env,
+            recorder,
+        ):
+            recorder.emit_instruction_message(
+                "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+            )
+            recorder.emit_end("Could not find a running package server.")
+            return False
+        else:
+            return True
+
     async def _run_all_tests(
         self,
         tests: selection_types.TestSelections,
@@ -1266,17 +1292,6 @@ class AsyncMain:
         assert exec_env is not None
 
         max_parallel = flags.parallel
-        if tests.has_device_test() and not await has_device_connected(
-            exec_env,
-            recorder,
-        ):
-            recorder.emit_warning_message(
-                "\nCould not find a running package server."
-            )
-            recorder.emit_instruction_message(
-                "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
-            )
-            return False
 
         # This is an error since no tests that were selected involved the device, even if the --host
         # flag was not specified on the command line. If a test selection includes _some_ device tests,

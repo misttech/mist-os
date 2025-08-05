@@ -69,7 +69,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
     client_scheduled_tasks_.erase(it);
   });
   fbl::AutoLock task_lock(&task_mtx_);
-  if (task->Post(controller_.client_dispatcher()->async_dispatcher()) == ZX_OK) {
+  if (task->Post(controller_.driver_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
 }
@@ -110,7 +110,7 @@ void ClientProxy::ReapplyConfig() {
     client_scheduled_tasks_.erase(it);
   });
   fbl::AutoLock task_lock(&task_mtx_);
-  if (task->Post(controller_.client_dispatcher()->async_dispatcher()) == ZX_OK) {
+  if (task->Post(controller_.driver_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
 }
@@ -125,7 +125,7 @@ zx_status_t ClientProxy::OnCaptureComplete() {
   return ZX_OK;
 }
 
-zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
                                         display::DriverConfigStamp driver_config_stamp) {
   AssertHeld(*controller_.mtx());
   fidl::Status event_sending_result = fidl::Status::Ok();
@@ -158,9 +158,9 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
     if (!acknowledge_request_sent_) {
       // We have not sent a (new) cookie to client for acknowledgement; do it now.
       // First, increment cookie sequence.
-      cookie_sequence_++;
+      ++vsync_cookie_sequence_;
       // Generate new cookie by xor'ing initial cookie with sequence number.
-      vsync_ack_cookie = initial_cookie_ ^ cookie_sequence_;
+      vsync_ack_cookie = display::VsyncAckCookie(vsync_cookie_salt_ ^ vsync_cookie_sequence_);
     } else {
       // Client has already been notified; check if client has acknowledged it.
       ZX_DEBUG_ASSERT(last_cookie_sent_ != display::kInvalidVsyncAckCookie);
@@ -191,7 +191,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
 
   auto cleanup = fit::defer([&]() {
     if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
-      cookie_sequence_--;
+      --vsync_cookie_sequence_;
     }
     // Make sure status is not `ZX_ERR_BAD_HANDLE`, otherwise channel write may crash (depending on
     // policy setting).
@@ -215,9 +215,9 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
   while (!buffered_vsync_messages_.empty()) {
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
-    event_sending_result =
-        handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
-                             vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
+    event_sending_result = handler_.NotifyVsync(
+        vsync_message_data.display_id, zx::time_monotonic{vsync_message_data.timestamp},
+        vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
       fdf::error("Failed to send all buffered vsync messages: {}\n",
                  event_sending_result.FormatDescription());
@@ -227,8 +227,8 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
   }
 
   // Send the latest vsync event.
-  event_sending_result =
-      handler_.NotifyVsync(display_id, zx::time{timestamp}, client_stamp, vsync_ack_cookie);
+  event_sending_result = handler_.NotifyVsync(display_id, zx::time_monotonic{timestamp},
+                                              client_stamp, vsync_ack_cookie);
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
   }
@@ -274,15 +274,9 @@ sync_completion_t* ClientProxy::FidlUnboundCompletionForTesting() {
 
 void ClientProxy::CloseForTesting() { handler_.TearDownForTesting(); }
 
-void ClientProxy::CloseOnControllerLoop() {
-  // Tasks only fail to post if the looper is dead. That can happen if the
-  // controller is unbinding and shutting down active clients, but if it does
-  // then it's safe to call Reset on this thread anyway.
-  [[maybe_unused]] zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *controller_.client_dispatcher()->async_dispatcher(),
-      // `Client::TearDown()` must be called even if the task fails to post.
-      [_ = display::CallFromDestructor(
-           [this]() { handler_.TearDown(ZX_ERR_CONNECTION_ABORTED); })]() {});
+void ClientProxy::TearDown() {
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
+  handler_.TearDown(ZX_ERR_CONNECTION_ABORTED);
 }
 
 zx_status_t ClientProxy::Init(
@@ -296,16 +290,21 @@ zx_status_t ClientProxy::Init(
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
-  initial_cookie_ = display::VsyncAckCookie(rand_r(&seed));
+  vsync_cookie_salt_ = rand_r(&seed);
 
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,
              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
+        ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
+
         sync_completion_signal(&fidl_unbound_completion_);
-        // Make sure we `TearDown()` so that no further tasks are scheduled on the controller loop.
+
+        // Make sure we `TearDown()` so that no further tasks are scheduled on
+        // the driver dispatcher.
         client->TearDown(ZX_OK);
 
-        // The client has died. Notify the proxy, which will free the classes.
+        // The client has died. Notify the proxy, which will free the Client
+        // instance.
         OnClientDead();
       };
 

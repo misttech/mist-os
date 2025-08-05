@@ -22,6 +22,10 @@
                 // TODO(https://fxbug.dev/342416456): Rework the test to take
                 // into account logs from the system.
                 "SyslogTest.ProcKmsgPoll",
+
+                // TODO(https://fxbug.dev/430852485): Flaky due to not decommitting the pages
+                // consistently on mremap. Fix and re-enable.
+                "MMapProcTest.MremapDontUnmapKeepsFlags",
             ],
         },
         {
@@ -29,6 +33,9 @@
             matchers: [
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
+
+                // TODO(https://fxbug.dev/297438799)
+                "MmapTest.CanMprotectNonExecMmapToExecutable",
 
                 // TODO(https://fxbug.dev/42072786)
                 "MMapProcTest.AdjacentFileMappings",
@@ -97,8 +104,9 @@
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
 
-                // TODO(https://fxbug.dev/419882465)
-                "MMapProcTest.MremapDontUnmapKeepsFlags",
+                // TODO(https://fxbug.dev/419882465): Need a more granular API to report these values correctly
+                "MMapProcTest.SmapsRssSplitMappingsStrict",
+                "MlockProcTest.MlockOnePageIncreasesVmLck",
             ],
         },
         {

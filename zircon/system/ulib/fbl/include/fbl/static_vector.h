@@ -16,8 +16,8 @@ namespace fbl {
 
 namespace internal {
 
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0843r4.html#STORAGE
-// "If the Capacity is zero the container has zero size."
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html#Layout
+// > If the `Capacity` is zero the container has zero size.
 template <typename T>
 class static_vector_storage_empty {
  public:
@@ -31,10 +31,9 @@ class static_vector_storage_empty {
   constexpr void destroy_at(size_t k) {}
 };
 
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0843r4.html#CONSTEXPR
-// "If is_trivially_copyable_v<T> && is_default_constructible_v<T> is true, static_vectors
-// can be seamlessly used from constexpr code ... This changes the algorithmic complexity of
-// static_vector constructors for trivial-types from 'Linear in N' to 'Constant in Capacity'."
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html#Layout
+// > If `T` is trivially-copyable or `N == 0`, then `inplace_vector<T, N>`
+// > is also trivially copyable.
 //
 // Note that TrivallyCopyable implies that T must have a trivial destructor:
 // https://en.cppreference.com/w/cpp/named_req/TriviallyCopyable
@@ -62,10 +61,9 @@ class static_vector_storage_trivial {
   constexpr void destroy_at(size_t k) {}
 };
 
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0843r4.html#STORAGE
-// "The container models ContiguousContainer. The elements of the static_vector are
-// contiguously stored and properly aligned within the static_vector object itself.
-// The exact location of the contiguous elements within the static_vector is not specified."
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html#Layout
+// > `inplace_vector` models `ContiguousContainer`. Its elements are stored and
+// > properly aligned within the `inplace_vector` object itself.
 template <typename T, size_t N>
 class static_vector_storage_nontrivial {
  private:
@@ -109,8 +107,8 @@ using static_vector_storage_t = typename static_vector_storage<T, N>::type;
 }  // namespace internal
 
 // This class implements a resizable vector with fixed capacity known at compile time.
-// This is a partial implementation of the following proposal:
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0843r4.html
+// This is a partial implementation of the `std::inplace_vector` (P0843R14)
+// approved for C++26.
 //
 // For now we have elided a few unneeded methods:
 //   - swap() method and std::swap() specialization

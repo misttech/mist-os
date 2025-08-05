@@ -171,37 +171,6 @@ void VmMapping::DumpLocked(uint depth, bool verbose) const {
   }
 }
 
-zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
-  canary_.Assert();
-  LTRACEF("%p %#" PRIxPTR " %#x %#x\n", this, base_, flags_, new_arch_mmu_flags);
-
-  if (!IS_PAGE_ALIGNED(base)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  size = ROUNDUP(size, PAGE_SIZE);
-
-  Guard<CriticalMutex> guard{lock()};
-  if (state_ != LifeCycleState::ALIVE) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  if (size == 0 || !is_in_range_locked(base, size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // Do not allow changing caching.
-  if (new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!is_valid_mapping_flags(new_arch_mmu_flags)) {
-    return ZX_ERR_ACCESS_DENIED;
-  }
-
-  return ProtectLocked(base, size, new_arch_mmu_flags);
-}
-
 using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
 
 // static
@@ -229,7 +198,7 @@ zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr
 
 zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
   // Assert a few things that should already have been checked by the caller.
-  DEBUG_ASSERT(size != 0 && IS_PAGE_ALIGNED(base) && IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(size != 0 && IS_PAGE_ROUNDED(base) && IS_PAGE_ROUNDED(size));
   DEBUG_ASSERT(!(new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK));
   DEBUG_ASSERT(is_valid_mapping_flags(new_arch_mmu_flags));
 
@@ -282,40 +251,9 @@ zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mm
   return status;
 }
 
-zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {
-  LTRACEF("%p %#" PRIxPTR " %zu\n", this, base, size);
-
-  if (!IS_PAGE_ALIGNED(base)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  size = ROUNDUP(size, PAGE_SIZE);
-
-  fbl::RefPtr<VmAspace> aspace(aspace_);
-  if (!aspace) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  Guard<CriticalMutex> guard{lock()};
-  if (state_ != LifeCycleState::ALIVE) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  if (size == 0 || !is_in_range_locked(base, size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // If we're unmapping everything, destroy this mapping
-  if (base == base_ && size == size_) {
-    return DestroyLocked();
-  }
-
-  return UnmapLocked(base, size);
-}
-
 zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
   canary_.Assert();
-  DEBUG_ASSERT(size != 0 && IS_PAGE_ALIGNED(size) && IS_PAGE_ALIGNED(base));
+  DEBUG_ASSERT(size != 0 && IS_PAGE_ROUNDED(size) && IS_PAGE_ROUNDED(base));
   DEBUG_ASSERT(base >= base_ && base - base_ < size_);
   DEBUG_ASSERT(size_ - (base - base_) >= size);
   DEBUG_ASSERT(parent_);
@@ -416,8 +354,8 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
 
 bool VmMapping::ObjectRangeToVaddrRange(uint64_t offset, uint64_t len, vaddr_t* base,
                                         uint64_t* virtual_len) const {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   DEBUG_ASSERT(base);
   DEBUG_ASSERT(virtual_len);
 
@@ -731,7 +669,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   Guard<CriticalMutex> aspace_guard{lock()};
   canary_.Assert();
 
-  len = ROUNDUP(len, PAGE_SIZE);
+  len = ROUNDUP_PAGE_SIZE(len);
   if (len == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -743,7 +681,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   LTRACEF("region %p, offset %#zx, size %#zx, commit %d\n", this, offset, len, commit);
 
   DEBUG_ASSERT(object_);
-  if (!IS_PAGE_ALIGNED(offset) || !is_in_range_locked(base_ + offset, len)) {
+  if (!IS_PAGE_ROUNDED(offset) || !is_in_range_locked(base_ + offset, len)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -975,7 +913,7 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(va));
 
   // Fault batch size when num_pages > 1.
   static constexpr uint64_t kBatchPages = 16;
@@ -1387,7 +1325,7 @@ void VmMapping::TryMergeNeighborsLocked() {
   }
 }
 
-void VmMapping::MarkMergeable(fbl::RefPtr<VmMapping>&& mapping) {
+void VmMapping::MarkMergeable(fbl::RefPtr<VmMapping> mapping) {
   Guard<CriticalMutex> guard{mapping->lock()};
   // Now that we have the lock check this mapping is still alive and we haven't raced with some
   // kind of destruction.

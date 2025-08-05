@@ -54,10 +54,12 @@ func TestAddFFXDeps(t *testing.T) {
 				Env: build.Environment{
 					Dimensions: build.DimensionSet{
 						"device_type": tc.deviceType,
+						"cpu":         tc.targetCPU,
 					},
 				},
 				Tests: []Test{{Test: build.Test{CPU: tc.targetCPU}}},
 			}
+			s.HostCPU = GetHostCPU(s.Env, false)
 			hostOS := runtime.GOOS
 			if err := AddFFXDeps(s, buildDir, build.Tools{
 				{Name: "ffx", OS: hostOS, CPU: "x64", Path: "host_x64/ffx"},

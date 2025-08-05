@@ -177,6 +177,25 @@ pub async fn fsck_with_options(
     root_store_root_objects.append(&mut allocator.parent_objects());
 
     if fsck.options.do_slow_passes {
+        // Scan each layer file for the root store.
+        let layer_set = root_store.tree().immutable_layer_set();
+        fsck.verbose(format!("Checking {} layers for root store...", layer_set.layers.len()));
+        for layer in layer_set.layers {
+            if let Some(handle) = layer.handle() {
+                fsck.verbose(format!(
+                    "Layer file {} for root_store is {} bytes",
+                    handle.object_id(),
+                    handle.get_size()
+                ));
+            }
+            fsck.check_layer_file_contents(
+                root_store.store_object_id(),
+                layer.handle().map(|h| h.object_id()).unwrap_or(INVALID_OBJECT_ID),
+                layer.clone(),
+            )
+            .await?;
+        }
+
         // Scan each layer file for the allocator.
         let layer_set = allocator.tree().immutable_layer_set();
         fsck.verbose(format!("Checking {} layers for allocator...", layer_set.layers.len()));

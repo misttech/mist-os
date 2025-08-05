@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use serde::{Deserialize, Serialize};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_sme as fidl_sme,
+};
 
 /// Enums and structs for wlan client status.
 /// These definitions come from fuchsia.wlan.policy/client_provider.fidl
@@ -97,21 +100,21 @@ pub(crate) enum ChannelBandwidthDef {
     Unknown = u32::MAX,
 }
 
-impl From<fidl_common::ChannelBandwidth> for ChannelBandwidthDef {
-    fn from(fidl_type: fidl_common::ChannelBandwidth) -> Self {
+impl From<fidl_ieee80211::ChannelBandwidth> for ChannelBandwidthDef {
+    fn from(fidl_type: fidl_ieee80211::ChannelBandwidth) -> Self {
         match fidl_type {
-            fidl_common::ChannelBandwidth::Cbw20 => Self::Cbw20,
-            fidl_common::ChannelBandwidth::Cbw40 => Self::Cbw40,
-            fidl_common::ChannelBandwidth::Cbw40Below => Self::Cbw40Below,
-            fidl_common::ChannelBandwidth::Cbw80 => Self::Cbw80,
-            fidl_common::ChannelBandwidth::Cbw160 => Self::Cbw160,
-            fidl_common::ChannelBandwidth::Cbw80P80 => Self::Cbw80P80,
-            fidl_common::ChannelBandwidthUnknown!() => Self::Unknown,
+            fidl_ieee80211::ChannelBandwidth::Cbw20 => Self::Cbw20,
+            fidl_ieee80211::ChannelBandwidth::Cbw40 => Self::Cbw40,
+            fidl_ieee80211::ChannelBandwidth::Cbw40Below => Self::Cbw40Below,
+            fidl_ieee80211::ChannelBandwidth::Cbw80 => Self::Cbw80,
+            fidl_ieee80211::ChannelBandwidth::Cbw160 => Self::Cbw160,
+            fidl_ieee80211::ChannelBandwidth::Cbw80P80 => Self::Cbw80P80,
+            fidl_ieee80211::ChannelBandwidthUnknown!() => Self::Unknown,
         }
     }
 }
 
-impl From<ChannelBandwidthDef> for fidl_common::ChannelBandwidth {
+impl From<ChannelBandwidthDef> for fidl_ieee80211::ChannelBandwidth {
     fn from(serde_type: ChannelBandwidthDef) -> Self {
         match serde_type {
             ChannelBandwidthDef::Cbw20 => Self::Cbw20,
@@ -132,8 +135,8 @@ pub(crate) struct WlanChannelDef {
     pub secondary80: u8,
 }
 
-impl From<fidl_common::WlanChannel> for WlanChannelDef {
-    fn from(fidl_type: fidl_common::WlanChannel) -> Self {
+impl From<fidl_ieee80211::WlanChannel> for WlanChannelDef {
+    fn from(fidl_type: fidl_ieee80211::WlanChannel) -> Self {
         Self {
             primary: fidl_type.primary,
             cbw: fidl_type.cbw.into(),
@@ -142,7 +145,7 @@ impl From<fidl_common::WlanChannel> for WlanChannelDef {
     }
 }
 
-impl From<WlanChannelDef> for fidl_common::WlanChannel {
+impl From<WlanChannelDef> for fidl_ieee80211::WlanChannel {
     fn from(serde_type: WlanChannelDef) -> Self {
         Self {
             primary: serde_type.primary,

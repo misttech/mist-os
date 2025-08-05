@@ -115,6 +115,16 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         else:
             asserts.assert_is_instance(self.device.firmware_version, str)
 
+    def test_last_reboot_reason(self) -> None:
+        """Test case for last_reboot_reason"""
+        # It's unclear how much this functional test should be asserting. Is it
+        # about whether the reboot reason returned here is the one on the
+        # device? Is it about whether the device rebooted with the right reason?
+        # Given that we have //src/tests/end_to_end/reboot_reason to test the
+        # whole reboot flow and the reason, it's fine here to just assert that
+        # a string reboot reason should always be available.
+        asserts.assert_is_instance(self.device.last_reboot_reason, str)
+
     def test_is_starnix_device(self) -> None:
         """Test case for is_starnix_device"""
         asserts.assert_is_instance(self.device.is_starnix_device(), bool)

@@ -16,6 +16,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -429,10 +430,24 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 	}
 	err := r.Run(ctx, testCmd, subprocess.RunOptions{Stdout: stdout, Stderr: stderr})
 	t.setTestRun(test, profileRelDir)
+	var exitErr *exec.ExitError
 	if err == nil {
 		testResult.Result = runtests.TestSuccess
 	} else if errors.Is(err, context.DeadlineExceeded) {
 		testResult.Result = runtests.TestAborted
+	} else if againstDevice() && errors.As(err, &exitErr) {
+		// Exit code 40 signals that the device is in a bad state and
+		// needs to be power-cycled. See https://fxbug.dev/425675837.
+		// A device in this state may still pass the generic health
+		// check that's run in between tests so we explicitly check for
+		// it here so that we can recover the device before the next test.
+		if exitErr.ExitCode() == 40 {
+			r := &subprocess.Runner{Env: os.Environ()}
+			if err := setPowerState(ctx, r, "cycle"); err != nil {
+				return testResult, fmt.Errorf("failed to power cycle target: %w", err)
+			}
+		}
+		testResult.FailReason = err.Error()
 	} else {
 		testResult.FailReason = err.Error()
 	}

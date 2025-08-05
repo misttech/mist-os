@@ -21,15 +21,12 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/repo"
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
-	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	"go.fuchsia.dev/fuchsia/tools/lib/syslog"
@@ -107,7 +104,7 @@ type FuchsiaTarget interface {
 	SSHKey() string
 
 	// Start starts the target.
-	Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) error
+	Start(ctx context.Context, args []string, pbPath string, isBootTest bool) error
 
 	// StartSerialServer starts the serial server for the target iff one
 	// does not exist.
@@ -518,71 +515,6 @@ func (t *genericFuchsiaTarget) Stop() {
 	t.targetCtxCancel()
 }
 
-func copyImagesToDir(ctx context.Context, dir string, preservePath bool, imgs ...*bootserver.Image) error {
-	// Copy each in a goroutine for efficiency's sake.
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, img := range imgs {
-		if img != nil {
-			img := img
-			eg.Go(func() error {
-				base := img.Name
-				if preservePath {
-					base = img.Path
-				}
-				dest := filepath.Join(dir, base)
-				return bootserver.DownloadWithRetries(ctx, dest, func() error {
-					return copyImageToDir(ctx, dest, img)
-				})
-			})
-		}
-	}
-	return eg.Wait()
-}
-
-func copyImageToDir(ctx context.Context, dest string, img *bootserver.Image) error {
-	f, ok := img.Reader.(*os.File)
-	if ok {
-		if err := osmisc.CopyFile(f.Name(), dest); err != nil {
-			return err
-		}
-		img.Path = dest
-		return nil
-	}
-
-	f, err := osmisc.CreateFile(dest)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	// Log progress to avoid hitting I/O timeout in case of slow transfers.
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	go func() {
-		for range ticker.C {
-			logger.Debugf(ctx, "transferring %s...\n", img.Name)
-		}
-	}()
-
-	if _, err := io.Copy(f, iomisc.ReaderAtToReader(img.Reader)); err != nil {
-		return fmt.Errorf("%s (%q): %w", constants.FailedToCopyImageMsg, img.Name, err)
-	}
-	img.Path = dest
-
-	if img.IsExecutable {
-		if err := os.Chmod(img.Path, os.ModePerm); err != nil {
-			return fmt.Errorf("failed to make %s executable: %w", img.Path, err)
-		}
-	}
-
-	// We no longer need the reader at this point.
-	if c, ok := img.Reader.(io.Closer); ok {
-		c.Close()
-	}
-	img.Reader = nil
-	return nil
-}
-
 func localScopedLocalHost(laddr string) string {
 	tokens := strings.Split(laddr, ":")
 	host := strings.Join(tokens[:len(tokens)-1], ":") // Strips the port.
@@ -700,9 +632,6 @@ type StartOptions struct {
 	// Netboot tells the image to use netboot if true; otherwise, pave.
 	Netboot bool
 
-	// ImageManifest is the path to an image manifest.
-	ImageManifest string
-
 	// ZirconArgs are kernel command-line arguments to pass to zircon on boot.
 	ZirconArgs []string
 
@@ -721,11 +650,6 @@ type StartOptions struct {
 
 // StartTargets starts all the targets given the opts.
 func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarget) error {
-	bootMode := bootserver.ModePave
-	if opts.Netboot {
-		bootMode = bootserver.ModeNetboot
-	}
-
 	// We wait until targets have started before running testrunner against the zeroth one.
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targets {
@@ -734,12 +658,6 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 			t.SetConnectionTimeout(opts.BootupTimeout)
 		}
 		eg.Go(func() error {
-			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)
-			if err != nil {
-				return err
-			}
-			defer closeFunc()
-
 			// Parse the product bundles
 			var pbPath string
 			if opts.ProductBundles != "" && t.UseProductBundles() {
@@ -751,7 +669,7 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 				pbPath = build.GetPbPathByName(productBundles, opts.ProductBundleName)
 			}
 
-			return t.Start(startCtx, imgs, opts.ZirconArgs, pbPath, opts.IsBootTest)
+			return t.Start(startCtx, opts.ZirconArgs, pbPath, opts.IsBootTest)
 		})
 	}
 	return eg.Wait()

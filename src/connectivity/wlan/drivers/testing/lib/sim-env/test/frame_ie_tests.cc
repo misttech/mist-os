@@ -20,8 +20,8 @@ const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i',
                                                    'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kDefaultBssid{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc};
 const common::MacAddr kDefaultDest{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa};
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = 20, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211_wire::WlanChannel kDefaultChannel = {
+    .primary = 20, .cbw = wlan_ieee80211_wire::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
 class FrameIeTest : public ::testing::Test {};
 

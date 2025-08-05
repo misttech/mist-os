@@ -6,8 +6,7 @@
 #define SRC_UI_SCENIC_TESTS_UTILS_SCREEN_CAPTURE_UTILS_H_
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
-
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 
 namespace integration_tests {
 
@@ -33,12 +32,11 @@ bool PixelEquals(const uint8_t* a, const uint8_t* b);
 
 void AppendPixel(std::vector<uint8_t>* values, const uint8_t* pixel);
 
-void GenerateImageForFlatlandInstance(uint32_t buffer_collection_index,
-                                      fuchsia::ui::composition::FlatlandPtr& flatland,
-                                      TransformId parent_transform,
-                                      allocation::BufferCollectionImportToken import_token,
-                                      SizeU size, Vec translation, uint32_t image_id,
-                                      uint32_t transform_id);
+void GenerateImageForFlatlandInstance(
+    uint32_t buffer_collection_index, fuchsia::ui::composition::FlatlandPtr& flatland,
+    TransformId parent_transform,
+    fuchsia::ui::composition::BufferCollectionImportToken import_token, SizeU size, Vec translation,
+    uint32_t image_id, uint32_t transform_id);
 
 void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                          fuchsia::sysmem2::BufferCollectionInfo& buffer_collection_info,
@@ -47,7 +45,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage);
 

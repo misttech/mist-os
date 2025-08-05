@@ -160,7 +160,7 @@ TEST_F(Pipe, Pipe) {
   constexpr int kTimeout = 10000;
 
   {
-    char c;
+    char c = 'a';
     EXPECT_EQ(write(fds()[1].get(), &c, sizeof(c)), ssize_t(sizeof(c)), "%s", strerror(errno));
     struct pollfd pfds[] = {{
                                 .fd = fds()[0].get(),

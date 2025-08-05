@@ -131,11 +131,9 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	hostPathAuthorizedKeys := ffxInstance.GetSshAuthorizedKeys()
 	i := distro.CreateContextWithAuthorizedKeys(ctx, device, config.Bin.ZbiHostTool, hostPathAuthorizedKeys)
 	i.Start()
-	i.WaitForLogMessage("initializing platform")
-	// Component manager starts up.
-	i.WaitForLogMessage("[component_manager] INFO: Component manager is starting up...")
-	// Netstack is up. This would contain the line number of the log message. Lets avoid it.
-	i.WaitForLogMessage("[netstack] INFO: ")
+	// Wait for sshd-host to come up.
+	t.Log("Waiting for sshd-host on target")
+	i.WaitForLogMessage("[sshd-host] INFO: sshd-host starting up")
 
 	shard := testsharder.Test{
 		Test: build.Test{
@@ -147,6 +145,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	}
 
 	// Create a new fuchsia tester that is responsible for executing the test.
+	t.Log("Starting FFX runner through ssh")
 	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, outDir, botanist.Experiments{}, config.Bin.LlvmProfdata)
 	if err != nil {
 		t.Fatalf("Cannot create Ffx Tester. Reason: %s", err)

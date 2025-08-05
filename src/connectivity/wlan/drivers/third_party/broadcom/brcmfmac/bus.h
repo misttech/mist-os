@@ -16,7 +16,9 @@
 
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
+
 #include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
+#include <fidl/fuchsia.wlan.broadcom/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.stats/cpp/wire_types.h>
 #include <lib/stdcompat/span.h>
 #include <sys/types.h>
@@ -64,7 +66,7 @@ struct brcmf_bus;
 struct brcmf_bus_ops {
   enum brcmf_bus_type (*get_bus_type)();
   zx_status_t (*get_bootloader_macaddr)(brcmf_bus* bus, uint8_t* mac_addr);
-  zx_status_t (*get_wifi_metadata)(brcmf_bus* bus, void* config, size_t exp_size, size_t* actual);
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> (*get_wifi_metadata)(brcmf_bus*);
 
   // Deprecated entry points.
   zx_status_t (*preinit)(brcmf_bus* bus);
@@ -174,9 +176,9 @@ static inline zx_status_t brcmf_bus_get_bootloader_macaddr(struct brcmf_bus* bus
   return bus->ops->get_bootloader_macaddr(bus, mac_addr);
 }
 
-static inline zx_status_t brcmf_bus_get_wifi_metadata(struct brcmf_bus* bus, void* config,
-                                                      size_t exp_size, size_t* actual) {
-  return bus->ops->get_wifi_metadata(bus, config, exp_size, actual);
+static inline zx::result<fuchsia_wlan_broadcom::WifiConfig> brcmf_bus_get_wifi_metadata(
+    struct brcmf_bus* bus) {
+  return bus->ops->get_wifi_metadata(bus);
 }
 
 static inline zx_status_t brcmf_bus_recovery(struct brcmf_bus* bus) {

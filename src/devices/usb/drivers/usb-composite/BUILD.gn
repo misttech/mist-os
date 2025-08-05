@@ -62,7 +62,7 @@ fuchsia_driver_component("usb-composite") {
     "//src/devices/serial/drivers/ftdi/test:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/usb:drivers",
-    "//src/devices/usb/drivers/usb-virtual-bus:*",
+    "//src/devices/usb/drivers/usb-virtual-bus/tests:*",
     "//src/ui/input/drivers/usb-hid:*",
   ]
   info = "meta/usb-composite-info.json"

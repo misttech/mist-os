@@ -226,13 +226,13 @@ impl Device for FakeDevice {
 
     fn discard_random_since_last_flush(&self) -> Result<(), Error> {
         let bs = self.allocator.block_size();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut guard = self.inner.lock();
         let Inner { ref mut data, ref mut blocks_written_since_last_barrier, .. } = &mut *guard;
         log::info!("Discarding from {blocks_written_since_last_barrier:?}");
         let mut discarded = Vec::new();
         for block in blocks_written_since_last_barrier.drain(..) {
-            if rng.gen() {
+            if rng.random() {
                 data[block * bs..(block + 1) * bs].fill(0xaf);
                 discarded.push(block);
             }
@@ -262,7 +262,6 @@ mod tests {
     use super::FakeDevice;
     use crate::Device;
     use block_protocol::WriteOptions;
-    use rand::{thread_rng, Rng};
 
     const TEST_DEVICE_BLOCK_SIZE: usize = 512;
 
@@ -272,7 +271,7 @@ mod tests {
         // Loop 100 times to catch errors.
         for _ in 0..1000 {
             let mut data = vec![0; 7 * TEST_DEVICE_BLOCK_SIZE];
-            thread_rng().fill(&mut data[..]);
+            rand::fill(&mut data[..]);
             // Ensure that barriers work with overwrites.
             let indices = [1, 2, 3, 4, 3, 5, 6];
             for i in 0..indices.len() {

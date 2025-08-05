@@ -33,7 +33,7 @@ constexpr uint16_t ByteSwap(uint16_t x) {
 }
 
 TEST(UTF16To8TestCase, BadArgs) {
-  uint16_t src;
+  uint16_t src = 0;
   uint8_t dst = 0xFE;
   size_t dst_len;
   zx_status_t res;
@@ -66,7 +66,7 @@ TEST(UTF16To8TestCase, BadArgs) {
 }
 
 TEST(UTF16To8TestCase, EmptySource) {
-  uint16_t src;
+  uint16_t src = 0;
   static constexpr uint8_t kExpected[] = {0xA1, 0xB2, 0xC3, 0xD4};
   uint8_t actual[sizeof(kExpected)];
   size_t dst_len;
@@ -271,7 +271,9 @@ TEST(UTF16To8TestCase, EndiannessAndBom) {
   uint8_t actual[std::size(bom_encoded_inverted)];
 
 #define EXPECT(e) \
-  { e, sizeof(e) }
+  {               \
+    e, sizeof(e)  \
+  }
   static const struct {
     uint32_t flags;
     struct {

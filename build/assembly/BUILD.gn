@@ -41,6 +41,7 @@ if (is_host) {
     testonly = true
     deps = [
       "scripts:tests($host_toolchain)",
+      "tools/assembly:assembly_test($host_toolchain)",
       "tools/assembly_config:assembly_config_test($host_toolchain)",
     ]
   }

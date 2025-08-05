@@ -14,13 +14,13 @@ On Debian-based systems this can usually be achieved with `sudo apt install llvm
 
 > Note: This section and the next will be simplified when [https://fxbug.dev/42153476][gn-template-bug] is resolved.
 
-While the generated code will be checked in to git, it is important that it is easy for any contributor to update the generated code. The first step here is to make an executable file in your target's directory called `bindgen.sh`. See [`//src/lib/usb_bulk/bindgen.sh`](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/usb_bulk/bindgen.sh) for an example which uses our prebuilt `bindgen` binary and further customizes the output.
+While the generated code will be checked in to git, it is important that it is easy for any contributor to update the generated code. The first step here is to make an executable file in your target's directory called `bindgen.sh`. See [`//src/lib/usb_rs/bindgen.sh`](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/usb_rs/bindgen.sh) for an example which uses our prebuilt `bindgen` binary and further customizes the output.
 
 Run the script on your development machine to generate a Rust file that will be committed with your build target.
 
 ## Building generated code
 
-Once you have a script that can reliably generate a Rust file from your C++ headers, it needs to be added to the build. The generated file can be its own `rust_library` target or it can be included as a submodule of another Rust target, as it is in [the `//src/lib/usb_bulk` example](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/usb_bulk/rust/BUILD.gn). Make sure that the library target which includes the file from `bindgen` also includes the appropriate external deps in `non_rust_deps`.
+Once you have a script that can reliably generate a Rust file from your C++ headers, it needs to be added to the build. The generated file can be its own `rust_library` target or it can be included as a submodule of another Rust target, as it is in [the `//src/lib/usb_rs` example](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/usb_rs/BUILD.gn). Make sure that the library target which includes the file from `bindgen` also includes the appropriate external deps in `non_rust_deps`.
 
 [`bindgen`]: https://github.com/rust-lang/rust-bindgen
 [static-link-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=78852

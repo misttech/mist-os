@@ -1052,7 +1052,7 @@ impl NamespaceNode {
     ) -> Result<FileHandle, Errno> {
         FileObject::new(
             current_task,
-            self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
+            self.entry.node.open(locked, current_task, self, flags, access_check)?,
             self.clone(),
             flags,
         )
@@ -1075,11 +1075,11 @@ impl NamespaceNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let owner = current_task.as_fscred();
+        let owner = current_task.current_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let create_fn =
             |locked: &mut Locked<L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
-                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+                dir.create_node(locked, current_task, mount, name, mode, dev, owner)
             };
         let entry = if flags.contains(OpenFlags::EXCL) {
             self.entry.create_entry(locked, current_task, &self.mount, name, create_fn)
@@ -1109,7 +1109,7 @@ impl NamespaceNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let owner = current_task.as_fscred();
+        let owner = current_task.current_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let entry = self.entry.create_entry(
             locked,
@@ -1117,7 +1117,7 @@ impl NamespaceNode {
             &self.mount,
             name,
             |locked, dir, mount, name| {
-                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+                dir.create_node(locked, current_task, mount, name, mode, dev, owner)
             },
         )?;
         Ok(self.with_new_entry(entry))
@@ -1136,7 +1136,7 @@ impl NamespaceNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let owner = current_task.as_fscred();
+        let owner = current_task.current_fscred();
         let entry = self.entry.create_entry(
             locked,
             current_task,
@@ -1164,7 +1164,7 @@ impl NamespaceNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let owner = current_task.as_fscred();
+        let owner = current_task.current_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.create_tmpfile(
             locked,
@@ -1214,14 +1214,14 @@ impl NamespaceNode {
             &self.mount,
             name,
             |locked, dir, mount, name| {
-                let node = dir.mknod(
+                let node = dir.create_node(
                     locked,
                     current_task,
                     mount,
                     name,
                     mode,
                     DeviceType::NONE,
-                    current_task.as_fscred(),
+                    current_task.current_fscred(),
                 )?;
                 if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
                     unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
@@ -2161,7 +2161,7 @@ mod test {
                 let node = path_symlink_node.clone();
                 Ok(SymlinkTarget::Node(node))
             }),
-            FsNodeInfo::new(mode!(IFLNK, 0o777), current_task.as_fscred()),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), current_task.current_fscred()),
         );
         second_subdir
             .entry

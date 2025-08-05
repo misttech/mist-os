@@ -2226,10 +2226,7 @@ mod tests {
     #[test]
     fn on_no_tasks_race() {
         fn sleep_random() {
-            use rand::Rng;
-            std::thread::sleep(std::time::Duration::from_micros(
-                rand::thread_rng().gen_range(0..10),
-            ));
+            std::thread::sleep(std::time::Duration::from_micros(rand::random_range(0..10)));
         }
         for _ in 0..2000 {
             let mut executor = SendExecutor::new(2);

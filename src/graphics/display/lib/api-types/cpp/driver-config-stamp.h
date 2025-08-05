@@ -10,27 +10,27 @@
 
 #include <cstdint>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+struct DriverConfigStampTraits
+    : public DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display_engine::wire::ConfigStamp,
+                                 config_stamp_t> {
+  static constexpr uint64_t FromBanjo(const config_stamp_t& banjo_config_stamp) noexcept {
+    return banjo_config_stamp.value;
+  }
+  static constexpr config_stamp_t ToBanjo(const uint64_t& config_stamp_value) noexcept {
+    return config_stamp_t{.value = config_stamp_value};
+  }
+};
+
+}  // namespace display::internal
 
 namespace display {
 
 // More useful representation of `fuchsia.hardware.display.engine/ConfigStamp`.
-DEFINE_STRONG_INT(DriverConfigStamp, uint64_t);
-
-constexpr DriverConfigStamp ToDriverConfigStamp(config_stamp_t banjo_driver_config_stamp) {
-  return DriverConfigStamp(banjo_driver_config_stamp.value);
-}
-constexpr DriverConfigStamp ToDriverConfigStamp(
-    fuchsia_hardware_display_engine::wire::ConfigStamp fidl_driver_config_stamp) {
-  return DriverConfigStamp(fidl_driver_config_stamp.value);
-}
-constexpr config_stamp_t ToBanjoDriverConfigStamp(DriverConfigStamp driver_config_stamp) {
-  return config_stamp_t{.value = driver_config_stamp.value()};
-}
-constexpr fuchsia_hardware_display_engine::wire::ConfigStamp ToFidlDriverConfigStamp(
-    DriverConfigStamp driver_config_stamp) {
-  return fuchsia_hardware_display_engine::wire::ConfigStamp{.value = driver_config_stamp.value()};
-}
+using DriverConfigStamp = display::internal::IdType<display::internal::DriverConfigStampTraits>;
 
 constexpr DriverConfigStamp kInvalidDriverConfigStamp(
     fuchsia_hardware_display_engine::wire::kInvalidConfigStampValue);

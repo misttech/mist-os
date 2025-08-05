@@ -6,10 +6,8 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SONAME_H_
 
 #include <cassert>
-#include <compare>
 #include <cstdint>
 #include <string_view>
-#include <type_traits>
 
 #include "abi-ptr.h"
 #include "gnu-hash.h"
@@ -18,39 +16,42 @@ namespace elfldltl {
 
 // This provides an optimized type for holding a DT_SONAME / DT_NEEDED string.
 // It always hashes the string to make equality comparisons faster.
-template <class Elf = Elf<>, class AbiTraits = LocalAbiTraits>
+template <class Elf = Elf<>, AbiPtrTraitsApi<const char, Elf> AbiTraits = LocalAbiTraits>
 class Soname {
  public:
+  static constexpr bool kLocal = AbiPtrLocalTraitsApi<AbiTraits, const char, Elf>;
+
   constexpr Soname() = default;
 
   constexpr Soname(const Soname&) = default;
 
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>,
-            typename = std::enable_if_t<std::is_constructible_v<Ptr, const char*>>>
   constexpr explicit Soname(std::string_view name)
+    requires kLocal
       : name_(name.data()), size_(static_cast<uint32_t>(name.size())), hash_(GnuHashString(name)) {
     assert(size_ == name.size());
   }
 
   constexpr Soname& operator=(const Soname&) noexcept = default;
 
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>,
-            typename = std::enable_if_t<std::is_constructible_v<Ptr, const char*>>>
-  constexpr Soname& operator=(std::string_view name) noexcept {
+  constexpr Soname& operator=(std::string_view name) noexcept
+    requires kLocal
+  {
     *this = Soname{name};
     return *this;
   }
 
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr std::string_view str() const {
+  constexpr std::string_view str() const
+    requires kLocal
+  {
     return {name_.get(), size_};
   }
 
   // This can only be used if the std::string_view used in construction is
   // known to point to a NUL-terminated string, such as a string literal or a
   // DT_STRTAB entry.
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr const char* c_str() const {
+  constexpr const char* c_str() const
+    requires kLocal
+  {
     assert(name_.get()[size_] == '\0');
     return name_.get();
   }
@@ -58,8 +59,9 @@ class Soname {
   // This is slightly different from str().copy() because it also includes the
   // '\0' terminator in the count of chars to be copied.  Hence it can return
   // up to size() + 1, not only up to size() like std::string_view::copy.
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr size_t copy(char* dest, size_t count, size_t pos = 0) const {
+  constexpr size_t copy(char* dest, size_t count, size_t pos = 0) const
+    requires kLocal
+  {
     assert(name_.get()[size_] == '\0');
     size_t n = str().copy(dest, count, pos);
     if (n < count) {
@@ -77,15 +79,15 @@ class Soname {
 
   constexpr uint32_t hash() const { return hash_; }
 
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator==(const Soname& other) const {
+  constexpr bool operator==(const Soname& other) const
+    requires kLocal
+  {
     return other.hash_ == hash_ && other.str() == str();
   }
 
-  constexpr bool operator!=(const Soname& other) const = default;
-
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr auto operator<=>(const Soname& other) const {
+  constexpr auto operator<=>(const Soname& other) const
+    requires kLocal
+  {
     return str() <=> other.str();
   }
 

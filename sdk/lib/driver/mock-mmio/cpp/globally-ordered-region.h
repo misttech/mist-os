@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <vector>
 
 namespace mock_mmio {
 

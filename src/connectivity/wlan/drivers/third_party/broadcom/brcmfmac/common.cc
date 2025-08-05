@@ -21,6 +21,7 @@
 #include <sys/random.h>
 #include <zircon/status.h>
 
+#include <algorithm>
 #include <memory>
 
 #include "brcmu_utils.h"
@@ -34,6 +35,7 @@
 #include "fwil.h"
 #include "fwil_types.h"
 #include "linuxisms.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 #define BRCMF_DEFAULT_SCAN_CHANNEL_TIME 40
 #define BRCMF_DEFAULT_SCAN_UNASSOC_TIME 40
@@ -215,21 +217,14 @@ static zx_status_t brcmf_set_macaddr(struct brcmf_if* ifp) {
 }
 
 // Get Broadcom WiFi Metadata by calling the bus specific function
-zx_status_t brcmf_get_meta_data(brcmf_if* ifp, wifi_config_t* config) {
-  zx_status_t err;
-  size_t actual;
-  err = brcmf_bus_get_wifi_metadata(ifp->drvr->bus_if, config, sizeof(wifi_config_t), &actual);
-  if (err != ZX_OK) {
-    BRCMF_ERR("Failed to retrieve wifi metadata: %s", zx_status_get_string(err));
-    memset(config, 0, sizeof(*config));
-    return err;
+zx::result<fuchsia_wlan_broadcom::WifiConfig> brcmf_get_meta_data(brcmf_if* ifp) {
+  zx::result config = brcmf_bus_get_wifi_metadata(ifp->drvr->bus_if);
+  if (config.is_error()) {
+    BRCMF_ERR("Failed to retrieve wifi metadata: %s", config.status_string());
+    return config.take_error();
   }
-  if (actual != sizeof(*config)) {
-    BRCMF_ERR("meta data size err exp:%lu act: %lu", sizeof(*config), actual);
-    memset(config, 0, sizeof(*config));
-    return ZX_ERR_IO;
-  }
-  return ZX_OK;
+
+  return zx::ok(std::move(config.value()));
 }
 
 /* Search through the given country code table and issue the iovar */
@@ -240,35 +235,33 @@ zx_status_t brcmf_set_country(brcmf_pub* drvr,
   }
 
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
-  wifi_config_t config;
   struct brcmf_fil_country_le ccreq;
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
-  unsigned char code[fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len];
-  int i;
+  char code[fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len];
 
   memcpy(code, country->alpha2().data(), fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   BRCMF_DBG(TRACE, "Enter: code=%c%c", code[0], code[1]);
   // Get Broadcom WiFi Metadata by calling the bus specific function
-  err = brcmf_get_meta_data(ifp, &config);
-  if (err != ZX_OK) {
-    return err;
+  zx::result config = brcmf_get_meta_data(ifp);
+  if (config.is_error()) {
+    return config.status_value();
   }
 
   // This is the default value in case the relevant entry is not found in the table.
   ccreq.rev = 0;
-  // Search through the table until a valid or Null entry is found
-  for (i = 0; i < MAX_CC_TABLE_ENTRIES; i++) {
-    if (config.cc_table[i].cc_abbr[0] == 0) {
-      BRCMF_ERR("Failed to find ccode %c%c in table", code[0], code[1]);
-      return ZX_ERR_NOT_FOUND;
-    }
-    if (memcmp(config.cc_table[i].cc_abbr, code, fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len) ==
-        0) {
-      ccreq.rev = config.cc_table[i].cc_rev;
-      break;
-    }
+
+  // Search through the table for a valid entry.
+  const auto& cc_table = config.value().cc_table();
+  auto entry = std::ranges::find_if(cc_table, [&](auto entry) {
+    return memcmp(entry.cc_abbr().c_str(), code, fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len) == 0;
+  });
+  if (entry == cc_table.end()) {
+    BRCMF_ERR("Failed to find ccode %c%c in table", code[0], code[1]);
+    return ZX_ERR_NOT_FOUND;
   }
+  ccreq.rev = entry->cc_rev();
+
   // It appears brcm firmware expects ccode and country_abbrev to have the same value
   ccreq.ccode[0] = code[0];
   ccreq.ccode[1] = code[1];
@@ -402,23 +395,20 @@ zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr,
 
 // This function applies configured platform specific iovars to the firmware
 static void brcmf_set_init_cfg_params(brcmf_if* ifp) {
-  int i;
   bcme_status_t fwerr;
   zx_status_t err;
-  wifi_config_t config;
 
-  err = brcmf_get_meta_data(ifp, &config);
-  if (err != ZX_OK) {
+  zx::result config = brcmf_get_meta_data(ifp);
+  if (config.is_error()) {
     return;
   }
   // Go through the table until a null entry is found
-  for (i = 0; i < MAX_IOVAR_ENTRIES; i++) {
-    iovar_entry_t iovar_entry = config.iovar_table[i];
-    switch (iovar_entry.iovar_type) {
-      case IOVAR_STR_TYPE: {
+  for (const auto& iovar_entry : config.value().iovar_table()) {
+    switch (iovar_entry.Which()) {
+      case fuchsia_wlan_broadcom::IovarEntry::Tag::kString: {
         uint32_t cur_val;
-        char* iovar_str = iovar_entry.iovar_str;
-        uint32_t new_val = iovar_entry.val;
+        const char* iovar_str = iovar_entry.string().value().name().c_str();
+        uint32_t new_val = iovar_entry.string().value().val();
 
         // First, get the current value (for debugging)
         err = brcmf_fil_iovar_int_get(ifp, iovar_str, &cur_val, &fwerr);
@@ -436,9 +426,9 @@ static void brcmf_set_init_cfg_params(brcmf_if* ifp) {
         }
         break;
       }
-      case IOVAR_CMD_TYPE: {
-        uint32_t iovar_cmd = iovar_entry.iovar_cmd;
-        uint32_t new_val = iovar_entry.val;
+      case fuchsia_wlan_broadcom::IovarEntry::Tag::kCommand: {
+        uint32_t iovar_cmd = iovar_entry.command().value().cmd();
+        uint32_t new_val = iovar_entry.command().value().val();
 
         BRCMF_DBG(FIL, "set iovar cmd %u: new %u", iovar_cmd, new_val);
         err = brcmf_fil_cmd_data_set(ifp, iovar_cmd, &new_val, sizeof(new_val), &fwerr);
@@ -447,10 +437,6 @@ static void brcmf_set_init_cfg_params(brcmf_if* ifp) {
                     brcmf_fil_get_errstr(fwerr));
         }
         break;
-      }
-      case IOVAR_LIST_END_TYPE: {
-        // End of list, done setting iovars
-        return;
       }
       default:
         // Should never get here.

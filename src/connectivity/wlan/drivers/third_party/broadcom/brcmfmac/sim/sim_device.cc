@@ -95,8 +95,8 @@ zx_status_t SimDevice::LoadFirmware(const char* path, zx_handle_t* fw, size_t* s
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t SimDevice::DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx::result<fuchsia_wlan_broadcom::WifiConfig> SimDevice::GetWifiConfig() {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 brcmf_simdev* SimDevice::GetSim() { return brcmf_bus_->bus_priv.sim; }

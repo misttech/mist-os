@@ -31,7 +31,7 @@ class Interrupts {
   // All interrupt callbacks are currently run on the same thread (the internal
   // thread dedicated to handling interrupt). However, implementations must be
   // thread-safe, and not rely on any assumptions around the threading model.
-  using PipeVsyncCallback = fit::function<void(PipeId, zx_time_t)>;
+  using PipeVsyncCallback = fit::function<void(PipeId, zx_instant_mono_t)>;
   using HotplugCallback = fit::function<void(DdiId ddi_id, bool long_pulse)>;
 
   Interrupts();
@@ -78,7 +78,7 @@ class Interrupts {
 
  private:
   void EnableHotplugInterrupts();
-  void HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp);
+  void HandlePipeInterrupt(PipeId pipe_id, zx_instant_mono_t timestamp);
 
   void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                         const zx_packet_interrupt_t* interrupt);

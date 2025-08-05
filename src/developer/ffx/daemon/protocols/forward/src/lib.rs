@@ -106,7 +106,7 @@ impl FidlProtocol for Forward {
                 })?;
 
                 let query = ffx_config::query(TUNNEL_CFG).level(Some(ConfigLevel::User));
-                if let Err(e) = query.add(cfg).await {
+                if let Err(e) = query.add(cfg) {
                     log::warn!("Failed to persist tunnel configuration: {:?}", e);
                 }
 

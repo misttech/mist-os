@@ -24,7 +24,7 @@
     "fuchsia.devices.usb.drivers.dwc3.interrupt": { "capacity": "125us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.devices.usb.drivers.crg-udc.interrupt": { "capacity": "125us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.devices.usb.audio": { "capacity": "250us", "deadline": "1ms", "period": "1ms" },
-    "fuchsia.graphics.display.drivers.display.controller": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
+    "fuchsia.graphics.display.drivers.display.coordinator": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
     "fuchsia.graphics.display.drivers.amlogic-display.vsync": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
     "fuchsia.graphics.display.drivers.intel-display.interrupt": { "priority": 24 },
     "fuchsia.media.audio.drivers.intel-hda.controller": { "priority": 24 },

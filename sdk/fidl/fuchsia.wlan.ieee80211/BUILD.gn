@@ -9,6 +9,7 @@ fidl("fuchsia.wlan.ieee80211") {
   sdk_area = "WLAN"
 
   sources = [
+    "channel.fidl",
     "constants.fidl",
     "fields.fidl",
     "overview.fidl",

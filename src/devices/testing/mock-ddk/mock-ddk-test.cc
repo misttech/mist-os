@@ -129,15 +129,6 @@ class TestDevice : public DeviceType {
     return zx::ok(data);
   }
 
-  zx::result<size_t> GetMetadataSize(uint32_t type) {
-    size_t actual;
-    auto status = device_get_metadata_size(parent_, type, &actual);
-    if (status == ZX_OK) {
-      return zx::ok(actual);
-    }
-    return zx::error(status);
-  }
-
   // Add a child device with this device as the parent:
   zx::result<TestDevice*> AddChild() {
     auto result = Bind(zxdev());
@@ -326,8 +317,6 @@ TEST(MockDdk, SetMetadata) {
   // As expected, there is no default metadata available in devices:
   auto metadata_result = test_device->GetMetadata(kFakeMetadataType, kFakeMetadataSize);
   ASSERT_FALSE(metadata_result.is_ok());
-  auto metadata_size_result = test_device->GetMetadataSize(kFakeMetadataType);
-  ASSERT_FALSE(metadata_size_result.is_ok());
 
   // If your driver requires metadata, you can add it to the parent:
   // (This could be done before the device is added)
@@ -338,10 +327,6 @@ TEST(MockDdk, SetMetadata) {
   ASSERT_TRUE(metadata_result.is_ok());
   EXPECT_EQ(metadata_result.value().size(), sizeof(kSource));
   ASSERT_BYTES_EQ(metadata_result.value().data(), kSource, sizeof(kSource));
-  // get_metadata_size also works:
-  metadata_size_result = test_device->GetMetadataSize(kFakeMetadataType);
-  ASSERT_TRUE(metadata_size_result.is_ok());
-  EXPECT_EQ(metadata_size_result.value(), sizeof(kSource));
 
   // Setting metadata allows the metadata to be accessed when querying for that type only:
   auto bad_metadata_result = test_device->GetMetadata(0, kFakeMetadataSize);

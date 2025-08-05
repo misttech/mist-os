@@ -16,8 +16,8 @@ namespace ddk {
 // Returns an error if metadata does not exist.
 inline zx::result<std::vector<uint8_t>> GetMetadataBlob(zx_device_t* dev, uint32_t type) {
   size_t metadata_size;
-  zx_status_t status = device_get_metadata_size(dev, type, &metadata_size);
-  if (status != ZX_OK) {
+  zx_status_t status = device_get_metadata(dev, type, nullptr, 0, &metadata_size);
+  if (status != ZX_ERR_BUFFER_TOO_SMALL) {
     return zx::error(status);
   }
   std::vector<uint8_t> ret(metadata_size);

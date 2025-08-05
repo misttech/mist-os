@@ -24,9 +24,9 @@
             {% when DeclType::Table %}
                 {{ self.table(self.schema().table_declarations[ident]) }}
             {% when DeclType::Union %}
-                {% let union = self.schema().union_declarations[ident] %}
-                {% if !union.is_result %}
-                    {{ self.union(union) }}
+                {% let union_ = self.schema().union_declarations[ident] %}
+                {% if !union_.is_result %}
+                    {{ self.union_(union_) }}
                 {% endif %}
             {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
             {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}

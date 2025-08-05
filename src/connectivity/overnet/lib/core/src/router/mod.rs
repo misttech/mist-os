@@ -41,7 +41,6 @@ use futures::future::poll_fn;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::ready;
-use rand::Rng;
 use std::collections::{BTreeMap, HashMap};
 use std::pin::pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -153,7 +152,7 @@ struct ProxiedHandle {
 
 /// Generate a new random node id
 fn generate_node_id() -> NodeId {
-    rand::thread_rng().gen::<u64>().into()
+    rand::random::<u64>().into()
 }
 
 fn sorted<T: std::cmp::Ord>(mut v: Vec<T>) -> Vec<T> {

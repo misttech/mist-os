@@ -8,7 +8,7 @@ use crate::task::{
 };
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
-    FileObject, FileOps, WeakFileHandle,
+    FileObject, FileObjectState, FileOps, WeakFileHandle,
 };
 use itertools::Itertools;
 use starnix_logging::log_warn;
@@ -526,9 +526,9 @@ impl FileOps for EpollFileObject {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         let guard = self.state.lock();

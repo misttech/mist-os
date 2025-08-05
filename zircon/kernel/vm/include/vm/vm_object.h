@@ -792,14 +792,19 @@ class VmObject : public VmHierarchyBase,
   static constexpr uint64_t MAX_SIZE = VmPageList::MAX_SIZE;
   // Ensure that MAX_SIZE + PAGE_SIZE doesn't overflow so no VmObjects
   // need to worry about overflow for loop bounds.
-  static_assert(MAX_SIZE <= ROUNDDOWN(UINT64_MAX, PAGE_SIZE) - PAGE_SIZE);
+  static_assert(MAX_SIZE <= ROUNDDOWN_PAGE_SIZE(UINT64_MAX) - PAGE_SIZE);
   static_assert(MAX_SIZE % PAGE_SIZE == 0);
 
  private:
-  mutable DECLARE_MUTEX(VmObject) child_observer_lock_;
+  // Usage of this lock happens on VmObject creation/deletion in situations where we are also either
+  // manipulating the heap and/or the AllVmosList lock. As such this lock does not end up receiving
+  // any contention, due to both being an infrequent operation and already effectively serialized by
+  // the aforementioned other global locks.
+  // This lock is expected to be acquired before the VMO lock.
+  DECLARE_SINGLETON_MUTEX(ChildObserverLock);
 
   // This member, if not null, is used to signal the user facing Dispatcher.
-  VmObjectChildObserver* child_observer_ TA_GUARDED(child_observer_lock_) = nullptr;
+  VmObjectChildObserver* child_observer_ TA_GUARDED(ChildObserverLock::Get()) = nullptr;
 
   using GlobalList = fbl::TaggedDoublyLinkedList<VmObject*, internal::GlobalListTag>;
 

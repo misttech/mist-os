@@ -13,14 +13,16 @@ use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, VecOutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
-    fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
+    fileops_impl_seekless, FileHandle, FileObject, FileObjectState, FileOps, FsString,
+    NamespaceNode, OutputBuffer,
 };
+use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -65,18 +67,15 @@ bitflags! {
     }
 }
 
-pub fn device_mapper_init(current_task: &CurrentTask) {
-    let kernel = current_task.kernel();
-
-    kernel
-        .device_registry
-        .register_major(
-            "device-mapper".into(),
-            DeviceMode::Block,
-            DEVICE_MAPPER_MAJOR,
-            get_or_create_dm_device,
-        )
-        .expect("dm device register failed.");
+pub fn device_mapper_init(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
+    kernel.device_registry.register_major(
+        locked,
+        "device-mapper".into(),
+        DeviceMode::Block,
+        DEVICE_MAPPER_MAJOR,
+        get_or_create_dm_device,
+    )?;
+    Ok(())
 }
 
 #[derive(Debug, Default)]
@@ -142,15 +141,15 @@ impl DeviceMapperRegistry {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
-    ) -> Arc<DmDevice>
+    ) -> Result<Arc<DmDevice>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
             .entry(minor)
-            .or_insert_with(|| DmDevice::new(locked, current_task, minor))
-            .clone()
+            .or_insert_with_fallible(|| DmDevice::new(locked, current_task, minor))
+            .cloned()
     }
 
     /// Finds a free minor number in the DeviceMapperRegistry. Returns that minor number along with
@@ -167,7 +166,7 @@ impl DeviceMapperRegistry {
         for minor in 0..u32::MAX {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
-                    let device = DmDevice::new(locked, current_task, minor);
+                    let device = DmDevice::new(locked, current_task, minor)?;
                     e.insert(device.clone());
                     return Ok(device);
                 }
@@ -207,7 +206,11 @@ pub struct DmDevice {
 }
 
 impl DmDevice {
-    fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
+    fn new<L>(
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        minor: u32,
+    ) -> Result<Arc<Self>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -231,12 +234,12 @@ impl DmDevice {
             ),
             virtual_block_class,
             |device, dir| build_block_device_directory(device, device_weak, dir),
-        );
+        )?;
         {
             let mut state = device.state.lock();
             state.set_k_device(k_device);
         }
-        device
+        Ok(device)
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
@@ -410,9 +413,9 @@ impl FileOps for DmDeviceFile {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let mut state = self.device.state.lock();
@@ -1189,26 +1192,26 @@ impl FileOps for DeviceMapper {
 }
 
 pub fn create_device_mapper(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(DeviceMapper::new(current_task.kernel().expando.get::<DeviceMapperRegistry>())))
 }
 
 fn get_or_create_dm_device(
-    locked: &mut Locked<DeviceOpen>,
+    locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task
         .kernel()
         .expando
         .get::<DeviceMapperRegistry>()
-        .get_or_create_by_minor(locked, current_task, id.minor())
+        .get_or_create_by_minor(locked, current_task, id.minor())?
         .create_file_ops())
 }

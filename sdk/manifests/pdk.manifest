@@ -1,6 +1,5 @@
 data://data/config/symbol_index
 documentation://docs/metadata_schemas.json
-ffx_tool://tools/arm64/ffx_tools/ffx-agis
 ffx_tool://tools/arm64/ffx_tools/ffx-assembly
 ffx_tool://tools/arm64/ffx_tools/ffx-audio
 ffx_tool://tools/arm64/ffx_tools/ffx-component
@@ -23,7 +22,6 @@ ffx_tool://tools/arm64/ffx_tools/ffx-starnix
 ffx_tool://tools/arm64/ffx_tools/ffx-test
 ffx_tool://tools/arm64/ffx_tools/ffx-trace
 ffx_tool://tools/arm64/ffx_tools/ffx-wlan
-ffx_tool://tools/x64/ffx_tools/ffx-agis
 ffx_tool://tools/x64/ffx_tools/ffx-assembly
 ffx_tool://tools/x64/ffx_tools/ffx-audio
 ffx_tool://tools/x64/ffx_tools/ffx-component

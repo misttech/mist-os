@@ -8,7 +8,6 @@
 #include <lib/pci/pio.h>
 #include <zircon/types.h>
 
-#include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 #include <kernel/spinlock.h>
 
@@ -23,7 +22,7 @@ namespace Pci {
 
 #ifdef ARCH_X86
 #include <arch/x86.h>
-static SpinLock pio_lock;
+DECLARE_SINGLETON_SPINLOCK(pio_lock);
 
 static constexpr uint16_t kPciConfigAddr = 0xCF8;
 static constexpr uint16_t kPciConfigData = 0xCFC;
@@ -33,7 +32,7 @@ static constexpr uint32_t WidthMask(size_t width) {
 }
 
 zx_status_t PioCfgRead(uint32_t addr, uint32_t* val, size_t width) {
-  AutoSpinLock lock(&pio_lock);
+  Guard<SpinLock, IrqSave> lock(pio_lock::Get());
 
   size_t shift = (addr & 0x3) * 8u;
   if (shift + width > 32) {
@@ -55,7 +54,7 @@ zx_status_t PioCfgRead(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, u
 }
 
 zx_status_t PioCfgWrite(uint32_t addr, uint32_t val, size_t width) {
-  AutoSpinLock lock(&pio_lock);
+  Guard<SpinLock, IrqSave> lock(pio_lock::Get());
 
   size_t shift = (addr & 0x3) * 8u;
   if (shift + width > 32) {
@@ -88,9 +87,7 @@ zx_status_t PioCfgRead(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, u
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t PioCfgWrite(uint32_t addr, uint32_t val, size_t width) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
+zx_status_t PioCfgWrite(uint32_t addr, uint32_t val, size_t width) { return ZX_ERR_NOT_SUPPORTED; }
 
 zx_status_t PioCfgWrite(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, uint32_t val,
                         size_t width) {

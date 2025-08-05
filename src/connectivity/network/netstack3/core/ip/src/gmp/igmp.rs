@@ -19,6 +19,7 @@ use netstack3_base::{
     InspectableValue, Inspector, InspectorExt, Instant, InstantContext, Ipv4DeviceAddr,
     ResourceCounterContext, WeakDeviceIdentifier,
 };
+use netstack3_filter::DynTransportSerializer;
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder};
 use packet_formats::error::ParseError;
 use packet_formats::igmp::messages::{
@@ -559,7 +560,8 @@ where
         for report in reports {
             self.increment_both(device, |counters: &IgmpCounters| &counters.tx_igmpv3_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
-            let ip_frame = header.clone().wrap_body(report.into_serializer());
+            let mut report = report.into_serializer();
+            let ip_frame = header.clone().wrap_body(DynTransportSerializer::new(&mut report));
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
                     self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
@@ -846,11 +848,12 @@ where
     M: MessageType<EmptyBuf, FixedHeader = Ipv4Addr, VariableBody = ()>,
 {
     let header = new_ip_header_builder(core_ctx, device, dst_ip);
-    let body =
-        IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
-    let body = header.wrap_body(body.into_serializer());
+    let mut body =
+        IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time)
+            .into_serializer();
+    let ip_frame = header.wrap_body(DynTransportSerializer::new(&mut body));
     let destination = IpPacketDestination::Multicast(dst_ip);
-    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, ip_frame)
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 

@@ -2,13 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <optional>
+#include <string_view>
+
 #include <gtest/gtest.h>
 
 #include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/split_string.h"
 #include "src/starnix/tests/syscalls/cpp/proc_test_base.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
-class MlockProcTest : public ProcTestBase {};
+class MlockProcTest : public ProcTestBase {
+ protected:
+  std::optional<size_t> GetVmLckInKb() {
+    std::string status;
+    if (!files::ReadFileToString(proc_path() + "/self/status", &status)) {
+      return std::nullopt;
+    }
+
+    const std::string_view prefix = "VmLck";
+    for (const auto& line :
+         fxl::SplitString(status, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty)) {
+      std::vector<std::string_view> fields =
+          fxl::SplitString(line, ":", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+      if (fields[0] == prefix) {
+        if (fields.size() != 2) {
+          return std::nullopt;
+        }
+        return test_helper::parse_field_in_kb(fields[1]);
+      }
+    }
+    return std::nullopt;
+  }
+};
 
 TEST_F(MlockProcTest, UnalignedAddress) {
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
@@ -101,4 +127,41 @@ TEST_F(MlockProcTest, SplitMapping) {
   ASSERT_EQ(third_mapping->start, third_addr) << *third_mapping;
   ASSERT_EQ(third_mapping->end, third_addr + page_size) << *third_mapping;
   ASSERT_FALSE(third_mapping->ContainsFlag("lo")) << *third_mapping;
+}
+
+TEST_F(MlockProcTest, MlockOnePageIncreasesVmLck) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t map_size = 2 * page_size;
+
+  // Map 2 private-anonymous pages.
+  auto mapping = test_helper::ScopedMMap::MMap(nullptr, map_size, PROT_READ | PROT_WRITE,
+                                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_TRUE(mapping.is_ok()) << mapping.error_value();
+
+  // Touch them to ensure non-zero number of committed bytes.
+  reinterpret_cast<volatile char*>(mapping->mapping())[0] = 'a';
+  reinterpret_cast<volatile char*>(mapping->mapping())[page_size] = 'a';
+
+  // Record the `VmLck` value.
+  auto vmlck_before = GetVmLckInKb();
+  ASSERT_NE(vmlck_before, std::nullopt);
+
+  // Test that locking any of the two pages results in the increase of VmLck by one page
+  for (int i = 0; i < 2; i++) {
+    // Lock one page.
+    ASSERT_EQ(mlock(reinterpret_cast<uint8_t*>(mapping->mapping()) + (i * page_size), page_size), 0)
+        << strerror(errno);
+
+    // Record the `VmLck` value again.
+    auto vmlck_after = GetVmLckInKb();
+    ASSERT_NE(vmlck_after, std::nullopt);
+
+    // Check that the new value is greater than the base one by exactly one page.
+    EXPECT_GT(*vmlck_after, *vmlck_before);
+    EXPECT_EQ(*vmlck_after - *vmlck_before, page_size / 1024);
+
+    ASSERT_EQ(munlock(reinterpret_cast<uint8_t*>(mapping->mapping()) + (i * page_size), page_size),
+              0)
+        << strerror(errno);
+  }
 }

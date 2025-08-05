@@ -17,6 +17,7 @@
 
 #include <fstream>
 #include <memory>
+#include <string_view>
 
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
@@ -255,10 +256,10 @@ bool VerifyTestEventsFromJson(const std::string& test_output_file, size_t* out_n
 bool VerifyTestEventsFromFxt(const std::string& test_output_file,
                              trace::TraceReader::RecordConsumer record_consumer) {
   size_t num_errors = 0;
-  auto error_handler = [&num_errors](fbl::String error) {
+  auto error_handler = [&num_errors](std::string_view error) {
     ++num_errors;
     if (num_errors <= kMaxErrorCount) {
-      FX_LOGS(ERROR) << "While reading records got error: " << error.c_str();
+      FX_LOGS(ERROR) << "While reading records got error: " << error;
     }
     if (num_errors == kMaxErrorCount) {
       FX_LOGS(ERROR) << "Remaining errors will not be printed";

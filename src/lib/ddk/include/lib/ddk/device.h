@@ -194,61 +194,6 @@ typedef struct zx_protocol_device {
   // be executed on the devhost's main thread.
   void (*suspend)(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
 
-  //@ ## resume
-  // The resume hook is used for resuming a device from a non-working sleep
-  // state to a working state. It requires reinitializing the device completely
-  // or partially depending on the sleep state that device was in, when the
-  // resume call was made.
-  //
-  // requested_state is the performance state that the device has to be in.
-  //
-  // The driver should put the device into the requested_state and call **device_resume_reply()**
-  // on itself. device_resume_reply() will take in the following parameters:
-  // (1)Status of the resume operation (2)out_power_state (3) out_perf_state
-  // On success, the device has been resumed successfully to a working state,
-  // out_perf_state is same as requested state.
-  // If the device is not able to resume to a working state, the hook returns a
-  // failure. out_power_state has the non working state the device is in.
-  // if out_power_state is a working state, out_perf_state has the performance
-  // state the device is in.
-  // This hook assumes that the drivers are aware of their current state.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  void (*resume)(void* ctx, uint32_t requested_state);
-
-  //@ ## configure_autosuspend
-  // The configure_autosuspend hook is used for configuring whether a driver can
-  // auto suspend the device depending on the activity and idleness of the device.
-  //
-  // If "enable" is true, auto suspend is configured. deepest_sleep_state is the deepest
-  // sleep state the device is expected to go into when the device is suspended.
-  //
-  // On success, the device is configured to be autosuspended
-  // On failure, the device not configured to be autosuspended. If the device does
-  // not implement the autosuspend hook, it means the device does not support autosuspend.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  //
-
-  zx_status_t (*configure_auto_suspend)(void* ctx, bool enable, uint8_t deepest_sleep_state);
-
-  //@ ## rxrpc
-  // Only called for bus devices.
-  // When the "shadow" of a busdev sends an rpc message, the
-  // device that is shadowing is notified by the rxrpc op and
-  // should attempt to read and respond to a single message on
-  // the provided channel.
-  //
-  // Any error return from this method will result in the channel
-  // being closed and the remote "shadow" losing its connection.
-  //
-  // This method is called with ZX_HANDLE_INVALID for the channel
-  // when a new client connects -- at which point any state from
-  // the previous client should be torn down.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  zx_status_t (*rxrpc)(void* ctx, zx_handle_t channel);
-
   //@ ## message
   // Process a FIDL rpc message. This is used to handle class or
   // device specific messaging.
@@ -304,18 +249,6 @@ zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo);
 
 // Opens a connection to the specified runtime service offered by |device|.
 //
-// |device| is typically the parent of the device invoking this function.
-// |service_name| can be constructed with `my_service_name::Name`.
-// |request| must be the server end of a zircon channel.
-//
-// If you are inside a C++ device class, it may be more convenient to use the
-// DdkConnectRuntimeProtocol wrapper method from ddktl, which supplies |device| and
-// |service_name| automatically.
-zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
-                                            const char* protocol_name, fdf_handle_t request);
-
-// Opens a connection to the specified runtime service offered by |device|.
-//
 // |device| should be a composite device. |fragment_name| picks out the specific
 // fragment device to use; it must match the fragment name declared in the
 // composite device's bind file.
@@ -344,13 +277,6 @@ zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol
 // searches parent devices to find a match
 zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual);
-
-// retrieves metadata size for a specific device
-// searches parent devices to find a match
-zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* out_size);
-
-// Adds metadata to a specific device.
-zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data, size_t length);
 
 // Returns the specific protocol from the named fragment, identified by the name
 // provided when it was created via`device_add_composite`. Returns ZX_ERR_NOT_FOUND if

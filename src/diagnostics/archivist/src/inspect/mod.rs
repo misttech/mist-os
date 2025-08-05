@@ -164,7 +164,7 @@ impl ReaderServer {
                             .and_then(InspectHandleName::as_name)
                             .unwrap_or("")
                 );
-                snapshot_data.into()
+                NodeHierarchyData::from(snapshot_data)
             };
 
             let handle_name = unfiltered_node_hierarchy_data

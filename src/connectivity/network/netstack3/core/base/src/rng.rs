@@ -93,9 +93,6 @@ pub(crate) mod testutil {
         fn fill_bytes(&mut self, dest: &mut [u8]) {
             self.0.lock().fill_bytes(dest)
         }
-        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.0.lock().try_fill_bytes(dest)
-        }
     }
 
     impl<R: RngCore> CryptoRng for FakeCryptoRng<R> {}
@@ -133,7 +130,7 @@ pub(crate) mod testutil {
         // Arbitrary seed.
         let mut rng = new_rng(0x0fe50fae6c37593d71944697f1245847);
         for _ in 0..64 {
-            f(rng.r#gen());
+            f(rng.random());
         }
     }
 }

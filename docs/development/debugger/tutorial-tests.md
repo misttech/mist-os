@@ -45,7 +45,7 @@ the `fx test` command with `zxdb`.
   You can add this test target to your build graph with `fx set`:
 
   ```posix-terminal
-  fx set workbench_eng.x64 --with-tests //src/diagnostics/archivist:tests
+  fx set workbench_eng.x64 --with-test //src/diagnostics/archivist:tests
   ```
 
 * {C++}
@@ -83,7 +83,7 @@ the `fx test` command with `zxdb`.
   You can add this test target to your build graph with `fx set`:
 
   ```posix-terminal
-  fx set workbench_eng.x64 --with-tests //src/developer/debug:tests
+  fx set workbench_eng.x64 --with-test //src/developer/debug:tests
   ```
 
 ## Executing tests {:#execute-tests .numbered}

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dist/renamed_binary.gni")
 import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
@@ -451,12 +450,6 @@ fuchsia_test_component("ota_downloader-component") {
   deps = [ ":ota_downloader" ]
 }
 
-renamed_binary("pkg_resolver-binary") {
-  dest = "bin/pkg_resolver"
-  source = "$root_out_dir/grand_swd_binary"
-  source_deps = [ "//src/sys/pkg/bin/grand-swd-binary" ]
-}
-
 fuchsia_component_manifest("pkg-resolver-manifest") {
   component_name = "pkg-resolver"
   manifest = "meta/pkg-resolver-for-test.cml"
@@ -485,7 +478,7 @@ fuchsia_component("pkg-resolver-component") {
   cm_label = ":pkg-resolver-manifest"
   deps = [
     ":pkg-resolver-config",
-    ":pkg_resolver-binary",
+    "//src/sys/pkg/bin/pkg-resolver:bin",
   ]
 }
 

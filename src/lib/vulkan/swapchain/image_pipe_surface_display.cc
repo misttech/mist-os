@@ -625,15 +625,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     uint32_t image_id = next_image_id();
     {
       const fuchsia_hardware_display::ImageId fidl_image_id(image_id);
-      display_coordinator_
-          ->ImportImage({
-              image_metadata, /*buffer_id=*/
-              {
-                  /*buffer_collection_id=*/kBufferCollectionId,
-                  /*buffer_index=*/i,
-              },
-              fidl_image_id,
-          })
+      display_coordinator_->ImportImage({image_metadata, kBufferCollectionId, i, fidl_image_id})
           .ThenExactlyOnce([this, &status](fidl::Result<DisplayCoordinator::ImportImage>& result) {
             if (result.is_error()) {
               auto& err = result.error_value();

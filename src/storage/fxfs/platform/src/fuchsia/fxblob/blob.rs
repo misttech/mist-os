@@ -26,6 +26,7 @@ use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
 use fxfs::round::{round_down, round_up};
 use fxfs::serialized_types::BlobMetadata;
 use fxfs_macros::ToWeakNode;
+use std::future::Future;
 use std::num::NonZero;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -99,11 +100,13 @@ impl FxBlob {
         })
     }
 
+    /// Returns the new blob and some deferred work in an async future that must complete before
+    /// returning to the external caller.
     pub fn overwrite_me(
         self: &Arc<Self>,
         handle: DataObjectHandle<FxVolume>,
         compression_info: Option<CompressionInfo>,
-    ) -> Arc<Self> {
+    ) -> (Arc<Self>, Option<impl Future<Output = ()>>) {
         let vmo = self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
         let new_blob = Arc::new(Self {
@@ -123,16 +126,23 @@ impl FxBlob {
                 .collect(),
         });
 
-        // Lock must be held until the open counts are swapped to prevent concurrent handling of
+        // Lock must be held until the open counts is incremented to prevent concurrent handling of
         // zero children signals.
         let receiver_lock =
             self.pager_packet_receiver_registration.receiver().set_receiver(&new_blob);
-        if receiver_lock.is_strong() {
-            // If there was a strong moved between them, then the counts exchange as well.
+        let deferred_work = receiver_lock.is_strong().then(|| {
+            // If there was a strong moved between them, then the counts exchange as well. It is
+            // only important that the increment happen under the lock as it may handle the next
+            // zero children signal, no new requests can now go to the old blob, but to safely
+            // ensure that all existing requests finish, we will defer to an async context.
             new_blob.open_count_add_one();
-            self.clone().open_count_sub_one();
-        }
-        new_blob
+            let old_blob = self.clone();
+            async move {
+                old_blob.pager().page_in_barrier().await;
+                old_blob.open_count_sub_one();
+            }
+        });
+        (new_blob, deferred_work)
     }
 
     pub fn root(&self) -> Hash {
@@ -178,13 +188,6 @@ impl Drop for FxBlob {
     fn drop(&mut self) {
         let volume = self.handle.owner();
         volume.cache().remove(self);
-        if self.open_count.load(Ordering::Relaxed) == PURGED {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.object_id());
-        }
     }
 }
 
@@ -233,6 +236,13 @@ impl FxNode for FxBlob {
     fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
         assert!(old & !PURGED > 0);
+        if old == PURGED + 1 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
@@ -243,10 +253,16 @@ impl FxNode for FxBlob {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
     }
 
-    fn mark_to_be_purged(&self) -> bool {
+    fn mark_to_be_purged(&self) {
         let old = self.open_count.fetch_or(PURGED, Ordering::Relaxed);
         assert!(old & PURGED == 0);
-        old == 0
+        if old == 0 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }
 
@@ -590,9 +606,10 @@ fn read_ahead_size_for_chunk_size(chunk_size: u64, suggested_read_ahead_size: u6
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fuchsia::epochs::Epochs;
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
-    use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
-    use crate::fuchsia::pager::PagerRange;
+    use crate::fuchsia::memory_pressure::MemoryPressureLevel;
+    use crate::fuchsia::pager::PageInRange;
     use crate::fuchsia::volume::{MemoryPressureConfig, MAX_READ_AHEAD_SIZE};
     use assert_matches::assert_matches;
     use delivery_blob::CompressionMode;
@@ -956,10 +973,10 @@ mod tests {
 
         {
             let volume = fixture.volume().volume().clone();
-            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
-            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
-                .expect("Failed to create MemoryPressureMonitor");
-            volume.start_background_task(MemoryPressureConfig::default(), Some(&mem_pressure));
+            volume.start_background_task(
+                MemoryPressureConfig::default(),
+                fixture.volumes_directory().memory_pressure_monitor(),
+            );
 
             let data = vec![0xffu8; 252 * 1024];
             let hash = fixture.write_blob(&data, CompressionMode::Never).await;
@@ -970,7 +987,8 @@ mod tests {
 
             assert_eq!(&get_chunks(&blob.chunks_supplied), &[1, 1, 1, 1, 0, 0, 0, 0]);
 
-            watcher_proxy
+            fixture
+                .memory_pressure_proxy()
                 .on_level_changed(MemoryPressureLevel::Critical)
                 .await
                 .expect("Failed to send memory pressure level change");
@@ -984,9 +1002,15 @@ mod tests {
             blob.vmo.read_to_vec(164 * 1024, 4096).unwrap();
             assert_eq!(&get_chunks(&blob.chunks_supplied), &[1, 1, 1, 1, 0, 1, 0, 0]);
 
+            let epochs = Epochs::new();
+
             // We can't evict pages from the VMO so get the kernel to resupply them but we can call
             // page_in directly and wait for the counters to change.
-            blob.clone().page_in(PagerRange::new(32 * 1024..36 * 1024, blob.clone()));
+            blob.clone().page_in(PageInRange::new(
+                32 * 1024..36 * 1024,
+                blob.clone(),
+                epochs.add_ref(),
+            ));
             wait(
                 || blob.chunks_supplied[1].load(Ordering::Relaxed) == 2,
                 "chunk was never supplied",
@@ -998,7 +1022,11 @@ mod tests {
 
             // Page in the last chunk and then do it again.
             blob.vmo.read_to_vec(224 * 1024, 4096).unwrap();
-            blob.clone().page_in(PagerRange::new(224 * 1024..228 * 1024, blob.clone()));
+            blob.clone().page_in(PageInRange::new(
+                224 * 1024..228 * 1024,
+                blob.clone(),
+                epochs.add_ref(),
+            ));
             wait(
                 || blob.chunks_supplied[7].load(Ordering::Relaxed) == 2,
                 "chunk was never supplied",

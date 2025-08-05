@@ -190,7 +190,7 @@ __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
   if (!fidl_flags) {
     return ZX_ERR_INVALID_ARGS;
   }
-  zx::result open_options = intree_vfs::VnodeConnectionOptions::FromOpen1Flags(*fidl_flags);
+  zx::result open_options = intree_vfs::DeprecatedOptions::FromOpen1Flags(*fidl_flags);
   if (open_options.is_error()) {
     return open_options.error_value();
   }

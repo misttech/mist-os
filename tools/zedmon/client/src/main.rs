@@ -68,7 +68,8 @@ fn validate_downsampling_interval(value: String) -> Result<(), String> {
     }
 }
 
-fn main() -> Result<(), Error> {
+#[fuchsia_async::run(1)]
+async fn main() -> Result<(), Error> {
     let matches = App::new("zedmon")
         .about("Utility for interacting with Zedmon power measurement device")
         .subcommand(
@@ -215,10 +216,10 @@ fn run_describe(arg_matches: &ArgMatches<'_>) -> Result<(), Error> {
     match arg_matches.value_of("name") {
         Some(name) => println!("{}", zedmon.describe(name).unwrap()),
         None => {
-            let params = zedmon::DESCRIBABLE_PROPERTIES
-                .iter()
-                .map(|name| (name.to_string(), zedmon.describe(name).unwrap()))
-                .collect();
+            let mut params = json::Map::<String, json::Value>::new();
+            for name in zedmon::DESCRIBABLE_PROPERTIES {
+                params.insert(name.to_string(), zedmon.describe(name).unwrap());
+            }
             println!("{}", json::to_string_pretty(&json::Value::Object(params)).unwrap());
         }
     }

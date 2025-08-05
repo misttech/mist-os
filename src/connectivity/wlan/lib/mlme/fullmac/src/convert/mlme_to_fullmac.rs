@@ -322,9 +322,9 @@ mod tests {
             beacon_period: 123u16,
             capability_info: 456u16,
             ies: vec![1, 2, 3, 4],
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 112,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 45,
             },
             rssi_dbm: -41i8,
@@ -447,7 +447,7 @@ mod tests {
             mesh_id: vec![6, 5, 6, 5],
             rsne: Some(vec![123; fidl_ieee80211::WLAN_IE_MAX_LEN as usize + 1]),
             phy: fidl_common::WlanPhyType::Ofdm,
-            channel_bandwidth: fidl_common::ChannelBandwidth::Cbw20,
+            channel_bandwidth: fidl_ieee80211::ChannelBandwidth::Cbw20,
         };
 
         assert!(convert_start_bss_request(mlme).is_err());

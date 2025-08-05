@@ -6,6 +6,9 @@
 ## require optimize=none
 ## set timeout 30
 
+[zxdb] set debug-mode true
+Set global debug-mode = true
+
 # TODO(https://fxbug.dev/42077983): attach shouldn't be necessary.
 [zxdb] attach starnix_proc
 Waiting for process matching "starnix_proc".

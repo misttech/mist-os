@@ -52,8 +52,10 @@
 // Macros for reading REG_RTE entries
 #define IO_APIC_RTE_REMOTE_IRR (1ULL << 14)
 #define IO_APIC_RTE_DELIVERY_STATUS (1ULL << 12)
-#define IO_APIC_RTE_GET_POLARITY(r) ((enum interrupt_polarity)(((r) >> 13) & 0x1))
-#define IO_APIC_RTE_GET_TRIGGER_MODE(r) ((enum interrupt_trigger_mode)(((r) >> 15) & 0x1))
+#define IO_APIC_RTE_GET_POLARITY(r) \
+  ((((r) >> 13) & 0x1) ? interrupt_polarity::LOW : interrupt_polarity::HIGH)
+#define IO_APIC_RTE_GET_TRIGGER_MODE(r) \
+  ((((r) >> 15) & 0x1) ? interrupt_trigger_mode::LEVEL : interrupt_trigger_mode::EDGE)
 #define IO_APIC_RTE_GET_VECTOR(r) ((uint8_t)((r) & 0xFF))
 
 // Technically this can be larger, but the spec as of the 100-Series doesn't
@@ -128,16 +130,16 @@ void apic_io_init(struct io_apic_descriptor* io_apic_descs, size_t num_io_apic_d
     struct io_apic* apic = &io_apics[i];
     const paddr_t paddr = apic->desc.paddr;
     void* vaddr = nullptr;
-    const paddr_t paddr_page_base = ROUNDDOWN(paddr, PAGE_SIZE);
+    const paddr_t paddr_page_base = ROUNDDOWN_PAGE_SIZE(paddr);
     // An IO APIC cannot cross a page boundary.
     ASSERT(paddr + IO_APIC_WINDOW_SIZE <= paddr_page_base + PAGE_SIZE);
 
     // Check if a previous IO APIC shared the same page as this one so we can re-use the mapping.
     for (size_t j = 0; j < i; j++) {
-      if (ROUNDDOWN(io_apics[j].desc.paddr, PAGE_SIZE) == paddr_page_base) {
+      if (ROUNDDOWN_PAGE_SIZE(io_apics[j].desc.paddr) == paddr_page_base) {
         // The vaddr stored in the io_apics is to the MMIO base, round it back down to the page base
         vaddr = reinterpret_cast<void*>(
-            ROUNDDOWN(reinterpret_cast<uintptr_t>(io_apics[j].vaddr), PAGE_SIZE));
+            ROUNDDOWN_PAGE_SIZE(reinterpret_cast<uintptr_t>(io_apics[j].vaddr)));
         break;
       }
     }
@@ -385,8 +387,8 @@ void apic_io_configure_isa_irq(uint8_t isa_irq, enum apic_interrupt_delivery_mod
                                uint8_t vector) {
   ASSERT(isa_irq < NUM_ISA_IRQS);
   uint32_t global_irq = isa_irq;
-  enum interrupt_trigger_mode trig_mode = IRQ_TRIGGER_MODE_EDGE;
-  enum interrupt_polarity polarity = IRQ_POLARITY_ACTIVE_HIGH;
+  enum interrupt_trigger_mode trig_mode = interrupt_trigger_mode::EDGE;
+  enum interrupt_polarity polarity = interrupt_polarity::HIGH;
   if (isa_overrides[isa_irq].remapped) {
     global_irq = isa_overrides[isa_irq].global_irq;
     trig_mode = isa_overrides[isa_irq].tm;
@@ -462,8 +464,8 @@ static void apic_io_debug_nolock(void) {
       printf("    %4u: dst: %s %02hhx, %s, %s, %s, dm %hhx, vec %2hhx, %s %s\n", global_irq,
              (reg & (1 << 11)) ? "l" : "p", (uint8_t)(reg >> 56),
              (reg & IO_APIC_RTE_MASKED) ? "masked" : "unmasked",
-             IO_APIC_RTE_GET_TRIGGER_MODE(reg) ? "level" : "edge",
-             IO_APIC_RTE_GET_POLARITY(reg) ? "low" : "high", (uint8_t)((reg >> 8) & 0x7),
+             interrupt_trigger_mode_string(IO_APIC_RTE_GET_TRIGGER_MODE(reg)),
+             interrupt_polarity_string(IO_APIC_RTE_GET_POLARITY(reg)), (uint8_t)((reg >> 8) & 0x7),
              (uint8_t)reg, (reg & (1 << 12)) ? "pending" : "", (reg & (1 << 14)) ? "RIRR" : "");
     }
   }

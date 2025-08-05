@@ -4,12 +4,11 @@
 
 use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use crate::{consumer_controls_binding, input_device, metrics};
-use anyhow::{Context, Error};
 use async_trait::async_trait;
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -121,64 +120,6 @@ impl MediaButtonsHandler {
         Rc::new(media_buttons_handler)
     }
 
-    /// Handles the incoming DeviceListenerRegistryRequestStream.
-    ///
-    /// This method will end when the request stream is closed. If the stream closes with an
-    /// error the error will be returned in the Result.
-    ///
-    /// # Parameters
-    /// - `stream`: The stream of DeviceListenerRegistryRequestStream.
-    pub async fn handle_device_listener_registry_request_stream(
-        self: &Rc<Self>,
-        mut stream: fidl_ui_policy::DeviceListenerRegistryRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) = stream
-            .try_next()
-            .await
-            .context("Error handling device listener registry request stream")?
-        {
-            match request {
-                fidl_ui_policy::DeviceListenerRegistryRequest::RegisterListener {
-                    listener,
-                    responder,
-                } => {
-                    let proxy = listener.into_proxy();
-                    // Add the listener to the registry.
-                    self.inner
-                        .borrow_mut()
-                        .listeners
-                        .insert(proxy.as_channel().raw_handle(), proxy.clone());
-                    let proxy_clone = proxy.clone();
-
-                    // Send the listener the last media button event.
-                    if let Some(event) = &self.inner.borrow().last_event {
-                        let event_to_send = event.clone();
-                        let fut = async move {
-                            match proxy_clone.on_event(&event_to_send).await {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    log::info!(
-                                        "Failed to send media buttons event to listener {:?}",
-                                        e
-                                    )
-                                }
-                            }
-                        };
-                        let metrics_logger_clone = self.metrics_logger.clone();
-                        self.inner
-                            .borrow()
-                            .send_event_task_tracker
-                            .track(metrics_logger_clone, fasync::Task::local(fut));
-                    }
-                    let _ = responder.send();
-                }
-                _ => {}
-            }
-        }
-
-        Ok(())
-    }
-
     /// Creates a fidl_ui_input::MediaButtonsEvent from a media_buttons::MediaButtonEvent.
     ///
     /// # Parameters
@@ -258,6 +199,35 @@ impl MediaButtonsHandler {
             tracker.track(metrics_logger_clone, fasync::Task::local(fut));
         }
     }
+
+    // Add the listener to the registry.
+    ///
+    /// # Parameters
+    /// - `proxy`: A new listener proxy to send events to.
+    pub async fn register_listener_proxy(
+        self: &Rc<Self>,
+        proxy: fidl_ui_policy::MediaButtonsListenerProxy,
+    ) {
+        self.inner.borrow_mut().listeners.insert(proxy.as_channel().raw_handle(), proxy.clone());
+
+        // Send the listener the last media button event.
+        if let Some(event) = &self.inner.borrow().last_event {
+            let event_to_send = event.clone();
+            let fut = async move {
+                match proxy.on_event(&event_to_send).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::info!("Failed to send media buttons event to listener {:?}", e)
+                    }
+                }
+            };
+            let metrics_logger_clone = self.metrics_logger.clone();
+            self.inner
+                .borrow()
+                .send_event_task_tracker
+                .track(metrics_logger_clone, fasync::Task::local(fut));
+        }
+    }
 }
 
 /// Maintains a collection of pending local [`Task`]s, allowing them to be dropped (and cancelled)
@@ -298,13 +268,14 @@ impl LocalTaskTracker {
 
 #[cfg(test)]
 mod tests {
-    use crate::input_handler::InputHandler;
-
     use super::*;
+    use crate::input_handler::InputHandler;
     use crate::testing_utilities;
+    use anyhow::Error;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use futures::channel::oneshot;
+    use futures::TryStreamExt;
     use pretty_assertions::assert_eq;
     use std::task::Poll;
     use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync};
@@ -312,13 +283,30 @@ mod tests {
     fn spawn_device_listener_registry_server(
         handler: Rc<MediaButtonsHandler>,
     ) -> fidl_ui_policy::DeviceListenerRegistryProxy {
-        let (device_listener_proxy, device_listener_stream) =
+        let (device_listener_proxy, mut device_listener_stream) =
             create_proxy_and_stream::<fidl_ui_policy::DeviceListenerRegistryMarker>();
 
         fasync::Task::local(async move {
-            let _ = handler
-                .handle_device_listener_registry_request_stream(device_listener_stream)
-                .await;
+            loop {
+                match device_listener_stream.try_next().await {
+                    Ok(Some(fidl_ui_policy::DeviceListenerRegistryRequest::RegisterListener {
+                        listener,
+                        responder,
+                    })) => {
+                        handler.register_listener_proxy(listener.into_proxy()).await;
+                        let _ = responder.send();
+                    }
+                    Ok(Some(_)) => {
+                        panic!("Unexpected registration");
+                    }
+                    Ok(None) => {
+                        break;
+                    }
+                    Err(e) => {
+                        panic!("Error handling device listener registry request stream: {}", e);
+                    }
+                }
+            }
         })
         .detach();
 

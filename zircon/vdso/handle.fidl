@@ -254,4 +254,45 @@ closed protocol Handlefuncs {
     }) -> (resource struct {
         out Handle;
     }) error Status;
+
+    /// ## Summary
+    ///
+    /// Checks a handle's validity.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_status_t zx_handle_check_valid(zx_handle_t handle);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Checks if *handle* is a valid handle value referring to a valid handle.
+    ///
+    /// ## Rights
+    ///
+    /// None.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_handle_check_valid()` returns `ZX_OK` if *handle* is valid.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  The value *handle* is ZX_HANDLE_INVALID (0).
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE`  One of the bits in ZX_HANDLE_FIXED_BITS_MASK (0b11) is
+    ///  0. Values in this range are never valid handle values.
+    ///  See [handles](/docs/concepts/kernel/handles.md) for more details.
+    ///
+    /// `ZX_ERR_NOT_FOUND`  The value *handle* is structurally valid but does not refer
+    ///  to a valid handle. For example, the handle value could refer to a handle that has
+    ///  been closed or it could be a valid bit pattern that has not been allocated in
+    ///  the calling process' handle table.
+    @vdsocall
+    strict HandleCheckValid(resource struct {
+        handle Handle;
+    }) -> () error Status;
 };

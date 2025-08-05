@@ -19,7 +19,6 @@ import (
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
-	"fidl/fuchsia/hardware/network"
 	fnet "fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces"
 
@@ -969,14 +968,5 @@ func TestAddressRemovedStringer(t *testing.T) {
 	want := "{nicid:1 addr:1.2.3.4/16 reason:ManualAction}"
 	if got := a.String(); got != want {
 		t.Fatalf("got = \"%s\", want = \"%s\"", got, want)
-	}
-}
-
-func TestPortClassConversions(t *testing.T) {
-	// Verify that `deviceClassFromPortClass` has a conversion for all possible
-	// variants of PortClass.
-	var arbitraryPortClass network.PortClass
-	for _, portClass := range network.PortClass.I_EnumValues(arbitraryPortClass) {
-		deviceClassFromPortClass(portClass)
 	}
 }

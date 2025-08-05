@@ -1160,7 +1160,6 @@ mod tests {
     use fxfs::object_store::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp};
     use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
-    use rand::Rng;
     use std::future::poll_fn;
     use std::os::fd::AsRawFd;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1654,7 +1653,7 @@ mod tests {
 
             let parent = open_parent().await;
             let deleter = fasync::Task::spawn(async move {
-                let wait_time = rand::thread_rng().gen_range(0..5);
+                let wait_time = rand::random_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 match parent
                     .unlink(CHILD, &fio::UnlinkOptions::default())
@@ -2972,7 +2971,7 @@ mod tests {
             .expect("update_attributes failed");
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         for _ in 0..100 {
-            let one_char = || CHARSET[rand::thread_rng().gen_range(0..CHARSET.len())] as char;
+            let one_char = || CHARSET[rand::random_range(0..CHARSET.len())] as char;
             let filename: String = std::iter::repeat_with(one_char).take(100).collect();
             let dir = open_dir_checked(
                 parent.as_ref(),

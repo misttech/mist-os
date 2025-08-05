@@ -364,6 +364,14 @@ fn validate_name<const N: usize>(name: &str) -> Result<(), ParseError> {
     Ok(())
 }
 
+impl<const N: usize> ToOwned for BoundedBorrowedName<N> {
+    type Owned = BoundedName<N>;
+
+    fn to_owned(&self) -> Self::Owned {
+        BoundedName::<N>::new_unchecked(&self.0)
+    }
+}
+
 impl<const N: usize> AsRef<str> for BoundedBorrowedName<N> {
     #[inline]
     fn as_ref(&self) -> &str {
@@ -567,6 +575,10 @@ impl NamespacePath {
 
     pub fn pop_front(&mut self) -> Option<Name> {
         self.0.pop_front()
+    }
+
+    pub fn into_relative(self) -> RelativePath {
+        self.0
     }
 }
 

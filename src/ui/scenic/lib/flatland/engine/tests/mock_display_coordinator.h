@@ -47,10 +47,11 @@ class MockDisplayCoordinator
                ImportEventCompleter::Sync&),
               (override));
 
-  MOCK_METHOD(void, SetLayerColorConfig,
-              (fuchsia_hardware_display::wire::CoordinatorSetLayerColorConfigRequest*,
-               SetLayerColorConfigCompleter::Sync&),
-              (override));
+  MOCK_METHOD(
+      void, SetLayerColorConfig,
+      (fidl::WireServer<fuchsia_hardware_display::Coordinator>::SetLayerColorConfigRequestView,
+       SetLayerColorConfigCompleter::Sync&),
+      (override));
 
   MOCK_METHOD(void, SetLayerImage2,
               (fuchsia_hardware_display::wire::CoordinatorSetLayerImage2Request*,

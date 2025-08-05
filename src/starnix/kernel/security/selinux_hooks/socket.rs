@@ -5,7 +5,7 @@
 use super::audit::Auditable;
 use super::fs_node::compute_new_fs_node_sid;
 use super::{
-    check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
+    check_permission, current_task_state, fs_node_effective_sid_and_class, todo_check_permission,
 };
 use crate::security::selinux_hooks::{superblock, FsNodeSidAndClass};
 use crate::task::{CurrentTask, Kernel};
@@ -194,7 +194,7 @@ where
     // Ensure sockfs gets labeled, in case it was mounted after the SELinux policy has been loaded.
     superblock::file_system_resolve_security(locked, security_server, &current_task, &sockfs)
         .expect("resolve fs security");
-    let effective_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
     let new_socket_sid = if let Some(fs_label) = sockfs.security_state.state.label() {
         compute_new_fs_node_sid(
@@ -213,7 +213,7 @@ where
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
         current_task.kernel(),
-        effective_sid,
+        current_sid,
         new_socket_sid,
         CommonFsNodePermission::Create.for_class(new_socket_class),
         current_task.into(),
@@ -252,7 +252,7 @@ pub(in crate::security) fn check_socket_bind_access(
         return Ok(());
     };
 
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
 
     // TODO: https://fxbug.dev/364569010 - Add checks for `name_bind` between the socket and the SID
     // of the port number, and for `node_bind` between the socket and the SID of the IP address.
@@ -274,7 +274,7 @@ pub(in crate::security) fn check_socket_connect_access(
     socket: DowncastedFile<'_, SocketFile>,
     _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
 
     // TODO: https://fxbug.dev/364568577 - Add checks for `name_connect` between the socket and the
     // SID of the port number for TCP sockets.
@@ -303,7 +303,7 @@ pub(in crate::security) fn check_socket_listen_access(
         return Ok(());
     };
 
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     has_socket_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
@@ -322,7 +322,7 @@ pub(in crate::security) fn socket_accept(
     listening_socket: DowncastedFile<'_, SocketFile>,
     accepted_socket: DowncastedFile<'_, SocketFile>,
 ) -> Result<(), Errno> {
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     let listening_security_state = listening_socket.file().node().security_state.lock().clone();
     todo_has_socket_permission(
         TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_accept checks."),
@@ -353,7 +353,7 @@ pub(in crate::security) fn check_socket_getsockopt_access(
         return Ok(());
     };
 
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     todo_has_socket_permission(
         TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_getsockopt checks."),
         &security_server.as_permission_check(),
@@ -380,7 +380,7 @@ pub(in crate::security) fn check_socket_setsockopt_access(
         );
         return Ok(());
     };
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     has_socket_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
@@ -404,7 +404,7 @@ pub(in crate::security) fn check_socket_sendmsg_access(
         );
         return Ok(());
     };
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = current_task_state(current_task).lock().current_sid;
     todo_has_socket_permission(
         TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_sendmsg checks."),
         &security_server.as_permission_check(),
@@ -429,7 +429,7 @@ pub(in crate::security) fn check_socket_recvmsg_access(
         );
         return Ok(());
     };
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = current_task_state(current_task).lock().current_sid;
     todo_has_socket_permission(
         TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_recvmsg checks."),
         &security_server.as_permission_check(),
@@ -455,7 +455,7 @@ pub(in crate::security) fn check_socket_getname_access(
         return Ok(());
     };
 
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     todo_has_socket_permission(
         TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_getname checks."),
         &security_server.as_permission_check(),
@@ -482,7 +482,7 @@ pub(in crate::security) fn check_socket_shutdown_access(
         return Ok(());
     };
 
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     has_socket_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
@@ -500,7 +500,26 @@ pub(in crate::security) fn socket_getpeersec_stream(
     socket: &Socket,
 ) -> Result<Vec<u8>, Errno> {
     let peer_sid = socket.security.state.peer_sid.lock().unwrap_or(InitialSid::Unlabeled.into());
-    Ok(security_server.sid_to_security_context(peer_sid).unwrap())
+    // The SELinux Test Suite assumes that `SO_PEERSEC` will return a NUL terminated label.
+    let mut context = security_server.sid_to_security_context(peer_sid).unwrap();
+    context.push(b'\0');
+    Ok(context)
+}
+
+/// Returns the Security Context with which messages sent by this [`crate::vfs::Socket`] should
+/// be labeled.
+pub(in crate::security) fn socket_getpeersec_dgram(
+    security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+    socket: &Socket,
+) -> Vec<u8> {
+    let socket_sid = if let Some(socket_node) = socket.fs_node() {
+        fs_node_effective_sid_and_class(&socket_node).sid
+    } else {
+        track_stub!(TODO("https://fxbug.dev/414583985"), "socket_getpeersec_dgram without FsNode");
+        InitialSid::Unlabeled.into()
+    };
+    security_server.sid_to_security_context(socket_sid).unwrap()
 }
 
 /// Checks if the Unix domain `sending_socket` is allowed to send a message to the
@@ -585,7 +604,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().effective_sid = task_sid;
+                current_task_state(current_task).lock().current_sid = task_sid;
 
                 let socket_node = SocketFile::new_socket(
                     locked,
@@ -613,7 +632,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().effective_sid = task_sid;
+                current_task_state(current_task).lock().current_sid = task_sid;
 
                 assert_matches!(
                     SocketFile::new_socket(
@@ -638,7 +657,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_no_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().effective_sid = task_sid;
+                current_task_state(current_task).lock().current_sid = task_sid;
 
                 assert_matches!(SocketFile::new_socket(
                     locked,

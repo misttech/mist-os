@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fdio::service_connect;
+use kgsl_strings::{ioctl_kgsl, kgsl_prop};
 use magma::{
     magma_device_import, magma_device_query, magma_device_release, magma_device_t, magma_handle_t,
     magma_initialize_logging, MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_OK,
@@ -32,8 +33,8 @@ pub struct KgslFile {
 impl KgslFile {
     pub fn init() {
         match Self::init_magma_logging() {
-            Ok(()) => log_info!("KGSL magma logging enabled"),
-            Err(()) => log_warn!("KGSL magma logging failed to initialize"),
+            Ok(()) => log_info!("kgsl: magma logging enabled"),
+            Err(()) => log_warn!("kgsl: magma logging failed to initialize"),
         };
     }
 
@@ -69,7 +70,7 @@ impl KgslFile {
         if result != MAGMA_STATUS_OK {
             return Err(zx::Status::INTERNAL);
         }
-        log_info!("Magma device at {} is vendor {:#04x}", path, result_out);
+        log_info!("kgsl: magma device at {} is vendor {:#04x}", path, result_out);
         Ok(magma_device)
     }
 
@@ -112,6 +113,16 @@ impl FileOps for KgslFile {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        // Special ioctl to signal container to use kgsl.
+        // TODO(b/429239527): remove after transitioned
+        const IOCTL_KGSL_ENABLE: u32 = 42;
+        if request == IOCTL_KGSL_ENABLE {
+            if cfg!(not(feature = "starnix-kgsl-enable")) {
+                log_info!("kgsl: suppressing further use of kgsl");
+                return error!(ENXIO);
+            }
+            return Ok(SUCCESS);
+        }
         match request {
             IOCTL_KGSL_DEVICE_GETPROPERTY => {
                 let user_params = UserRef::<kgsl_device_getproperty>::from(arg);
@@ -127,13 +138,16 @@ impl FileOps for KgslFile {
                         Ok(SUCCESS)
                     }
                     _ => {
-                        log_error!("KGSL unimplemented GetProperty type {}", params.type_);
+                        log_error!(
+                            "kgsl: unimplemented GetProperty type {}",
+                            kgsl_prop(params.type_)
+                        );
                         error!(ENOTSUP)
                     }
                 }
             }
             _ => {
-                log_error!("KGSL unimplemented ioctl {}", request);
+                log_error!("kgsl: unimplemented ioctl {}", ioctl_kgsl(request));
                 error!(ENOTSUP)
             }
         }

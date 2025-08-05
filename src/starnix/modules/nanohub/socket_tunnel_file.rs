@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_core::vfs::NamespaceNode;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -15,7 +16,7 @@ use starnix_core::fs_node_impl_not_dir;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -39,6 +40,8 @@ impl SocketTunnelFile {
     }
 }
 impl SocketTunnelSysfsFile {
+    #[allow(dead_code)]
+    // TODO(b/433761169): Remove this dead code.
     pub fn new(socket_label: FsString) -> SocketTunnelSysfsFile {
         SocketTunnelSysfsFile { socket_label: Arc::new(socket_label) }
     }
@@ -89,10 +92,10 @@ fn connect(socket_label: Arc<FsString>) -> Result<Box<dyn FileOps>, Errno> {
 impl DeviceOps for SocketTunnelFile {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         connect(self.socket_label.clone())

@@ -179,8 +179,8 @@ mod tests {
     use fuchsia_async::Task;
     use futures::channel::mpsc;
     use futures::{try_join, FutureExt, SinkExt};
-    use rand::distributions::{Alphanumeric, DistString as _};
-    use rand::thread_rng;
+    use rand::distr::{Alphanumeric, SampleString as _};
+    use rand::rng;
     use std::sync::Mutex;
 
     #[async_trait]
@@ -248,12 +248,11 @@ mod tests {
         let (tx, rx) = zx::Socket::create_stream();
         let rx = fasync::Socket::from_socket(rx);
         let (mut sender, recv) = create_mock_logger();
-        let msg = std::iter::repeat_with(|| {
-            Alphanumeric.sample_string(&mut thread_rng(), MAX_MESSAGE_SIZE - 1)
-        })
-        .take(3)
-        .collect::<Vec<_>>()
-        .join("\n");
+        let msg =
+            std::iter::repeat_with(|| Alphanumeric.sample_string(&mut rng(), MAX_MESSAGE_SIZE - 1))
+                .take(3)
+                .collect::<Vec<_>>()
+                .join("\n");
 
         let () = take_and_write_to_socket(tx, &msg)?;
         let (actual, ()) =
@@ -422,6 +421,6 @@ mod tests {
     }
 
     fn get_random_string(size: usize) -> String {
-        Alphanumeric.sample_string(&mut thread_rng(), size)
+        Alphanumeric.sample_string(&mut rng(), size)
     }
 }

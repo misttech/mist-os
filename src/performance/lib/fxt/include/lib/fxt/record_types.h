@@ -10,6 +10,7 @@
 
 #include <zircon/syscalls/object.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <type_traits>
 
@@ -28,6 +29,10 @@ struct WordSize {
   constexpr size_t SizeInBytes() const { return num_words_ * sizeof(uint64_t); }
   constexpr size_t SizeInWords() const { return num_words_; }
 
+  constexpr WordSize Clamp(WordSize max) const {
+    return WordSize(std::min(num_words_, max.num_words_));
+  }
+
   constexpr WordSize operator+=(const WordSize& other) {
     num_words_ += other.num_words_;
     return *this;
@@ -36,6 +41,17 @@ struct WordSize {
   constexpr WordSize operator+(const WordSize& other) const {
     return WordSize(num_words_ + other.num_words_);
   }
+
+  constexpr WordSize operator-(const WordSize& other) const {
+    return WordSize(num_words_ - other.num_words_);
+  }
+
+  constexpr bool operator==(const WordSize& other) const { return num_words_ == other.num_words_; }
+  constexpr bool operator!=(const WordSize& other) const { return !(*this == other); }
+  constexpr bool operator<(const WordSize& other) const { return num_words_ < other.num_words_; }
+  constexpr bool operator<=(const WordSize& other) const { return !(*this > other); }
+  constexpr bool operator>(const WordSize& other) const { return num_words_ > other.num_words_; }
+  constexpr bool operator>=(const WordSize& other) const { return !(*this < other); }
 
  private:
   size_t num_words_;
@@ -98,6 +114,7 @@ enum class ArgumentType {
   kPointer = 7,
   kKoid = 8,
   kBool = 9,
+  kBlob = 10,
 };
 
 // EventType enumerates all known trace event types.

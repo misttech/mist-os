@@ -30,22 +30,24 @@ zx::result<> CoordinatorDriver::Start() {
     return create_engine_driver_client_result.take_error();
   }
 
-  const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
-  zx::result<fdf::SynchronizedDispatcher> create_client_dispatcher_result =
+  constexpr std::string_view kSchedulerRole =
+      "fuchsia.graphics.display.drivers.display.coordinator";
+  zx::result<fdf::SynchronizedDispatcher> engine_listener_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
-          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
-          [](fdf_dispatcher_t* dispatcher) {
-            fdf::debug("Display coordinator client dispatcher is shut down.");
-          },
-          kSchedulerRoleName);
-  if (create_client_dispatcher_result.is_error()) {
-    fdf::error("Failed to create dispatcher: {}", create_client_dispatcher_result);
-    return create_client_dispatcher_result.take_error();
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "engine-listener-dispatcher",
+          /*shutdown_handler=*/
+          [](fdf_dispatcher_t*) { fdf::info("Engine listener dispatcher is shut down."); },
+          kSchedulerRole);
+  if (engine_listener_dispatcher_result.is_error()) {
+    fdf::error("Failed to create display engine listener dispatcher: %s",
+               engine_listener_dispatcher_result.status_string());
+    return engine_listener_dispatcher_result.take_error();
   }
-  client_dispatcher_ = std::move(create_client_dispatcher_result).value();
+  controller_engine_listener_dispatcher_ = std::move(engine_listener_dispatcher_result).value();
 
   zx::result<std::unique_ptr<Controller>> create_controller_result = Controller::Create(
-      std::move(create_engine_driver_client_result).value(), client_dispatcher_.borrow());
+      std::move(create_engine_driver_client_result).value(), driver_dispatcher()->borrow(),
+      controller_engine_listener_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     fdf::error("Failed to create Controller: {}", create_controller_result);
     return create_controller_result.take_error();

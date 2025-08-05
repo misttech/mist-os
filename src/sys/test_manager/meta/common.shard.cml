@@ -756,7 +756,6 @@
             protocol: [
                 "fuchsia.factory.WeaveFactoryStoreProvider",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
             to: [ "#system-tests" ],

@@ -94,6 +94,7 @@ func shard(env build.Environment, os string, ids ...int) *Shard {
 		Tests:      tests,
 		Env:        env,
 		ExpectsSSH: true,
+		HostCPU:    GetHostCPU(env, false),
 	}
 }
 
@@ -107,24 +108,25 @@ func shardWithMetadata(env build.Environment, os string, testMetadata metadata.T
 		Tests:      tests,
 		Env:        env,
 		ExpectsSSH: true,
+		HostCPU:    GetHostCPU(env, false),
 	}
 }
 
 func TestMakeShards(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{"device_type": "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU", "cpu": "x64"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{"device_type": "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC", "cpu": "x64"},
 		Tags:       []string{},
 	}
 	env3 := build.Environment{
-		Dimensions: build.DimensionSet{"os": "Linux"},
+		Dimensions: build.DimensionSet{"os": "Linux", "cpu": "x64"},
 		Tags:       []string{},
 	}
 	env4 := build.Environment{
-		Dimensions: build.DimensionSet{"device_type": "AEMU"},
+		Dimensions: build.DimensionSet{"device_type": "AEMU", "cpu": "arm64"},
 		Tags:       []string{},
 	}
 
@@ -342,11 +344,13 @@ func TestMakeShards(t *testing.T) {
 				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(2, "fuchsia")},
 				Env:        env1,
 				ExpectsSSH: true,
+				HostCPU:    GetHostCPU(env1, false),
 			}, {
 				Name:       environmentName(env2),
 				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(3, "fuchsia")},
 				Env:        env2,
 				ExpectsSSH: true,
+				HostCPU:    GetHostCPU(env2, false),
 			},
 		}
 		assertEqual(t, expected, actual)
@@ -443,6 +447,7 @@ func TestMakeShards(t *testing.T) {
 				ExpectsSSH: true,
 				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env1)),
 				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env1))},
+				HostCPU:    GetHostCPU(env1, false),
 			}, {
 				Name:       environmentName(env2),
 				Tests:      []Test{makeTestWithPackageManifest(1)},
@@ -450,6 +455,7 @@ func TestMakeShards(t *testing.T) {
 				ExpectsSSH: true,
 				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env2)),
 				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env2))},
+				HostCPU:    GetHostCPU(env2, false),
 			},
 		}
 		assertEqual(t, expected, actual)

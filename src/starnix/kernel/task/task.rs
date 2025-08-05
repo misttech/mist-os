@@ -20,7 +20,8 @@ use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{
-    FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease,
+    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, TaskRelease, TerminalLock,
 };
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -32,7 +33,7 @@ use starnix_uapi::signals::{sigaltstack_contains_pointer, SigSet, Signal};
 use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, tid_t, uapi, ucred,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, tid_t, uapi,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
@@ -876,17 +877,18 @@ impl TaskStateCode {
 /// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
 /// that it is available while the task is being dropped and so is not accessible from a weak
 /// pointer.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct TaskPersistentInfoState {
     /// Immutable information about the task
     tid: tid_t,
     thread_group_key: ThreadGroupKey,
 
     /// The command of this task.
-    command: CString,
+    command: Mutex<CString>,
 
-    /// The security credentials for this task.
-    creds: Credentials,
+    /// The security credentials for this task. These are only set when the task is the CurrentTask,
+    /// or on task creation.
+    creds: RwLock<Credentials>,
 }
 
 impl TaskPersistentInfoState {
@@ -896,7 +898,12 @@ impl TaskPersistentInfoState {
         command: CString,
         creds: Credentials,
     ) -> TaskPersistentInfo {
-        Arc::new(Mutex::new(Self { tid, thread_group_key, command, creds }))
+        Arc::new(Self {
+            tid,
+            thread_group_key,
+            command: Mutex::new(command),
+            creds: RwLock::new(creds),
+        })
     }
 
     pub fn tid(&self) -> tid_t {
@@ -907,20 +914,22 @@ impl TaskPersistentInfoState {
         self.thread_group_key.pid()
     }
 
-    pub fn command(&self) -> &CString {
-        &self.command
+    pub fn command(&self) -> MutexGuard<'_, CString> {
+        self.command.lock()
     }
 
-    pub fn creds(&self) -> &Credentials {
-        &self.creds
+    pub fn real_creds(&self) -> RwLockReadGuard<'_, Credentials> {
+        self.creds.read()
     }
 
-    pub fn creds_mut(&mut self) -> &mut Credentials {
-        &mut self.creds
+    /// SAFETY: Only use from CurrentTask. Changing credentials outside of the CurrentTask may
+    /// introduce TOCTOU issues in access checks.
+    pub(in crate::task) unsafe fn creds_mut(&self) -> RwLockWriteGuard<'_, Credentials> {
+        self.creds.write()
     }
 }
 
-pub type TaskPersistentInfo = Arc<Mutex<TaskPersistentInfoState>>;
+pub type TaskPersistentInfo = Arc<TaskPersistentInfoState>;
 
 /// A unit of execution.
 ///
@@ -1082,7 +1091,7 @@ impl Task {
                     starnix_logging::log_error!("Exiting without an exit code.");
                     ExitStatus::Exit(u8::MAX)
                 });
-                let uid = self.persistent_info.lock().creds().uid;
+                let uid = self.persistent_info.real_creds().uid;
                 let exit_signal = self.thread_group().exit_signal.clone();
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
@@ -1213,7 +1222,8 @@ impl Task {
             {
                 // Note that `Kernel::pids` is already locked by the caller of `Task::new()`.
                 let _l1 = task.read();
-                let _l2 = task.persistent_info.lock();
+                let _l2 = task.persistent_info.real_creds();
+                let _l3 = task.persistent_info.command();
             }
             task
         })
@@ -1233,8 +1243,11 @@ impl Task {
         self.files.add_with_flags(locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }
 
-    pub fn creds(&self) -> Credentials {
-        self.persistent_info.lock().creds.clone()
+    /// Returns the real credentials of the task. These credentials are used to check permissions
+    /// for actions performed on the task. If the task itself is performing an action, use
+    /// `CurrentTask::current_creds` instead.
+    pub fn real_creds(&self) -> Credentials {
+        self.persistent_info.real_creds().clone()
     }
 
     pub fn ptracer_task(&self) -> WeakRef<Task> {
@@ -1350,13 +1363,17 @@ impl Task {
     /// uses this mechanism to implement pthread_join. The thread that calls
     /// pthread_join sleeps using FUTEX_WAIT on the child tid address. We wake
     /// them up here to let them know the thread is done.
-    pub fn clear_child_tid_if_needed(&self) -> Result<(), Errno> {
+    pub fn clear_child_tid_if_needed<L>(&self, locked: &mut Locked<L>) -> Result<(), Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let mut state = self.write();
         let user_tid = state.clear_child_tid;
         if !user_tid.is_null() {
             let zero: tid_t = 0;
             self.write_object(user_tid, &zero)?;
             self.kernel().shared_futexes.wake(
+                locked,
                 self,
                 user_tid.addr(),
                 usize::MAX,
@@ -1418,13 +1435,8 @@ impl Task {
             .map_err(|status| from_status_like_fdio!(status))
     }
 
-    pub fn as_ucred(&self) -> ucred {
-        let creds = self.creds();
-        ucred { pid: self.get_pid(), uid: creds.uid, gid: creds.gid }
-    }
-
-    pub fn as_fscred(&self) -> FsCred {
-        self.creds().as_fscred()
+    pub fn real_fscred(&self) -> FsCred {
+        self.real_creds().as_fscred()
     }
 
     /// Interrupts the current task.
@@ -1445,7 +1457,7 @@ impl Task {
     }
 
     pub fn command(&self) -> CString {
-        self.persistent_info.lock().command.clone()
+        self.persistent_info.command.lock().clone()
     }
 
     pub fn set_command_name(&self, name: CString) {
@@ -1471,7 +1483,7 @@ impl Task {
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
 
-        self.persistent_info.lock().command = if bytes.len() > 15 {
+        *self.persistent_info.command.lock() = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
@@ -1519,7 +1531,8 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a> = (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
+    type Context<'a> =
+        (Box<ThreadState>, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
 
     fn release<'a>(mut self, context: Self::Context<'a>) {
         let (thread_state, locked, mut pids) = context;
@@ -1631,7 +1644,7 @@ impl fmt::Debug for Task {
             "{}:{}[{}]",
             self.thread_group().leader,
             self.tid,
-            self.persistent_info.lock().command.to_string_lossy()
+            self.persistent_info.command.lock().to_string_lossy()
         )
     }
 }
@@ -1645,12 +1658,6 @@ impl cmp::PartialEq for Task {
 }
 
 impl cmp::Eq for Task {}
-
-impl From<&Task> for FsCred {
-    fn from(t: &Task) -> FsCred {
-        t.creds().into()
-    }
-}
 
 #[cfg(test)]
 mod test {
@@ -1697,7 +1704,7 @@ mod test {
     async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
-        assert_eq!(current_task.creds().cap_inheritable, Capabilities::empty());
+        assert_eq!(current_task.real_creds().cap_inheritable, Capabilities::empty());
 
         current_task.set_creds(Credentials::with_ids(1, 1));
         assert!(!security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));

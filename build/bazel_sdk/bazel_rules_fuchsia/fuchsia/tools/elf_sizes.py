@@ -6,13 +6,14 @@
 
 import argparse
 import json
+import math
 import mmap
 import os
 import struct
-import subprocess
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -803,6 +804,57 @@ def get_elf_info(filename: str, match_notes: bool = False) -> None | elf_info:
     return None
 
 
+def aligned_size(size: int, alignment: int) -> int:
+    """Return the size taken by a file, given a block alignment.
+
+    e.g,:
+      - with a 200-byte file and 4K alignment, 4K is returned
+      - with a 5K file, and 2K alignment, 6K is returned
+    """
+    return math.ceil(size / alignment) * alignment
+
+
+@dataclass
+class BlobInfo:
+    merkle: str
+    source_path: Path
+    size: int
+
+
+def extract_blobs_from_manifest(manifest_path: Path) -> list[BlobInfo]:
+    """Given the path to a package manifest, return all the non-meta.far blobs as BlobInfo objects
+
+    This returns a list of BlobInfo objects for each non-meta.far blob in the package.
+    """
+    with open(manifest_path) as manifest_file:
+        manifest = json.load(manifest_file)
+        return [
+            BlobInfo(
+                blob_entry["merkle"],
+                manifest_path.parent / blob_entry["source_path"],
+                blob_entry["size"],
+            )
+            for blob_entry in manifest["blobs"]
+            if blob_entry["path"] != "meta/"
+        ]
+
+
+def flatten_path(path: str) -> str:
+    """Remove all internal '..' path segments of a path
+
+    Python doesn't have a way to do this directly, and this is needed to fix up some of the
+    wonky relative paths that we get from symlinks to gn outputs.
+    """
+    parts: list[str] = []
+    for part in Path(path).parts:
+        if part == "..":
+            parts.pop()
+        else:
+            parts.append(part)
+
+    return str(Path(*parts))
+
+
 # Module public API.
 __all__ = ["cpu", "elf_info", "elf_note", "get_elf_accessor", "get_elf_info"]
 
@@ -810,25 +862,10 @@ __all__ = ["cpu", "elf_info", "elf_note", "get_elf_accessor", "get_elf_info"]
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--assembly-dir",
-        help="Path to an assembled-system container directory",
+        "--product-assembly-dir",
+        help="Path to a product assembly container directory",
         type=Path,
         metavar="DIR",
-        required=True,
-    )
-    parser.add_argument(
-        "--zbi-tool",
-        help="Path to the 'zbi' tool",
-        type=Path,
-        metavar="FILE",
-        required=True,
-    )
-    parser.add_argument(
-        "--scratch-dir",
-        help="Path to a directory to write temporary files in",
-        type=Path,
-        metavar="DIR",
-        required=True,
     )
     parser.add_argument(
         "--sizes",
@@ -839,115 +876,74 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # The path to the ZBI
-    zbi = None
-    # The json description of blobfs/fxblob (described below)
-    contents = None
+    # Create a unified list of source files to process
+    files: set[str] = set()
 
-    # Open the 'assembled_system.json' manifest that describes the
-    # assembled system's output, and use that to locate the zbi and
-    # the contents of the blobfs/fxblob image.
-    with open(args.assembly_dir / "assembled_system.json") as f:
-        assembled_system = json.load(f)
-        for image in assembled_system["images"]:
-            if image["type"] == "zbi":
-                zbi = args.assembly_dir / image["path"]
-            else:
-                if "contents" in image:
-                    contents = image["contents"]
+    # overall size data for blobs and bootfs files
+    blobs_by_source: dict[str, BlobInfo] = {}
+    bootfs_file_sizes: dict[str, int] = {}
 
-    if not zbi:
-        raise ValueError("Unable to find ZBI in assembled_system.json")
-    if not contents:
-        raise ValueError("Unable to find packages in assembled_system.json")
+    with open(args.product_assembly_dir / "image_assembly.json") as f:
+        image_assembly = json.load(f)
 
-    # Extract the zbi into a scratch directory, so that all of the files
-    # within it can processed.
-    extracted_bootfs_dir = args.scratch_dir / "bootfs"
-    extracted_zbi_json = args.scratch_dir / "zbi.json"
-    os.makedirs(args.scratch_dir, exist_ok=True)
+        # For each package manifest listed, find all the non-meta.far blobs
+        # and add them to the set of blobs to scan.
+        manifests: list[Path] = []
+        manifests.extend([Path(p) for p in image_assembly.get("base", [])])
+        manifests.extend([Path(p) for p in image_assembly.get("cache", [])])
 
-    rc = subprocess.run(
-        [
-            args.zbi_tool,
-            "--extract",
-            "--output-dir",
-            extracted_bootfs_dir,
-            "--json-output",
-            extracted_zbi_json,
-            zbi,
-        ],
-    )
-    if rc.returncode != 0:
-        raise ValueError("Unable to extract BOOTFS from ZBI")
+        # collect all the blobs (deduplicating by merkle)
+        blobs: dict[str, BlobInfo] = {}
+        for manifest_path in manifests:
+            for info in extract_blobs_from_manifest(manifest_path):
+                if info.merkle not in blobs:
+                    blobs[info.merkle] = info
 
-    # Walk the 'zbi.json' created during the extraction, to find all the bootfs
-    # files, and compute the path in the scratch dir for the file.
-    files = []
-    bootfs_map = {}
-    with open(extracted_zbi_json) as f:
-        zbi = json.load(f)
-    for entry in zbi:
-        if entry["type"] != "BOOTFS":
-            continue
-        for item in entry["contents"]:
-            filepath = str(extracted_bootfs_dir / item["name"])
-            files.append(filepath)
-            bootfs_map[filepath] = item
+        blobs_by_source = {
+            str(info.source_path): info for info in blobs.values()
+        }
 
-    # 'contents' is a dict based on json such as:
-    # {
-    #   "contents":
-    #     "packages": {
-    #         "base": [
-    #             {
-    #               "name": <package name>,
-    #               "manifest": <path to manifest>,
-    #               "blobs": [
-    #                {
-    #                  "merkle": <hash>,
-    #                  "path": <path in package>,
-    #                  "used_space_in_blobfs": <int>
-    #
-    # Theinfo needed from this are the merkles and their sizes in blobfs,
-    # as the individual package blobs can be found in:
-    #   '<args.assembly_dir>/blobs/<merkle>'
-    #
+        # Gather all the blobs for the bootfs packages
+        bootfs_blobs: dict[str, BlobInfo] = {}
+        for manifest_path in image_assembly["bootfs_packages"]:
+            for info in extract_blobs_from_manifest(Path(manifest_path)):
+                if info.merkle not in bootfs_blobs:
+                    bootfs_blobs[info.merkle] = info
 
-    # This is a map of all blobs in the fxfs/blobfs image, by merkle and their
-    # size in blobfs (not the data size of the file, but the size taken up in
-    # the image
-    blobs_map: dict[str, int] = {}
-    for _, packages in contents["packages"].items():
-        for package in packages:
-            for blob in package["blobs"]:
-                merkle = blob["merkle"]
-                if merkle not in blobs_map:
-                    blobs_map[merkle] = blob["used_space_in_blobfs"]
+        bootfs_file_sizes = {
+            str(info.source_path): info.size for info in bootfs_blobs.values()
+        }
 
-    files += [
-        str(args.assembly_dir / "blobs" / merkle) for merkle in blobs_map.keys()
-    ]
+        # Gather all the bare bootfs files.
+        bootfs_files = [
+            entry["source"] for entry in image_assembly["bootfs_files"]
+        ]
+        # We need to directly get the source file size from the source file itself
+        for bootfs_file in bootfs_files:
+            if bootfs_file not in bootfs_file_sizes:
+                bootfs_file_sizes[bootfs_file] = os.stat(bootfs_file).st_size
+
+        # Update the set of files to process
+        files.update(str(info.source_path) for info in blobs.values())
+        files.update(str(info.source_path) for info in bootfs_blobs.values())
+        files.update(bootfs_files)
+
+    # Create the json size entry from the elf info based on the outputs from
+    # create_system (image assembly)
+    def json_size(info: elf_info) -> dict[Any, Any]:
+        sizes = info.sizes._asdict()
+        sizes["path"] = flatten_path(info.filename)
+        sizes["build_id"] = info.build_id
+        if info.filename in bootfs_file_sizes:
+            sizes["zbi"] = aligned_size(bootfs_file_sizes[info.filename], 4096)
+        if info.filename in blobs_by_source:
+            sizes["blob"] = aligned_size(
+                blobs_by_source[info.filename].size, 4096
+            )
+        return sizes
 
     # Now that all the files have been found, get the elf info for each one
     # if it is an ELF file, ignoring those that aren't.
-    def json_size(info: Any) -> dict[Any, Any]:
-        sizes = info.sizes._asdict()
-        sizes["path"] = info.filename
-        sizes["build_id"] = info.build_id
-        if info.filename in bootfs_map:
-            item = bootfs_map[info.filename]
-            assert info.sizes.file == item["length"], "%r != %r in %r vs %r" % (
-                info.sizes.file,
-                item["length"],
-                info,
-                item,
-            )
-            sizes["zbi"] = item["size"]
-        if info.filename in blobs_map:
-            sizes["blob"] = blobs_map[info.filename]
-        return sizes
-
     # Sort for stable output.
     sizes = sorted(
         [

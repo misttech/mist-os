@@ -22,7 +22,7 @@ rustc_binary("manager") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/storage/lib/vfs/rust:vfs",
+    "//src/lib/fuchsia-fs",
     "//src/tee/manager-config",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:anyhow",

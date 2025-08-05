@@ -5,7 +5,7 @@
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    fs_node_impl_dir_readonly, CloseFreeSafe, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SymlinkNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
@@ -158,6 +158,11 @@ impl SimpleDirectory {
         let (parent, basename) = self.walk(path)?;
         parent.get(basename)
     }
+
+    pub fn into_node(self: Arc<Self>, fs: &FileSystemHandle, mode: u32) -> FsNodeHandle {
+        let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
+        fs.create_node_and_allocate_node_id(self, info)
+    }
 }
 
 impl FsNodeOps for Arc<SimpleDirectory> {
@@ -193,6 +198,8 @@ impl FsNodeOps for Arc<SimpleDirectory> {
     }
 }
 
+/// `SimpleDirectory` doesn't implement the `close` method.
+impl CloseFreeSafe for SimpleDirectory {}
 impl FileOps for SimpleDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();

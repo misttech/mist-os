@@ -149,6 +149,15 @@ void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const cha
 zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
     ZX_AVAILABLE_SINCE(27);
 
+// Scans active thread pools for threads that are stalled on long running tasks and potentially
+// spawn new threads to compensate.
+//
+// # Thread requirements
+//
+// This should not be called from a thread managed by the driver runtime,
+// such as from tasks or ChannelRead callbacks.
+void fdf_env_scan_threads_for_stalls(void) ZX_AVAILABLE_SINCE(HEAD);
+
 __END_CDECLS
 
 #endif  // LIB_FDF_ENV_H_

@@ -5,16 +5,12 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 
-#include <cassert>
-#include <compare>
 #include <cstdint>
+#include <type_traits>
 
 #include "layout.h"
 
 namespace elfldltl {
-
-// See below.
-struct LocalAbiTraits;
 
 // elfldltl::AbiPtr<T> is like a T* but can support a stable and cross-friendly
 // ABI.  It can be used to store pointers that use a different byte order,
@@ -40,11 +36,84 @@ struct LocalAbiTraits;
 // stored pointer to a real pointer in the local address space.  If it does,
 // then elfldltl::AbiPtr<T> can be used like a smart-pointer type with `get()`
 // and `*` and `->` operators and can be constructed from real T* pointers.
-//
-// The Traits template API is described below.  The default LocalAbiTraits type
-// just uses a normal pointer and supports all the the smart-pointer methods
-// and operators.
-template <typename T, class Elf = elfldltl::Elf<>, class Traits = LocalAbiTraits>
+
+// Each Traits class is defined just once for all data types and ELF layouts,
+// with member types and static members that are all templated on Elf and T
+// themselves individually.  The AbiTraitsApi concept can only check that the
+// Traits class meets the API contract for a given Elf and T instantiation, but
+// each class is expected to work with any combination of types.
+
+// This concept is used as part of the AbiTraitsApi concept.
+template <typename StorageType, typename T, typename size_type>
+concept AbiPtrTraitsStorageType =
+    std::same_as<StorageType, T*> || requires(StorageType storage, size_type unsigned_integer,
+                                              std::make_signed_t<size_type> signed_integer) {
+      { storage + unsigned_integer } -> std::convertible_to<StorageType>;
+      { storage + signed_integer } -> std::convertible_to<StorageType>;
+      { storage - unsigned_integer } -> std::convertible_to<StorageType>;
+      { storage - signed_integer } -> std::convertible_to<StorageType>;
+      { storage - storage } -> std::integral;
+    };
+
+// Any Traits type used with AbiPtr must meet the AbiTraitsApi requirements.
+template <class Traits, typename T, class Elf>
+concept AbiPtrTraitsApi = requires(  //
+    typename Elf::Addr addr, typename Traits::template StorageType<Elf, T> storage) {
+  // This must be defined to some type that admits + and - operators with
+  // integer types, and operator- with itself.  Pointer types can satisfy this
+  // even while incomplete, though they'll have to be complete by the time the
+  // AbiPtr arithmetic methods are used.
+  typename Traits::template StorageType<Elf, T>;
+  {
+    typename Traits::template StorageType<Elf, T>{}
+  } -> AbiPtrTraitsStorageType<T, typename Elf::size_type>;
+
+  // The kScale<T> template static constexpr variable must be defined to a
+  // factor by which an integer should be scaled up before adding or
+  // subtracting it to a StorageType<..., T> value, and by which the value of
+  // subtracting two such values should be scaled down.
+  //
+  // This is not imposed as a formal requirement because that requires
+  // instantiating kScale<T> as part of the instantiation of AbiPtr<T>, and
+  // that might require T to be a complete type (e.g. if sizeof(T) is used in
+  // kScale<T> as in RemoteAbiTraits).  But that would make it impossible to
+  // declare self-referential data types using AbiPtr.
+  //{
+  //  std::integral_constant<decltype(Traits::template kScale<T>),
+  //                         Traits::template kScale<T>>::value +
+  //      0
+  //} -> std::unsigned_integral;
+
+  // This must be defined to accept any StorageType<...> argument and yield the
+  // address in the target address space as some unsigned integer type.
+  { Traits::GetAddress(storage) } -> std::unsigned_integral;
+
+  // This must be defined to accept any StorageType<...> argument and yield a
+  // type that admits operator<=> for comparison of two pointers it's valid to
+  // compare by C rules.
+  { Traits::ComparisonValue(storage) } -> std::totally_ordered;
+
+  // This must be defined to accept Elf::Addr (or Elf::size_type, since they
+  // are mutually convertible).
+  { Traits::template FromAddress<Elf, T>(addr) } -> std::convertible_to<decltype(storage)>;
+};
+
+// If an AbiTraits class offers the Make and Get methods to convert directly to
+// a local pointer, it qualifies as a LocalAbiTraitsApi class.  In this case,
+// AbiPtr will support all the smart-pointer methods and operators and be
+// convertible to and from normal pointers (T*).
+template <class Traits, typename T, class Elf>
+concept AbiPtrLocalTraitsApi =
+    AbiPtrTraitsApi<Traits, T, Elf> &&
+    requires(T* ptr, typename Traits::template StorageType<Elf, T> storage) {
+      {
+        Traits::template Make<Elf, T>(ptr)
+      } -> std::convertible_to<typename Traits::template StorageType<Elf, T>>;
+
+      { Traits::template Get<Elf, T>(storage) } -> std::convertible_to<T*>;
+    };
+
+template <typename T, class Elf = elfldltl::Elf<>, AbiPtrTraitsApi<T, Elf> Traits = LocalAbiTraits>
 struct AbiPtr {
  public:
   using value_type = T;
@@ -59,31 +128,33 @@ struct AbiPtr {
   // The Traits type determines the underlying type stored.
   using StorageType = typename Traits::template StorageType<Elf, T>;
 
+  // This provides a convenient shorthand for checking if AbiPtr is just
+  // interchangeable with normal pointers.
+  static constexpr bool kLocal = AbiPtrLocalTraitsApi<Traits, T, Elf>;
+
   constexpr AbiPtr() = default;
 
   constexpr AbiPtr(const AbiPtr&) = default;
 
-  // If Traits::Get<T> is supported, then Traits::Make<T> is too.
-  // In this case, the AbiPtr can be constructed from a normal pointer.
-  template <class TT = Traits,
-            typename = decltype(TT::template Get<value_type>(std::declval<StorageType>()))>
-  constexpr explicit AbiPtr(value_type* ptr) : storage_(Traits::template Make<value_type>(ptr)) {}
+  // If Traits supports it, AbiPtr can be constructed from a normal pointer.
+  constexpr explicit AbiPtr(value_type* ptr)
+    requires kLocal
+      : storage_(Traits::template Make<value_type>(ptr)) {}
 
   constexpr AbiPtr& operator=(const AbiPtr&) = default;
 
-  template <class TT = Traits,
-            typename = decltype(TT::template Get<value_type>(std::declval<StorageType>()))>
-  constexpr AbiPtr& operator=(value_type* ptr) {
+  constexpr AbiPtr& operator=(value_type* ptr)
+    requires kLocal
+  {
     *this = AbiPtr{ptr};
     return *this;
   }
 
-  // AbiPtr<T> is convertible to AbiPtr<const T> just like T* to const T*.
-  template <typename TT = T, typename = std::enable_if_t<!std::is_const_v<TT>>>
-  constexpr operator AbiPtr<const TT, Elf, Traits>() const {
-    static_assert(std::is_same_v<TT, T>);
-    static_assert(!std::is_const_v<TT>);
-    return Reinterpret<const T>();
+  // AbiPtr<T> is convertible to AbiPtr<U> exactly like T* to U*.
+  template <typename U>
+    requires std::is_convertible_v<T*, U*>
+  constexpr explicit(!std::convertible_to<T*, U*>) operator AbiPtr<U, Elf, Traits>() const {
+    return Reinterpret<U>();
   }
 
   static constexpr AbiPtr FromAddress(Addr address) {
@@ -102,11 +173,7 @@ struct AbiPtr {
     return ComparisonValue() == other.ComparisonValue();
   }
 
-  constexpr bool operator!=(const AbiPtr& other) const {
-    return ComparisonValue() != other.ComparisonValue();
-  }
-
-  constexpr std::strong_ordering operator<=>(const AbiPtr& other) const {
+  constexpr auto operator<=>(const AbiPtr& other) const {
     return ComparisonValue() <=> other.ComparisonValue();
   }
 
@@ -139,21 +206,21 @@ struct AbiPtr {
 
   // Dereferencing methods are only available if enabled by the Traits type.
 
-  template <typename TT = Traits,
-            typename = decltype(TT::template Get<T>(std::declval<StorageType>()))>
-  constexpr T* get() const {
+  constexpr T* get() const
+    requires kLocal
+  {
     return Traits::template Get<T>(storage_);
   }
 
-  template <typename TT = Traits,
-            typename = decltype(TT::template Get<T>(std::declval<StorageType>()))>
-  constexpr T* operator->() const {
+  constexpr T* operator->() const
+    requires kLocal
+  {
     return get();
   }
 
-  template <typename TT = Traits,
-            typename = decltype(TT::template Get<T>(std::declval<StorageType>()))>
-  constexpr T& operator*() const {
+  constexpr T& operator*() const
+    requires kLocal
+  {
     return *get();
   }
 
@@ -174,42 +241,27 @@ template <typename T>
 AbiPtr(T*) -> AbiPtr<T>;
 
 // This is the default Traits type for AbiPtr and things that use it.
-// It also serves as the exemplar for the template API.  Comments here
-// describe what any Traits type must define.
+// It meets both AbiTraitsApi and LocalAbiTraitsApi for any Elf and T.
 struct LocalAbiTraits {
-  // This must be defined to some type that admits + and - operators with
-  // integer types, and operator- with itself.
   template <class Elf, typename T>
   using StorageType = T*;
 
-  // This must be defined to a factor by which an integer should be scaled up
-  // before adding or subtracting to StorageType<..., T>, and by which the
-  // value of subtracting two StorageType<..., T> values should be scaled down.
   template <typename T>
   static constexpr uint32_t kScale = 1;
 
-  // This must be defined to accept any StorageType<...> argument and yield the
-  // address in the target address space as some unsigned integer type.
   static uintptr_t GetAddress(const void* ptr) { return reinterpret_cast<uintptr_t>(ptr); }
 
-  // This must be defined to accept any StorageType<...> argument and yield an
-  // integer type that admits operator<=> for comparison of two pointers it's
-  // valid to compare by C rules.
   template <typename T>
   static constexpr auto ComparisonValue(T* ptr) {
     return ptr;
   }
 
-  // This must be defined to accept Elf::Addr (or Elf::size_type, since they
-  // are mutually convertible).
   template <class Elf, typename T>
-  static StorageType<Elf, T> FromAddress(typename Elf::size_type address) {
-    return reinterpret_cast<T*>(static_cast<uintptr_t>(address));
+  static StorageType<Elf, T> FromAddress(uintptr_t address) {
+    return reinterpret_cast<T*>(address);
   }
 
-  // The last two functions don't have to be defined, but if one is defined
-  // then both must be defined.  They convert between a local T* pointer and
-  // StorageType<Elf,T> and are only defined when such a conversion exists.
+  // LocalAbiTraitsApi methods.
 
   template <class Elf, typename T>
   static constexpr StorageType<Elf, T> Make(T* ptr) {
@@ -221,6 +273,7 @@ struct LocalAbiTraits {
     return ptr;
   }
 };
+static_assert(AbiPtrLocalTraitsApi<LocalAbiTraits, Elf<>::Addr, Elf<>>);
 
 // This is a baseline Traits type for storing pointers in a different address
 // space and pointer encoding.  An AbiPtr<..., RemoteAbiTraits> type doesn't
@@ -228,6 +281,8 @@ struct LocalAbiTraits {
 //
 // elfldltl::AbiPtr<T, Elf, elfldltl::RemoteAbiTraits> has in every context the
 // same layout that elfldltl::AbiPtr<T> does wherever elfldltl::Elf<> is Elf.
+//
+// This meets AbiTraitsApi for any Elf and T, but not LocalAbiTraitsApi.
 struct RemoteAbiTraits {
   template <class Elf, typename T>
   using StorageType = typename Elf::Addr;
@@ -235,23 +290,16 @@ struct RemoteAbiTraits {
   template <typename T>
   static constexpr uint32_t kScale = sizeof(T);
 
-  template <typename Addr>
-  static constexpr auto GetAddress(Addr ptr) {
-    return ptr();
-  }
+  static constexpr auto GetAddress(auto ptr) { return ptr(); }
 
-  template <typename Addr>
-  static constexpr auto ComparisonValue(Addr ptr) {
-    return ptr();
-  }
+  static constexpr auto ComparisonValue(auto ptr) { return ptr(); }
 
-  // This must be defined to accept Elf::Addr (or Elf::size_type, since they
-  // are mutually convertible).
   template <class Elf, typename T>
   static constexpr StorageType<Elf, T> FromAddress(typename Elf::Addr address) {
     return address;
   }
 };
+static_assert(AbiPtrTraitsApi<RemoteAbiTraits, Elf<>::Addr, Elf<>>);
 
 }  // namespace elfldltl
 

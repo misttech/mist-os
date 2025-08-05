@@ -157,7 +157,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   IgdOpRegion* igd_opregion_for_testing() { return &igd_opregion_; }
 
   void HandleHotplug(DdiId ddi_id, bool long_pulse);
-  void HandlePipeVsync(PipeId pipe_id_num, zx_time_t timestamp);
+  void HandlePipeVsync(PipeId pipe_id_num, zx_instant_mono_t timestamp);
 
   void ResetPipePlaneBuffers(PipeId pipe_id);
   bool ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_id);

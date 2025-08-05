@@ -54,6 +54,46 @@ impl TryFrom<fidl::Channel> for Dict {
     }
 }
 
+impl Dict {
+    /// Like [RemotableCapability::try_into_directory_entry], but this version actually consumes
+    /// the contents of the [Dict]. In other words, if this function returns `Ok`, `self` will
+    /// be empty. If any items are added to `self` later, they will not appear in the directory.
+    /// This method is useful when the caller has no need to keep the original [Dict]. Note
+    /// that even if there is only one reference to the [Dict], calling
+    /// [RemotableCapability::try_into_directory_entry] does not have the same effect because the
+    /// `vfs` keeps alive reference to the [Dict] -- see the comment in the implementation.
+    ///
+    /// This is transitive: any [Dict]s nested in this one will be consumed as well.
+    pub fn try_into_directory_entry_oneshot(
+        self,
+        scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        let directory = pfs::simple();
+        for (key, value) in self.drain() {
+            let dir_entry = match value {
+                Capability::Dictionary(value) => {
+                    value.try_into_directory_entry_oneshot(scope.clone())?
+                }
+                value => value.try_into_directory_entry(scope.clone())?,
+            };
+            let key =
+                Name::try_from(key.to_string()).expect("cm_types::Name is always a valid vfs Name");
+            directory
+                .add_entry_impl(key, dir_entry, false)
+                .expect("dictionary values must be unique")
+        }
+
+        let not_found = self.lock().not_found.take();
+        directory.clone().set_not_found_handler(Box::new(move |path| {
+            if let Some(not_found) = not_found.as_ref() {
+                not_found(path);
+            }
+        }));
+
+        Ok(directory)
+    }
+}
+
 impl RemotableCapability for Dict {
     fn try_into_directory_entry(
         self,
@@ -1574,6 +1614,61 @@ mod tests {
         // At this point there are no entries left in the dictionary, so the directory should be
         // empty too.
         assert_eq!(fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(), vec![],);
+    }
+
+    #[fuchsia::test]
+    async fn into_directory_oneshot() {
+        let dict = Dict::new();
+        let inner_dict = Dict::new();
+        let fs = pseudo_directory! {};
+        let dir_entry = DirEntry::new(fs);
+        inner_dict.insert("x".parse().unwrap(), Capability::DirEntry(dir_entry.clone())).unwrap();
+        dict.insert("a".parse().unwrap(), Capability::DirEntry(dir_entry.clone())).unwrap();
+        dict.insert("b".parse().unwrap(), Capability::DirEntry(dir_entry.clone())).unwrap();
+        dict.insert("c".parse().unwrap(), Capability::Dictionary(inner_dict.clone())).unwrap();
+
+        let scope = ExecutionScope::new();
+        let remote = dict.clone().try_into_directory_entry_oneshot(scope.clone()).unwrap();
+        let dir_proxy =
+            serve_directory(remote.clone(), &scope, fio::PERM_READABLE).unwrap().into_proxy();
+
+        // The dictionary already had three entries in it when the directory proxy was created, so
+        // we should see those in the directory.
+        let mut readdir_results = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
+        readdir_results.sort_by(|entry_1, entry_2| entry_1.name.cmp(&entry_2.name));
+        assert_eq!(
+            readdir_results,
+            vec![
+                directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "c".to_string(), kind: fio::DirentType::Directory },
+            ]
+        );
+
+        let (inner_proxy, server) = create_proxy::<fio::DirectoryMarker>();
+        dir_proxy.open("c", Default::default(), &Default::default(), server.into()).unwrap();
+        let readdir_results = fuchsia_fs::directory::readdir(&inner_proxy).await.unwrap();
+        assert_eq!(
+            readdir_results,
+            vec![directory::DirEntry { name: "x".to_string(), kind: fio::DirentType::Directory }]
+        );
+
+        // The Dict should be empty because `try_into_directory_entry_oneshot consumed it.
+        assert_matches!(dict.keys().next(), None);
+        assert_matches!(inner_dict.keys().next(), None);
+
+        // Adding to the empty Dict has no impact on the directory.
+        dict.insert("z".parse().unwrap(), Capability::DirEntry(dir_entry.clone())).unwrap();
+        let mut readdir_results = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
+        readdir_results.sort_by(|entry_1, entry_2| entry_1.name.cmp(&entry_2.name));
+        assert_eq!(
+            readdir_results,
+            vec![
+                directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "c".to_string(), kind: fio::DirentType::Directory },
+            ]
+        );
     }
 
     /// Generates a key from an integer such that if i < j, key_for(i) < key_for(j).

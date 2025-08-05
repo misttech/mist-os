@@ -13,7 +13,6 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver/bootserverconstants"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
@@ -495,7 +494,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.IfChange(hrtimer_wait_signaled_sync_tefmo)
 			String: "wait_signaled_sync: not signaled yet. See HrTimer bug: b/428223204",
 			// LINT.ThenChange(//src/starnix/kernel/task/hr_timer_manager.rs:hrtimer_wait_signaled_sync_tefmo)
-			Type: syslogType,
+			Type:               syslogType,
+			SkipAllPassedTests: true,
 		},
 		// For https://fxbug.dev/428030027
 		&stringInLogCheck{
@@ -619,12 +619,6 @@ func infraToolLogChecks() []FailureModeCheck {
 		&stringInLogCheck{String: "kvm run failed Bad address", Type: swarmingOutputType},
 		// For https://fxbug.dev/42121230.
 		&stringInLogCheck{String: netutilconstants.CannotFindNodeErrMsg, Type: swarmingOutputType},
-		// For https://fxbug.dev/42128160.
-		&stringInLogCheck{
-			String:         bootserverconstants.FailedToSendErrMsg(bootserverconstants.CmdlineNetsvcName),
-			Type:           swarmingOutputType,
-			SkipPassedTask: true,
-		},
 		// For https://fxbug.dev/42119464.
 		&stringInLogCheck{String: "/dev/net/tun (qemu): Device or resource busy", Type: swarmingOutputType},
 		// testrunner logs this when the serial socket goes away unexpectedly.
@@ -683,14 +677,6 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type:   swarmingOutputType,
 			// This error may be emitted, but since we retry paving, this may not be
 			// fatal.
-			SkipPassedTask: true,
-		},
-		// Emitted by the GCS Go library during image download.
-		&stringInLogCheck{
-			String: bootserverconstants.BadCRCErrorMsg,
-			Type:   swarmingOutputType,
-			// This error is generally transient, so ignore it as long as the
-			// download can be retried and eventually succeeds.
 			SkipPassedTask: true,
 		},
 		// For https://fxbug.dev/42170540.
@@ -905,8 +891,14 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/427942765
 		&stringInLogCheck{
-			String:             "Failed to setup PSY and IIO path",
-			Type:               syslogType,
+			String:          "Failed to setup PSY and IIO path",
+			Type:            syslogType,
+			AttributeToTest: true,
+		},
+		// For https://fxbug.dev/428551639
+		&stringInLogCheck{
+			String:             "Restarts have not restored connectivity. Giving up.",
+			Type:               swarmingOutputType,
 			SkipAllPassedTests: true,
 			AttributeToTest:    true,
 		},

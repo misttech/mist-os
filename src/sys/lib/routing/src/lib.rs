@@ -16,10 +16,12 @@ pub mod path;
 pub mod policy;
 pub mod resolving;
 pub mod rights;
+pub mod subdir;
 pub mod walk_state;
 
 use crate::bedrock::request_metadata::{
-    dictionary_metadata, protocol_metadata, resolver_metadata, runner_metadata, service_metadata,
+    dictionary_metadata, directory_metadata, protocol_metadata, resolver_metadata, runner_metadata,
+    service_metadata,
 };
 use crate::capability_source::{
     CapabilitySource, ComponentCapability, ComponentSource, InternalCapability, VoidSource,
@@ -53,17 +55,17 @@ use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
-    RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirConnector, DirEntry, Request, Routable,
+    Router, RouterResponse,
 };
 use std::sync::Arc;
+use subdir::SubDir;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
 
 pub use bedrock::dict_ext::{DictExt, GenericRouterResponse};
 pub use bedrock::lazy_get::LazyGet;
 pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
 pub use bedrock::with_porcelain::WithPorcelain;
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -328,8 +330,18 @@ where
 {
     match request {
         // Route from an ExposeDecl
-        RouteRequest::ExposeDirectory(expose_directory_decl) => {
-            route_directory_from_expose(expose_directory_decl, target, mapper).await
+        RouteRequest::ExposeDirectory(expose_dir_decl) => {
+            route_capability_inner::<DirConnector, _>(
+                &target.component_sandbox().await?.component_output.capabilities(),
+                &expose_dir_decl.target_name,
+                directory_metadata(
+                    expose_dir_decl.availability,
+                    expose_dir_decl.rights.and_then(|v| Some(v.into())),
+                    Some(expose_dir_decl.subdir.into()),
+                ),
+                target,
+            )
+            .await
         }
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
             let sandbox = target.component_sandbox().await?;
@@ -417,7 +429,21 @@ where
 
         // Route from a UseDecl
         RouteRequest::UseDirectory(use_directory_decl) => {
-            route_directory(use_directory_decl, target, mapper).await
+            let subdir = match use_directory_decl.source {
+                UseSource::Self_ => None,
+                _ => Some(SubDir::from(use_directory_decl.subdir)),
+            };
+            route_capability_inner::<DirConnector, _>(
+                &target.component_sandbox().await?.program_input.namespace(),
+                &use_directory_decl.target_path,
+                directory_metadata(
+                    use_directory_decl.availability,
+                    Some(use_directory_decl.rights.into()),
+                    subdir,
+                ),
+                target,
+            )
+            .await
         }
         RouteRequest::UseEventStream(use_event_stream_decl) => {
             route_event_stream(use_event_stream_decl, target, mapper).await
@@ -491,7 +517,26 @@ where
             .await
         }
         RouteRequest::OfferDirectory(offer_directory_decl) => {
-            route_directory_from_offer(offer_directory_decl, target, mapper).await
+            let target_dictionary =
+                get_dictionary_for_offer_target(target, &offer_directory_decl).await?;
+            let metadata = directory_metadata(
+                offer_directory_decl.availability,
+                offer_directory_decl.rights.and_then(|v| Some(v.into())),
+                Some(offer_directory_decl.subdir.into()),
+            );
+            metadata
+                .insert(
+                    Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
+                    Capability::Data(Data::Uint64(1)),
+                )
+                .unwrap();
+            route_capability_inner::<DirConnector, _>(
+                &target_dictionary,
+                &offer_directory_decl.target_name,
+                metadata,
+                target,
+            )
+            .await
         }
         RouteRequest::OfferStorage(offer_storage_decl) => {
             route_storage_from_offer(offer_storage_decl, target, mapper).await
@@ -676,35 +721,6 @@ where
             }
         }
     }
-}
-
-/// Routes a Directory capability from `target` to its source, starting from `offer_decl`.
-/// Returns the capability source, along with a `DirectoryState` accumulated from traversing
-/// the route.
-async fn route_directory_from_offer<C>(
-    offer_decl: OfferDirectoryDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let mut state = DirectoryState {
-        rights: WalkState::new(),
-        subdir: Default::default(),
-        availability_state: offer_decl.availability.into(),
-    };
-    let allowed_sources =
-        Sources::new(CapabilityTypeName::Directory).framework().namespace().component();
-    let source = legacy_router::route_from_offer(
-        RouteBundle::from_offer(offer_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut state,
-        mapper,
-    )
-    .await?;
-    Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `offer_decl`.
@@ -922,93 +938,6 @@ impl CapabilityVisitor for DirectoryState {
             _ => Ok(()),
         }
     }
-}
-
-/// Routes a Directory capability from `target` to its source, starting from `use_decl`.
-/// Returns the capability source, along with a `DirectoryState` accumulated from traversing
-/// the route.
-async fn route_directory<C>(
-    use_decl: UseDirectoryDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    match use_decl.source {
-        UseSource::Self_ => {
-            let mut availability_visitor = use_decl.availability;
-            let allowed_sources = Sources::new(CapabilityTypeName::Dictionary).component();
-            let source = legacy_router::route_from_self(
-                use_decl.into(),
-                target.clone(),
-                allowed_sources,
-                &mut availability_visitor,
-                mapper,
-            )
-            .await?;
-            Ok(RouteSource::new(source))
-        }
-        _ => {
-            let mut state = DirectoryState::new(
-                RightsWalker::new(use_decl.rights, target.moniker().clone()),
-                use_decl.subdir.clone(),
-                &use_decl.availability,
-            );
-            if let UseSource::Framework = &use_decl.source {
-                let moniker = target.moniker().clone();
-                state.finalize(
-                    &moniker.clone().into(),
-                    RightsWalker::new(fio::RX_STAR_DIR, moniker),
-                    Default::default(),
-                )?;
-            }
-            let allowed_sources =
-                Sources::new(CapabilityTypeName::Directory).framework().namespace().component();
-            let source = legacy_router::route_from_use(
-                use_decl.into(),
-                target.clone(),
-                allowed_sources,
-                &mut state,
-                mapper,
-            )
-            .await?;
-
-            target.policy_checker().can_route_capability(&source, target.moniker())?;
-            Ok(RouteSource::new_with_relative_path(source, state.subdir))
-        }
-    }
-}
-
-/// Routes a Directory capability from `target` to its source, starting from `expose_decl`.
-/// Returns the capability source, along with a `DirectoryState` accumulated from traversing
-/// the route.
-async fn route_directory_from_expose<C>(
-    expose_decl: ExposeDirectoryDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let mut state = DirectoryState {
-        rights: WalkState::new(),
-        subdir: Default::default(),
-        availability_state: expose_decl.availability.into(),
-    };
-    let allowed_sources =
-        Sources::new(CapabilityTypeName::Directory).framework().namespace().component();
-    let source = legacy_router::route_from_expose(
-        RouteBundle::from_expose(expose_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut state,
-        mapper,
-    )
-    .await?;
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
-    Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
 /// Verifies that the given component is in the index if its `storage_id` is StaticInstanceId.

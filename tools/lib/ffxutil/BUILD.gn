@@ -16,7 +16,6 @@ go_library("ffxutil") {
   ]
   deps = [
     ":constants",
-    "//tools/bootserver:bootserver_lib",
     "//tools/botanist:constants",
     "//tools/build",
     "//tools/lib/retry",

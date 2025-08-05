@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <imports>
-    <localimport file="bazel_modules"/>
     <localimport file="chromium/chromium"/>
     <localimport file="dart"/>
     <localimport file="goldfish-opengl"/>
@@ -38,7 +37,7 @@
     <project name="third_party/android/platform/external/avb"
              path="third_party/android/platform/external/avb"
              remote="https://fuchsia.googlesource.com/third_party/android/platform/external/avb"
-             revision="394bb50c7b67da912765469d79037c6577453b13"/>
+             revision="ca7642716fd4da6eef05e9e8b275092780f4f1b3"/>
     <project name="third_party/android.googlesource.com/platform/bionic"
              path="third_party/android/platform/bionic"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/bionic"
@@ -46,7 +45,7 @@
     <project name="third_party/android.googlesource.com/platform/frameworks/native"
              path="third_party/android/platform/frameworks/native"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/frameworks/native"
-             revision="12ad17aaa308a3bf4683d74df98366a846e2ed8c"/>
+             revision="889aaed858e2c7e8b506d07d52ee38fe7c3e54e2"/>
     <project name="third_party/android.googlesource.com/platform/system/logging"
              path="third_party/android/platform/system/logging"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/logging"
@@ -79,7 +78,7 @@
              path="third_party/bcmdhd"
              remote="https://fuchsia.googlesource.com/third_party/bcmdhd"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="529e0c2128936bd1d2d6777cd1f61c79a39ac831"/>
+             revision="d0740d3747717e7315ee447e4ad863b86004788e"/>
     <project name="boringssl"
              path="third_party/boringssl/src"
              remote="https://boringssl.googlesource.com/boringssl"
@@ -93,7 +92,7 @@
     <project name="third_party/crashpad"
              path="third_party/crashpad/src"
              remote="https://fuchsia.googlesource.com/third_party/crashpad"
-             revision="4346c21cb1039b02803b852eec7c60d3963ada7c"
+             revision="2918808a641484f5499c1174b9c9fa8b817c8dc4"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="chromium/mini_chromium"
              path="third_party/mini_chromium/src"
@@ -109,7 +108,7 @@
              path="third_party/curl"
              remote="https://fuchsia.googlesource.com/third_party/curl"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="b8a7d6da5b2335df140d630f69759bb9402fa969"/>
+             revision="0605361a38cc37ede3a30d194294e892b956d81f"/>
     <project name="third_party/github.com/google/emboss"
              path="third_party/github.com/google/emboss/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/emboss"
@@ -171,7 +170,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="1a476b9884ad25ae9f6e17e9509b2948cdda59d4"/>
     <project name="third_party/gflags"
-             path="third_party/gflags"
+             path="third_party/gflags/src"
              remote="https://fuchsia.googlesource.com/third_party/gflags"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="e482d90905743e36c97060d1afbc0ca9fccc4b25"/>
@@ -191,7 +190,7 @@
     <project name="third_party/go"
              remote="https://fuchsia.googlesource.com/third_party/go"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="236b72c74af2fa468f20db99355d0ea2d57834ec"
+             revision="771304dd4279cdced80182197ea9a8d8a9fde430"
              path="third_party/go"/>
     <project name="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
              path="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
@@ -289,11 +288,6 @@
              remote="https://fuchsia.googlesource.com/third_party/libpng"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="fceba46d3aeb8172b13f32ab3893cf5a9f91cb01"/>
-    <project name="third_party/libxml2"
-             path="third_party/libxml2"
-             remote="https://fuchsia.googlesource.com/third_party/libxml2"
-             gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e5377a26d88da83baa8f638afed98b468630fbb6"/>
     <project name="linux-syscall-support"
              path="third_party/linux-syscall-support/src"
              remote="https://chromium.googlesource.com/linux-syscall-support"
@@ -301,7 +295,7 @@
     <project name="llvm-project/libc"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="4d813268ccd5982a0cc180bba15ea68a9cbce595"/>
+             revision="71c6ed21d1c9bd9a83e354e1068da9315de73ba9"/>
     <project name="third_party/luci-go"
              path="third_party/luci-go"
              revision="fd977bf9e01d199a529f28af6dc10fe0fa35d9e7"
@@ -330,7 +324,7 @@
     <project name="third_party/mesa"
              path="third_party/mesa"
              remote="https://fuchsia.googlesource.com/third_party/mesa"
-             revision="5ac635c51e1ae93e0f1ad3586043fdc9d573cd11"
+             revision="488e3abddca47ebb70d4e0fa48c741e711bfc8d9"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/github.com/jd/tenacity"
              path="third_party/github.com/jd/tenacity/src"
@@ -416,12 +410,12 @@
              path="third_party/perfetto"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/perfetto"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="40b529923598b739b2892a536a7692eedbed5685" />
+             revision="4d963b9c6f29901989b692fbb24f1606abc9f999" />
     <project name="third_party/pigweed"
              path="third_party/pigweed/src"
              remote="https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="7ab9a27beaed20f078016276d4a6f043bb77d976"/>
+             revision="3be1c116149fb281d5a8606b27ba4232ddcda174"/>
     <project name="third_party/github.com/google/python_portpicker"
              path="third_party/python_portpicker/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/python_portpicker"
@@ -476,7 +470,7 @@
     <project name="scudo"
              path="third_party/scudo/src"
              remote="https://llvm.googlesource.com/scudo"
-             revision="8695ad12b793f9a832bef986ac77670a4612e64c"/>
+             revision="61d6928d64cef1cda2b0cf743c50a6667a2227a9"/>
     <project name="gwp-asan"
              path="third_party/scudo/gwp_asan"
              remote="https://llvm.googlesource.com/gwp-asan"
@@ -500,7 +494,7 @@
              path="third_party/spirv-tools/src"
              remote="https://fuchsia.googlesource.com/third_party/spirv-tools"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e2089320fed89e2b25fd3c97dd947bd99c2942c7"/>
+             revision="09be116271cd5a8c5b5cbbb2e82db7830e9c34e7"/>
     <project name="third_party/syzkaller"
              path="third_party/syzkaller"
              remote="https://fuchsia.googlesource.com/third_party/syzkaller"
@@ -533,7 +527,7 @@
              path="third_party/openthread"
              remote="https://fuchsia.googlesource.com/third_party/openthread"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="c050c7a7c0e68dcd338bdaea70f04827405e18ae"/>
+             revision="3792ee2217954fafe56ead013a442e307f5309e5"/>
     <project name="third_party/openweave-core"
              path="third_party/openweave-core"
              remote="https://fuchsia.googlesource.com/third_party/openweave-core"
@@ -580,11 +574,6 @@
              remote="https://fuchsia.googlesource.com/third_party/github.com/KhronosGroup/Vulkan-Utility-Libraries"
              revision="aa177d06561b6125afb76c78fe2f7774ee17d4cf"
              gerrithost="https://fuchsia-review.googlesource.com"/>
-    <project name="third_party/wayland"
-             path="third_party/wayland"
-             remote="https://fuchsia.googlesource.com/third_party/wayland"
-             gerrithost="https://fuchsia-review.googlesource.com"
-             revision="9192d3cebd2e7a82aa3dc7cd235fb15ae8a5884d"/>
     <project name="third_party/yxml"
              path="third_party/yxml"
              remote="https://fuchsia.googlesource.com/third_party/yxml"

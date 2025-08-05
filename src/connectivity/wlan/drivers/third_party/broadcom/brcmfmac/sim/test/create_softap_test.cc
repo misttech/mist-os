@@ -7,7 +7,6 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
 
-#include <wifi/wifi-config.h>
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
@@ -16,6 +15,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 
@@ -28,8 +28,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 namespace wlan_ieee80211 = wlan_ieee80211;
 
 constexpr uint16_t kDefaultCh = 149;
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = kDefaultCh, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
 
 class CreateSoftAPTest;

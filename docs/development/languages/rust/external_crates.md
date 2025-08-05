@@ -1,7 +1,7 @@
 # External Rust crates
 
 Fuchsia uses external Rust crates. External Rust crates are placed in
-[`//third-party/rust_crates/vendor`][external-vendor]. This set of crates is
+[`//third_party/rust_crates/vendor`][external-vendor]. This set of crates is
 based on the dependencies listed in
 [`//third_party/rust_crates/Cargo.toml`][external-cargo-toml].
 

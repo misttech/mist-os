@@ -13,41 +13,70 @@
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/ImageBufferUsage`].
-struct ImageBufferUsage {
-  ImageTilingType tiling_type;
+class ImageBufferUsage {
+ private:
+  // Enables creating instances using the designated initializer syntax.
+  struct ConstructorArgs;
+
+ public:
+  // Constructor that enables the designated initializer syntax.
+  //
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  constexpr ImageBufferUsage(const ImageBufferUsage::ConstructorArgs& args);
+
+  explicit constexpr ImageBufferUsage(
+      fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage);
+  explicit constexpr ImageBufferUsage(image_buffer_usage_t banjo_image_buffer_usage);
+
+  constexpr ImageBufferUsage(const ImageBufferUsage&) noexcept = default;
+  constexpr ImageBufferUsage(ImageBufferUsage&&) noexcept = default;
+  constexpr ImageBufferUsage& operator=(const ImageBufferUsage&) noexcept = default;
+  constexpr ImageBufferUsage& operator=(ImageBufferUsage&&) noexcept = default;
+  ~ImageBufferUsage() = default;
+
+  friend constexpr bool operator==(const ImageBufferUsage& lhs, const ImageBufferUsage& rhs);
+  friend constexpr bool operator!=(const ImageBufferUsage& lhs, const ImageBufferUsage& rhs);
+
+  constexpr fuchsia_hardware_display_types::wire::ImageBufferUsage ToFidl() const;
+  constexpr image_buffer_usage_t ToBanjo() const;
+
+  constexpr ImageTilingType tiling_type() const { return tiling_type_; }
+
+ private:
+  struct ConstructorArgs {
+    ImageTilingType tiling_type;
+  };
+
+  ImageTilingType tiling_type_;
 };
 
+constexpr ImageBufferUsage::ImageBufferUsage(const ImageBufferUsage::ConstructorArgs& args)
+    : tiling_type_(args.tiling_type) {}
+
+constexpr ImageBufferUsage::ImageBufferUsage(
+    fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage)
+    : tiling_type_(fidl_image_buffer_usage.tiling_type) {}
+
+constexpr ImageBufferUsage::ImageBufferUsage(image_buffer_usage_t banjo_image_buffer_usage)
+    : tiling_type_(banjo_image_buffer_usage.tiling_type) {}
+
 constexpr bool operator==(const ImageBufferUsage& lhs, const ImageBufferUsage& rhs) {
-  return lhs.tiling_type == rhs.tiling_type;
+  return lhs.tiling_type_ == rhs.tiling_type_;
 }
 
 constexpr bool operator!=(const ImageBufferUsage& lhs, const ImageBufferUsage& rhs) {
   return !(lhs == rhs);
 }
 
-constexpr ImageBufferUsage ToImageBufferUsage(
-    fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage) {
-  return ImageBufferUsage{
-      .tiling_type = ImageTilingType(fidl_image_buffer_usage.tiling_type),
-  };
-}
-
-constexpr ImageBufferUsage ToImageBufferUsage(image_buffer_usage_t banjo_image_buffer_usage) {
-  return ImageBufferUsage{
-      .tiling_type = ImageTilingType(banjo_image_buffer_usage.tiling_type),
-  };
-}
-
-constexpr fuchsia_hardware_display_types::wire::ImageBufferUsage ToFidlImageBufferUsage(
-    const ImageBufferUsage& image_buffer_usage) {
+constexpr fuchsia_hardware_display_types::wire::ImageBufferUsage ImageBufferUsage::ToFidl() const {
   return fuchsia_hardware_display_types::wire::ImageBufferUsage{
-      .tiling_type = image_buffer_usage.tiling_type.ToFidl(),
+      .tiling_type = tiling_type_.ToFidl(),
   };
 }
 
-constexpr image_buffer_usage_t ToBanjoImageBufferUsage(const ImageBufferUsage& image_buffer_usage) {
+constexpr image_buffer_usage_t ImageBufferUsage::ToBanjo() const {
   return image_buffer_usage_t{
-      .tiling_type = image_buffer_usage.tiling_type.ToBanjo(),
+      .tiling_type = tiling_type_.ToBanjo(),
   };
 }
 

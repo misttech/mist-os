@@ -4,6 +4,7 @@
 
 #include "src/performance/trace2json/trace_parser.h"
 
+#include <fstream>
 #include <sstream>
 
 #include <gtest/gtest.h>
@@ -12,9 +13,9 @@ namespace {
 
 TEST(TraceParserTest, InvalidTrace) {
   std::istringstream input("asdfasdfasdfasdfasdf");
-  std::ostringstream output;
+  const std::filesystem::path& output = "test-trace-invalid.json";
 
-  tracing::FuchsiaTraceParser parser(&output);
+  tracing::FuchsiaTraceParser parser(output);
   EXPECT_FALSE(parser.ParseComplete(&input));
 }
 
@@ -26,9 +27,10 @@ TEST(TraceParserTest, InvalidTrace) {
 // but we can reproduce the same problem with a zero-size file.
 TEST(TraceParserTest, EndOfFile) {
   std::istringstream input("");
-  std::ostringstream output;
+  const std::filesystem::path& output = "test-trace.json";
+  ;
 
-  tracing::FuchsiaTraceParser parser(&output);
+  tracing::FuchsiaTraceParser parser(output);
   EXPECT_TRUE(parser.ParseComplete(&input));
 }
 

@@ -112,6 +112,13 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
 
    private:
+    // EndpointServer overrides
+    void OnUnbound(fidl::UnbindInfo info,
+                   fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) override {
+      CancelAll(ZX_ERR_IO_NOT_PRESENT);
+      usb::EndpointServer::OnUnbound(info, std::move(server_end));
+    }
+
     // fuchsia_hardware_usb_endpoint::Endpoint protocol implementation.
     void GetInfo(GetInfoCompleter::Sync& completer) override;
     void QueueRequests(QueueRequestsRequest& request,
@@ -229,6 +236,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
     fuchsia_hardware_usb_descriptor::wire::UsbSpeed cur_speed{
         fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined};
+    bool transfer_in_progress_ = false;
   };
 
   constexpr bool is_ep0_num(uint8_t ep_num) { return ((ep_num == kEp0Out) || (ep_num == kEp0In)); }

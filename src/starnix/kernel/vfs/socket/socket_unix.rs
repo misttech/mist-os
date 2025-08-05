@@ -12,8 +12,9 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
 };
 use crate::vfs::socket::{
-    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketFile, SocketHandle, SocketMessageFlags,
-    SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
+    AcceptQueue, SockOptValue, Socket, SocketAddress, SocketDomain, SocketFile, SocketHandle,
+    SocketMessageFlags, SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
+    DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
@@ -24,12 +25,11 @@ use ebpf::{
 };
 use ebpf_api::{
     get_socket_filter_helpers, LoadBytesBase, MapValueRef, MapsContext, PinnedMap, ProgramType,
-    SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
+    SocketCookieContext, SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
 use starnix_uapi::file_mode::Access;
 use starnix_uapi::open_flags::OpenFlags;
@@ -38,7 +38,8 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     __sk_buff, errno, error, gid_t, socklen_t, uapi, ucred, uid_t, FIONREAD, SOL_SOCKET,
     SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK,
-    SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
+    SO_PASSCRED, SO_PASSSEC, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
+    SO_SNDBUF,
 };
 use std::sync::Arc;
 use zerocopy::IntoBytes;
@@ -114,6 +115,9 @@ struct UnixSocketInner {
     /// See SO_PASSCRED.
     pub passcred: bool,
 
+    /// See SO_PASSSEC.
+    pub passsec: bool,
+
     /// See SO_BROADCAST.
     pub broadcast: bool,
 
@@ -152,6 +156,7 @@ impl UnixSocket {
                 peer_closed_with_unread_data: false,
                 linger: uapi::linger::default(),
                 passcred: false,
+                passsec: false,
                 broadcast: false,
                 no_check: false,
                 reuseaddr: false,
@@ -180,7 +185,7 @@ impl UnixSocket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let credentials = current_task.as_ucred();
+        let credentials = current_task.current_ucred();
         let left = Socket::new(
             locked,
             current_task,
@@ -266,7 +271,7 @@ impl UnixSocket {
         )?;
         security::unix_stream_connect(current_task, socket, peer, &server)?;
         client.state = UnixSocketState::Connected(server.clone());
-        client.credentials = Some(current_task.as_ucred());
+        client.credentials = Some(current_task.current_ucred());
         {
             let mut server = downcast_socket_to_unix(&server).lock();
             server.state = UnixSocketState::Connected(socket.clone());
@@ -274,6 +279,7 @@ impl UnixSocket {
             server.messages.set_capacity(listener.messages.capacity())?;
             server.credentials = listener.credentials.clone();
             server.passcred = listener.passcred;
+            server.passsec = listener.passsec;
         }
 
         // We already checked that the socket is in Listening state...but the borrow checker cannot
@@ -377,6 +383,16 @@ impl UnixSocket {
     fn set_passcred(&self, passcred: bool) {
         let mut inner = self.lock();
         inner.passcred = passcred;
+    }
+
+    fn get_passsec(&self) -> bool {
+        let inner = self.lock();
+        inner.passsec
+    }
+
+    fn set_passsec(&self, passsec: bool) {
+        let mut inner = self.lock();
+        inner.passsec = passsec;
     }
 
     fn get_broadcast(&self) -> bool {
@@ -600,8 +616,14 @@ impl SocketOps for UnixSocket {
         let unix_socket = downcast_socket_to_unix(&peer);
         let mut peer = unix_socket.lock();
         if peer.passcred {
-            let creds = creds.unwrap_or_else(|| current_task.as_ucred());
+            let creds = creds.unwrap_or_else(|| current_task.current_ucred());
             ancillary_data.push(AncillaryData::Unix(UnixControlData::Credentials(creds)));
+        }
+        if peer.passsec {
+            // TODO: https://fxbug.dev/364568855 - Store the opaque LSM property value, and expand
+            // it to a string upon readmsg.
+            let context = security::socket_getpeersec_dgram(current_task, socket);
+            ancillary_data.push(AncillaryData::Unix(UnixControlData::Security(context.into())));
         }
         peer.write(locked, current_task, data, local_address, ancillary_data, socket.socket_type)
     }
@@ -766,58 +788,59 @@ impl SocketOps for UnixSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     // See StreamUnixSocketPairTest.SetSocketSendBuf for why we multiply by 2 here.
                     self.set_send_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     self.set_receive_capacity(requested_capacity as usize);
                 }
                 SO_LINGER => {
-                    let mut linger: uapi::linger =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let mut linger: uapi::linger = optval.read(current_task)?;
                     if linger.l_onoff != 0 {
                         linger.l_onoff = 1;
                     }
                     self.set_linger(linger);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = optval.read(current_task)?;
                     self.set_passcred(passcred != 0);
                 }
+                SO_PASSSEC => {
+                    let passsec: u32 = optval.read(current_task)?;
+                    self.set_passsec(passsec != 0);
+                }
                 SO_BROADCAST => {
-                    let broadcast: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let broadcast: u32 = optval.read(current_task)?;
                     self.set_broadcast(broadcast != 0);
                 }
                 SO_NO_CHECK => {
-                    let no_check: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let no_check: u32 = optval.read(current_task)?;
                     self.set_no_check(no_check != 0);
                 }
                 SO_REUSEADDR => {
-                    let reuseaddr: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let reuseaddr: u32 = optval.read(current_task)?;
                     self.set_reuseaddr(reuseaddr != 0);
                 }
                 SO_REUSEPORT => {
-                    let reuseport: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let reuseport: u32 = optval.read(current_task)?;
                     self.set_reuseport(reuseport != 0);
                 }
                 SO_KEEPALIVE => {
-                    let keepalive: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let keepalive: u32 = optval.read(current_task)?;
                     self.set_keepalive(keepalive != 0);
                 }
 
                 SO_ATTACH_BPF => {
                     #[cfg(not(feature = "starnix_lite"))]
                     {
-                        let fd: FdNumber = current_task.read_object(user_opt.try_into()?)?;
+                        let fd: FdNumber = optval.read(current_task)?;
                         let object = get_bpf_object(current_task, fd)?;
                         let program = object.as_program()?;
 
@@ -869,6 +892,7 @@ impl SocketOps for UnixSocket {
                 SO_RCVBUF => Ok((self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec()),
                 SO_LINGER => Ok(self.get_linger().as_bytes().to_vec()),
                 SO_PASSCRED => Ok((self.get_passcred() as u32).as_bytes().to_vec()),
+                SO_PASSSEC => Ok((self.get_passsec() as u32).as_bytes().to_vec()),
                 SO_BROADCAST => Ok((self.get_broadcast() as u32).as_bytes().to_vec()),
                 SO_NO_CHECK => Ok((self.get_no_check() as u32).as_bytes().to_vec()),
                 SO_REUSEADDR => Ok((self.get_reuseaddr() as u32).as_bytes().to_vec()),
@@ -1106,21 +1130,22 @@ impl<'a> MapsContext<'a> for UnixSocketEbpfHelpersContext<'a> {
     }
 }
 
-impl<'a> SocketFilterContext for UnixSocketEbpfHelpersContext<'a> {
-    type SkBuf<'b> = SkBuf;
-    fn get_socket_uid(&self, _sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
+impl<'a, 'b> SocketCookieContext<&'a mut SkBuf> for UnixSocketEbpfHelpersContext<'b> {
+    fn get_socket_cookie(&self, _sk_buf: &'a mut SkBuf) -> u64 {
+        track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_get_socket_cookie");
+        0
+    }
+}
+
+impl<'a, 'b> SocketFilterContext<&'a mut SkBuf> for UnixSocketEbpfHelpersContext<'b> {
+    fn get_socket_uid(&self, _sk_buf: &'a mut SkBuf) -> Option<uid_t> {
         track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_get_socket_uid");
         None
     }
 
-    fn get_socket_cookie(&self, _sk_buf: &Self::SkBuf<'_>) -> u64 {
-        track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_get_socket_cookie");
-        0
-    }
-
     fn load_bytes_relative(
         &self,
-        _sk_buf: &Self::SkBuf<'_>,
+        _sk_buf: &'a mut SkBuf,
         _base: LoadBytesBase,
         _offset: usize,
         _buf: &mut [u8],
@@ -1151,6 +1176,7 @@ mod tests {
     use super::*;
     use crate::mm::MemoryAccessor;
     use crate::testing::*;
+    use starnix_types::user_buffer::UserBuffer;
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {
@@ -1196,7 +1222,7 @@ mod tests {
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
         server_socket
-            .setsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
+            .setsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer.into())
             .unwrap();
 
         let opt_bytes =

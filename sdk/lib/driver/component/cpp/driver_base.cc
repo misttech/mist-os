@@ -72,6 +72,20 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
 #endif
 }
 
+void DriverBase::RegisterInitMethods(InitMethodCallback cb) {
+  init_methods_.push_back(std::move(cb));
+}
+
+zx::result<> DriverBase::RunInitMethods() {
+  for (auto& method : init_methods_) {
+    zx::result result = method(dispatcher(), *incoming());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  return zx::ok();
+}
+
 void DriverBase::InitializeAndServe(
     Namespace incoming, fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request) {
   incoming_ = std::make_shared<Namespace>(std::move(incoming));

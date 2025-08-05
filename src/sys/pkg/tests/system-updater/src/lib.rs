@@ -6,8 +6,12 @@
 #![cfg(test)]
 
 use self::SystemUpdaterInteraction::*;
+use ::update_package::images::AssetType;
+use ::update_package::manifest::{self, OtaManifestV1};
 use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
+use blobfs_ramdisk::BlobfsRamdisk;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_update_installer_ext::{
     start_update, Initiator, Options, UpdateAttempt, UpdateAttemptError,
@@ -27,16 +31,18 @@ use mock_reboot::MockRebootService;
 use mock_resolver::MockResolverService;
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 use zx::Status;
+
 use {
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_paver as paver,
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
+    fidl_fuchsia_net_http as fhttp, fidl_fuchsia_paver as paver, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg_internal as fpkg_internal, fidl_fuchsia_space as fspace,
     fidl_fuchsia_update_installer as finstaller, fuchsia_async as fasync,
 };
 
@@ -93,6 +99,27 @@ pub fn make_images_json_recovery() -> String {
     .unwrap()
 }
 
+fn make_manifest(
+    blobs: impl IntoIterator<Item = ::update_package::manifest::Blob>,
+) -> OtaManifestV1 {
+    OtaManifestV1 {
+        board: "x64".to_string(),
+        epoch: SOURCE_EPOCH,
+        mode: ::update_package::UpdateMode::Normal,
+        images: vec![manifest::Image {
+            fuchsia_merkle_root: hash(9),
+            sha256: EMPTY_SHA256.parse().unwrap(),
+            size: 0,
+            slot: manifest::Slot::AB,
+            image_type: manifest::ImageType::Asset(AssetType::Zbi),
+            delivery_blob_type: 1,
+        }],
+        blobs: blobs.into_iter().collect(),
+        blob_base_url: "http://fuchsia.com/blobs".parse().unwrap(),
+        build_version: "1.2.3.4".parse().unwrap(),
+    }
+}
+
 // A set of tags for interactions the system updater has with external services.
 // We aren't tracking Cobalt interactions, since those may arrive out of order,
 // and they are tested in individual tests which care about them specifically.
@@ -105,6 +132,14 @@ enum SystemUpdaterInteraction {
     Reboot,
     ClearRetainedPackages,
     ReplaceRetainedPackages(Vec<fidl_fuchsia_pkg_ext::BlobId>),
+    ClearRetainedBlobs,
+    ReplaceRetainedBlobs(Vec<fidl_fuchsia_pkg_ext::BlobId>),
+    OtaDownloader(OtaDownloaderEvent),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum OtaDownloaderEvent {
+    FetchBlob(fidl_fuchsia_pkg_ext::BlobId),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -116,6 +151,9 @@ enum Protocol {
     Reboot,
     FuchsiaMetrics,
     RetainedPackages,
+    RetainedBlobs,
+    OtaDownloader,
+    HttpLoader,
 }
 
 type SystemUpdaterInteractions = Arc<Mutex<Vec<SystemUpdaterInteraction>>>;
@@ -126,6 +164,8 @@ struct TestEnvBuilder {
     mount_data: bool,
     history: Option<serde_json::Value>,
     system_image_hash: Option<fuchsia_hash::Hash>,
+    ota_manifest: Option<OtaManifestV1>,
+    blobs: HashMap<Hash, Vec<u8>>,
 }
 
 impl TestEnvBuilder {
@@ -136,6 +176,8 @@ impl TestEnvBuilder {
             mount_data: true,
             history: None,
             system_image_hash: None,
+            ota_manifest: None,
+            blobs: HashMap::new(),
         }
     }
 
@@ -163,6 +205,16 @@ impl TestEnvBuilder {
         self
     }
 
+    fn ota_manifest(mut self, manifest: OtaManifestV1) -> Self {
+        self.ota_manifest = Some(manifest);
+        self
+    }
+
+    fn blob(mut self, hash: Hash, content: Vec<u8>) -> Self {
+        self.blobs.insert(hash, content);
+        self
+    }
+
     async fn build(self) -> TestEnv {
         let Self {
             paver_service_builder,
@@ -170,6 +222,8 @@ impl TestEnvBuilder {
             mount_data,
             history,
             system_image_hash,
+            ota_manifest,
+            blobs,
         } = self;
 
         let test_dir = TempDir::new().expect("create test tempdir");
@@ -217,6 +271,11 @@ impl TestEnvBuilder {
             fs.add_remote("system", system);
         }
 
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
+        let blobfs = Arc::new(blobfs);
+        fs.add_remote("blob", blobfs.root_dir_handle().unwrap().into_proxy());
+        fs.add_remote("blob-svc", blobfs.svc_dir().unwrap().unwrap());
+
         // A buffer to store all the interactions the system-updater has with external services.
         let interactions = Arc::new(Mutex::new(vec![]));
         let interactions_paver_clone = Arc::clone(&interactions);
@@ -255,6 +314,14 @@ impl TestEnvBuilder {
         let space_service = Arc::new(MockSpaceService::new(Arc::clone(&interactions)));
         let retained_packages_service =
             Arc::new(MockRetainedPackagesService::new(Arc::clone(&interactions)));
+        let retained_blobs_service =
+            Arc::new(MockRetainedBlobsService::new(Arc::clone(&interactions)));
+        let ota_downloader_service = Arc::new(MockOtaDownloaderService::new(
+            Arc::clone(&interactions),
+            blobs,
+            Arc::clone(&blobfs),
+        ));
+        let http_loader_service = Arc::new(MockHttpLoaderService::new(ota_manifest));
 
         // Register the mock services with the test environment service provider.
         {
@@ -265,6 +332,9 @@ impl TestEnvBuilder {
             let logger_factory = Arc::clone(&logger_factory);
             let space_service = Arc::clone(&space_service);
             let retained_packages_service = Arc::clone(&retained_packages_service);
+            let retained_blobs_service = Arc::clone(&retained_blobs_service);
+            let ota_downloader_service = Arc::clone(&ota_downloader_service);
+            let http_loader_service = Arc::clone(&http_loader_service);
 
             let should_register = |protocol: Protocol| !blocked_protocols.contains(&protocol);
 
@@ -338,6 +408,42 @@ impl TestEnvBuilder {
                     .detach()
                 });
             }
+            if should_register(Protocol::RetainedBlobs) {
+                fs.dir("svc").add_fidl_service(move |stream| {
+                    fasync::Task::spawn(
+                        Arc::clone(&retained_blobs_service)
+                            .run_retained_blobs_service(stream)
+                            .unwrap_or_else(|e| {
+                                panic!("error running retained blobs service: {e:?}")
+                            }),
+                    )
+                    .detach()
+                });
+            }
+            if should_register(Protocol::OtaDownloader) {
+                fs.dir("svc").add_fidl_service(
+                    move |stream: fpkg_internal::OtaDownloaderRequestStream| {
+                        fasync::Task::spawn(
+                            Arc::clone(&ota_downloader_service)
+                                .run_ota_downloader_service(stream)
+                                .unwrap_or_else(|e| {
+                                    panic!("error running ota downloader service: {e:?}")
+                                }),
+                        )
+                        .detach()
+                    },
+                );
+            }
+            if should_register(Protocol::HttpLoader) {
+                fs.dir("svc").add_fidl_service(move |stream: fhttp::LoaderRequestStream| {
+                    fasync::Task::spawn(
+                        Arc::clone(&http_loader_service)
+                            .run_http_loader_service(stream)
+                            .unwrap_or_else(|e| panic!("error running http loader service: {e:?}")),
+                    )
+                    .detach()
+                });
+            }
         }
 
         let fs_holder = Mutex::new(Some(fs));
@@ -398,10 +504,21 @@ impl TestEnvBuilder {
                     .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
                     .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
+                    .capability(Capability::protocol::<fpkg::RetainedBlobsMarker>())
+                    .capability(Capability::protocol::<fhttp::LoaderMarker>())
+                    .capability(Capability::protocol::<fpkg_internal::OtaDownloaderMarker>())
                     .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(Capability::protocol::<
                         fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
                     >())
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobCreatorMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobCreatorMarker::PROTOCOL_NAME)),
+                    )
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobReaderMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobReaderMarker::PROTOCOL_NAME)),
+                    )
                     .capability(
                         Capability::directory("build-info")
                             .path("/config/build-info")
@@ -441,6 +558,12 @@ impl TestEnvBuilder {
                 .unwrap();
         }
 
+        builder.init_mutable_config_from_package(&system_updater).await.unwrap();
+        builder
+            .set_config_value(&system_updater, "allow_packageless_update", true.into())
+            .await
+            .unwrap();
+
         let realm_instance = builder.build().await.unwrap();
 
         TestEnv {
@@ -455,6 +578,7 @@ impl TestEnvBuilder {
             data_path,
             build_info_path,
             interactions,
+            _blobfs: blobfs,
         }
     }
 }
@@ -471,6 +595,7 @@ struct TestEnv {
     data_path: PathBuf,
     build_info_path: PathBuf,
     interactions: SystemUpdaterInteractions,
+    _blobfs: Arc<BlobfsRamdisk>,
 }
 
 impl TestEnv {
@@ -534,6 +659,10 @@ impl TestEnv {
 
     async fn run_update(&self) -> Result<(), Error> {
         self.run_update_with_options(UPDATE_PKG_URL, default_options()).await
+    }
+
+    async fn run_packageless_update(&self) -> Result<(), Error> {
+        self.run_update_with_options(MANIFEST_URL, default_options()).await
     }
 
     async fn run_update_with_options(&self, url: &str, options: Options) -> Result<(), Error> {
@@ -646,7 +775,7 @@ impl MockRetainedPackagesService {
                     responder.send().unwrap();
                 }
                 fidl_fuchsia_pkg::RetainedPackagesRequest::Replace { iterator, responder } => {
-                    let blobs = Self::collect_blob_id_iterator(iterator.into_proxy()).await;
+                    let blobs = collect_blob_id_iterator(iterator.into_proxy()).await;
                     self.interactions.lock().push(ReplaceRetainedPackages(blobs));
                     responder.send().unwrap();
                 }
@@ -655,19 +784,129 @@ impl MockRetainedPackagesService {
 
         Ok(())
     }
+}
 
-    async fn collect_blob_id_iterator(
-        iterator: fpkg::BlobIdIteratorProxy,
-    ) -> Vec<fidl_fuchsia_pkg_ext::BlobId> {
-        let mut blobs = vec![];
-        loop {
-            let new_blobs = iterator.next().await.unwrap();
-            if new_blobs.is_empty() {
-                break;
+struct MockRetainedBlobsService {
+    interactions: SystemUpdaterInteractions,
+}
+impl MockRetainedBlobsService {
+    fn new(interactions: SystemUpdaterInteractions) -> Self {
+        Self { interactions }
+    }
+
+    async fn run_retained_blobs_service(
+        self: Arc<Self>,
+        mut stream: fidl_fuchsia_pkg::RetainedBlobsRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(event) = stream.try_next().await.expect("received request") {
+            match event {
+                fidl_fuchsia_pkg::RetainedBlobsRequest::Clear { responder } => {
+                    self.interactions.lock().push(ClearRetainedBlobs);
+                    responder.send().unwrap();
+                }
+                fidl_fuchsia_pkg::RetainedBlobsRequest::Replace { iterator, responder } => {
+                    let blobs = collect_blob_id_iterator(iterator.into_proxy()).await;
+                    self.interactions.lock().push(ReplaceRetainedBlobs(blobs));
+                    responder.send().unwrap();
+                }
             }
-            blobs.extend(new_blobs.into_iter().map(fidl_fuchsia_pkg_ext::BlobId::from));
         }
-        blobs
+
+        Ok(())
+    }
+}
+
+async fn collect_blob_id_iterator(
+    iterator: fpkg::BlobIdIteratorProxy,
+) -> Vec<fidl_fuchsia_pkg_ext::BlobId> {
+    let mut blobs = vec![];
+    loop {
+        let new_blobs = iterator.next().await.unwrap();
+        if new_blobs.is_empty() {
+            break;
+        }
+        blobs.extend(new_blobs.into_iter().map(fidl_fuchsia_pkg_ext::BlobId::from));
+    }
+    blobs
+}
+
+struct MockOtaDownloaderService {
+    interactions: SystemUpdaterInteractions,
+    blobs: HashMap<Hash, Vec<u8>>,
+    blobfs: Arc<BlobfsRamdisk>,
+}
+
+impl MockOtaDownloaderService {
+    fn new(
+        interactions: SystemUpdaterInteractions,
+        blobs: HashMap<Hash, Vec<u8>>,
+        blobfs: Arc<BlobfsRamdisk>,
+    ) -> Self {
+        Self { interactions, blobs, blobfs }
+    }
+
+    async fn run_ota_downloader_service(
+        self: Arc<Self>,
+        mut stream: fpkg_internal::OtaDownloaderRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(event) = stream.try_next().await? {
+            match event {
+                fpkg_internal::OtaDownloaderRequest::FetchBlob { hash, responder, .. } => {
+                    self.interactions
+                        .lock()
+                        .push(OtaDownloader(OtaDownloaderEvent::FetchBlob(hash.into())));
+                    let hash = fidl_fuchsia_pkg_ext::BlobId::from(hash).into();
+                    if let Some(content) = self.blobs.get(&hash) {
+                        let () = self.blobfs.write_blob(hash, content).await.unwrap();
+                        responder.send(Ok(()))?;
+                    } else {
+                        responder.send(Err(fpkg::ResolveError::BlobNotFound))?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+struct MockHttpLoaderService {
+    manifest: Option<OtaManifestV1>,
+}
+
+impl MockHttpLoaderService {
+    fn new(manifest: Option<OtaManifestV1>) -> Self {
+        Self { manifest }
+    }
+
+    async fn run_http_loader_service(
+        self: Arc<Self>,
+        mut stream: fhttp::LoaderRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(event) = stream.try_next().await? {
+            match event {
+                fhttp::LoaderRequest::Fetch { request, responder } => {
+                    let url = request.url.unwrap();
+                    assert_eq!(url, MANIFEST_URL);
+                    let versioned_manifest = self.manifest.clone().unwrap().into_versioned();
+                    let manifest_json = serde_json::to_vec(&versioned_manifest).unwrap();
+                    let (client, server) = zx::Socket::create_stream();
+                    let mut server = fasync::Socket::from_socket(server);
+                    fasync::Task::spawn(
+                        async move { server.write_all(&manifest_json).await.unwrap() },
+                    )
+                    .detach();
+
+                    let response = fhttp::Response {
+                        body: Some(client),
+                        status_code: Some(200),
+                        ..Default::default()
+                    };
+                    responder.send(response).context("send failed")?;
+                }
+                request => panic!("unsupported http loader request {request:?}"),
+            }
+        }
+        Ok(())
     }
 }
 
@@ -757,6 +996,7 @@ const UPDATE_HASH: &str = "00112233445566778899aabbccddeeffffeeddccbbaa998877665
 const SYSTEM_IMAGE_HASH: &str = "42ade6f4fd51636f70c68811228b4271ed52c4eb9a647305123b4f4d0741f296";
 const SYSTEM_IMAGE_URL: &str = "fuchsia-pkg://fuchsia.com/system_image/0?hash=42ade6f4fd51636f70c68811228b4271ed52c4eb9a647305123b4f4d0741f296";
 const UPDATE_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/update";
+const MANIFEST_URL: &str = "https://fuchsia.com/ota.json";
 const UPDATE_PKG_URL_PINNED: &str = "fuchsia-pkg://fuchsia.com/update?hash=00112233445566778899aabbccddeeffffeeddccbbaa99887766554433221100";
 
 fn resolved_urls(interactions: SystemUpdaterInteractions) -> Vec<String> {

@@ -40,7 +40,7 @@ static const std::vector<fpbus::Mmio> astro_video_mmios{
     }},
     {{
         .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
     {{
         .base = S905D2_DMC_BASE,

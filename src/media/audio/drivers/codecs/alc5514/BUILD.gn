@@ -24,7 +24,7 @@ fuchsia_cc_driver("alc5514-driver") {
   sources = [ "alc5514.cc" ]
   deps = [
     ":alc5514_bind",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

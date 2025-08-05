@@ -7,7 +7,7 @@
 
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl_test_base.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <string>
 
@@ -33,7 +33,7 @@ class FakeFocuser : public fuchsia::ui::views::testing::Focuser_TestBase {
   }
 
   void NotImplemented_(const std::string& name) override {
-    FX_LOGF(ERROR, nullptr, "FakeFocuser does not implement %s", name.c_str());
+    FX_LOGS(ERROR) << "FakeFocuser does not implement " << name;
   }
 
   bool request_focus_called_ = false;

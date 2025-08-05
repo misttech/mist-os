@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_pkg as fpkg;
 use hmac::Mac as _;
-use rand::Rng as _;
 
 /// Creates and authenticates `fidl_fuchsia_pkg::ResolutionContext`s using an HMAC.
 /// The contexts contain the hash of the superpackage.
@@ -22,7 +21,7 @@ impl ContextAuthenticator {
     /// Create a ContextAuthenticator initialized with a random secret key.
     pub(crate) fn new() -> Self {
         let mut secret = [0; SECRET_LEN];
-        let () = rand::thread_rng().fill(&mut secret[..]);
+        let () = rand::fill(&mut secret[..]);
         Self::from_secret(secret)
     }
 

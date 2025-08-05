@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_self_permission, task_effective_sid, todo_check_permission,
+    check_self_permission, current_task_state, todo_check_permission,
 };
 use crate::task::CurrentTask;
 use crate::TODO_DENY;
@@ -17,7 +17,7 @@ pub fn binder_set_context_mgr(
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
-    let sid = task_effective_sid(current_task);
+    let sid = current_task_state(current_task).lock().current_sid;
     check_self_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
@@ -35,7 +35,7 @@ pub fn binder_transaction(
     target_task: &Task,
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     let target_sid = target_task.security_state.lock().current_sid;
     todo_check_permission(
         TODO_DENY!("https://fxbug.dev/427888888", "Enforce call check."),

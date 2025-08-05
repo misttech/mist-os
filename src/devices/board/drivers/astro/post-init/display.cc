@@ -59,7 +59,7 @@ static const std::vector<fpbus::Mmio> display_mmios{
         // AOBUS
         // TODO(https://fxbug.dev/42081392): Restrict range to RTI
         .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
+        .length = 0x1000,
         .name = "always-on-rti",
     }},
     {{

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_RUNTIME_MODULE_H_
-#define LIB_DL_RUNTIME_MODULE_H_
+#ifndef LIB_C_DLFCN_DL_RUNTIME_MODULE_H_
+#define LIB_C_DLFCN_DL_RUNTIME_MODULE_H_
 
 // Avoid symbol conflict between <ld/abi/abi.h> and <link.h>
 #pragma push_macro("_r_debug")
@@ -13,6 +13,7 @@
 #pragma pop_macro("_r_debug")
 
 #include <lib/elfldltl/alloc-checker-container.h>
+#include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/abi.h>
@@ -108,6 +109,13 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   constexpr const Soname& name() const { return name_; }
 
+  // Translate a void * pointer, as when passed to public-facing <dlfcn.h> APIs,
+  // into a RuntimeModule reference.
+  static constexpr const RuntimeModule& FromPtr(const void* ptr) {
+    return *static_cast<const RuntimeModule*>(ptr);
+  }
+  static constexpr RuntimeModule& FromPtr(void* ptr) { return *static_cast<RuntimeModule*>(ptr); }
+
   // TODO(https://fxbug.dev/333920495): pass in the symbolizer_modid.
   [[nodiscard]] static std::unique_ptr<RuntimeModule> Create(fbl::AllocChecker& ac, Soname soname) {
     auto result = [&ac](std::unique_ptr<RuntimeModule> v) {
@@ -161,6 +169,16 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
 
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
+
+  constexpr const ld::abi::Abi<>::LinkMap& link_map() const { return abi_module_.link_map; }
+
+  // The ld::abi::Abi<>::LinkMap embedded in the RuntimeModule's ABI module is
+  // compatible with `struct link_map` (see <lib/elfldltl/svr4-abi.h>). This
+  // will cast the module's LinkMap into the `struct link_map` type used by
+  // users of the public-facing <dlfcn.h> API.
+  const struct link_map* user_link_map() const {
+    return reinterpret_cast<const struct link_map*>(&link_map());
+  }
 
   constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
 
@@ -258,4 +276,4 @@ using ModuleTree = decltype(std::declval<RuntimeModule>().module_tree());
 
 }  // namespace dl
 
-#endif  // LIB_DL_RUNTIME_MODULE_H_
+#endif  // LIB_C_DLFCN_DL_RUNTIME_MODULE_H_

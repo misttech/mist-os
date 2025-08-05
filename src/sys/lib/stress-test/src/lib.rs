@@ -22,8 +22,8 @@ use std::time::Duration;
 
 /// Use entropy to generate a random seed
 pub fn random_seed() -> u64 {
-    let mut temp_rng = SmallRng::from_entropy();
-    temp_rng.gen()
+    let mut temp_rng = SmallRng::from_os_rng();
+    temp_rng.random()
 }
 
 /// Runs the test loop for the given environment to completion.

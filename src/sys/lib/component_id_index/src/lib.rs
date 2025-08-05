@@ -263,7 +263,7 @@ mod tests {
 
         let mut index = Index::default();
         let moniker = ["foo"].try_into().unwrap();
-        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let instance_id = InstanceId::new_random(&mut rand::rng());
         index.insert(moniker, instance_id).unwrap();
 
         ctx.merge(Utf8Path::new("/random/file/path"), &index)?;
@@ -276,7 +276,7 @@ mod tests {
         let source1 = Utf8Path::new("/a/b/c");
         let source2 = Utf8Path::new("/d/e/f");
 
-        let id = InstanceId::new_random(&mut rand::thread_rng());
+        let id = InstanceId::new_random(&mut rand::rng());
         let index1 = {
             let mut index = Index::default();
             let moniker = ["foo"].try_into().unwrap();
@@ -314,13 +314,13 @@ mod tests {
         let moniker: Moniker = ["foo"].try_into().unwrap();
         let index1 = {
             let mut index = Index::default();
-            let id = InstanceId::new_random(&mut rand::thread_rng());
+            let id = InstanceId::new_random(&mut rand::rng());
             index.insert(moniker.clone(), id).unwrap();
             index
         };
         let index2 = {
             let mut index = Index::default();
-            let id = InstanceId::new_random(&mut rand::thread_rng());
+            let id = InstanceId::new_random(&mut rand::rng());
             index.insert(moniker.clone(), id).unwrap();
             index
         };
@@ -414,7 +414,7 @@ mod tests {
             let mut index = Index::default();
             for i in 0..5 {
                 let moniker: Moniker = [i.to_string().as_str()].try_into().unwrap();
-                let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+                let instance_id = InstanceId::new_random(&mut rand::rng());
                 index.insert(moniker, instance_id).unwrap();
             }
             index

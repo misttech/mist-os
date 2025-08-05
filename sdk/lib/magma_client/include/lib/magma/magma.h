@@ -81,7 +81,7 @@ MAGMA_EXPORT magma_status_t magma_enumerate_devices(
     uint32_t* device_count_inout,
     uint32_t device_path_size,
     char* device_paths_out)
-MAGMA_AVAILABLE_SINCE(NEXT);
+MAGMA_AVAILABLE_SINCE(28);
 
 ///
 /// \brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either

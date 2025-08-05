@@ -8,7 +8,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 
+#include "fidl/fuchsia.io/cpp/fidl.h"
 #include "fidl/fuchsia.netemul.guest/cpp/wire_types.h"
+#include "fidl/fuchsia.virtualization.guest.interaction/cpp/fidl.h"
 #include "fidl/fuchsia.virtualization/cpp/markers.h"
 #include "lib/fidl/cpp/wire/status.h"
 
@@ -37,22 +39,20 @@ bool GuestImpl::IsShutdown() const { return shutdown_; }
 
 void GuestImpl::PutFile(PutFileRequestView request, PutFileCompleter::Sync& completer) {
   CheckGuestValidForGuestFIDLMethod("PutFile");
-  guest_interaction_client_.Put(
-      fidl::InterfaceHandle<fuchsia::io::File>(request->local_file.TakeChannel()),
-      std::string(request->remote_path.get()),
-      [completer = completer.ToAsync()](zx_status_t put_result) mutable {
-        completer.Reply(put_result);
-      });
+  guest_interaction_client_.Put(fidl::ClientEnd<fuchsia_io::File>(request->local_file.TakeHandle()),
+                                std::string(request->remote_path.get()),
+                                [completer = completer.ToAsync()](zx_status_t put_result) mutable {
+                                  completer.Reply(put_result);
+                                });
 }
 
 void GuestImpl::GetFile(GetFileRequestView request, GetFileCompleter::Sync& completer) {
   CheckGuestValidForGuestFIDLMethod("GetFile");
-  guest_interaction_client_.Get(
-      std::string(request->remote_path.get()),
-      fidl::InterfaceHandle<fuchsia::io::File>(request->local_file.TakeChannel()),
-      [completer = completer.ToAsync()](zx_status_t get_result) mutable {
-        completer.Reply(get_result);
-      });
+  guest_interaction_client_.Get(std::string(request->remote_path.get()),
+                                fidl::ClientEnd<fuchsia_io::File>(request->local_file.TakeHandle()),
+                                [completer = completer.ToAsync()](zx_status_t get_result) mutable {
+                                  completer.Reply(get_result);
+                                });
 }
 
 void GuestImpl::ExecuteCommand(ExecuteCommandRequestView request,
@@ -65,8 +65,8 @@ void GuestImpl::ExecuteCommand(ExecuteCommandRequestView request,
   guest_interaction_client_.Exec(
       std::string(request->command.get()), env_variables, std::move(request->stdin_),
       std::move(request->stdout_), std::move(request->stderr_),
-      fidl::InterfaceRequest<fuchsia::virtualization::guest::interaction::CommandListener>(
-          request->command_listener.TakeChannel()),
+      fidl::ServerEnd<fuchsia_virtualization_guest_interaction::CommandListener>(
+          request->command_listener.TakeHandle()),
       loop_.dispatcher());
 }
 

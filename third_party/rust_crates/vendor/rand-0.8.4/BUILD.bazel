@@ -59,7 +59,6 @@ rust_library(
         "libc",
         "rand_chacha",
         "rand_hc",
-        "small_rng",
         "std",
         "std_rng",
     ],

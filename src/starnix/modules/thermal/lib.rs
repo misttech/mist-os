@@ -4,12 +4,17 @@
 
 #![recursion_limit = "256"]
 
+mod family;
+mod thermal_zone;
+
+use crate::thermal_zone::{SensorProxy, ThermalZone};
+use async_lock::OnceCell;
+use family::ThermalFamily;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_hardware_temperature as ftemperature;
 use fuchsia_async::TimeoutExt;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::TryStreamExt;
-use once_cell::sync::OnceCell;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -23,13 +28,14 @@ use starnix_uapi::file_mode::mode;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use thermal_netlink::celsius_to_millicelsius;
 use zx::MonotonicInstant;
 
 const TEMPERATURE_DRIVER_DIR: &str = "/dev/class/trippoint";
 
 fn build_thermal_zone_directory(
     device: &Device,
-    proxy: Arc<OnceCell<ftemperature::DeviceSynchronousProxy>>,
+    proxy: Arc<OnceCell<SensorProxy>>,
     device_type: String,
     dir: &SimpleDirectoryMutator,
 ) {
@@ -49,19 +55,23 @@ fn build_thermal_zone_directory(
 }
 
 struct TemperatureFile {
-    proxy: Arc<OnceCell<ftemperature::DeviceSynchronousProxy>>,
+    proxy: Arc<OnceCell<SensorProxy>>,
 }
 
 impl TemperatureFile {
-    pub fn new_node(proxy: Arc<OnceCell<ftemperature::DeviceSynchronousProxy>>) -> impl FsNodeOps {
+    pub fn new_node(proxy: Arc<OnceCell<SensorProxy>>) -> impl FsNodeOps {
         BytesFile::new_node(Self { proxy })
     }
 }
 
 impl BytesFileOps for TemperatureFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let (zx_status, temp) =
-            self.proxy.wait().get_temperature_celsius(MonotonicInstant::INFINITE).map_err(|e| {
+        let (zx_status, temp) = self
+            .proxy
+            .wait_blocking()
+            .sync
+            .get_temperature_celsius(MonotonicInstant::INFINITE)
+            .map_err(|e| {
                 log_error!("get_temperature_celsius failed: {}", e);
                 Errno::new(starnix_uapi::errors::ENOENT)
             })?;
@@ -70,7 +80,7 @@ impl BytesFileOps for TemperatureFile {
             Errno::new(starnix_uapi::errors::ENOENT)
         })?;
 
-        let out = format!("{}\n", (temp * 1000.0) as i32);
+        let out = format!("{}\n", celsius_to_millicelsius(temp) as i32);
         Ok(out.as_bytes().to_owned().into())
     }
 }
@@ -81,8 +91,9 @@ pub fn thermal_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel, devic
 
     let mut sensor_proxies = HashMap::new();
 
-    for (index, sensor_name) in devices.into_iter().enumerate() {
-        let thermal_zone = format!("thermal_zone{}", index);
+    for (thermal_zone_id, sensor_name) in devices.into_iter().enumerate() {
+        let thermal_zone_id = thermal_zone_id as u32;
+        let thermal_zone = format!("thermal_zone{}", thermal_zone_id);
         let proxy = Arc::new(OnceCell::new());
         let proxy_clone = proxy.clone();
         let sensor_name_clone = sensor_name.clone();
@@ -94,8 +105,13 @@ pub fn thermal_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel, devic
             |device, dir| build_thermal_zone_directory(device, proxy, sensor_name, dir),
         );
 
-        sensor_proxies.insert(sensor_name_clone, proxy_clone);
+        sensor_proxies
+            .insert(sensor_name_clone, ThermalZone { id: thermal_zone_id, proxy: proxy_clone });
     }
+
+    let (thermal_family, thermal_family_worker) = ThermalFamily::new(sensor_proxies.clone());
+    kernel.generic_netlink().add_family(Arc::new(thermal_family));
+    kernel.kthreads.spawn_future(thermal_family_worker);
 
     kernel.kthreads.spawn_future(async move {
         // TODO: Move this to expect once test support is enabled
@@ -141,17 +157,21 @@ pub fn thermal_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel, devic
                         >(&dir, &filename)
                         .expect("connect_to_named_protocol_at_dir_root failed");
 
+                        let sync_proxy = connect_to_named_protocol_at_dir_root::<
+                            ftemperature::DeviceMarker,
+                        >(&dir, &filename)
+                        .expect("connect_to_named_protocol_at_dir_root failed")
+                        .into_client_end()
+                        .expect("Failed to conver proxy to client end")
+                        .into_sync_proxy();
+
                         let name =
                             async_proxy.get_sensor_name().await.expect("Failed to get sensor name");
 
-                        if let Some(proxy) = sensor_proxies.remove(&name) {
+                        if let Some(ThermalZone { proxy, .. }) = sensor_proxies.remove(&name) {
                             let _ = proxy
-                                .set(
-                                    async_proxy
-                                        .into_client_end()
-                                        .expect("Failed to conver proxy to client end")
-                                        .into_sync_proxy(),
-                                )
+                                .set(SensorProxy { sync: sync_proxy, asynch: async_proxy })
+                                .await
                                 .expect("Proxy already set");
                         }
                     }

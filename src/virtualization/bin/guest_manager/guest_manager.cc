@@ -245,7 +245,7 @@ GuestNetworkState GuestManager::QueryGuestNetworkState() {
       continue;
     }
 
-    if (!event.existing().has_device_class() || !event.existing().device_class().is_device()) {
+    if (!event.existing().has_port_class() || !event.existing().port_class().is_device()) {
       // Ignore loopback interfaces.
       continue;
     }
@@ -255,21 +255,22 @@ GuestNetworkState GuestManager::QueryGuestNetworkState() {
       continue;
     }
 
-    switch (event.existing().device_class().device()) {
-      case ::fuchsia::hardware::network::DeviceClass::VIRTUAL:
+    switch (event.existing().port_class().device()) {
+      case ::fuchsia::hardware::network::PortClass::VIRTUAL:
         num_virtual++;
         break;
-      case ::fuchsia::hardware::network::DeviceClass::ETHERNET:
+      case ::fuchsia::hardware::network::PortClass::ETHERNET:
         has_ethernet = true;
         break;
-      case ::fuchsia::hardware::network::DeviceClass::WLAN:
+      case ::fuchsia::hardware::network::PortClass::WLAN_CLIENT:
         has_wlan = true;
         break;
-      case ::fuchsia::hardware::network::DeviceClass::BRIDGE:
+      case ::fuchsia::hardware::network::PortClass::BRIDGE:
         has_bridge = true;
         break;
-      case ::fuchsia::hardware::network::DeviceClass::PPP:
-      case ::fuchsia::hardware::network::DeviceClass::WLAN_AP:
+      case ::fuchsia::hardware::network::PortClass::PPP:
+      case ::fuchsia::hardware::network::PortClass::WLAN_AP:
+      default:
         // Ignore.
         break;
     }

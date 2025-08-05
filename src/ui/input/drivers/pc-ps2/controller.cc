@@ -10,6 +10,7 @@
 #include <lib/ddk/hw/inout.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/time.h>
+#include <unistd.h>
 
 #include "src/ui/input/drivers/pc-ps2/commands.h"
 #include "src/ui/input/drivers/pc-ps2/device.h"

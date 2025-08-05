@@ -24,9 +24,11 @@ TEST(SingletonDisplayService, GetMetrics) {
   static constexpr uint32_t kHeightInMm = 55;
   static constexpr uint32_t kRefreshRate = 44000;
   auto display = std::make_shared<Display>(
-      fuchsia_hardware_display_types::wire::DisplayId{.value = 1}, kWidthInPx, kHeightInPx,
-      kWidthInMm, kHeightInMm, std::vector{fuchsia_images2::wire::PixelFormat::kB8G8R8A8},
-      kRefreshRate);
+      fuchsia_hardware_display_types::wire::DisplayId{.value = 1},
+      fuchsia_hardware_display_types::wire::Mode{
+          .active_area = {.width = kWidthInPx, .height = kHeightInPx},
+          .refresh_rate_millihertz = kRefreshRate},
+      kWidthInMm, kHeightInMm, std::vector{fuchsia_images2::wire::PixelFormat::kB8G8R8A8});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
   uint32_t width_in_px = 0;
@@ -62,12 +64,12 @@ TEST(SingletonDisplayService, GetMetrics) {
 }
 
 TEST(SingletonDisplayService, DevicePixelRatioChange) {
-  auto display =
-      std::make_shared<Display>(fuchsia_hardware_display_types::wire::DisplayId{.value = 1},
-                                /*width_in_px=*/777, /*height_in_px=*/555,
-                                /*width_in_mm=*/77, /*height_in_mm=*/55,
-                                std::vector{fuchsia_images2::wire::PixelFormat::kB8G8R8A8},
-                                /*refresh_rate=*/4400);
+  auto display = std::make_shared<Display>(
+      fuchsia_hardware_display_types::wire::DisplayId{.value = 1},
+      fuchsia_hardware_display_types::wire::Mode{.active_area = {.width = 777, .height = 555},
+                                                 .refresh_rate_millihertz = 4400},
+      /*width_in_mm=*/77, /*height_in_mm=*/55,
+      std::vector{fuchsia_images2::wire::PixelFormat::kB8G8R8A8});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
   const float kDPRx = 1.25f;

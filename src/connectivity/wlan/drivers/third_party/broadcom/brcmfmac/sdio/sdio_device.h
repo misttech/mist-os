@@ -17,6 +17,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -57,7 +58,8 @@ class SdioDevice final : public Device, public fdf::DriverBase {
     BRCMF_WARN("Fidl Error: %s", error.FormatDescription().c_str());
   }
 
-  zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() override;
+
   zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
       std::string_view metadata_serializable_name) override;
 
@@ -66,6 +68,7 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   fidl::WireClient<fdf::Node> parent_node_;
   std::unique_ptr<DeviceInspect> inspect_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
+  fdf::PDev pdev_;
 };
 
 }  // namespace wlan::brcmfmac

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zxdump/elf-search.h>
 #include <lib/zxdump/types.h>
 #include <zircon/assert.h>
 
@@ -49,6 +50,15 @@ std::ostream& operator<<(std::ostream& os, const zxdump::FdError& fd_error) {
     return os << fd_error.op_;
   }
   return os << fd_error.op_ << ": " << strerror(fd_error.error_);
+}
+
+std::ostream& operator<<(std::ostream& os, const zxdump::ElfSearchError& error) {
+  ZX_DEBUG_ASSERT(!error.op_.empty());
+  auto flags = os.flags();
+  os << std::showbase << std::hex;
+  os << error.op_ << " at virtual address " << error.vaddr << ": " << PrintStatus{error.status_};
+  os.flags(flags);
+  return os;
 }
 
 }  // namespace zxdump

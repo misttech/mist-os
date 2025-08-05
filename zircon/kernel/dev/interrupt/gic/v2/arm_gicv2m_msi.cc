@@ -15,6 +15,8 @@
 #include <dev/interrupt/arm_gicv2m.h>
 #include <dev/interrupt/arm_gicv2m_msi.h>
 
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE 0
 
 namespace {
@@ -156,11 +158,11 @@ void arm_gicv2m_msi_free_block(msi_block_t* block) {
   memset(block, 0, sizeof(*block));
 }
 
-void arm_gicv2m_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
-                                     void* ctx) {
+void arm_gicv2m_msi_register_handler(const msi_block_t* block, uint msi_id,
+                                     interrupt_handler_t handler) {
   DEBUG_ASSERT(block && block->allocated);
   DEBUG_ASSERT(msi_id < block->num_irq);
-  zx_status_t status = register_int_handler(block->base_irq_id + msi_id, handler, ctx);
+  zx_status_t status = register_int_handler(block->base_irq_id + msi_id, ktl::move(handler));
   DEBUG_ASSERT(status == ZX_OK);
 }
 

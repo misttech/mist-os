@@ -70,9 +70,18 @@ void platform_halt_cpu();
 // Returns true iff this platform supports |platform_suspend_cpu|.
 bool platform_supports_suspend_cpu();
 
+// Specifies whether this suspend operation is limited to the calling CPU or may
+// power down the encapsulating power domain.
+enum class PlatformAllowDomainPowerDown : bool { No, Yes };
+
 // Suspend the calling CPU.
 //
 // On success, the CPU will enter an implementation-defined suspend state.
+//
+// If |allow_domain| is No, then the operation will only target the calling CPU.
+// However, if Yes is specified, then, depending on the implementation, the
+// power domain encapsulating the calling CPU may also be suspended and powered
+// down.
 //
 // Prior to calling this function, it's critical to set up some kind of
 // interrupt that will wake the CPU and resume execution.  Upon successful
@@ -93,22 +102,22 @@ bool platform_supports_suspend_cpu();
 // incompatible with the current power state of other CPUs.  This is a somewhat
 // normal error and must be handled by callers.
 //
-// TODO(https://fxbug.dev/414456459): Consider adding a platform-specific or
+// TODO(https://fxbug.dev/417556024): Consider adding a platform-specific or
 // custom result type to differentiates between success-but-did-not-power-down
 // and powered-down.
 //
-// TODO(https://fxbug.dev/414456459): Consider checking the state of the
+// TODO(https://fxbug.dev/417558115): Consider checking the state of the
 // secondary CPUs in order to determine which power state value to use so that
 // we can eliminate the need to return ZX_ERR_ACCESS_DENIED or
 // ZX_ERR_INVALID_ARGS in "normal" situations.
 //
-// TODO(https://fxbug.dev/414456459): Currently, the caller is responsible for
+// TODO(https://fxbug.dev/417558115): Currently, the caller is responsible for
 // determining if pausing/resuming the monotonic clock is necessary and then
 // actually doing it.  More thought needs to be given to where that logic should
 // live.  Right now, it's done in |IdlePowerThread::UpdateMonotonicClock|,
 // however, it might be better to move some of that logic down into the platform
 // layer (perhaps within |platform_suspend_cpu|).
-zx_status_t platform_suspend_cpu();
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain);
 
 // Returns true if this system has a debug serial port that is enabled
 bool platform_serial_enabled();

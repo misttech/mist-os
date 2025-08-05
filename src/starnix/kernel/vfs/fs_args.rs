@@ -38,6 +38,21 @@ impl MountParams {
         self.options.get(key)
     }
 
+    pub fn get_as<T: std::str::FromStr>(&self, key: &[u8]) -> Result<Option<T>, Errno>
+    where
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
+    {
+        self.get(key).map(|v| parse::<T>(v.as_ref())).transpose()
+    }
+
+    pub fn get_with<T, E: std::fmt::Debug>(
+        &self,
+        key: &[u8],
+        parser: impl FnOnce(&str) -> Result<T, E>,
+    ) -> Result<Option<T>, Errno> {
+        self.get(key).map(|v| parse_with(v.as_ref(), parser)).transpose()
+    }
+
     pub fn remove(&mut self, key: &[u8]) -> Option<FsString> {
         self.options.remove(key)
     }
@@ -89,9 +104,17 @@ pub fn parse<F: std::str::FromStr>(data: &FsStr) -> Result<F, Errno>
 where
     <F as std::str::FromStr>::Err: std::fmt::Debug,
 {
-    std::str::from_utf8(data.as_ref())
-        .map_err(|e| errno!(EINVAL, e))?
-        .parse::<F>()
+    parse_with(data, F::from_str)
+}
+
+/// Parses `data` slice into another type.
+///
+/// This relies on str::parse so expects `data` to be utf8.
+pub fn parse_with<F, E: std::fmt::Debug>(
+    data: &FsStr,
+    parser: impl FnOnce(&str) -> Result<F, E>,
+) -> Result<F, Errno> {
+    parser(std::str::from_utf8(data.as_ref()).map_err(|e| errno!(EINVAL, e))?)
         .map_err(|e| errno!(EINVAL, format!("{:?}", e)))
 }
 

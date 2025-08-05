@@ -12,8 +12,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_tee_manager_config::TAConfig;
 use futures::prelude::*;
 use tee_internal::Error as TeeError;
-use vfs::file::vmo::read_only;
-use vfs::file::File;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 struct TAConnectRequest {
@@ -154,12 +152,19 @@ async fn main() -> Result<(), Error> {
         });
     }
 
-    let system_props =
-        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))
-            .context("Failed to read system properties")?;
+    let system_props_file = fuchsia_fs::file::open_in_namespace(
+        "/pkg/data/properties/system_properties",
+        fio::PERM_READABLE,
+    )
+    .context("Failed to open system properties")?;
+    let vmo = system_props_file
+        .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::PRIVATE_CLONE)
+        .await?
+        .map_err(fidl::Status::from_raw)
+        .context("Failed to get system properties vmo")?;
+
     let mut data_dir = fs.dir("data");
     let mut properties_dir = data_dir.dir("properties");
-    let vmo = read_only(system_props).get_backing_memory(fio::VmoFlags::READ).await?;
     let _ = properties_dir.add_vmo_file_at("system_properties", vmo);
 
     let _ = fs.take_and_serve_directory_handle()?;

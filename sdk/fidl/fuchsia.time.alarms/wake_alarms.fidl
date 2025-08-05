@@ -147,6 +147,7 @@ open protocol WakeAlarms {
 ///
 /// Dropping the server-end will cancel all alarms scheduled with [WakeAlarms.Set]
 /// associated with this server instance.
+@discoverable
 open protocol Notifier {
     /// Notifies when an alarm previously set by [WakeAlarms.Set] fires.
     Notify(resource struct {

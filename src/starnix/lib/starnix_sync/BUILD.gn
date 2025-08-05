@@ -19,6 +19,7 @@ rustc_library("starnix_sync") {
   deps = [
     "//sdk/rust/zx",
     "//src/lib/fuchsia-sync",
+    "//src/starnix/lib/starnix_stack",
     "//src/starnix/lib/starnix_sync/lock_ordering_macro",
     "//third_party/rust_crates:lock_api",
     "//third_party/rust_crates:static_assertions",

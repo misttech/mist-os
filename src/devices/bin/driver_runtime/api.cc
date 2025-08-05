@@ -330,4 +330,10 @@ __EXPORT zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_d
 }
 #endif
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+__EXPORT void fdf_env_scan_threads_for_stalls(void) {
+  driver_runtime::GetDispatcherCoordinator().ScanThreadsForStalls();
+}
+#endif
+
 __END_CDECLS

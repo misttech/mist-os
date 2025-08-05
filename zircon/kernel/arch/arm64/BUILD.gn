@@ -158,6 +158,7 @@ if (toolchain_environment == "physmem" ||
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/perfmon",
       "//zircon/kernel/lib/syscalls",
+      "//zircon/kernel/lib/thread-stack",
       "//zircon/kernel/lib/unittest",
       "//zircon/kernel/lib/userabi:headers",
       "//zircon/kernel/object",

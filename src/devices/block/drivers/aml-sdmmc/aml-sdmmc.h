@@ -41,7 +41,8 @@ namespace aml_sdmmc {
 
 class AmlSdmmc : public fdf::DriverBase,
                  public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc>,
-                 public fidl::Server<fuchsia_hardware_power::PowerTokenProvider> {
+                 public fidl::Server<fuchsia_hardware_power::PowerTokenProvider>,
+                 public fidl::Server<fuchsia_power_broker::ElementRunner> {
  public:
   // Note: This name can't be changed without migrating users in other repos.
   static constexpr char kDriverName[] = "aml-sd-emmc";
@@ -312,10 +313,13 @@ class AmlSdmmc : public fdf::DriverBase,
       const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
       fuchsia_power_broker::PowerLevel power_level);
 
-  // Watches the required hardware power level and adjusts it accordingly. Also serves requests that
-  // were delayed because they were received during suspended state. Communicates power level
-  // transitions to the Power Broker.
-  void WatchHardwareRequiredLevel();
+  // Implement fuchsia.power.broker.ElementRunner, allowing Power Broker
+  // to set this device's power level.
+  void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+                SetLevelCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Serves requests that were delayed because they were received during suspended state.
   void ServeDelayedRequests() __TA_REQUIRES(tuning_lock_, lock_);
@@ -337,8 +341,8 @@ class AmlSdmmc : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::ElementRunner>>
+      hardware_power_element_runner_server_binding_;
   zx::event hardware_power_assertive_token_;
 
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;

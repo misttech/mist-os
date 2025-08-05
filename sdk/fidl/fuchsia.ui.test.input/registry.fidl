@@ -29,6 +29,23 @@ type CoordinateUnit = flexible enum {
     /// In general, test writers should NOT assume that a particular view's logical
     /// coordinate space matches the physical coordinate space.
     PHYSICAL_PIXELS = 1;
+
+    /// The physical display is mapped to a coordinate space from argument of
+    /// RegisterTouchScreen.
+    @available(added=NEXT)
+    REGISTERED_DIMENSIONS = 2;
+};
+
+@available(added=NEXT)
+type DisplayDimensions = struct {
+    /// min_x of the display.
+    min_x int64;
+    /// min_y of the display.
+    min_y int64;
+    /// max_x of the display. max_x should be larger than min_x.
+    max_x int64;
+    /// max_y of the display. max_y should be larger than min_y.
+    max_y int64;
 };
 
 /// *** This protocol must not be used in production. ***
@@ -53,6 +70,11 @@ closed protocol Registry {
         /// Indicates the coordinate space in which to describe touch events.
         @available(added=11)
         2: coordinate_unit CoordinateUnit;
+
+        /// the dimensions of the display, only used when coordinate_unit is
+        /// `REGISTERED_DIMENSIONS`.
+        @available(added=NEXT)
+        3: display_dimensions DisplayDimensions;
     }) -> ();
 
     /// Enables the client to inject touch events using the corresponding
@@ -70,6 +92,11 @@ closed protocol Registry {
 
         /// Indicates the coordinate space in which to describe touch events.
         2: coordinate_unit CoordinateUnit;
+
+        /// the dimensions of the display, only used when coordinate_unit is
+        /// `REGISTERED_DIMENSIONS`.
+        @available(added=NEXT)
+        3: display_dimensions DisplayDimensions;
     }) -> (resource table {
         1: device_id uint32;
     });

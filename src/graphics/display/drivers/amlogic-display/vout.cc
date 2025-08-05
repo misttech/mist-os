@@ -164,7 +164,7 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
   switch (type_) {
     case VoutType::kDsi: {
       return raw_display_info_t{
-          .display_id = display::ToBanjoDisplayId(display_id),
+          .display_id = display_id.ToBanjo(),
           .preferred_modes_list = &dsi_.banjo_display_mode,
           .preferred_modes_count = 1,
           .edid_bytes_list = nullptr,
@@ -176,7 +176,7 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
     case VoutType::kHdmi:
       ZX_DEBUG_ASSERT(!hdmi_.current_display_edid.is_empty());
       return raw_display_info_t{
-          .display_id = display::ToBanjoDisplayId(display_id),
+          .display_id = display_id.ToBanjo(),
           .preferred_modes_list = nullptr,
           .preferred_modes_count = 0,
           .edid_bytes_list = hdmi_.current_display_edid.data(),

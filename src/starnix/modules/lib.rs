@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Increase recursion limit because LTO causes overflow.
+#![recursion_limit = "256"]
+
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::bpf::fs::BpfFs;
 use starnix_core::device::kobject::DeviceMetadata;
@@ -13,7 +16,7 @@ use starnix_core::fs::fuchsia::nmfs::fuchsia_network_monitor_fs;
 use starnix_core::fs::fuchsia::{new_remote_fs, new_remote_vol};
 use starnix_core::fs::sysfs::sys_fs;
 use starnix_core::fs::tmpfs::tmp_fs;
-use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::task::Kernel;
 use starnix_core::vfs::fs_registry::FsRegistry;
 use starnix_core::vfs::pipe::register_pipe_fs;
 use starnix_modules_binderfs::BinderFs;
@@ -32,52 +35,53 @@ use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
 
-fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
-    let kernel = current_task.kernel();
+fn misc_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
     registry.register_device(
         locked,
-        current_task,
+        kernel,
         // TODO(https://fxbug.dev/322365477) consider making this configurable
         "hw_random".into(),
         DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
-        current_task,
+        kernel,
         "fuse".into(),
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
         misc_class.clone(),
         open_fuse_device,
-    );
+    )?;
     registry.register_device(
         locked,
-        current_task,
+        kernel,
         "device-mapper".into(),
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
         create_device_mapper,
-    );
+    )?;
     registry.register_device(
         locked,
-        current_task,
+        kernel,
         "loop-control".into(),
         DeviceMetadata::new("loop-control".into(), DeviceType::LOOP_CONTROL, DeviceMode::Char),
         misc_class.clone(),
         create_loop_control_device,
-    );
+    )?;
     registry.register_device(
         locked,
-        current_task,
+        kernel,
         "tun".into(),
         DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
         misc_class,
         simple_device_ops::<DevTun>,
-    );
+    )?;
+    Ok(())
 }
 
 /// Initializes common devices in `Kernel`.
@@ -85,13 +89,14 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
 /// Adding device nodes to devtmpfs requires the current running task. The `Kernel` constructor does
 /// not create an initial task, so this function should be triggered after a `CurrentTask` has been
 /// initialized.
-pub fn init_common_devices(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
-    misc_device_init(locked, system_task);
-    mem_device_init(locked, system_task);
-    tty_device_init(locked, system_task);
-    loop_device_init(locked, system_task);
-    device_mapper_init(system_task);
-    zram_device_init(locked, system_task);
+pub fn init_common_devices(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
+    misc_device_init(locked, kernel)?;
+    mem_device_init(locked, kernel)?;
+    tty_device_init(locked, kernel)?;
+    loop_device_init(locked, kernel)?;
+    device_mapper_init(locked, kernel)?;
+    zram_device_init(locked, kernel)?;
+    Ok(())
 }
 
 pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Kernel) {

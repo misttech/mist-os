@@ -16,6 +16,8 @@ ffx_plugin("ffx_trace") {
   args_sources = [ "src/args.rs" ]
 
   sources = [
+    "src/daemon.rs",
+    "src/direct.rs",
     "src/lib.rs",
     "src/process.rs",
   ]
@@ -34,7 +36,9 @@ ffx_plugin("ffx_trace") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/performance/lib/fxt/rust",
+    "//src/performance/trace_task",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",

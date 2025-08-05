@@ -17,7 +17,7 @@ using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage) {
   FX_DCHECK(flatland_allocator);

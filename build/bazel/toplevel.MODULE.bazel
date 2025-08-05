@@ -103,7 +103,7 @@ fuchsia_idk = use_extension(
     "//build/bazel:module_extensions/fuchsia_idk_extensions.bzl",
     "fuchsia_idk",
 )
-fuchsia_idk.in_tree_repository(path = "regenerator_outputs/fuchsia_in_tree_idk")
+fuchsia_idk.in_tree_repository(path = "fuchsia_build_generated/fuchsia_in_tree_idk")
 use_repo(fuchsia_idk, "fuchsia_in_tree_idk")
 
 fuchsia_idk_repository = use_repo_rule(
@@ -182,7 +182,7 @@ fuchsia_clang_ext = use_extension(
 )
 fuchsia_clang_ext.local(
     local_path = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
-    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
+    local_version_file = "//:fuchsia_build_generated/content_hashes/fuchsia_clang.hash",
 )
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
@@ -206,7 +206,7 @@ compact_python_runtime_repository = use_repo_rule(
 compact_python_runtime_repository(
     name = "prebuilt_python",
     # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
+    content_hash_file = "fuchsia_build_generated/content_hashes/prebuilt_python.hash",
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
@@ -222,7 +222,7 @@ fuchsia_icu_config_repository = use_repo_rule(
 fuchsia_icu_config_repository(
     name = "fuchsia_icu_config",
     # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
+    content_hash_file = "fuchsia_build_generated/content_hashes/fuchsia_icu_config.hash",
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
@@ -256,7 +256,7 @@ boringssl_repository = use_repo_rule(
 boringssl_repository(
     name = "boringssl",
     # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/boringssl.hash",
+    content_hash_file = "fuchsia_build_generated/content_hashes/boringssl.hash",
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
@@ -269,7 +269,7 @@ generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
     clang_install_dir = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
     # LINT.IfChange
-    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
+    repository_version_file = "fuchsia_build_generated/content_hashes/prebuilt_clang.hash",
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 

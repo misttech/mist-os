@@ -73,6 +73,15 @@ impl AioContext {
     ) -> Result<(), Errno> {
         self.inner.submit(current_task, control_block, iocb_addr)
     }
+
+    pub fn cancel(
+        self: &Arc<Self>,
+        _current_task: &CurrentTask,
+        control_block: iocb,
+        iocb_addr: IocbPtr,
+    ) -> Result<(), Errno> {
+        self.inner.cancel(control_block, iocb_addr)
+    }
 }
 
 impl std::fmt::Debug for AioContext {
@@ -155,6 +164,11 @@ impl AioContextInner {
     ) -> Result<(), Errno> {
         let op = IoOperation::new(current_task, control_block, iocb_addr)?;
         self.operations.enqueue(op)
+    }
+
+    fn cancel(self: &Arc<Self>, control_block: iocb, iocb_addr: IocbPtr) -> Result<(), Errno> {
+        let op_type: OpType = (control_block.aio_lio_opcode as u32).try_into()?;
+        self.operations.remove(op_type.worker_type(), iocb_addr)
     }
 
     fn spawn_worker(self: &Arc<Self>, kthreads: &KernelThreads, worker_type: WorkerType) {
@@ -457,6 +471,26 @@ impl OperationQueue {
             return Some(IoAction::Stop);
         }
         pending.ops_for(worker_type).pop_front().map(IoAction::Op)
+    }
+
+    fn remove(&self, worker_type: WorkerType, iocb_addr: IocbPtr) -> Result<(), Errno> {
+        {
+            let mut pending = self.pending.lock();
+            if pending.is_stopped {
+                return error!(EINVAL);
+            }
+            // TODO: Use pop_front_if when available.
+            if let Some(idx) = pending
+                .ops_for(worker_type)
+                .iter()
+                .position(|value| value.iocb_addr.addr() == iocb_addr.addr())
+            {
+                pending.ops_for(worker_type).remove(idx);
+            } else {
+                return error!(EAGAIN);
+            }
+        }
+        Ok(())
     }
 
     fn block_until_dequeue(

@@ -15,8 +15,8 @@ if (is_host) {
     deps = [ ":runtime_deps" ]
   }
 
-  python_host_test("monsoon_test") {
-    main_source = "monsoon_test.py"
+  python_host_test("powerserver_test") {
+    main_source = "powerserver_test.py"
     libraries = [
       "//src/tests/end_to_end/lib/power",
       "//src/performance/lib/trace_processing",
@@ -36,6 +36,6 @@ group("tests") {
   testonly = true
   public_deps = [
     ":gonk_test($host_toolchain)",
-    ":monsoon_test($host_toolchain)",
+    ":powerserver_test($host_toolchain)",
   ]
 }

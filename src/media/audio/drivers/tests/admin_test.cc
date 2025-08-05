@@ -812,10 +812,6 @@ void AdminTest::ValidateElement(const fhasp::Element& element) {
                 element.type() == fhasp::ElementType::RING_BUFFER) &&
                element.has_can_bypass() && element.can_bypass())
       << "DAI_INTERCONNECT and RING_BUFFER elements must not set 'can_bypass'";
-
-  // can_disable | type_specific.endpoint: Deprecated (removed in SDK 20), thus disallowed.
-  EXPECT_FALSE(element.has_can_disable());
-  EXPECT_FALSE(element.has_type_specific() && element.type_specific().is_endpoint());
 }
 
 // Validate the type-specific portion of this DAI_INTERCONNECT Element.
@@ -1392,11 +1388,6 @@ void AdminTest::ValidateElementState(const fhasp::Element& element,
 
   // vendor_specific_data: Optional (for ALL element types). If present, cannot be empty.
   EXPECT_FALSE(state.has_vendor_specific_data() && state.vendor_specific_data().empty());
-
-  // enabled | latency | type_specific.endpoint: Deprecated (removed in SDK 20), thus disallowed.
-  EXPECT_FALSE(state.has_enabled());
-  EXPECT_FALSE(state.has_latency());
-  EXPECT_FALSE(state.has_type_specific() && state.type_specific().is_endpoint());
 }
 
 // Validate the type-specific portion of the ElementState returned by a DAI_INTERCONNECT element.
@@ -1503,9 +1494,6 @@ void AdminTest::ValidateEqualizerElementState(const fhasp::Element& element,
   // type_specific: Required. Must contain the variant that matches its Element (EQUALIZER).
   ASSERT_TRUE(state.has_type_specific());
   ASSERT_TRUE(state.type_specific().is_equalizer());
-
-  // bands_state: Deprecated in SDK 20, thus disallowed.
-  ASSERT_FALSE(state.type_specific().equalizer().has_bands_state());
 
   // band_states: Required. Cannot be empty.
   ASSERT_TRUE(state.type_specific().equalizer().has_band_states());

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
-#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 namespace spi {
@@ -20,13 +19,11 @@ class SpiChild : public fidl::WireServer<fuchsia_hardware_spi::Device>,
  public:
   SpiChild(fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi, uint32_t chip_select,
            bool has_siblings, fdf::UnownedSynchronizedDispatcher fidl_dispatcher,
-           std::unique_ptr<compat::SyncInitializedDeviceServer> compat_server,
            fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_client)
       : spi_(std::move(spi)),
         cs_(chip_select),
         has_siblings_(has_siblings),
         fidl_dispatcher_(std::move(fidl_dispatcher)),
-        compat_server_(std::move(compat_server)),
         controller_(std::move(controller_client)),
         devfs_connector_(fit::bind_member<&SpiChild::DevfsConnect>(this)) {}
 
@@ -70,7 +67,6 @@ class SpiChild : public fidl::WireServer<fuchsia_hardware_spi::Device>,
 
   std::optional<fidl::ServerBinding<fuchsia_hardware_spi::Device>> binding_;
   fidl::ServerBindingGroup<fuchsia_hardware_spi::Controller> controller_bindings_;
-  std::unique_ptr<compat::SyncInitializedDeviceServer> compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_hardware_spi::Controller> devfs_connector_;
 };

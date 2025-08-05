@@ -4,7 +4,6 @@
 
 use super::arrays::{FsContext, FsUseType};
 use super::metadata::HandleUnknown;
-use super::parser::ParseStrategy;
 use super::security_context::{SecurityContext, SecurityLevel};
 use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
@@ -28,7 +27,7 @@ pub struct FsUseLabelAndType {
 /// `policy_index.classes(KernelClass::Process).unwrap()` yields the offset in the policy's
 /// collection of classes where the "process" class resides.
 #[derive(Debug)]
-pub(super) struct PolicyIndex<PS: ParseStrategy> {
+pub(super) struct PolicyIndex {
     /// Map from object class Ids to their offset in the associate policy's
     /// [`crate::symbols::Classes`] collection. The map includes mappings from both the Ids used
     /// internally for kernel object classes, and from the policy-defined Id for each policy-
@@ -39,19 +38,19 @@ pub(super) struct PolicyIndex<PS: ParseStrategy> {
     /// collection.
     permissions: HashMap<crate::KernelPermission, PermissionIndex>,
     /// The parsed binary policy.
-    parsed_policy: ParsedPolicy<PS>,
+    parsed_policy: ParsedPolicy,
     /// The "object_r" role used as a fallback for new file context transitions.
     cached_object_r_role: RoleId,
 }
 
-impl<PS: ParseStrategy> PolicyIndex<PS> {
+impl PolicyIndex {
     /// Constructs a [`PolicyIndex`] that indexes over well-known policy elements.
     ///
     /// [`Class`]es and [`Permission`]s used by the kernel are amongst the indexed elements.
     /// The policy's `handle_unknown()` configuration determines whether the policy can be loaded even
     /// if it omits classes or permissions expected by the kernel, and whether to allow or deny those
     /// permissions if so.
-    pub fn new(parsed_policy: ParsedPolicy<PS>) -> Result<Self, anyhow::Error> {
+    pub fn new(parsed_policy: ParsedPolicy) -> Result<Self, anyhow::Error> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
@@ -132,7 +131,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     /// Returns the policy entry for a class identified either by its well-known kernel object class
     /// enum value, or its policy-defined Id.
-    pub fn class<'a>(&'a self, object_class: crate::ObjectClass) -> Option<&'a Class<PS>> {
+    pub fn class<'a>(&'a self, object_class: crate::ObjectClass) -> Option<&'a Class> {
         let index = self.classes.get(&object_class)?;
         Some(&self.parsed_policy.classes()[*index])
     }
@@ -141,7 +140,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     pub fn permission<'a>(
         &'a self,
         permission: &crate::KernelPermission,
-    ) -> Option<&'a Permission<PS>> {
+    ) -> Option<&'a Permission> {
         let target_class = self.class(permission.class().into())?;
         self.permissions.get(permission).map(|p| match p {
             PermissionIndex::Class { permission_index } => {
@@ -304,7 +303,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         self.cached_object_r_role
     }
 
-    pub(super) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
+    pub(super) fn parsed_policy(&self) -> &ParsedPolicy {
         &self.parsed_policy
     }
 
@@ -361,7 +360,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Partial paths are prefix-matched, so that "/abc/default" would also be assigned label3.
         //
         // TODO(372212126): Optimize the algorithm.
-        let mut result: Option<&FsContext<PS>> = None;
+        let mut result: Option<&FsContext> = None;
         for fs_context in fs_contexts {
             if node_path.0.starts_with(fs_context.partial_path()) {
                 if result.is_none()
@@ -395,7 +394,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         current_role: RoleId,
         type_: TypeId,
-        class: &Class<PS>,
+        class: &Class,
     ) -> Option<RoleId> {
         self.parsed_policy
             .role_transitions()
@@ -425,7 +424,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source_type: TypeId,
         target_type: TypeId,
-        class: &Class<PS>,
+        class: &Class,
     ) -> Option<TypeId> {
         // Return first match. The `checkpolicy` tool will not compile a policy that has
         // multiple matches, so behavior on multiple matches is undefined.
@@ -445,7 +444,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source_type: TypeId,
         target_type: TypeId,
-        class: &Class<PS>,
+        class: &Class,
         name: NullessByteStr<'_>,
     ) -> Option<TypeId> {
         self.parsed_policy.compute_filename_transition(source_type, target_type, class.id(), name)
@@ -455,7 +454,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source_type: TypeId,
         target_type: TypeId,
-        class: &Class<PS>,
+        class: &Class,
     ) -> Option<(SecurityLevel, Option<SecurityLevel>)> {
         for range_transition in self.parsed_policy.range_transitions() {
             if range_transition.source_type() == source_type
@@ -497,10 +496,7 @@ enum PermissionIndex {
     Common { common_symbol_index: usize, permission_index: usize },
 }
 
-fn get_class_index_by_name<'a, PS: ParseStrategy>(
-    classes: &'a Classes<PS>,
-    name: &str,
-) -> Option<usize> {
+fn get_class_index_by_name<'a>(classes: &'a Classes, name: &str) -> Option<usize> {
     let name_bytes = name.as_bytes();
     for i in 0..classes.len() {
         if classes[i].name_bytes() == name_bytes {
@@ -511,8 +507,8 @@ fn get_class_index_by_name<'a, PS: ParseStrategy>(
     None
 }
 
-fn get_common_symbol_index_by_name_bytes<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
+fn get_common_symbol_index_by_name_bytes<'a>(
+    common_symbols: &'a CommonSymbols,
     name_bytes: &[u8],
 ) -> Option<usize> {
     for i in 0..common_symbols.len() {
@@ -524,9 +520,9 @@ fn get_common_symbol_index_by_name_bytes<'a, PS: ParseStrategy>(
     None
 }
 
-fn get_permission_index_by_name<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
-    class: &'a Class<PS>,
+fn get_permission_index_by_name<'a>(
+    common_symbols: &'a CommonSymbols,
+    class: &'a Class,
     name: &str,
 ) -> Option<PermissionIndex> {
     if let Some(permission_index) = get_class_permission_index_by_name(class, name) {
@@ -545,10 +541,7 @@ fn get_permission_index_by_name<'a, PS: ParseStrategy>(
     }
 }
 
-fn get_class_permission_index_by_name<'a, PS: ParseStrategy>(
-    class: &'a Class<PS>,
-    name: &str,
-) -> Option<usize> {
+fn get_class_permission_index_by_name<'a>(class: &'a Class, name: &str) -> Option<usize> {
     let name_bytes = name.as_bytes();
     let permissions = class.permissions();
     for i in 0..permissions.len() {
@@ -560,8 +553,8 @@ fn get_class_permission_index_by_name<'a, PS: ParseStrategy>(
     None
 }
 
-fn get_common_permission_index_by_name<'a, PS: ParseStrategy>(
-    common_symbol: &'a CommonSymbol<PS>,
+fn get_common_permission_index_by_name<'a>(
+    common_symbol: &'a CommonSymbol,
     name: &str,
 ) -> Option<usize> {
     let name_bytes = name.as_bytes();

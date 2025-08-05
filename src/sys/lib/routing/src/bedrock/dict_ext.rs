@@ -11,8 +11,8 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
-    RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirConnector, DirEntry, Request, Routable,
+    Router, RouterResponse,
 };
 use std::fmt::Debug;
 
@@ -45,8 +45,8 @@ pub trait DictExt {
         capability: Capability,
     ) -> Result<(), fsandbox::CapabilityStoreError>;
 
-    /// Removes the capability at the path, if it exists.
-    fn remove_capability(&self, path: &impl IterablePath);
+    /// Removes the capability at the path, if it exists, and returns it.
+    fn remove_capability(&self, path: &impl IterablePath) -> Option<Capability>;
 
     /// Looks up the element at `path`. When encountering an intermediate router, use `request` to
     /// request the underlying capability from it. In contrast, `get_capability` will return
@@ -259,7 +259,7 @@ impl DictExt for Dict {
         }
     }
 
-    fn remove_capability(&self, path: &impl IterablePath) {
+    fn remove_capability(&self, path: &impl IterablePath) -> Option<Capability> {
         let mut segments = path.iter_segments();
         let mut current_name = segments.next().expect("path must be non-empty");
         let mut current_dict = self.clone();
@@ -273,14 +273,13 @@ impl DictExt for Dict {
                         .and_then(|value| value.to_dictionary());
                     if sub_dict.is_none() {
                         // The capability doesn't exist, there's nothing to remove.
-                        return;
+                        return None;
                     }
                     current_dict = sub_dict.unwrap();
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.remove(current_name);
-                    return;
+                    return current_dict.remove(current_name);
                 }
             }
         }
@@ -387,6 +386,15 @@ impl DictExt for Dict {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
                         RouterResponse::<DirEntry>::Debug(d) => {
+                            return Ok(Some(GenericRouterResponse::Debug(d)));
+                        }
+                    },
+                    Capability::DirConnectorRouter(r) => match r.route(request, debug).await? {
+                        RouterResponse::<DirConnector>::Capability(c) => c.into(),
+                        RouterResponse::<DirConnector>::Unavailable => {
+                            return Ok(Some(GenericRouterResponse::Unavailable));
+                        }
+                        RouterResponse::<DirConnector>::Debug(d) => {
                             return Ok(Some(GenericRouterResponse::Debug(d)));
                         }
                     },

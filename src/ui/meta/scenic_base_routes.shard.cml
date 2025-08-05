@@ -68,7 +68,6 @@
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
                 "fuchsia.ui.pointer.augment.LocalHit",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "#scenic",

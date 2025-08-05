@@ -23,9 +23,7 @@ use zx::{self as zx, HandleBased};
 
 use crate::config::{DisplayConfig, LayerConfig};
 use crate::error::{ConfigError, Error, Result};
-use crate::types::{
-    BufferCollectionId, BufferId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId,
-};
+use crate::types::{BufferCollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId};
 use crate::INVALID_EVENT_ID;
 
 const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
@@ -201,7 +199,7 @@ impl Coordinator {
                 } => {
                     inner.write().handle_vsync(
                         display_id.into(),
-                        zx::MonotonicInstant::from_nanos(timestamp),
+                        timestamp,
                         applied_config_stamp,
                         cookie,
                     )?;
@@ -243,9 +241,13 @@ impl Coordinator {
             )?;
             for layer in &config.layers {
                 match &layer.config {
-                    LayerConfig::Color { color } => {
+                    LayerConfig::Color { color, display_destination } => {
                         let fidl_color = fidl_fuchsia_hardware_display_types::Color::from(color);
-                        proxy.set_layer_color_config(&layer.id.into(), &fidl_color)?;
+                        proxy.set_layer_color_config(
+                            &layer.id.into(),
+                            &fidl_color,
+                            display_destination,
+                        )?;
                     }
                     LayerConfig::Primary { image_id, image_metadata, unblock_event } => {
                         proxy.set_layer_primary_config(&layer.id.into(), &image_metadata)?;
@@ -323,7 +325,8 @@ impl Coordinator {
         self.proxy()
             .import_image(
                 &image_metadata,
-                &BufferId::new(collection_id, 0).into(),
+                &collection_id.into(),
+                0, // buffer_index
                 &image_id.into(),
             )
             .await?

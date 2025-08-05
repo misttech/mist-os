@@ -27,6 +27,7 @@
                 "fs_filesystem",
                 "glblub",
                 "inet_socket/tcp",
+                "inet_socket/udp",
                 "ioctl",
                 "key_socket",
                 "keys",
@@ -52,15 +53,6 @@
         {
             type: "skip",
             matchers: [
-                // TODO: https://fxbug.dev/398663317 - This sub-directory was mistakenly added to the test list.
-                "inet_socket",
-
-                // TODO: https://fxbug.dev/398663317 - Test hangs, possibly because IP_PASSSEC is not implemented yet.
-                "inet_socket/udp",
-
-                // TODO: https://fxbug.dev/398696695 - Test sometimes hangs.
-                "unix_socket",
-
                 // TODO: https://fxbug.dev/319480589 - Starnix does not support dynamic kernel module loading.
                 "module_load",
             ],

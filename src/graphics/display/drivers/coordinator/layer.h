@@ -24,8 +24,8 @@
 #include "src/graphics/display/drivers/coordinator/waiting-image-list.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 
 namespace display_coordinator {
 
@@ -38,11 +38,14 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
   Layer* layer;
 };
 
-// Almost-POD used by Client to manage layer state. Public state is used by Controller.
-class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> {
+// Manages Client-created Layer configurations.
+//
+// This class is not thread safe. Its methods and destructor must be invoked
+// on the Controller's driver dispatcher.
+class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
  public:
   // `controller` must be non-null.
-  explicit Layer(Controller* controller, display::DriverLayerId id);
+  explicit Layer(Controller* controller, display::LayerId id);
 
   Layer(const Layer&) = delete;
   Layer(Layer&&) = delete;
@@ -99,11 +102,11 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   // Removes references to all Images associated with this Layer.
   // Returns true if the applied config has been affected.
-  bool CleanUpAllImages() __TA_REQUIRES(mtx());
+  bool CleanUpAllImages();
 
   // Removes references to the provided Image. `image` must be valid.
   // Returns true if the applied config has been affected.
-  bool CleanUpImage(const Image& image) __TA_REQUIRES(mtx());
+  bool CleanUpImage(const Image& image);
 
   // If a new image is available, retire applied_image() and other pending images. Returns false if
   // no images were ready.
@@ -128,7 +131,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
       fuchsia_hardware_display_types::wire::CoordinateTransformation image_source_transformation,
       fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
-  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
+  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
+                      fuchsia_math::wire::RectU display_destination);
   void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
   // Called on all waiting images when any fence fires. Returns true if an image is ready to
@@ -138,9 +142,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // Returns true if the layer has any waiting images. An image transitions from "pending" to
   // "waiting" (in the context of a specific layer) when that layer appears in an applied config.
   bool HasWaitingImages() const;
-
-  // Aliases controller_.mtx() for the purpose of thread-safety analysis.
-  fbl::Mutex* mtx() const;
 
  private:
   // Retires the `draft_image_`.
@@ -153,7 +154,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // Retires the image most recently sent to the display engine driver.
   //
   // Returns true if this changes the applied display configuration.
-  bool RetireAppliedImage() __TA_REQUIRES(mtx());
+  bool RetireAppliedImage();
 
   Controller& controller_;
 
@@ -172,8 +173,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // Manages images which are waiting to be displayed. Each one has an optional wait fence which
   // may not have been signaled yet.
   //
-  // Must be accessed on `controller_`'s client dispatcher loop. Call-sites must guarantee this via
-  // `ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher())`.
+  // Must be accessed on `controller_`'s driver dispatcher loop. Call-sites must guarantee this via
+  // `ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher())`.
   WaitingImageList waiting_images_;
 
   fbl::RefPtr<Image> applied_image_;

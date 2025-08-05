@@ -94,7 +94,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   //
   // Tests are recommended to call this in a TearDown() method, or at the end of
   // the test case implementation.
-  void CheckAllAccessesReplayed();
+  void CheckAllCallsReplayed();
 
   // display::DisplayEngineInterface:
   display::EngineInfo CompleteCoordinatorConnection() override;

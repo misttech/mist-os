@@ -34,11 +34,19 @@ pub struct FeedbackConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub remote_device_id_provider: bool,
 
-    /// The URL of the component, if any, that satisfies the requirements found at
-    /// //src/developer/forensics/flash_ts_feedback_id/meta/README.md. Namely, the component that
-    /// implements the fuchsia.feedback.DeviceIdProvider and google.flashts.Reader protocols.
+    /// The URL of the component, if any, that connects the fuchsia.feedback.DeviceIdProvider and
+    /// google.flashts.Reader protocols and should be added to the core realm. This cannot be used
+    /// in conjunction with sysinfo_feedback_id_component_url.
+    ///
+    /// TODO(https://fxbug.dev/427264599): remove once all products have migrated to
+    /// feedback_id_component_url.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flash_ts_feedback_id_component_url: Option<String>,
+
+    /// The URL of the component, if any, that exposes the fuchsia.feedback.DeviceIdProvider
+    /// protocol and should be added to the core realm.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub feedback_id_component_url: FeedbackIdComponentUrl,
 
     /// Whether to include the last few kernel logs in the last reboot info.
     #[serde(skip_serializing_if = "crate::common::is_default")]
@@ -66,4 +74,19 @@ pub struct CobaltConfig {
     #[walk_paths]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<Utf8PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackIdComponentUrl {
+    #[default]
+    None,
+
+    /// The URL of the component, if any, that connects the fuchsia.feedback.DeviceIdProvider and
+    /// google.flashts.Reader protocols.
+    FlashTs(String),
+
+    /// The URL of the component, if any, that connects the fuchsia.feedback.DeviceIdProvider and
+    /// fuchsia.sysinfo.SysInfo protocols.
+    SysInfo(String),
 }

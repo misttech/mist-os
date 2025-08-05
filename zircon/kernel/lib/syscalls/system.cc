@@ -266,7 +266,7 @@ static zx_status_t vmo_coalesce_pages(zx_handle_t vmo_hdl, const size_t extra_by
 
   const size_t vmo_size = vmo->size();
 
-  const size_t num_pages = ROUNDUP(vmo_size + extra_bytes, PAGE_SIZE) / PAGE_SIZE;
+  const size_t num_pages = ROUNDUP_PAGE_SIZE(vmo_size + extra_bytes) / PAGE_SIZE;
 
   paddr_t base_addr;
   list_node list = LIST_INITIAL_VALUE(list);

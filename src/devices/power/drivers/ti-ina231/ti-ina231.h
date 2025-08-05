@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
@@ -16,6 +15,7 @@
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "ti-ina231-metadata.h"
 
 namespace power_sensor {

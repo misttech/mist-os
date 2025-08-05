@@ -16,6 +16,7 @@
 /*********************channel spec common functions*********************/
 
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/wire.h>
 #include <zircon/assert.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
@@ -205,27 +206,27 @@ static void brcmu_d11ac_decchspec(struct brcmu_chan* ch) {
 }
 
 uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
-                             const fuchsia_wlan_common::WlanChannel* ch) {
+                             const fuchsia_wlan_ieee80211::WlanChannel* ch) {
   struct brcmu_chan ch_inf;
 
   ch_inf.chnum = ch->primary();
 
   switch (ch->cbw()) {
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw20:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20:
       ch_inf.bw = BRCMU_CHAN_BW_20;
       ch_inf.sb = BRCMU_CHAN_SB_NONE;
       break;
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw40:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40:
       ch_inf.bw = BRCMU_CHAN_BW_40;
       ch_inf.sb = BRCMU_CHAN_SB_U;
       break;
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw40Below:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40Below:
       ch_inf.bw = BRCMU_CHAN_BW_40;
       ch_inf.sb = BRCMU_CHAN_SB_L;
       break;
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw80:
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw160:
-    case fuchsia_wlan_common::ChannelBandwidth::kCbw80P80:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw80:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw160:
+    case fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw80P80:
     default:
       BRCMF_ERR("unsupported channel width: %u", static_cast<uint32_t>(ch->cbw()));
       break;
@@ -238,27 +239,27 @@ uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
 }
 
 uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
-                             const fuchsia_wlan_common_wire::WlanChannel* ch) {
+                             const fuchsia_wlan_ieee80211::wire::WlanChannel* ch) {
   struct brcmu_chan ch_inf;
 
   ch_inf.chnum = ch->primary;
 
   switch (ch->cbw) {
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw20:
       ch_inf.bw = BRCMU_CHAN_BW_20;
       ch_inf.sb = BRCMU_CHAN_SB_NONE;
       break;
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw40:
       ch_inf.bw = BRCMU_CHAN_BW_40;
       ch_inf.sb = BRCMU_CHAN_SB_U;
       break;
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40Below:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw40Below:
       ch_inf.bw = BRCMU_CHAN_BW_40;
       ch_inf.sb = BRCMU_CHAN_SB_L;
       break;
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80:
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw160:
-    case fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80P80:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw80:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw160:
+    case fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw80P80:
     default:
       BRCMF_ERR("unsupported channel width: %u", static_cast<uint32_t>(ch->cbw));
       break;
@@ -271,7 +272,7 @@ uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
 }
 
 void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec,
-                         fuchsia_wlan_common_wire::WlanChannel* ch) {
+                         fuchsia_wlan_ieee80211::wire::WlanChannel* ch) {
   brcmu_chan ch_inf = {.chspec = chanspec};
   d11_inf->decchspec(&ch_inf);
 
@@ -280,15 +281,15 @@ void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec,
 
   switch (ch_inf.bw) {
     case BRCMU_CHAN_BW_20:
-      ch->cbw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+      ch->cbw = fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw20;
       break;
     case BRCMU_CHAN_BW_40:
       switch (ch_inf.sb) {
         case BRCMU_CHAN_SB_U:
-          ch->cbw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40;
+          ch->cbw = fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw40;
           break;
         case BRCMU_CHAN_SB_L:
-          ch->cbw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40Below;
+          ch->cbw = fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw40Below;
           break;
         default:
           BRCMF_ERR("unsupported channel side band: %hhu", static_cast<uint8_t>(ch_inf.sb));
@@ -296,7 +297,7 @@ void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec,
       }
       break;
     case BRCMU_CHAN_BW_80:
-      ch->cbw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80;
+      ch->cbw = fuchsia_wlan_ieee80211::wire::ChannelBandwidth::kCbw80;
       break;
     default:
       BRCMF_ERR("unsupported channel width: %u", ch_inf.bw);

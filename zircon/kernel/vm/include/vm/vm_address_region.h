@@ -428,7 +428,7 @@ class RegionList final {
       size_t size;
     };
     const auto align_range = [align_pow2](vaddr_t range_base, size_t range_size) -> AlignedRange {
-      const vaddr_t aligned_base = ALIGN(range_base, 1UL << align_pow2);
+      const vaddr_t aligned_base = ROUNDUP(range_base, 1UL << align_pow2);
       const size_t base_delta = aligned_base - range_base;
       const size_t aligned_size = ffl::SaturateSubtractAs<size_t>(range_size, base_delta);
       return {.base = aligned_base, .size = aligned_size};
@@ -596,7 +596,7 @@ class RegionList final {
 
     DEBUG_ASSERT(allocation_result.is_ok());
     *alloc_spot = allocation_result.value();
-    ASSERT_MSG(IS_ALIGNED(*alloc_spot, 1UL << align_pow2), "size=%zu align_pow2=%u alloc_spot=%zx",
+    ASSERT_MSG(IS_ROUNDED(*alloc_spot, 1UL << align_pow2), "size=%zu align_pow2=%u alloc_spot=%zx",
                size, align_pow2, *alloc_spot);
     return ZX_OK;
   }
@@ -662,6 +662,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     Commit,
     Decommit,
     MapRange,
+    Zero,
     DontNeed,
     AlwaysNeed,
     Prefetch,
@@ -1047,17 +1048,17 @@ class VmMapping final : public VmAddressRegionOrMapping {
   zx_status_t MapRange(size_t offset, size_t len, bool commit, bool ignore_existing = false)
       TA_EXCL(lock());
 
-  // Unmap a subset of the region of memory in the containing address space,
-  // returning it to the parent region to allocate.  If all of the memory is unmapped,
-  // Destroy()s this mapping.  If a subrange of the mapping is specified, the
-  // mapping may be split.
-  zx_status_t Unmap(vaddr_t base, size_t size);
+  // Unlocked convenience wrapper of UnmapLocked for testing.
+  zx_status_t DebugUnmap(vaddr_t base, size_t size) TA_EXCL(lock()) {
+    Guard<CriticalMutex> guard{lock()};
+    return UnmapLocked(base, size);
+  }
 
-  // Change access permissions for this mapping.  It is an error to specify a
-  // caching mode in the flags.  This will persist the caching mode the
-  // mapping was created with.  If a subrange of the mapping is specified, the
-  // mapping may be split.
-  zx_status_t Protect(vaddr_t base, size_t size, uint new_arch_mmu_flags);
+  // Unlocked convenience wrapper of ProtectLocked for testing.
+  zx_status_t DebugProtect(vaddr_t base, size_t size, uint new_arch_mmu_flags) TA_EXCL(lock()) {
+    Guard<CriticalMutex> guard{lock()};
+    return ProtectLocked(base, size, new_arch_mmu_flags);
+  }
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
 
@@ -1120,7 +1121,7 @@ class VmMapping final : public VmAddressRegionOrMapping {
   // the region via the parent vmar in the future, and so the region merely needs to remain valid
   // through some VmMapping.
   // For this the function requires you to hand in your last remaining refptr to the mapping.
-  static void MarkMergeable(fbl::RefPtr<VmMapping>&& mapping);
+  static void MarkMergeable(fbl::RefPtr<VmMapping> mapping);
 
   // Used to cache the memory attribution counts for this vmo range. Also tracks the vmo hierarchy
   // generation count and the mapping generation count at the time of caching the attribution
@@ -1188,10 +1189,16 @@ class VmMapping final : public VmAddressRegionOrMapping {
 
   zx_status_t DestroyLocked() TA_REQ(lock()) override;
 
-  // Implementation for Unmap().  This supports partial unmapping.
+  // Unmap a subset of the region of memory in the containing address space,
+  // returning it to the parent region to allocate.  If all of the memory is unmapped,
+  // Destroy()s this mapping.  If a subrange of the mapping is specified, the
+  // mapping may be split.
   zx_status_t UnmapLocked(vaddr_t base, size_t size) TA_REQ(lock());
 
-  // Implementation for Protect().
+  // Change access permissions for this mapping.  It is an error to specify a
+  // caching mode in the flags.  This will persist the caching mode the
+  // mapping was created with.  If a subrange of the mapping is specified, the
+  // mapping may be split.
   zx_status_t ProtectLocked(vaddr_t base, size_t size, uint new_arch_mmu_flags) TA_REQ(lock());
 
   // Helper for protect and unmap.

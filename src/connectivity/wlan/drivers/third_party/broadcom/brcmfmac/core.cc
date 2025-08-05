@@ -41,6 +41,7 @@
 #include "inspect/device_inspect.h"
 #include "linuxisms.h"
 #include "proto.h"
+#include "src/devices/lib/broadcom/commands.h"
 #include "workqueue.h"
 
 #define MAX_WAIT_FOR_8021X_TX_MSEC (950)

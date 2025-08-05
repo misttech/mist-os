@@ -12,10 +12,9 @@
 #include <arch/x86/hwp.h>
 #include <arch/x86/platform_access.h>
 #include <fbl/algorithm.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mp.h>
 
-static SpinLock g_microcode_lock;
+DECLARE_SINGLETON_SPINLOCK(g_microcode_lock);
 
 struct x86_intel_microcode_update_header {
   uint32_t header_version;
@@ -82,7 +81,7 @@ bool x86_intel_check_microcode_patch(cpu_id::CpuId* cpuid, MsrAccess* msr, zx_io
 
 // Attempt to load a compatible microcode patch. Invoked on every logical processor.
 void x86_intel_load_microcode_patch(cpu_id::CpuId* cpuid, MsrAccess* msr, zx_iovec_t patch) {
-  AutoSpinLock lock(&g_microcode_lock);
+  Guard<SpinLock, IrqSave> lock(g_microcode_lock::Get());
 
   auto* const hdr = reinterpret_cast<const x86_intel_microcode_update_header*>(patch.buffer);
   const uint32_t current_patch_level = x86_intel_get_patch_level();

@@ -87,7 +87,6 @@ rustc_binary("fshost") {
     "//src/lib/fuchsia-sync",
   ]
   sources = [
-    "src/boot_args.rs",
     "src/config.rs",
     "src/copier.rs",
     "src/crypt.rs",

@@ -46,6 +46,13 @@ impl Into<u64> for Rights {
     }
 }
 
+impl Into<fio::Operations> for Rights {
+    fn into(self) -> fio::Operations {
+        let Self(ops) = self;
+        ops
+    }
+}
+
 impl fmt::Display for Rights {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self(rights) = &self;

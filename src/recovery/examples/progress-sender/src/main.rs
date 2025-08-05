@@ -34,7 +34,7 @@ async fn inner_main() -> Result<(), Error> {
     std::thread::sleep(std::time::Duration::from_secs(3));
     fx_log_info!("Sleep complete, sending progress updates");
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let num_updates = 200;
     for i in 0..num_updates {
         // Increment progress

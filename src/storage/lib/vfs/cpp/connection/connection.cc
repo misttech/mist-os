@@ -56,7 +56,7 @@ Connection::~Connection() {
 void Connection::NodeCloneDeprecated(fio::OpenFlags flags, VnodeProtocol protocol,
                                      fidl::ServerEnd<fio::Node> server_end) {
   zx_status_t status = [&]() -> zx_status_t {
-    zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags, protocol);
+    zx::result clone_options = DeprecatedOptions::FromCloneFlags(flags, protocol);
     if (clone_options.is_error()) {
       FS_PRETTY_TRACE_DEBUG("[NodeCloneDeprecated] invalid clone flags: ", flags);
       return clone_options.error_value();
@@ -73,7 +73,8 @@ void Connection::NodeCloneDeprecated(fio::OpenFlags flags, VnodeProtocol protoco
       return ZX_ERR_ACCESS_DENIED;
     }
 
-    if (zx::result validated = vnode()->ValidateOptions(*clone_options); validated.is_error()) {
+    if (zx::result validated = vnode()->DeprecatedValidateOptions(*clone_options);
+        validated.is_error()) {
       return validated.error_value();
     }
 

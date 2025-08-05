@@ -33,6 +33,11 @@ if (rustc_prefix == default_rustc_prefix) {
   default_rustc_version_string = ""
 }
 
+# The default value used for `rust_cap_lints`, this variable is used to detect when
+# it's been changed from the default and to use the correct logic with RBE to ensure
+# cache hits when using a different value with local execution.
+rust_cap_lints_default = "deny"
+
 declare_args() {
   # This is a string identifying the particular toolchain version in use.  Its
   # only purpose is to be unique enough that it changes when switching to a new
@@ -54,7 +59,7 @@ declare_args() {
   # Sets the maximum lint level.
   # "deny" will make all warnings into errors, "warn" preserves them as warnings, and "allow" will
   # ignore warnings.
-  rust_cap_lints = "deny"
+  rust_cap_lints = rust_cap_lints_default
 
   # Set the lint level for all clippy lints to "warn".
   # Note: setting lint levels in source takes precedence over this.

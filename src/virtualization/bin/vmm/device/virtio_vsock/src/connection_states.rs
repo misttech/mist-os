@@ -1071,7 +1071,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::channel::mpsc;
     use futures::{FutureExt, TryStreamExt};
-    use rand::distributions::Standard;
+    use rand::distr::StandardUniform;
     use rand::Rng;
     use std::collections::HashSet;
     use std::io::Read;
@@ -1543,7 +1543,7 @@ mod tests {
         // Create a vector of random bytes that will entirely exhaust the TX credit.
         let num_bytes_to_send: usize = header.buf_alloc.get().try_into().unwrap();
         let random_bytes: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(num_bytes_to_send).collect();
+            rand::rng().sample_iter(StandardUniform).take(num_bytes_to_send).collect();
 
         // Each time send_bytes is called with a slice, a chain is created with the slice spread
         // across three descriptors.
@@ -1619,7 +1619,7 @@ mod tests {
         // Max out the client socket's TX buffer with random bytes.
         let num_bytes_to_send = client_socket.info().expect("failed to get info").tx_buf_max;
         let random_bytes: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(num_bytes_to_send).collect();
+            rand::rng().sample_iter(StandardUniform).take(num_bytes_to_send).collect();
         let mut received_bytes: Vec<u8> = Vec::new();
 
         assert_eq!(
@@ -1653,12 +1653,12 @@ mod tests {
                 .fake_queue
                 .publish(
                     ChainBuilder::new()
-                        .writable(rand::thread_rng().gen_range(min_chain_size..100), &mem)
-                        .writable(rand::thread_rng().gen_range(1..100), &mem)
-                        .writable(rand::thread_rng().gen_range(1..100), &mem)
-                        .writable(rand::thread_rng().gen_range(1..100), &mem)
-                        .writable(rand::thread_rng().gen_range(1..100), &mem)
-                        .writable(rand::thread_rng().gen_range(1..100), &mem)
+                        .writable(rand::random_range(min_chain_size..100), &mem)
+                        .writable(rand::random_range(1..100), &mem)
+                        .writable(rand::random_range(1..100), &mem)
+                        .writable(rand::random_range(1..100), &mem)
+                        .writable(rand::random_range(1..100), &mem)
+                        .writable(rand::random_range(1..100), &mem)
                         .build(),
                 )
                 .expect("failed to publish writable chain");
@@ -1981,7 +1981,7 @@ mod tests {
         // Client writes 9 bytes to the socket. Note that this is above the guest credit, but this
         // is fine as the device will enforce this when writing to the chain.
         let mut received_bytes: Vec<u8> = Vec::new();
-        let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(9).collect();
+        let random_bytes: Vec<u8> = rand::rng().sample_iter(StandardUniform).take(9).collect();
         assert_eq!(
             client_socket.write(&random_bytes).expect("failed to write bytes"),
             random_bytes.len()

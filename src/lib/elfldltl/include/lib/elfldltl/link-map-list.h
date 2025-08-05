@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LINK_MAP_LIST_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LINK_MAP_LIST_H_
 
+#include <cassert>
 #include <iterator>
 
 #include "layout.h"

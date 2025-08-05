@@ -5,13 +5,13 @@
 use crate::device::kobject::DeviceMetadata;
 use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::devpts::TtyFile;
+use crate::fs::devpts::{new_pts_fs_with_state, TtyFile};
 use crate::task::{CurrentTask, EventHandler, Kernel, Waiter};
-use crate::vfs::{FileOps, FsNode, FsString, VecInputBuffer, VecOutputBuffer};
+use crate::vfs::{FileOps, FsString, NamespaceNode, VecInputBuffer, VecOutputBuffer};
 use anyhow::Error;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_serial as fserial;
-use starnix_sync::{DeviceOpen, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::{DeviceType, TTY_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
@@ -100,13 +100,15 @@ impl SerialDevice {
     ///
     /// To register the device, call `register_serial_device`.
     pub fn new(
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         serial_device: ClientEnd<fserial::DeviceMarker>,
     ) -> Result<Arc<Self>, Errno> {
         let kernel = current_task.kernel();
 
-        let state = kernel.expando.get::<TtyState>();
-        let terminal = state.get_next_terminal(current_task)?;
+        let state = Arc::new(TtyState::default());
+        let fs = new_pts_fs_with_state(locked, kernel, Default::default(), state.clone())?;
+        let terminal = state.get_next_terminal(fs.root().clone(), current_task.current_fscred())?;
 
         let serial_proxy = Arc::new(serial_device.into_sync_proxy());
         let forward_task = ForwardTask::new(terminal.clone(), serial_proxy);
@@ -120,10 +122,10 @@ impl SerialDevice {
 impl DeviceOps for Arc<SerialDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(TtyFile::new(self.terminal.clone())))
@@ -139,7 +141,7 @@ pub fn register_serial_device(
     system_task: &CurrentTask,
     index: u32,
     serial_device: Arc<SerialDevice>,
-) {
+) -> Result<(), Errno> {
     // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
     //  64 = /dev/ttyS0    First UART serial port
     const SERIAL_MINOR_BASE: u32 = 64;
@@ -159,5 +161,6 @@ pub fn register_serial_device(
         ),
         registry.objects.tty_class(),
         serial_device,
-    );
+    )?;
+    Ok(())
 }

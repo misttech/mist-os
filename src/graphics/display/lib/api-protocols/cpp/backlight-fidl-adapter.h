@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_PROTOCOLS_CPP_BACKLIGHT_FIDL_ADAPTER_H_
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
+#include <lib/async/dispatcher.h>
 
 #include "src/graphics/display/lib/api-protocols/cpp/backlight-interface.h"
 

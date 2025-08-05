@@ -373,12 +373,15 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
           .test_collection = get_test_realm_res->test_collection,
       }};
     }
+
+    LOGS(Info) << "Launching test: " << test_url_;
     auto run_res = suite_runner->Run(
         {test_url_, std::move(run_suite_options), CreateEndpointsAndBind(suite_controller_)});
     if (!run_res.is_ok()) {
       return debug::ZxStatus(run_res.error_value().status(),
                              run_res.error_value().FormatDescription());
     }
+    LOGS(Info) << "Launching test succeeded, watching for events.";
     suite_controller_->WatchEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });

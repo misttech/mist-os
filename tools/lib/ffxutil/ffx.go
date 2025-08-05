@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
@@ -221,7 +220,6 @@ func (b *strictFfxCmdBuilder) setConfigMap(user, global map[string]any) error {
 	// Strip out certain configs that don't apply to strict invocations
 	// TODO(slgrady): remove this code once we remove non-strict ffx invocations.
 	delete(global, "daemon.autostart")
-	delete(global, "ffx.target-list.local-connect")
 	delete(global, "ffx.isolated")
 	b.configs = global
 	return nil
@@ -752,6 +750,12 @@ func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (stri
 	return strings.TrimSpace(s), err
 }
 
+// RunWithTargetOutputAndTimeout runs ffx with the associated target, stdout redirected to the
+// provided writer, and the specified timeout.
+func (f *FFXInstance) RunWithTargetOutputAndTimeout(ctx context.Context, output io.Writer, timeout time.Duration, args ...string) error {
+	return f.invoker(args).setTarget(f.target).setStdout(output).setTimeout(timeout).run(ctx)
+}
+
 func (f *FFXInstance) StartDaemon(ctx context.Context, daemonLog *os.File) *exec.Cmd {
 	args := []string{"daemon", "start"}
 	// Special-case the daemon handling, since it's the one command where we want to redirect the stdout,
@@ -1002,7 +1006,7 @@ func processPBArtifactsResult(raw string, err error) ([]string, error) {
 }
 
 // GetImageFromPB returns an image from a product bundle.
-func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*bootserver.Image, error) {
+func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*build.Image, error) {
 	args := []string{"--machine", "json", "product", "get-image-path", pbPath, "-r"}
 	if slot != "" && imageType != "" && bootloader == "" {
 		args = append(args, "--slot", slot, "--image-type", imageType)
@@ -1019,7 +1023,7 @@ func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot st
 	return processImageFromPBResult(pbPath, strings.TrimSpace(s), err)
 }
 
-func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver.Image, error) {
+func processImageFromPBResult(pbPath string, raw string, err error) (*build.Image, error) {
 	if raw == "" {
 		if err != nil {
 			return nil, err
@@ -1062,22 +1066,7 @@ func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver
 	}
 
 	imagePath := filepath.Join(pbPath, result.Ok.Path)
-	buildImg := build.Image{Name: result.Ok.Path, Path: imagePath}
-	reader, err := os.Open(imagePath)
-	if err != nil {
-		return nil, err
-	}
-	fi, err := reader.Stat()
-	if err != nil {
-		return nil, err
-	}
-	image := bootserver.Image{
-		Image:  buildImg,
-		Reader: reader,
-		Size:   fi.Size(),
-	}
-
-	return &image, nil
+	return &build.Image{Name: result.Ok.Path, Path: imagePath}, nil
 }
 
 // Log runs "ffx log <args>", optionally sending the output to "output"

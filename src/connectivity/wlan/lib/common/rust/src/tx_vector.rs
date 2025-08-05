@@ -5,7 +5,10 @@
 use crate::ie::SupportedRate;
 use crate::mac::WlanGi;
 use anyhow::{bail, Error};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
+};
 
 pub const HT_NUM_MCS: u8 = 32; // Only support MCS 0-31
 pub const HT_NUM_UNIQUE_MCS: u8 = 8;
@@ -65,7 +68,7 @@ pub const MAX_VALID_IDX: u16 = DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u1
 pub struct TxVector {
     phy: fidl_common::WlanPhyType,
     gi: WlanGi,
-    cbw: fidl_common::ChannelBandwidth,
+    cbw: fidl_ieee80211::ChannelBandwidth,
     nss: u8, // Number of spatial streams for VHT and beyond.
     // For HT,  see IEEE 802.11-2016 Table 19-27
     // For VHT, see IEEE 802.11-2016 Table 21-30
@@ -77,7 +80,7 @@ impl TxVector {
     pub fn new(
         phy: fidl_common::WlanPhyType,
         gi: WlanGi,
-        cbw: fidl_common::ChannelBandwidth,
+        cbw: fidl_ieee80211::ChannelBandwidth,
         mcs_idx: u8,
     ) -> Result<Self, Error> {
         let supported_mcs = match phy {
@@ -89,9 +92,9 @@ impl TxVector {
                     other => bail!("Unsupported GI for HT PHY: {:?}", other),
                 }
                 match cbw {
-                    fidl_common::ChannelBandwidth::Cbw20
-                    | fidl_common::ChannelBandwidth::Cbw40
-                    | fidl_common::ChannelBandwidth::Cbw40Below => (),
+                    fidl_ieee80211::ChannelBandwidth::Cbw20
+                    | fidl_ieee80211::ChannelBandwidth::Cbw40
+                    | fidl_ieee80211::ChannelBandwidth::Cbw40Below => (),
                     other => bail!("Unsupported CBW for HT PHY: {:?}", other),
                 }
                 mcs_idx < HT_NUM_MCS
@@ -133,7 +136,7 @@ impl TxVector {
                 bail!("Invalid rate {} * 0.5 Mbps for 802.11a/b/g.", other_rate);
             }
         };
-        Self::new(phy, WlanGi::G_800NS, fidl_common::ChannelBandwidth::Cbw20, mcs_idx)
+        Self::new(phy, WlanGi::G_800NS, fidl_ieee80211::ChannelBandwidth::Cbw20, mcs_idx)
     }
 
     // We guarantee safety of the unwraps in the following two functions by testing all TxVecIdx
@@ -149,8 +152,8 @@ impl TxVector {
                     _ => WlanGi::G_800NS,
                 };
                 let cbw = match group_idx % HT_NUM_CBW as u16 {
-                    0 => fidl_common::ChannelBandwidth::Cbw20,
-                    _ => fidl_common::ChannelBandwidth::Cbw40,
+                    0 => fidl_ieee80211::ChannelBandwidth::Cbw20,
+                    _ => fidl_ieee80211::ChannelBandwidth::Cbw40,
                 };
                 let mcs_idx = ((*idx - HT_START_IDX) % HT_NUM_MCS as u16) as u8;
                 Self::new(phy, gi, cbw, mcs_idx).unwrap()
@@ -158,14 +161,14 @@ impl TxVector {
             fidl_common::WlanPhyType::Erp => Self::new(
                 phy,
                 WlanGi::G_800NS,
-                fidl_common::ChannelBandwidth::Cbw20,
+                fidl_ieee80211::ChannelBandwidth::Cbw20,
                 (*idx - ERP_START_IDX) as u8,
             )
             .unwrap(),
             fidl_common::WlanPhyType::Dsss | fidl_common::WlanPhyType::Hr => Self::new(
                 phy,
                 WlanGi::G_800NS,
-                fidl_common::ChannelBandwidth::Cbw20,
+                fidl_ieee80211::ChannelBandwidth::Cbw20,
                 (*idx - DSSS_CCK_START_IDX) as u8,
             )
             .unwrap(),
@@ -180,8 +183,8 @@ impl TxVector {
                     WlanGi::G_400NS => HT_NUM_CBW as u16,
                     _ => 0,
                 } + match self.cbw {
-                    fidl_common::ChannelBandwidth::Cbw40
-                    | fidl_common::ChannelBandwidth::Cbw40Below => 1,
+                    fidl_ieee80211::ChannelBandwidth::Cbw40
+                    | fidl_ieee80211::ChannelBandwidth::Cbw40Below => 1,
                     _ => 0,
                 };
                 TxVecIdx::new(HT_START_IDX + group_idx * HT_NUM_MCS as u16 + self.mcs_idx as u16)

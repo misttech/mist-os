@@ -37,16 +37,16 @@ namespace {
 
 namespace fio = fuchsia_io;
 
-TEST(Service, ConstructWithRawChannelConnector) {
+TEST(Service, FromChannelConnector) {
   auto svc = fbl::MakeRefCounted<fs::Service>([](zx::channel channel) { return ZX_OK; });
 }
 
-TEST(Service, ConstructWithTypedChannelConnector) {
+TEST(Service, FromTypedProtocolHandler) {
   auto svc = fbl::MakeRefCounted<fs::Service>(
       [](fidl::ServerEnd<fio::Directory> server_end) { return ZX_OK; });
 }
 
-TEST(Service, ApiTest) {
+TEST(Service, Lifecycle) {
   // Set up a service which can only be bound once (to make it easy to simulate an error to test
   // error reporting behavior from the connector)
   zx::channel bound_channel;
@@ -59,10 +59,8 @@ TEST(Service, ApiTest) {
 
   // open
   fbl::RefPtr<fs::Vnode> redirect;
-  auto result = svc->ValidateOptions({});
-  ASSERT_TRUE(result.is_ok());
   ASSERT_EQ(svc->Open(&redirect), ZX_OK);
-  EXPECT_TRUE(!redirect);
+  EXPECT_EQ(redirect, nullptr);
 
   // protocols and attributes
   EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kConnector, svc->GetProtocols());
@@ -86,7 +84,7 @@ TEST(Service, ApiTest) {
   EXPECT_EQ(hc1, bound_channel.get());
 }
 
-TEST(Service, ServeDirectory) {
+TEST(Service, PendingOpenRequestsAreHandled) {
   auto root = fidl::Endpoints<fio::Directory>::Create();
 
   // open client
@@ -114,7 +112,7 @@ TEST(Service, ServeDirectory) {
   EXPECT_EQ(ZX_ERR_BAD_STATE, loop.RunUntilIdle());
 }
 
-TEST(Service, ServiceNodeIsNotDirectory) {
+TEST(Service, OpenAsDirectoryShouldFail) {
   // Set up the server
   auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
 
@@ -131,13 +129,8 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   directory->AddEntry("abc", vnode);
   ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root_server)), ZX_OK);
 
-  // Call |ValidateOptions| with the directory flag should fail.
-  auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions{
-      .flags = fuchsia_io::OpenFlags::kDirectory,
-      .rights = fuchsia_io::kRwStarDir,
-  });
-  ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(ZX_ERR_NOT_DIR, result.status_value());
+  // The vnode shouldn't support anything except the connector protocol.
+  ASSERT_EQ(vnode->GetProtocols(), fio::NodeProtocolKinds::kConnector);
 
   // Open the service through FIDL with the directory flag, which should fail.
   auto [client, server] = fidl::Endpoints<fio::Node>::Create();
@@ -168,7 +161,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   loop.Shutdown();
 }
 
-TEST(Service, OpeningServiceWithNodeProtocol) {
+TEST(Service, OpenAsNode) {
   // Set up the server
   auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
 

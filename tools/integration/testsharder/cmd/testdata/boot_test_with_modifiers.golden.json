@@ -39,6 +39,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "boot-test_product_bundle/zbi",
             "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm.botanist.json",
@@ -48,7 +49,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundles.json"
         ],
         "timeout_secs": 602,
@@ -86,8 +86,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "602s",
             "-ffx",
@@ -142,6 +140,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "boot-test_product_bundle/zbi",
             "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm.botanist.json",
@@ -151,7 +150,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundles.json"
         ],
         "timeout_secs": 602,
@@ -189,8 +187,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "602s",
             "-ffx",

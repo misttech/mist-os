@@ -432,6 +432,201 @@ TEST_F(UtimensatTest, ReturnsENOENTOnEmptyPath) {
   EXPECT_TRUE(helper.WaitForChildren());
 }
 
+class CapDacTest : public ::testing::Test {
+ protected:
+  void SetUp() {
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+    }
+
+    char dir_template[] = "/tmp/XXXXXX";
+    ASSERT_NE(mkdtemp(dir_template), nullptr)
+        << "failed to create test folder: " << std::strerror(errno);
+    test_folder_ = std::string(dir_template);
+
+    test_file_ = test_folder_ + "/testfile";
+    int fd = open(test_file_.c_str(), O_RDWR | O_CREAT, 0666);
+    ASSERT_NE(fd, -1) << "failed to create test file: " << std::strerror(errno);
+    close(fd);
+
+    ASSERT_EQ(chown(test_folder_.c_str(), kOwnerUid, kOwnerGid), 0);
+    ASSERT_EQ(chmod(test_folder_.c_str(), 0777), 0);
+    ASSERT_EQ(chmod(test_file_.c_str(), 0666), 0);
+    ASSERT_EQ(chown(test_file_.c_str(), kOwnerUid, kOwnerGid), 0);
+  }
+
+  void TearDown() {
+    if (test_file_.length() != 0) {
+      ASSERT_EQ(remove(test_file_.c_str()), 0);
+    }
+    if (test_folder_.length() != 0) {
+      ASSERT_EQ(remove(test_folder_.c_str()), 0);
+    }
+  }
+
+  // test folder owned by kOwnerUid, perms 0o777
+  std::string test_folder_;
+
+  // test file owned by kOwnerUid, perms 0o666
+  std::string test_file_;
+};
+
+TEST_F(CapDacTest, NonOwnerCanReadAndTraverseDirectoryWithDacOverrideOrReadSearch) {
+  ASSERT_EQ(chmod(test_folder_.c_str(), 0), 0);
+
+  // Unreadable directory is unreadable without CAP_DAC_* capabilities.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+
+    fbl::unique_fd fd(open(test_folder_.c_str(), O_RDONLY));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDONLY)";
+
+    fd.reset(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDONLY)";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unreadable directory can be read and traversed with only CAP_DAC_READ_SEARCH.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_READ_SEARCH));
+
+    fbl::unique_fd fd(open(test_folder_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+    fd.reset(open(test_folder_.c_str(), O_RDWR));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDWR)";
+
+    fd.reset(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+    // The file can also be written, since the caller still has write permission to it.
+    fd.reset(open(test_file_.c_str(), O_RDWR));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDWR): " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unreadable directory can be read and traversed with only CAP_DAC_OVERRIDE.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+
+    fbl::unique_fd fd(open(test_folder_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+    fd.reset(open(test_folder_.c_str(), O_RDWR));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDWR)";
+
+    fd.reset(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+    // The file can also be written, since the caller still has write permission to it.
+    fd.reset(open(test_file_.c_str(), O_RDWR));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDWR): " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(CapDacTest, NonOwnerCanWriteDirectoryWithDacOverride) {
+  ASSERT_EQ(chmod(test_folder_.c_str(), 0), 0);
+
+  // Unwritable directory is unwritable without CAP_DAC_OVERRIDE capability.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    std::string write_test_file = test_folder_ + "/testfile_without_dac_caps";
+    fbl::unique_fd fd(open(write_test_file.c_str(), O_RDWR | O_CREAT, 0666));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDWR|O_CREAT) inside dir";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unwritable directory cannot be written with only CAP_DAC_READ_SEARCH.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_READ_SEARCH));
+    std::string write_test_file = test_folder_ + "/testfile_with_dac_read_search";
+    fbl::unique_fd fd(open(write_test_file.c_str(), O_RDWR | O_CREAT, 0666));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDWR|O_CREAT) inside dir";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unwritable directory can be written with only CAP_DAC_OVERRIDE.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+
+    std::string write_test_file = test_folder_ + "/testfile_with_dac_override";
+    fbl::unique_fd fd(open(write_test_file.c_str(), O_RDWR | O_CREAT, 0666));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDWR|O_CREAT) inside dir: " << std::strerror(errno);
+    ASSERT_EQ(remove(write_test_file.c_str()), 0) << "remove() test file: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(CapDacTest, NonOwnerCanReadFileWithDacOverrideOrReadSearch) {
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+
+  // Unreadable file is unreadable without CAP_DAC_* capabilities.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    fbl::unique_fd fd(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDONLY)";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unreadable file can be read with only CAP_DAC_READ_SEARCH.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_READ_SEARCH));
+    fbl::unique_fd fd(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+    fd.reset(open(test_file_.c_str(), O_RDWR));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_RDWR)";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unreadable file can be read with only CAP_DAC_OVERRIDE.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    fbl::unique_fd fd(open(test_file_.c_str(), O_RDONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_RDONLY): " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(CapDacTest, NonOwnerCanWriteFileWithDacOverride) {
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+
+  // Unwritable file is unwritable without CAP_DAC_OVERRIDE capability.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    fbl::unique_fd fd(open(test_file_.c_str(), O_WRONLY));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_WRONLY)";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unwritable file cannot be written with only CAP_DAC_READ_SEARCH.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_READ_SEARCH));
+    fbl::unique_fd fd(open(test_file_.c_str(), O_WRONLY));
+    EXPECT_FALSE(fd.is_valid()) << "open(O_WRONLY)";
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Unwritable file can be written with only CAP_DAC_OVERRIDE.
+  helper.RunInForkedProcess([this] {
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    fbl::unique_fd fd(open(test_file_.c_str(), O_WRONLY));
+    EXPECT_TRUE(fd.is_valid()) << "open(O_WRONLY): " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
 std::optional<std::string> MountOverlayFs(const std::string &temp_dir) {
   EXPECT_FALSE(temp_dir.empty());
 

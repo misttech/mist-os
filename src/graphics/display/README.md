@@ -32,14 +32,14 @@ consumers.
 
 The Display Coordinator maintains the state needed to multiplex the display
 engine hardware across multiple display clients. The Coordinator's design aims
-to allow for multiple display clients and multiple display engine drivers, but
-this goal was sacrificed in a few places, in the name of expediency.
+to allow for multiple display clients and multiple display engine drivers. This
+goal was sacrificed in a few places, in the name of expediency.
 
 Whenever possible, data processing is implemented in the Coordinator, reducing
 the implementation complexity of hardware-specific display drivers. For example,
-the Coordinator parses [EDID (Extended Display Identification Data)][edid], and
-the display drivers are only responsible for reading the EDID bytes from the
-display hardware.
+the Coordinator performs all the hardware-independent validation of the layer
+configurations received from display clients, before passing the configurations
+to the display engine drivers.
 
 The Coordinator implements the `fuchsia.hardware.display/Coordinator` FIDL
 interface, described above, to serve requests from display clients such as
@@ -50,7 +50,7 @@ the Fuchsia platform source tree. The `fuchsia.hardware.display/Coordinator`
 FIDL interface is currently served under the `display-coordinator` class in
 [`devfs`][devfs].
 
-### The FIDL and Banjo interfaces for display engine drivers
+### The interface between the Display Coordinator and engine drivers
 
 The Coordinator will soon use the
 [`fuchsia.hardware.display.engine/Engine`][display-engine-fidl] FIDL interface
@@ -58,31 +58,56 @@ to communicate with hardware-specific display drivers. This FIDL interface will
 soon become a part of the Fuchsia System Interface, and will be covered by API
 stability guarantees.
 
-The Coordinator currently also uses the
+The Coordinator currently uses the
 [`fuchsia.hardware.display.controller/DisplayEngine`][display-controller-banjo]
 Banjo interface to communicate with display engine drivers. This interface is
 associated with the `DISPLAY_CONTROLLER_IMPL` [protocol][dfv1-protocol]
-identifier. This Banjo interface will be removed when
-[DFv1 (Driver Framework v1)][dfv1] support is removed from the display stack.
+identifier. This Banjo interface will be removed when all the supported drivers
+are migrated to FIDL.
 
 ### Display engine drivers
 
 Display engine drivers contain hardware-specific logic for driving a display
 engine.
 
-All new display drivers shall be built on top of
-[DFv2 (Driver Framework v2)][dfv2]. Each DFv2 driver exposes an implementation
-of the `fuchsia.hardware.display.engine/Engine` FIDL interface to integrate with
-the rest of the display stack. Each driver uses the
-[DFv2 (Driver Framework v2) FIDL interface][dfv2-fidl] to communicate with the
-Driver Framework.
+Display engine drivers are currently built on top of [DFv2 (Driver Framework
+v2)][dfv2]. Drivers communicate with the Driver Framework via the [DFv2 (Driver
+Framework v2) FIDL interface][dfv2-fidl].
 
-At the time of this writing, existing display drivers are built on top of DFv1.
-These drivers will be [migrated to DFv2][dfv2-migration] or removed from the
-Fuchsia platform source tree.
+Many display engine drivers interface with the Display Coordinator using the
+[api-protocols][display-api-protocols] and [api-types][display-api-types]
+libraries. These libraries are ergonomic wrappers for proxies generated from the
+FIDL and Banjo interfaces mentioned above.
+
+Most display engine drivers were initially built on top of [DFv1][dfv1] and
+[migrated to DFv2][dfv2-migration]. The DFv1 legacy may show up in the drivers'
+structure, variable names, or comments. We consider this to be technical debt
+that causes cognitive overhead, and we aim to clean it up.
+
+## Coding standards
+
+We aim to have the display driver stack closely follow all applicable style
+guides. We see unnecessary variations as a source of complexity.
+
+The following list aims to include all the style guides referenced in our code
+reviews.
+
+* [Fuchsia C++ style guide][style-fuchsia-cpp]
+* [Google C++ style guide][style-google-cpp]
+* [Abseil C++ tips of the week][style-abseil-totw]
+* [Abseil performance guide][style-abseil-perf]
+* [TotT (Tech on the Toilet) in the Google Testing Blog][style-google-testing]
+* [Fuchsia documentation standards][style-fuchsia-doc-standards]
+* [Fuchsia documentation style guide][style-fuchsia-docs]
+* [Google developer documentation style guide][style-google-docs]
+* [Fuchsia FIDL style guide][style-fuchsia-fidl]
+* [Fuchsia FIDL API rubric][style-fuchsia-fidl-rubric]
+* [Software Engineering at Google][style-google-swe-book]
 
 [carnelian]: /src/bringup/bin/virtcon/README.md
 [devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
+[display-api-protocols]: /src/graphics/display/lib/api-protocols/README.md
+[display-api-types]: /src/graphics/display/lib/api-types/README.md
 [dfv1]: /docs/development/drivers/concepts/fdf.md
 [dfv1-protocol]: /docs/development/drivers/concepts/device_driver_model/protocol.md
 [dfv2]: /docs/concepts/drivers/driver_framework.md
@@ -93,8 +118,18 @@ Fuchsia platform source tree.
 [display-controller-banjo]: /sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
 [display-coordinator-fidl]: /sdk/fidl/fuchsia.hardware.display/coordinator.fidl
 [display-engine-fidl]: /sdk/fidl/fuchsia.hardware.display.engine/engine.fidl
-[edid]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
 [fuchsia-system-interface]: /docs/concepts/packages/system.md
 [recovery-ui]: /src/recovery/lib/recovery-ui/BUILD.gn
 [scenic]: /docs/concepts/ui/scenic/index.md
+[style-abseil-perf]: https://abseil.io/fast/
+[style-abseil-totw]: https://abseil.io/tips/
+[style-fuchsia-cpp]: /docs/development/languages/c-cpp/cpp-style.md
+[style-fuchsia-docs]: /docs/contribute/docs/documentation-style-guide.md
+[style-fuchsia-doc-standards]: /doc/contribute/docs/documentation-standards.md
+[style-fuchsia-fidl]: /docs/development/languages/fidl/guides/style.md
+[style-fuchsia-fidl-rubric]: https://fuchsia.dev/fuchsia-src/development/api/fidl/
+[style-google-cpp]: https://google.github.io/styleguide/cppguide.html
+[style-google-docs]: https://developers.google.com/style
+[style-google-swe-book]: https://abseil.io/resources/swe-book
+[style-google-testing]: https://testing.googleblog.com/search/label/TotT
 [virtcon]: /src/bringup/bin/virtcon/README.md

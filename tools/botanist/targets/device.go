@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -24,7 +23,6 @@ import (
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/netboot"
-	"go.fuchsia.dev/fuchsia/tools/net/netutil"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	"go.fuchsia.dev/fuchsia/tools/net/tftp"
 
@@ -49,11 +47,6 @@ const (
 	// Timeout to observe fastbootIdleSignature before proceeding anyway
 	// after hard power cycle
 	fastbootIdleWaitTimeoutSecs = 10
-
-	// One of the possible InstallMode mode types.
-	// Indicates that the target device is idling in fastboot mode.
-	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
-	fastbootMode = "fastboot"
 )
 
 // DeviceConfig contains the static properties of a target device.
@@ -86,12 +79,13 @@ type DeviceConfig struct {
 	// failure, not papering over it with retries.
 	MaxFlashAttempts int `json:"max_flash_attempts,omitempty"`
 
-	// InstallMode is an optional string that tells botanist what
-	// method to use to install fuchsia. This will be used to help
-	// botanist distinguish between NUC11s that should be paved and
-	// those that will be flashed (if the install_mode is fastboot).
-	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
-	InstallMode string `json:"install_mode,omitempty"`
+	// TCPFastboot is an optional bool that tells botanist whether
+	// a device idles in TCP fastboot or not. Botanist uses TCP
+	// ffx commands to flash devices in fastboot TCP as opposed to
+	// devices in USB fastboot. This distinction is important for
+	// botanist to determine which commands to use to flash devices
+	// in fastboot.
+	TCPFastboot bool `json:"tcp_fastboot,omitempty"`
 }
 
 // NetworkProperties are the static network properties of a target.
@@ -144,7 +138,7 @@ func NewDevice(ctx context.Context, config DeviceConfig, opts Options) (*Device,
 	}
 	var s io.ReadWriteCloser
 	if config.SerialMux != "" {
-		if config.FastbootSernum == "" && config.InstallMode != fastbootMode {
+		if config.FastbootSernum == "" && !config.TCPFastboot {
 			s, err = serial.NewSocket(ctx, config.SerialMux)
 			if err != nil {
 				return nil, fmt.Errorf("unable to open: %s: %w", config.SerialMux, err)
@@ -223,12 +217,8 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(&net.IPAddr{IP: addr}, "device")
 }
 
-func (t *Device) mustLoadThroughZedboot() bool {
-	return t.config.FastbootSernum == "" && t.config.InstallMode != fastbootMode
-}
-
 // Start starts the device target.
-func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) error {
+func (t *Device) Start(ctx context.Context, args []string, pbPath string, isBootTest bool) error {
 	serialSocketPath := t.SerialSocketPath()
 
 	// Set up log listener and dump kernel output to stdout.
@@ -281,7 +271,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	}
 
 	// Boot Fuchsia.
-	if t.config.FastbootSernum != "" || t.config.InstallMode == fastbootMode {
+	if t.config.FastbootSernum != "" || t.config.TCPFastboot {
 		maxAllowedAttempts := 1
 		if t.config.MaxFlashAttempts > maxAllowedAttempts {
 			maxAllowedAttempts = t.config.MaxFlashAttempts
@@ -330,63 +320,6 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 					return errWrapped
 				}
 			}
-		}
-	}
-	if t.mustLoadThroughZedboot() {
-		// Initialize the tftp client if:
-		// 1. It is currently uninitialized.
-		// 2. The device has been placed in Zedboot.
-		if t.tftp == nil {
-			// Discover the node on the network and initialize a tftp client to
-			// talk to it.
-			addr, err := netutil.GetNodeAddress(ctx, t.Nodename())
-			if err != nil {
-				return err
-			}
-			tftpClient, err := tftp.NewClient(&net.UDPAddr{
-				IP:   addr.IP,
-				Port: tftp.ClientPort,
-				Zone: addr.Zone,
-			}, 0, 0)
-			if err != nil {
-				return err
-			}
-			t.tftp = tftpClient
-		}
-		// For boot tests, we need to add the appropriate boot args to the
-		// specified custom images instead of the default images, so we'll pass
-		// in only the custom images to bootserver.Boot() to exclude the default
-		// images which already have boot args attached to them.
-		var finalImgs []bootserver.Image
-		var zbi, fvm *bootserver.Image
-		if isBootTest {
-			// Only get images from product bundle for boot tests when
-			// loading through zedboot. Regular tests should just use
-			// the images from images.json as is.
-			zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-			if err != nil {
-				return err
-			}
-			if zbi != nil {
-				zbi.Args = []string{"--boot"}
-				finalImgs = append(finalImgs, *zbi)
-			}
-			fvm, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-			if err != nil {
-				return err
-			}
-			if fvm != nil {
-				fvm.Args = []string{"--fvm"}
-				finalImgs = append(finalImgs, *fvm)
-			}
-		}
-		if len(finalImgs) == 0 {
-			for _, img := range images {
-				finalImgs = append(finalImgs, img)
-			}
-		}
-		if err := bootserver.Boot(ctx, t.Tftp(), finalImgs, args, authorizedKeys); err != nil {
-			return err
 		}
 	}
 

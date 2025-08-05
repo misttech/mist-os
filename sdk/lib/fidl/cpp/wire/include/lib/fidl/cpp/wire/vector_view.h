@@ -7,11 +7,13 @@
 
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/stdcompat/span.h>
+#include <zircon/availability.h>
 #include <zircon/fidl.h>
 
 #include <algorithm>
 #include <iterator>
 #include <type_traits>
+#include <vector>
 
 namespace {
 class LayoutChecker;
@@ -135,6 +137,8 @@ class VectorView {
   constexpr cpp20::span<T> get() const { return {data(), size()}; }
 
   constexpr size_t size() const { return size_; }
+
+  // TODO(https://fxbug.dev/430121763): Migrate away from this setter.
   constexpr void set_size(size_t size) { size_ = size; }
 
   // Deprecated in favor of `size()`.
@@ -142,9 +146,11 @@ class VectorView {
   // The Banjo convention was to use `count()` to express quantities of
   // elements, and use `size()` to express quantities of bytes. This method
   // facilitates migrating from Banjo to FIDL.
+  ZX_REMOVED_SINCE(1, 28, HEAD, "Use size()")
   constexpr size_t count() const { return size(); }
 
   // Deprecated in favor of `set_size()`. See `count()` for historical context.
+  ZX_REMOVED_SINCE(1, 28, HEAD, "Use set_size()")
   void set_count(size_t size) { set_size(size); }
 
   constexpr T* data() const { return data_; }

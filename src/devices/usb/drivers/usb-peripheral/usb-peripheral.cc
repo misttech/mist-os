@@ -90,6 +90,26 @@ zx::result<> UsbPeripheral::Start() {
     return client.take_error();
   }
   dci_new_.Bind(std::move(*client));
+  // Try to set DciIntf over FIDL. We don't do this for Banjo because SetInterface is used to
+  // indicate that all functions have been attached/un-attached. This is a separate method in
+  // FIDL, so we set DciIntf here for FIDL.
+  fidl::Arena arena;
+  auto client_end = intf_srv_.AddBinding();
+  auto result = dci_new_.buffer(arena)->SetInterface(std::move(client_end));
+  // DCI FIDL is not available. Return OK because we could be using Banjo DCI instead.
+  // In the future when we remove banjo. This should be an error.
+  if (!result.ok()) {
+    fdf::debug("Failed to send SetInterface request: {}", result.status_string());
+    return zx::ok();
+  }
+  if (result->is_error()) {
+    if (result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+      return zx::ok();
+    }
+    fdf::error("Failed to set interface: {}", zx_status_get_string(result->error_value()));
+    return zx::error(result->error_value());
+  }
+  dci_new_valid_ = true;
 
   zx::result dci_banjo = compat::ConnectBanjo<ddk::UsbDciProtocolClient>(incoming());
   if (dci_banjo.is_error()) {
@@ -195,27 +215,6 @@ zx::result<> UsbPeripheral::Start() {
   }
 
   usb_monitor_.Start();
-
-  // Try to set DciIntf over FIDL. We don't do this for Banjo because SetInterface is used to
-  // indicate that all functions have been attached/un-attached. This is a separate method in
-  // FIDL, so we set DciIntf here for FIDL.
-  fidl::Arena arena;
-  auto client_end = intf_srv_.AddBinding();
-  auto result = dci_new_.buffer(arena)->SetInterface(std::move(client_end));
-  // DCI FIDL is not available. Return OK because we could be using Banjo DCI instead.
-  // In the future when we remove banjo. This should be an error.
-  if (!result.ok()) {
-    fdf::debug("Failed to send SetInterface request: {}", result.status_string());
-    return zx::ok();
-  }
-  if (result->is_error()) {
-    if (result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-      return zx::ok();
-    }
-    fdf::error("Failed to set interface: {}", zx_status_get_string(result->error_value()));
-    return zx::error(result->error_value());
-  }
-  dci_new_valid_ = true;
 
   return zx::ok();
 }
@@ -339,6 +338,10 @@ zx_status_t UsbPeripheral::ValidateFunction(size_t function_index, void* descrip
 }
 
 bool UsbPeripheral::AllFunctionsRegistered() const {
+  if (!lock_functions_) {
+    return false;
+  }
+
   for (const auto& config : configurations_) {
     for (auto function_index : config.functions) {
       const auto& function = GetFunction(function_index);

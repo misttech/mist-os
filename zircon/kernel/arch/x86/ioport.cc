@@ -15,7 +15,6 @@
 #include <arch/x86/ioport.h>
 #include <arch/x86/mp.h>
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
 #include <kernel/thread.h>
@@ -46,7 +45,7 @@ static void x86_clear_tss_io_bitmap(const bitmap::RleBitmap& bitmap) {
 }
 
 void x86_clear_tss_io_bitmap(IoBitmap& io_bitmap) {
-  AutoSpinLockNoIrqSave guard(&io_bitmap.lock_);
+  Guard<SpinLock, NoIrqSave> guard(&io_bitmap.lock_);
   if (!io_bitmap.bitmap_)
     return;
 
@@ -65,7 +64,7 @@ static void x86_set_tss_io_bitmap(const bitmap::RleBitmap& bitmap) {
 }
 
 void x86_set_tss_io_bitmap(IoBitmap& io_bitmap) {
-  AutoSpinLockNoIrqSave guard(&io_bitmap.lock_);
+  Guard<SpinLock, NoIrqSave> guard(&io_bitmap.lock_);
   if (!io_bitmap.bitmap_)
     return;
 
@@ -99,7 +98,7 @@ void IoBitmap::UpdateTask(void* raw_context) {
   // reprogram the hardware to match.
   IoBitmap* io_bitmap = GetCurrent();
   if (io_bitmap == context->io_bitmap) {
-    AutoSpinLockNoIrqSave guard(&io_bitmap->lock_);
+    Guard<SpinLock, NoIrqSave> guard(&io_bitmap->lock_);
     // This is overkill, but it's much simpler to reason about
     x86_reset_tss_io_bitmap();
     x86_set_tss_io_bitmap(*io_bitmap->bitmap_);
@@ -162,7 +161,7 @@ int IoBitmap::SetIoBitmap(uint32_t port, uint32_t len, bool enable) {
     AutoPreemptDisabler preempt_disabler;
 
     {
-      AutoSpinLock guard(&lock_);
+      Guard<SpinLock, IrqSave> guard(&lock_);
 
       if (!bitmap_) {
         bitmap_ = ktl::move(optimistic_bitmap);

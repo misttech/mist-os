@@ -280,7 +280,7 @@ class VmPageOrMarker {
     // PAGE_SIZE_SHIFT bits and store only the upper bits.
     void SetAwaitingCleanLength(uint64_t len) {
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
-      DEBUG_ASSERT(IS_ALIGNED(len, PAGE_SIZE));
+      DEBUG_ASSERT(IS_ROUNDED(len, PAGE_SIZE));
       len = (len >> PAGE_SIZE_SHIFT) << kAwaitingCleanLengthShift;
       // Clear the old value.
       value_ &= BIT_MASK32(kAwaitingCleanLengthShift);
@@ -1175,11 +1175,11 @@ class VmPageList final {
   }
 
   // Takes the content out of this page list and places them in the provided |splice| list, which
-  // must have already been initialized but still be empty. The range to be taken is the range
-  // specified by the |splice| list, and will be |Finalize|d before returning.
-  // May return ZX_ERR_OUT_OF_MEMORY, in which case an unspecified number of pages will have been
-  // moved into |splice|.
-  zx_status_t TakePages(VmPageSpliceList* splice);
+  // must have already been initialized but still be empty. The range to be taken is determined by
+  // the provided |offset| and the length of the |splice| list, and will be |Finalize|d before
+  // returning. May return ZX_ERR_OUT_OF_MEMORY, in which case an unspecified number of pages will
+  // have been moved into |splice|.
+  zx_status_t TakePages(uint64_t offset, VmPageSpliceList* splice);
 
   // Moves the pages in the specified range in |this| onto the |other| with |offset| in this
   // mapping to the offset of 0 in |other|.
@@ -1420,8 +1420,8 @@ class VmPageList final {
   template <typename PTR_TYPE, NodeCheck NODE_CHECK, typename S, typename F>
   static zx_status_t ForEveryPageInRangeInternal(S self, F per_page_func, auto cur,
                                                  uint64_t start_offset, uint64_t end_offset) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(start_offset));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(end_offset));
     start_offset += self->list_skew_;
     end_offset += self->list_skew_;
 
@@ -1816,19 +1816,18 @@ class VmPageSpliceList final {
  public:
   VmPageSpliceList() = default;
   // Convenience constructor that calls Initialize.
-  VmPageSpliceList(uint64_t offset, uint64_t length) { Initialize(offset, length); }
+  explicit VmPageSpliceList(uint64_t length) { Initialize(length); }
   ~VmPageSpliceList();
 
   // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
   // finalized list.
-  static zx_status_t CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+  static zx_status_t CreateFromPageList(uint64_t length, list_node* pages,
                                         VmPageSpliceList* splice);
 
   // Initialize the list with the given range and skew. Can only be done once, and must be done
   // before providing pages.
-  void Initialize(uint64_t offset, uint64_t length) {
+  void Initialize(uint64_t length) {
     DEBUG_ASSERT(IsEmpty() && state_ == State::Constructed);
-    offset_ = offset;
     length_ = length;
     state_ = State::Initialized;
   }
@@ -1841,10 +1840,10 @@ class VmPageSpliceList final {
   // if and only if it is a reference. It is invalid to peek at a non-finalized splice list.
   VmPageOrMarkerRef PeekReference();
 
-  // Appends `content` to the end of the splice list.
+  // Inserts the |content| into the splice list at the specified |offset|.
   // The splice list takes ownership of `content` after this call.
   // It is invalid to append to a finalized splice list.
-  zx_status_t Append(VmPageOrMarker content);
+  zx_status_t Insert(uint64_t offset, VmPageOrMarker content);
 
   // Returns true after the whole collection has been processed by Pop.
   bool IsProcessed() const { return state_ == State::Processed; }
@@ -1860,7 +1859,6 @@ class VmPageSpliceList final {
   // to call it. Note that it is invalid to call `Finalize` twice on the same list.
   void Finalize() {
     DEBUG_ASSERT(IsInitialized());
-    pos_ = 0;
     state_ = State::Finalized;
   }
 
@@ -1878,12 +1876,11 @@ class VmPageSpliceList final {
 
   // Initialize the skew. Must be done after calling Initialize, but before adding any content. Only
   // necessary if directly moving list nodes where the skew has an impact.
-  void InitializeSkew(uint64_t skew) {
+  void InitializeSkew(uint64_t offset, uint64_t skew) {
     DEBUG_ASSERT(IsInitialized() && IsEmpty());
-    page_list_.InitializeSkew(skew, offset_);
+    page_list_.InitializeSkew(skew, offset);
   }
 
-  uint64_t offset_ = 0;
   uint64_t length_ = 0;
   uint64_t pos_ = 0;
 

@@ -25,9 +25,9 @@ use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly, CacheMode,
-    DirEntry, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+    DirEntry, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileObjectState,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
 };
 use starnix_core::{fileops_impl_dataless, security};
 use starnix_lifecycle::AtomicU64Counter;
@@ -36,8 +36,8 @@ use starnix_logging::{
     track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked,
-    Mutex, MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
+    ordered_lock_vec, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked, Mutex,
+    MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::convert::IntoFidl as _;
@@ -152,10 +152,10 @@ impl Deref for BinderDevice {
 impl DeviceOps for BinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let identifier = self.create_local_process(current_task.thread_group_key.clone());
@@ -205,12 +205,12 @@ impl FileOps for BinderConnection {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
-        self.close(current_task.kernel());
+        (*self).close(current_task.kernel());
     }
 
     fn query_events(
@@ -4154,7 +4154,7 @@ impl BinderDriver {
                 let transaction = TransactionData {
                     peer_pid: binder_proc.key.pid(),
                     peer_tid: binder_thread.tid,
-                    peer_euid: current_task.creds().euid,
+                    peer_euid: current_task.current_creds().euid,
                     object: {
                         if handle.is_handle_0() {
                             // This handle (0) always refers to the context manager, which is always
@@ -4333,7 +4333,7 @@ impl BinderDriver {
                 target_thread.lock().enqueue_command(Command::Reply(TransactionData {
                     peer_pid: binder_proc.key.pid(),
                     peer_tid: binder_thread.tid,
-                    peer_euid: current_task.creds().euid,
+                    peer_euid: current_task.current_creds().euid,
 
                     object: FlatBinderObject::Remote { handle: Handle::ContextManager },
                     code: data.transaction_data.code,
@@ -5246,23 +5246,29 @@ struct BinderFsState {
 }
 
 impl BinderFsDir {
-    fn new(current_task: &CurrentTask) -> Result<Self, Errno> {
-        let kernel = current_task.kernel();
+    fn new(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<Self, Errno> {
         let registry = &kernel.device_registry;
         let mut devices = BTreeMap::<FsString, DeviceType>::default();
-        let remote_device =
-            registry.register_silent_dyn_device("remote-binder".into(), RemoteBinderDevice {})?;
+        let remote_device = registry.register_silent_dyn_device(
+            locked,
+            "remote-binder".into(),
+            RemoteBinderDevice {},
+        )?;
         devices.insert("remote".into(), remote_device.device_type);
 
         for name in DEFAULT_BINDERS {
-            let device_metadata =
-                registry.register_silent_dyn_device(name.into(), BinderDevice::default())?;
+            let device_metadata = registry.register_silent_dyn_device(
+                locked,
+                name.into(),
+                BinderDevice::default(),
+            )?;
             devices.insert(name.into(), device_metadata.device_type);
         }
         let state = Arc::new(BinderFsState { devices: devices.into() });
 
         let control_device = registry
             .register_silent_dyn_device(
+                locked,
                 BINDER_CONTROL_DEVICE.into(),
                 BinderControlDevice { state: state.clone() },
             )?
@@ -5341,7 +5347,7 @@ impl BinderFs {
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, BinderFs, options)?;
-        let ops = BinderFsDir::new(current_task)?;
+        let ops = BinderFsDir::new(locked, kernel)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, ops);
         Ok(fs)
@@ -5356,10 +5362,10 @@ struct BinderControlDevice {
 impl DeviceOps for BinderControlDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(self.clone()))
@@ -5373,7 +5379,7 @@ impl FileOps for BinderControlDevice {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -5406,9 +5412,11 @@ impl FileOps for BinderControlDevice {
                 Entry::Occupied(_) => error!(EEXIST),
                 Entry::Vacant(entry) => {
                     let kernel = current_task.kernel();
-                    let device_metadata = kernel
-                        .device_registry
-                        .register_silent_dyn_device((*name).into(), BinderDevice::default())?;
+                    let device_metadata = kernel.device_registry.register_silent_dyn_device(
+                        locked,
+                        (*name).into(),
+                        BinderDevice::default(),
+                    )?;
                     entry.insert(device_metadata.device_type);
                     request.major = device_metadata.device_type.major();
                     request.minor = device_metadata.device_type.minor();
@@ -5492,7 +5500,7 @@ pub mod tests {
     use starnix_core::testing::*;
     use starnix_core::vfs::{anon_fs, Anon};
     use starnix_uapi::errors::{EBADF, EINVAL};
-    use starnix_uapi::file_mode::FileMode;
+
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         BINDER_TYPE_WEAK_HANDLE,
@@ -7994,18 +8002,15 @@ pub mod tests {
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
         let fs = anon_fs(locked, current_task.kernel());
-        let node = fs.create_node_and_allocate_node_id(
-            Anon::new_for_binder_device(),
-            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
-        );
+        let node = create_namespace_node_for_testing(&fs, Anon::new_for_binder_device());
 
-        let locked = locked.cast_locked::<DeviceOpen>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         FileObject::new_anonymous(
             current_task,
             binder_driver
                 .open(locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
-            node,
+            node.entry.node.clone(),
             OpenFlags::RDWR,
         )
     }

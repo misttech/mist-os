@@ -44,18 +44,22 @@ using scenic_impl::RendererType;
 
 // App installs the loader manifest FS at this path so it can use
 // fsl::DeviceWatcher on it.
-static const char* kDependencyPath = "/gpu-manifest-fs";
+const char* kDependencyPath = "/gpu-manifest-fs";
 
-static constexpr zx::duration kShutdownTimeout = zx::sec(1);
+constexpr zx::duration kShutdownTimeout = zx::sec(1);
 
 // After every Flatland frame is sent to the display, we kick off a task for Escher to clean up
 // unused Vulkan resources such as command buffers, which repeats with the specified interval until
 // all resources are cleaned up.
-static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
+constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
 
 // The maximum number of "layers" that can be passed to the display hardware in a single frame,
 // per display.
-static constexpr uint32_t kMaxDisplayLayers = 4;
+constexpr uint32_t kMaxDisplayLayers = 4;
+
+// See "Config for Fuchsia Visual Debugging": go/config-fuchsia-visual-debugging
+constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO = 2;
+constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO_PLUS = 3;
 
 std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
@@ -153,7 +157,8 @@ scenic_structured_config::Config GetConfig() {
                        .value
                 << " i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0)
                 << " display_rotation: " << GetDisplayRotation(values)
-                << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
+                << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level())
+                << " enable_frame_counter_overlay: " << values.enable_frame_counter_overlay();
 
   return values;
 }
@@ -431,8 +436,15 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.display_composition(), kMaxDisplayLayers,
-        config_values_.visual_debugging_level());
+        flatland::DisplayCompositorConfig{
+            .enable_direct_to_display = config_values_.display_composition(),
+            .max_display_layers = kMaxDisplayLayers,
+            .tint_gpu_fallback_images =
+                (config_values_.visual_debugging_level() >= VISUAL_DEBUGGING_LEVEL_INFO),
+            .enable_frame_counter_overlay =
+                config_values_.enable_frame_counter_overlay() ||
+                (config_values_.visual_debugging_level() >= VISUAL_DEBUGGING_LEVEL_INFO_PLUS),
+        });
   }
 
   // Flatland manager depends on compositor, and is required by engine.

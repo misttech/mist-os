@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::init_connection_behavior;
+use crate::init_daemon_connection_behavior;
 use anyhow::Context;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
@@ -52,8 +52,8 @@ impl TryFromEnv for DaemonProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let target_env = target_interface(env);
         if target_env.behavior().is_none() {
-            let b = init_connection_behavior(env.environment_context()).await?;
-            target_env.set_behavior(b);
+            let b = init_daemon_connection_behavior(env.environment_context()).await?;
+            target_env.set_behavior(b)?;
         }
         // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
         // into a user error. This line originally casted every error into "Failed to create daemon
@@ -379,6 +379,8 @@ impl Injector for Injection {
         })?
     }
 
+    /// TODO(b/432297777)
+    #[allow(clippy::await_holding_lock)]
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
         let timeout_error = self.daemon_timeout_error();
         // XXX Note: if we are doing local discovery, that will eat into this time.

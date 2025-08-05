@@ -147,7 +147,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   REGISTER_CALL_TRACKER(AsyncRemove)
   REGISTER_CALL_TRACKER(UnbindReply)
   REGISTER_CALL_TRACKER(SuspendReply)
-  REGISTER_CALL_TRACKER(ResumeReply)
   REGISTER_CALL_TRACKER(Remove)
   REGISTER_CALL_TRACKER(ChildPreRelease)
 #undef REGISTER_CALL_TRACKER
@@ -159,8 +158,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   void UnbindOp();
   void ReleaseOp();
   void SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
-  zx_status_t ConfigureAutoSuspendOp(bool enable, uint8_t requested_state);
-  void ResumeNewOp(uint32_t requested_state);
   bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn);
   void ChildPreReleaseOp(void* child_ctx);
   bool HasUnbindOp() { return ops_->unbind != nullptr; }
@@ -205,16 +202,14 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   // You can add FIDL service here to your device or your parent device.
   // if you want to add a service to a fragment, add the fragment's name as 'name'.
-  // Devices will use `device_connect_fidl_protocol2` or
-  // `device_connect_fragment_fidl_protocol` to connect to these protocols
+  // Devices will use `device_connect_fragment_fidl_protocol` to connect to these protocols
   void AddFidlService(const char* service_name, fidl::ClientEnd<fuchsia_io::Directory> ns,
-                      const char* name = "");
+                      const char* name = "default");
 
   // This struct can also be a root parent device, with reduced functionality.
   // This allows the parent to store protocols that can be accessed by a child device.
   // If IsRootParent returns true, only the following calls may target this device:
   //  device_get_protocol
-  //  device_get_metadata_size
   //  device_get_metadata
   // These calls will be able to target this type of device soon:
   //  device_get_fragment
@@ -278,8 +273,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   zx_status_t ConnectToFidlProtocol(const char* service_name, const char* protocol_name,
                                     zx::channel request, const char* fragment_name = "");
-  friend zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request);
   friend zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* service_name,
@@ -288,9 +281,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   zx_status_t ConnectToRuntimeProtocol(const char* service_name, const char* protocol_name,
                                        fdf::Channel request, const char* fragment_name = "");
-  friend zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request);
   friend zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device,
                                                               const char* fragment_name,
                                                               const char* service_name,
@@ -305,10 +295,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
   friend zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf,
                                          size_t buflen, size_t* actual);
-
-  // device_get_metadata_size calls GetMetadataSize:
-  zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
-  friend zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size);
 
   // device_get_config_vmo calls GetConfigVmo:
   zx::vmo& GetConfigVmo() { return config_vmo_; }

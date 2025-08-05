@@ -266,29 +266,6 @@ type NodeAttributeFlags = strict bits : uint32 {
     MODIFICATION_TIME = 0x00000002;
 };
 
-/// Bits reserved for posix protections. Native fuchsia filesystems
-/// are not required to set bits contained within `MODE_PROTECTION_MASK`,
-/// but filesystems that wish to do so may refer to sys/stat.h for their
-/// definitions.
-const MODE_PROTECTION_MASK uint32 = 0x00FFF;
-
-// Chosen to match S_IFDIR.
-const MODE_TYPE_DIRECTORY uint32 = 0x04000;
-// Chosen to match S_IFBLK.
-const MODE_TYPE_BLOCK_DEVICE uint32 = 0x06000;
-// Chosen to match S_IFREG.
-const MODE_TYPE_FILE uint32 = 0x08000;
-// Chosen to match S_IFLNK.
-@available(added=HEAD)
-const MODE_TYPE_SYMLINK uint32 = 0x0A000;
-// Chosen arbitrarily.
-const MODE_TYPE_SERVICE uint32 = 0x10000;
-
-/// Bits indicating node type. The canonical mechanism to check
-/// for a node type is to take 'mode', bitwise AND it with the
-/// `MODE_TYPE_MASK`, and check exact equality against a mode type.
-const MODE_TYPE_MASK uint32 = 0xFF000;
-
 /// NodeAttributes defines generic information about a filesystem node.
 type NodeAttributes = struct {
     /// Protection bits and node type information describe in 'mode'.
@@ -400,7 +377,7 @@ open protocol Node {
     /// Acquires information about the node.
     ///
     /// This method does not require any rights.
-    @available(replaced=NEXT, renamed="DeprecatedGetAttr")
+    @available(replaced=28, renamed="DeprecatedGetAttr")
     @selector("fuchsia.io1/Node.GetAttr")
     strict GetAttr() -> (struct {
         s zx.Status;
@@ -410,7 +387,7 @@ open protocol Node {
     /// DEPRECATED - Use `Node.GetAttributes` instead.
     // TODO(https://fxbug.dev/324081103): Delete (don't just set removed=NEXT) this method once all
     // we have no remaining out-of-tree callers, or when we drop support for API level 28.
-    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.io/Node.GetAttributes instead.")
+    @available(added=28, deprecated=HEAD, note="Use fuchsia.io/Node.GetAttributes instead.")
     @selector("fuchsia.io1/Node.GetAttr")
     strict DeprecatedGetAttr() -> (struct {
         s zx.Status;
@@ -423,7 +400,7 @@ open protocol Node {
     ///
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
-    @available(replaced=NEXT, renamed="DeprecatedSetAttr")
+    @available(replaced=28, renamed="DeprecatedSetAttr")
     @selector("fuchsia.io1/Node.SetAttr")
     strict SetAttr(struct {
         flags NodeAttributeFlags;
@@ -436,7 +413,7 @@ open protocol Node {
     /// DEPRECATED - Use `Node.UpdateAttributes` instead.
     // TODO(https://fxbug.dev/324081103): Delete (don't just set removed=NEXT) this method once all
     // we have no remaining out-of-tree callers, or when we drop support for API level 28.
-    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.io/Node.UpdateAttributes instead.")
+    @available(added=28, deprecated=HEAD, note="Use fuchsia.io/Node.UpdateAttributes instead.")
     @selector("fuchsia.io1/Node.SetAttr")
     strict DeprecatedSetAttr(struct {
         flags NodeAttributeFlags;

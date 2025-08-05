@@ -33,7 +33,6 @@ const SKIP_LIST_LAYER_ITEMS: usize = 512;
 pub use persistent_layer::{
     LayerHeader as PersistentLayerHeader, LayerHeaderV39 as PersistentLayerHeaderV39,
     LayerInfo as PersistentLayerInfo, LayerInfoV39 as PersistentLayerInfoV39,
-    OldLayerInfo as OldPersistentLayerInfo, OldLayerInfoV32 as OldPersistentLayerInfoV32,
 };
 
 pub async fn layers_from_handles<K: Key, V: Value>(
@@ -395,7 +394,7 @@ impl<K: Key + LayerKey + OrdLowerBound, V: Value> LayerSet<K, V> {
     pub fn sum_len(&self) -> usize {
         let mut size = 0;
         for layer in &self.layers {
-            size += *layer.estimated_len()
+            size += layer.len()
         }
         size
     }
@@ -432,8 +431,8 @@ mod tests {
     };
     use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
     use crate::lsm_tree::types::{
-        BoxedLayerIterator, FuzzyHash, Item, ItemCount, ItemRef, Key, Layer, LayerIterator,
-        LayerKey, OrdLowerBound, OrdUpperBound, SortByU64, Value,
+        BoxedLayerIterator, FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerKey,
+        OrdLowerBound, OrdUpperBound, SortByU64, Value,
     };
     use crate::lsm_tree::{layers_from_handles, Query};
     use crate::object_handle::ObjectHandle;
@@ -447,8 +446,8 @@ mod tests {
     use fprint::TypeFingerprint;
     use fuchsia_sync::Mutex;
     use fxfs_macros::FuzzyHash;
+    use rand::rng;
     use rand::seq::SliceRandom;
-    use rand::thread_rng;
     use std::hash::Hash;
     use std::sync::Arc;
 
@@ -667,7 +666,7 @@ mod tests {
         }
         let b = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let mut shuffled = items.clone();
-        shuffled.shuffle(&mut thread_rng());
+        shuffled.shuffle(&mut rng());
         for item in &shuffled {
             b.insert(item.clone()).expect("insert error");
         }
@@ -860,8 +859,8 @@ mod tests {
             self.drop_event.lock().clone()
         }
 
-        fn estimated_len(&self) -> ItemCount {
-            ItemCount::Estimate(0)
+        fn len(&self) -> usize {
+            0
         }
 
         async fn close(&self) {

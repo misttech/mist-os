@@ -44,7 +44,7 @@ zx::result<const void *> ZirconPhysmemReader::PhysToPtr(uintptr_t phys, size_t l
   // Aim to map this 1-1 with what this address would be in the physmap. This essentially causes
   // pieces of the physmap that were not RAM, and may have previously been unmapped, to be mapped
   // back in if they are ACPI regions.
-  const paddr_t paddr_base = ROUNDDOWN(phys, PAGE_SIZE);
+  const paddr_t paddr_base = ROUNDDOWN_PAGE_SIZE(phys);
   const vaddr_t vaddr_base = reinterpret_cast<vaddr_t>(paddr_to_physmap(paddr_base));
   if (vaddr_base == 0) {
     return zx::error(ZX_ERR_INTERNAL);
@@ -60,7 +60,7 @@ zx::result<const void *> ZirconPhysmemReader::PhysToPtr(uintptr_t phys, size_t l
   }
 
   zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
-      vaddr_base, paddr_base, (ROUNDUP(phys_end, PAGE_SIZE) - paddr_base) / PAGE_SIZE,
+      vaddr_base, paddr_base, (ROUNDUP_PAGE_SIZE(phys_end) - paddr_base) / PAGE_SIZE,
       ARCH_MMU_FLAG_PERM_READ);
   if (status != ZX_OK) {
     return zx::error(status);

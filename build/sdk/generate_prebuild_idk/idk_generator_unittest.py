@@ -5,6 +5,7 @@
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ from idk_generator import AtomInfo, IdkGenerator
 
 
 class IdkGeneratorTest(unittest.TestCase):
+    _FUCHSIA_SOURCE_DIR = Path(__file__).parent.parent.parent.parent
     _COLLECTION_INFO: AtomInfo = {
         "atom_id": "1.2.3.4",
         "atom_label": "//test_idk:collection",
@@ -27,6 +29,7 @@ class IdkGeneratorTest(unittest.TestCase):
         },
     }
     _SIMPLE_FIDL_LIBRARY_INFO: AtomInfo = {
+        "atom_id": "sdk://pkg/fuchsia.simple",
         "atom_label": "//sdk/fidl/fuchsia.simple:fuchsia.simple_fidl_sdk",
         "atom_type": "fidl_library",
         "category": "partner",
@@ -38,8 +41,10 @@ class IdkGeneratorTest(unittest.TestCase):
         },
         "atom_files": [],
         "is_stable": True,
+        "api_area": "Unknown",
     }
     _SIMPLE_CC_SOURCE_LIBRARY_INFO: AtomInfo = {
+        "atom_id": "sdk://pkg/simple_cc",
         "atom_label": "//sdk/lib/simple:simple_cc_sdk",
         "atom_type": "cc_source_library",
         "category": "partner",
@@ -56,6 +61,7 @@ class IdkGeneratorTest(unittest.TestCase):
         "is_stable": True,
     }
     _SIMPLE_DATA_INFO: AtomInfo = {
+        "atom_id": "sdk://pkg/some_data",
         "atom_label": "//sdk/data/invalid:some_data_sdk",
         "atom_type": "data",
         "category": "partner",
@@ -71,7 +77,7 @@ class IdkGeneratorTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
         self.build_dir = Path(self.tmpdir.name) / "build_out"
-        self.source_dir = Path(self.tmpdir.name) / "fuchsia"
+        self.source_dir = self._FUCHSIA_SOURCE_DIR
         self.output_dir = Path(self.tmpdir.name) / "idk_output"
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
@@ -102,10 +108,11 @@ class IdkGeneratorTest(unittest.TestCase):
             generator._meta_files["meta/manifest.json"]["parts"], []
         )
 
-    def test_generate_meta_file_contents_unhandled_label(self) -> None:
+    def test_generate_meta_file_contents_unhandled_type(self) -> None:
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             {
+                "atom_id": "sdk://pkg/unhandled",
                 "atom_label": "//sdk/unhandled",
                 "atom_type": "unhandled_type",
                 "category": "partner",
@@ -153,6 +160,7 @@ class IdkGeneratorTest(unittest.TestCase):
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             {
+                "atom_id": "sdk://pkg/test_cc",
                 "atom_label": "//sdk/lib/test:test_cc_sdk",
                 "atom_type": "cc_source_library",
                 "category": "partner",
@@ -180,6 +188,7 @@ class IdkGeneratorTest(unittest.TestCase):
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             {
+                "atom_id": "sdk://pkg/prebuilt_partner_atom",
                 "atom_label": "//sdk/partner/prebuilt_category_atom",
                 "atom_type": "data",
                 "category": "prebuilt",
@@ -197,6 +206,7 @@ class IdkGeneratorTest(unittest.TestCase):
                 "is_stable": True,
             },
             {
+                "atom_id": "sdk://pkg/partner_atom",
                 "atom_label": "//sdk/partner/partner_atom",
                 "atom_type": "data",
                 "category": "partner",
@@ -259,6 +269,7 @@ class IdkGeneratorTest(unittest.TestCase):
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             {
+                "atom_id": "sdk://pkg/test_package",
                 "atom_label": "//sdk/packages:test_package",
                 "atom_type": "package",
                 "category": "partner",
@@ -433,6 +444,7 @@ class IdkGeneratorTest(unittest.TestCase):
             self._COLLECTION_INFO,
             self._SIMPLE_FIDL_LIBRARY_INFO,
             {
+                "atom_id": "sdk://pkg/test_cc",
                 "atom_label": "//sdk/lib/test:test_cc_sdk",
                 "atom_type": "cc_source_library",
                 "category": "partner",
@@ -454,11 +466,130 @@ class IdkGeneratorTest(unittest.TestCase):
         self.assertEqual(ret_code, 0)
         self.assertEqual(files_read, set())
 
+    # This also covers the case that there are no deps on the incompatible
+    # atoms and that multiple violations are reported.
+    # This test uses the "internal" category to bypass the check that only
+    # atoms in the "partner" category are included, which would prevent this
+    # case from being tested.
+    def test_verify_dependency_relationships_category_collection_incompatible(
+        self,
+    ) -> None:
+        simple_fidl_with_internal_category = dict(
+            self._SIMPLE_FIDL_LIBRARY_INFO
+        )
+        simple_fidl_with_internal_category["category"] = "internal"
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            simple_fidl_with_internal_category,
+            {
+                "atom_id": "sdk://pkg/test_cc",
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "internal",
+                "atom_meta": {"dest": "pkg/test_cc_source/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc_source",
+                    "file_base": "pkg/test_cc_source",
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            """Violations detected in collection `//test_idk:collection`:
+"sdk://pkg/fuchsia.simple" has publication level "internal", which is incompatible with "partner".
+"sdk://pkg/test_cc" has publication level "internal", which is incompatible with "partner".""",
+        ):
+            generator.GenerateMetaFileContents(include_internal_atoms=True)
+
+    # This test uses the "internal" category to bypass the check that only
+    # atoms in the "partner" category are included, which would prevent this
+    # case from being tested.
+    def test_verify_dependency_relationships_category_deps_incompatible(
+        self,
+    ) -> None:
+        simple_fidl_with_internal_category = dict(
+            self._SIMPLE_FIDL_LIBRARY_INFO
+        )
+        simple_fidl_with_internal_category["category"] = "internal"
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            simple_fidl_with_internal_category,
+            {
+                "atom_id": "sdk://pkg/test_cc",
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/test_cc_source/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc_source",
+                    "file_base": "pkg/test_cc_source",
+                    "deps": [simple_fidl_with_internal_category["atom_label"]],
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        # The error is essentially the same as
+        # `test_verify_dependency_relationships_category_collection_incompatible`
+        # because only the entire collection - and not individual atom
+        # dependencies - is being checked.
+        with self.assertRaisesRegex(
+            AssertionError,
+            """Violations detected in collection `//test_idk:collection`:
+"sdk://pkg/fuchsia.simple" has publication level "internal", which is incompatible with "partner".""",
+        ):
+            generator.GenerateMetaFileContents(include_internal_atoms=True)
+
+    # Atoms in the other categories are filtered, so they are not detected as
+    # violations. This is a potential area for improvement.
+    def test_verify_dependency_relationships_category_no_error_if_filtered(
+        self,
+    ) -> None:
+        simple_fidl_with_prebuilt_category = dict(
+            self._SIMPLE_FIDL_LIBRARY_INFO
+        )
+        simple_fidl_with_prebuilt_category["category"] = "prebuilt"
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            simple_fidl_with_prebuilt_category,
+            {
+                "atom_id": "sdk://pkg/test_cc",
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "host_tool",
+                "atom_meta": {"dest": "pkg/test_cc_source/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc_source",
+                    "file_base": "pkg/test_cc_source",
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code, files_read = generator.GenerateMetaFileContents()
+        self.assertEqual(ret_code, 0)
+        self.assertEqual(files_read, set())
+
     def test_verify_dependency_relationships_bind_invalid_deps(self) -> None:
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             self._SIMPLE_CC_SOURCE_LIBRARY_INFO,
             {
+                "atom_id": "sdk://pkg/test_bind",
                 "atom_label": "//sdk/bind/fuchsia.test:fuchsia.test_bind_sdk",
                 "atom_type": "bind_library",
                 "category": "partner",
@@ -479,6 +610,33 @@ class IdkGeneratorTest(unittest.TestCase):
         ):
             generator.GenerateMetaFileContents()
 
+    def test_verify_dependency_relationships_bind_without_api_area(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_id": "sdk://pkg/test_bind",
+                "atom_label": "//sdk/bind/fuchsia.test:fuchsia.test_bind_sdk",
+                "atom_type": "bind_library",
+                "category": "partner",
+                "atom_meta": {"dest": "bind/fuchsia.test/meta.json"},
+                "prebuild_info": {
+                    "library_name": "fuchsia.test",
+                    "file_base": "bind/fuchsia.test",
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            """Violations detected in collection `//test_idk:collection`:
+sdk://pkg/test_bind must specify an API area. Valid areas: \\['Bluetooth', 'Component Framework', .*, 'WLAN', 'Unknown'\\]""",
+        ):
+            generator.GenerateMetaFileContents()
+
     def test_verify_dependency_relationships_cc_prebuilt_invalid_deps(
         self,
     ) -> None:
@@ -486,6 +644,7 @@ class IdkGeneratorTest(unittest.TestCase):
             self._COLLECTION_INFO,
             self._SIMPLE_DATA_INFO,
             {
+                "atom_id": "sdk://pkg/test_cc",
                 "atom_label": "//sdk/lib/test:test_cc_sdk",
                 "atom_type": "cc_prebuilt_library",
                 "category": "partner",
@@ -516,6 +675,7 @@ class IdkGeneratorTest(unittest.TestCase):
             self._COLLECTION_INFO,
             self._SIMPLE_DATA_INFO,
             {
+                "atom_id": "sdk://pkg/test_cc",
                 "atom_label": "//sdk/lib/test:test_cc_sdk",
                 "atom_type": "cc_source_library",
                 "category": "partner",
@@ -544,6 +704,7 @@ class IdkGeneratorTest(unittest.TestCase):
             self._COLLECTION_INFO,
             self._SIMPLE_CC_SOURCE_LIBRARY_INFO,
             {
+                "atom_id": "sdk://pkg/test_fidl",
                 "atom_label": "//sdk/fidl/fuchsia.test:fuchsia.test_fidl_sdk",
                 "atom_type": "fidl_library",
                 "category": "partner",
@@ -555,6 +716,7 @@ class IdkGeneratorTest(unittest.TestCase):
                 },
                 "atom_files": [],
                 "is_stable": True,
+                # API area is also missing.
             },
         ]
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
@@ -564,10 +726,45 @@ class IdkGeneratorTest(unittest.TestCase):
         ):
             generator.GenerateMetaFileContents()
 
+    def test_verify_dependency_relationships_fidl_without_api_area(
+        self,
+    ) -> None:
+        simple_fidl_without_api_area = dict(self._SIMPLE_FIDL_LIBRARY_INFO)
+        del simple_fidl_without_api_area["api_area"]
+
+        # The ordering is important to cause two violations to be reported.
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_id": "sdk://pkg/test_fidl",
+                "atom_label": "//sdk/fidl/fuchsia.test:fuchsia.test_fidl_sdk",
+                "atom_type": "fidl_library",
+                "category": "partner",
+                "atom_meta": {"dest": "fidl/fuchsia.test/meta.json"},
+                "prebuild_info": {
+                    "library_name": "fuchsia.test",
+                    "file_base": "fidl/fuchsia.test",
+                    "deps": [self._SIMPLE_FIDL_LIBRARY_INFO["atom_label"]],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+            simple_fidl_without_api_area,
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            """Violations detected in collection `//test_idk:collection`:
+sdk://pkg/test_fidl must specify an API area. Valid areas: \\['Bluetooth', 'Component Framework', .*, 'WLAN', 'Unknown'\\]
+sdk://pkg/fuchsia.simple must specify an API area. Valid areas: \\['Bluetooth', 'Component Framework', .*, 'WLAN', 'Unknown'\\]""",
+        ):
+            generator.GenerateMetaFileContents()
+
     def test_verify_dependency_relationships_no_prebuild_info(self) -> None:
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,
             {  # This atom has no "prebuild_info", so it should be skipped
+                "atom_id": "sdk://pkg/no_prebuild",
                 "atom_label": "//sdk/partner/no_prebuild",
                 "atom_type": "data",
                 "category": "partner",
@@ -591,6 +788,7 @@ class IdkGeneratorTest(unittest.TestCase):
             self._COLLECTION_INFO,
             self._SIMPLE_FIDL_LIBRARY_INFO,
             {
+                "atom_id": "sdk://pkg/data_with_deps",
                 "atom_label": "//sdk/data:data_with_deps_sdk",
                 "atom_type": "data",
                 "category": "partner",
@@ -611,6 +809,35 @@ class IdkGeneratorTest(unittest.TestCase):
         ):
             generator.GenerateMetaFileContents()
 
+
+# When run from GN as a compiled pyz file, `__file__` is no longer at the same
+# location relative to the Fuchsia source directory. In this case, relative path
+# from the target gen directory to the source directory is passed in. In that
+# case, this function:
+# 1. Pops this argument before running the unit tests.
+# 2. Gets the absolute path to the target gen dir based on `__file__`.
+# 3. Applies (1) to (2) to get the absolute path to Fuchsia source directory.
+# Note that an absolute path cannot be passed from GN since bots may run tests
+# from different directories than where they were built (while maintaining the
+# same structure).
+# LINT.IfChange(gn_test_main)
+def gn_test_main() -> None:
+    if len(sys.argv) > 1:
+        fuchsia_source_relative_to_target_gen_dir = sys.argv.pop()
+        # Drop this part of the path:
+        # `idk_generator_unittest/idk_generator_unittest.pyz/idk_generator_unittest.py`.
+        absolute_target_gen_dir = Path(__file__).parent.parent.parent
+        fuchsia_source_absolute_path = Path(
+            os.path.join(
+                absolute_target_gen_dir,
+                fuchsia_source_relative_to_target_gen_dir,
+            )
+        )
+        IdkGeneratorTest._FUCHSIA_SOURCE_DIR = fuchsia_source_absolute_path
+    unittest.main()
+
+
+# LINT.ThenChange(BUILD.gn:gn_test_main)
 
 if __name__ == "__main__":
     unittest.main()

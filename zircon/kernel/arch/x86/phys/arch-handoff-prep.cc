@@ -32,24 +32,27 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
 void HandoffPrep::ArchConstructKernelAddressSpace() {}
 
 void HandoffPrep::ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info) {
+  ZX_DEBUG_ASSERT_MSG(!abi.shadow_call_stack_base, "Shadow call stack not supported on x86");
+
   __asm__ volatile(
       // We want the kernel's main to be at the root of the call stack, so
       // clear the frame pointer.
       "xor %%ebp, %%ebp\n"
 
-      // TODO(https://fxbug.dev/42164859): Set the machine stack pointer
       // TODO(https://fxbug.dev/42164859): Set or clear the would-be unsafe stack pointer
       // TODO(https://fxbug.dev/42164859): Set the thread pointer.
+      "mov %[rsp], %%rsp\n"
 
       // The kernel's C++ entrypoint is allowed to assume that it's in the cld
       // state.
       "cld\n"
 
-      "jmp *%[entry]"
-      :                                //
-      : [entry] "r"(kernel_.entry()),  //
-        [handoff] "D"(handoff_),       // "D" places it in %rdi
-        "m"(*handoff_)                 // Ensures no store to the handoff can be regarded as dead
+      "jmpq *%[entry]"
+      :                                    //
+      : [entry] "r"(kernel_.entry()),      //
+        [handoff] "D"(handoff_),           // D" places it in %rdi
+        [rsp] "r"(abi.machine_stack_top),  //
+        "m"(*handoff_)  // Ensures no store to the handoff can be regarded as dead
   );
   __UNREACHABLE;
 }

@@ -973,8 +973,7 @@ mod tests {
         env.context
             .query(DEFAULT_FUZZING_OUTPUT_VARIABLE)
             .level(Some(ffx_config::ConfigLevel::User))
-            .set(serde_json::json!(&badpath))
-            .await?;
+            .set(serde_json::json!(&badpath))?;
         script.add(&mut test, format!("attach {}", TEST_URL));
         test.output_includes("invalid output directory");
 

@@ -12,7 +12,6 @@ library_headers("headers") {
     "lib/zxio/null.h",
     "lib/zxio/ops.h",
     "lib/zxio/fault_catcher.h",
-    "lib/zxio/posix_mode.h",
     "lib/zxio/bsdsocket.h",
     "lib/zxio/types.h",
     "lib/zxio/zxio.h",
@@ -124,6 +123,11 @@ shared_library("zxio_standalone") {
   inputs = [ version_script ]
   ldflags =
       [ "-Wl,--version-script=" + rebase_path(version_script, root_build_dir) ]
+}
+
+static_library("zxio_static") {
+  public_deps = [ ":zxio" ]
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 shared_out_dir =

@@ -22,9 +22,10 @@ use openthread_fuchsia::Platform as OtPlatform;
 use config::Config;
 use fidl::endpoints::create_proxy;
 
-use crate::driver::OtDriver;
+use crate::driver::{get_product_metadata, OtDriver, ProductMetadata};
 use crate::prelude::*;
 use fuchsia as _;
+use futures::channel::mpsc;
 use std::ffi::CString;
 use std::num::NonZeroU32;
 
@@ -60,6 +61,7 @@ pub type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;
 
 const MAX_EXPONENTIAL_BACKOFF_DELAY_SEC: i64 = 180;
 const RESET_EXPONENTIAL_BACKOFF_TIMER_MIN: i64 = 5;
+const SERVICE_CHANNEL_SIZE: usize = 100;
 
 impl Config {
     async fn open_spinel_device_proxy(&self) -> Result<SpinelDeviceProxy, Error> {
@@ -242,6 +244,10 @@ impl Config {
             warn!("Backbone interface not set, border routing not supported");
         }
 
+        let product_metadata =
+            get_product_metadata(connect_to_protocol::<fidl_fuchsia_hwinfo::ProductMarker>()?)
+                .await;
+
         let publisher =
             connect_to_protocol::<fidl_fuchsia_net_mdns::ServiceInstancePublisherMarker>().unwrap();
 
@@ -253,6 +259,7 @@ impl Config {
             ot_instance,
             netif,
             backbone_if,
+            product_metadata,
             publisher,
         );
 
@@ -267,6 +274,7 @@ async fn run_driver<N, RP, RFP, NI, BI>(
     ot_instance: OtInstanceBox,
     net_if: NI,
     backbone_if: BI,
+    product_metadata: ProductMetadata,
     publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
 ) -> Result<(), Error>
 where
@@ -277,7 +285,15 @@ where
     BI: BackboneInterface,
 {
     let name = name.as_ref();
-    let mut driver = OtDriver::new(ot_instance, net_if, backbone_if, publisher);
+    let (epskc_sender, epskc_receiver) = mpsc::channel(SERVICE_CHANNEL_SIZE);
+    let mut driver = OtDriver::new(
+        ot_instance,
+        net_if,
+        backbone_if,
+        product_metadata,
+        publisher.clone(),
+        epskc_sender,
+    );
 
     driver.start_multicast_routing_manager();
 
@@ -307,7 +323,7 @@ where
     // We use `stream::select_all` here so that only the
     // futures that actually need to be polled get polled.
     futures::stream::select_all([
-        driver.main_loop_stream().boxed(),
+        driver.main_loop_stream(epskc_receiver, publisher).boxed(),
         lowpan_device_task.into_stream().boxed(),
         lowpan_device_factory_task.into_stream().boxed(),
     ])

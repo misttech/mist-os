@@ -9,7 +9,7 @@ use assembly_cli_args::{
 use assembly_tool::{PlatformToolProvider, ToolProvider};
 
 pub fn product_assembly(args: ProductArgs) -> Result<ProductAssemblyOutputs> {
-    let tools = PlatformToolProvider::new(args.platform.clone());
+    let tools = PlatformToolProvider::new(args.input_bundles_dir.clone());
     let assembly_tool = tools.get_tool("assembly")?;
     assembly_tool.run(&args.to_vec())?;
 
@@ -44,7 +44,6 @@ mod tests {
         let tools = FakeToolProvider::default();
         let assembly_tool = tools.get_tool("assembly").unwrap();
 
-        let platform = Utf8PathBuf::from("path/to/platform");
         let product = Utf8PathBuf::from("path/to/product");
         let board_info = Utf8PathBuf::from("path/to/board_info");
         let outdir = Utf8PathBuf::from("path/to/outdir");
@@ -52,7 +51,6 @@ mod tests {
         let input_bundles_dir = Utf8PathBuf::from("path/to/bundles");
 
         let args = ProductArgs {
-            platform: platform.clone().into(),
             product: product.clone(),
             board_info: board_info.clone(),
             outdir: outdir.clone(),
@@ -63,6 +61,7 @@ mod tests {
             custom_boot_shim_aib: None,
             suppress_overrides_warning: false,
             developer_overrides: None,
+            include_example_aib_for_tests: Some(false),
         };
         assembly_tool.run(&args.to_vec()).unwrap();
 
@@ -74,8 +73,6 @@ mod tests {
                     "tool": "./host_x64/assembly",
                     "args": [
                         "product",
-                        "--platform",
-                        platform,
                         "--product",
                         product,
                         "--board-info",

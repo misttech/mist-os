@@ -5,9 +5,12 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/paging.h>
+#include <lib/elfldltl/machine.h>
 #include <lib/memalloc/range.h>
 
 #include <fbl/algorithm.h>
+#include <ktl/bit.h>
+#include <ktl/iterator.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
@@ -64,6 +67,16 @@ constexpr arch::AccessPermissions ToAccessPermissions(PhysMapping::Permissions p
   };
 }
 
+uint64_t PhysmapSize() {
+  // Find the highest RAM address, which gives the size of the physmap given
+  // the nature of the mapping.
+  auto last_ram = ktl::prev(Allocation::GetPool().end());
+  while (!memalloc::IsRamType(last_ram->type)) {  // There can't not be any RAM
+    --last_ram;
+  }
+  return PageAlignUp(last_ram->end());
+}
+
 }  // namespace
 
 HandoffPrep::VirtualAddressAllocator
@@ -71,7 +84,7 @@ HandoffPrep::VirtualAddressAllocator::TemporaryHandoffDataAllocator(const ElfIma
   return {
       /*start=*/kernel.load_address() - k1GiB,
       /*strategy=*/HandoffPrep::VirtualAddressAllocator::Strategy::kDown,
-      /*boundary=*/kArchPhysmapVirtualBase + kArchPhysmapSize,
+      /*boundary=*/kArchPhysmapVirtualBase + PhysmapSize(),
   };
 }
 
@@ -166,15 +179,57 @@ MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(ktl::string_view name,
   return {aligned.subspan(addr - aligned_paddr, size), addr};
 }
 
+MappedMemoryRange HandoffPrep::PublishStackVmar(ZirconAbiSpec::Stack stack, memalloc::Type type) {
+  ktl::string_view name = memalloc::ToString(type);
+
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.size_bytes), "%.*s size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.lower_guard_size_bytes),
+                      "%.*s lower guard size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.upper_guard_size_bytes),
+                      "%.*s upper guard size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+
+  size_t vmar_size = stack.lower_guard_size_bytes + stack.size_bytes + stack.upper_guard_size_bytes;
+  uintptr_t base = first_class_mapping_allocator_.AllocatePages(vmar_size);
+  auto prep = PrepareVmarAt(name, base, vmar_size);
+  uint64_t paddr = Allocation::GetPool().Allocate(type, stack.size_bytes, ZX_PAGE_SIZE).value();
+  PhysMapping mapping{
+      name,                                 //
+      PhysMapping::Type::kNormal,           //
+      base + stack.lower_guard_size_bytes,  //
+      stack.size_bytes,                     //
+      paddr,                                //
+      PhysMapping::Permissions::Rw(),       //
+  };
+  MappedMemoryRange mapped = prep.PublishMapping(mapping);
+  memset(mapped.data(), 0, mapped.size_bytes());
+  ktl::move(prep).Publish();
+  return mapped;
+}
+
 HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+  const memalloc::Pool& pool = Allocation::GetPool();
   ZirconAbi abi{};
 
   // Physmap.
-  {  // Shadowing the entire physmap would be redundantly wasteful.
-    PhysMapping mapping("physmap"sv, PhysMapping::Type::kNormal, kArchPhysmapVirtualBase,
-                        kArchPhysmapSize, 0, PhysMapping::Permissions::Rw(),
-                        /*kasan_shadow=*/false);
-    PublishSingleMappingVmar(ktl::move(mapping));
+  {
+    PhysVmarPrep prep = PrepareVmarAt("physmap"sv, kArchPhysmapVirtualBase, PhysmapSize());
+    auto map = [&prep](const memalloc::Range& range) {
+      uint64_t aligned_paddr = PageAlignDown(range.addr);
+      uint64_t aligned_size = PageAlignUp(range.size + (range.addr - aligned_paddr));
+
+      // Shadowing the physmap would be redundantly wasteful.
+      PhysMapping mapping("RAM"sv, PhysMapping::Type::kNormal,
+                          kArchPhysmapVirtualBase + aligned_paddr, aligned_size, aligned_paddr,
+                          PhysMapping::Permissions::Rw(),
+                          /*kasan_shadow=*/false);
+      prep.PublishMapping(mapping);
+      return true;
+    };
+    memalloc::NormalizeRam(pool, map);
+    ktl::move(prep).Publish();
   }
 
   // The kernel's mapping.
@@ -202,10 +257,22 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
     ktl::move(prep).Publish();
   }
 
+  // Kernel ABI
+  {
+    ktl::span machine_stack =
+        PublishStackVmar(abi_spec_.machine_stack, memalloc::Type::kBootMachineStack);
+    abi.machine_stack_top = elfldltl::AbiTraits<>::InitialStackPointer(
+        reinterpret_cast<uintptr_t>(machine_stack.data()), machine_stack.size_bytes());
+
+    if (abi_spec_.shadow_call_stack.size_bytes > 0) {
+      ktl::span shadow_call_stack =
+          PublishStackVmar(abi_spec_.shadow_call_stack, memalloc::Type::kBootShadowCallStack);
+      abi.shadow_call_stack_base = reinterpret_cast<uintptr_t>(shadow_call_stack.data());
+    }
+  }
+
   // Periphmap
   {
-    memalloc::Pool& pool = Allocation::GetPool();
-
     auto periph_filter = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
       return type == memalloc::Type::kPeripheral ? ktl::make_optional(type) : ktl::nullopt;
     };
@@ -242,6 +309,16 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
       handoff_->uart_mmio = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size);
     }
   });
+
+  // NVRAM
+  {
+    auto nvram = ktl::find_if(pool.begin(), pool.end(), [](const memalloc::Range& range) {
+      return range.type == memalloc::Type::kNvram;
+    });
+    if (nvram != pool.end()) {
+      handoff_->nvram = PublishSingleWritableDataMappingVmar("NVRAM"sv, nvram->addr, nvram->size);
+    }
+  }
 
   // Construct the arch-specific bits at the end (to give the non-arch-specific
   // placements in the address space a small amount of relative familiarity).

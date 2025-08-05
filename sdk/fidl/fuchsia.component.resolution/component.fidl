@@ -14,6 +14,7 @@ type Component = resource table {
     /// The resolved URL of the component.
     /// This is the canonical URL obtained by the component resolver after
     /// following redirects and resolving relative paths.
+    @available(removed=NEXT)
     1: url string:MAX_COMPONENT_URL_LENGTH;
 
     /// Binary representation of the component's declaration (`fuchsia.component.decl.Component`).
@@ -27,7 +28,7 @@ type Component = resource table {
     ///
     /// This is null if the component is not represented as a package.
     /// In that case, it is the runner's responsibility to load the component's
-    /// resource from the `resolved_url`.  This mechanism is used for web
+    /// resource from the `url`.  This mechanism is used for web
     /// applications.
     ///
     /// Most runners, including but not limited to the builtin ELF runner,

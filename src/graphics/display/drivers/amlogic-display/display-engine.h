@@ -137,7 +137,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   void PopulatePanelType() TA_REQ(display_mutex_);
 
   void OnHotPlugStateChange(HotPlugDetectionState current_state);
-  void OnVsync(zx::time timestamp);
+  void OnVsync(zx::time_monotonic timestamp);
   void OnCaptureComplete();
 
   // TODO(https://fxbug.dev/42082357): Currently, DisplayEngine has a multi-step

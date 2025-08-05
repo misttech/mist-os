@@ -239,6 +239,8 @@ RebootReason FromGracefulRebootReason(const GracefulRebootReason& reason) {
       return RebootReason::kNetstackMigration;
     case GracefulRebootReason::kAndroidUnexpectedReason:
       return RebootReason::kAndroidUnexpectedReason;
+    case GracefulRebootReason::kDeveloperRequest:
+      return RebootReason::kDeveloperRequest;
     case GracefulRebootReason::kNotSet:
       FX_LOGS(FATAL) << "Graceful reboot reason must be set";
       return RebootReason::kNotParseable;

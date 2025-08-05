@@ -15,16 +15,15 @@ use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     ptrace_detach, AtomicStopState, ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable,
     ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session,
-    StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
-    TimerTable, TypedWaitQueue, ZombiePtraces,
+    StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TimerTable, TypedWaitQueue,
+    ZombiePtraces,
 };
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::{
-    LockBefore, Locked, Mutex, MutexGuard, OrderedMutex, ProcessGroupState, RwLock,
-    ThreadGroupLimits, Unlocked,
+    LockBefore, Locked, Mutex, OrderedMutex, ProcessGroupState, RwLock, ThreadGroupLimits, Unlocked,
 };
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef, WeakRefKey};
 use starnix_types::stats::TaskTimeStats;
@@ -167,9 +166,6 @@ pub struct ThreadGroupMutableState {
     /// The IDs used to perform shell job control.
     pub process_group: Arc<ProcessGroup>,
 
-    /// The timers for this thread group (from timer_create(), etc.).
-    pub timers: TimerTable,
-
     pub did_exec: bool,
 
     /// A signal that indicates whether the process is going to become waitable
@@ -192,9 +188,6 @@ pub struct ThreadGroupMutableState {
 
     /// Channel to message when this thread group exits.
     exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
-
-    /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
-    pub is_sharing: bool,
 
     /// Notifier for name changes.
     pub notifier: Option<std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>>,
@@ -251,6 +244,9 @@ pub struct ThreadGroup {
 
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
+
+    /// The timers for this thread group (from timer_create(), etc.).
+    pub timers: TimerTable,
 
     /// A mechanism to be notified when this `ThreadGroup` is destroyed.
     pub drop_notifier: DropNotifier,
@@ -588,6 +584,7 @@ impl ThreadGroup {
                 leader,
                 exit_signal,
                 signal_actions,
+                timers: Default::default(),
                 drop_notifier: Default::default(),
                 // A child process created via fork(2) inherits its parent's
                 // resource limits.  Resource limits are preserved across execve(2).
@@ -614,7 +611,6 @@ impl ThreadGroup {
                     lifecycle_waiters: TypedWaitQueue::<ThreadGroupLifecycleWaitValue>::default(),
                     is_child_subreaper: false,
                     process_group: Arc::clone(&process_group),
-                    timers: Default::default(),
                     did_exec: false,
                     last_signal: None,
                     run_state: Default::default(),
@@ -625,7 +621,6 @@ impl ThreadGroup {
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
-                    is_sharing: false,
                     notifier: None,
                 }),
             };
@@ -772,7 +767,7 @@ impl ThreadGroup {
             let exit_info =
                 ProcessExitInfo { status: exit_status, exit_signal: self.exit_signal.clone() };
             let zombie =
-                ZombieProcess::new(state.as_ref(), persistent_info.lock().creds(), exit_info);
+                ZombieProcess::new(state.as_ref(), &persistent_info.real_creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
 
             state.leave_process_group(locked, pids);
@@ -1034,7 +1029,7 @@ impl ThreadGroup {
     }
 
     fn itimer_real(&self) -> IntervalTimerHandle {
-        self.write().timers.itimer_real()
+        self.timers.itimer_real()
     }
 
     pub fn set_itimer(
@@ -1140,7 +1135,7 @@ impl ThreadGroup {
         error!(ENOTTY)
     }
 
-    pub fn get_foreground_process_group(&self, terminal: &Arc<Terminal>) -> Result<pid_t, Errno> {
+    pub fn get_foreground_process_group(&self, terminal: &Terminal) -> Result<pid_t, Errno> {
         let state = self.read();
         let process_group = &state.process_group;
         let terminal_state = terminal.read();
@@ -1156,7 +1151,7 @@ impl ThreadGroup {
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         pgid: pid_t,
     ) -> Result<(), Errno>
     where
@@ -1206,7 +1201,7 @@ impl ThreadGroup {
     pub fn set_controlling_terminal(
         &self,
         current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         is_main: bool,
         steal: bool,
         is_readable: bool,
@@ -1251,8 +1246,7 @@ impl ThreadGroup {
             security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         }
 
-        session_writer.controlling_terminal =
-            Some(ControllingTerminal::new(terminal.clone(), is_main));
+        session_writer.controlling_terminal = Some(ControllingTerminal::new(terminal, is_main));
         terminal_state.controller = TerminalController::new(&process_group.session);
         Ok(())
     }
@@ -1261,7 +1255,7 @@ impl ThreadGroup {
         &self,
         locked: &mut Locked<L>,
         _current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         is_main: bool,
     ) -> Result<(), Errno>
     where
@@ -1457,7 +1451,7 @@ impl ThreadGroup {
                 // The shared information:
                 let mut pid: i32 = 0;
                 let info = process_state.tasks.values().next().unwrap().info().clone();
-                let uid = info.creds().uid;
+                let uid = info.real_creds().uid;
                 let mut exit_status = None;
                 let exit_signal = process_state.base.exit_signal.clone();
                 let time_stats =
@@ -1590,7 +1584,7 @@ impl ThreadGroup {
                 code: SI_USER as i32,
                 detail: SignalDetail::Kill {
                     pid: current_task.thread_group().leader,
-                    uid: current_task.creds().uid,
+                    uid: current_task.current_creds().uid,
                 },
                 ..SignalInfo::default(signal)
             };
@@ -1898,9 +1892,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         exit_status(siginfo)
                     };
                     let info = child.tasks.values().next().unwrap().info();
+                    let uid = info.real_creds().uid;
                     WaitResult {
                         pid: child.base.leader,
-                        uid: info.creds().uid,
+                        uid,
                         exit_info: ProcessExitInfo {
                             status: exit_status,
                             exit_signal: child.base.exit_signal,
@@ -2101,8 +2096,8 @@ impl TaskContainer {
         self.0.clone()
     }
 
-    fn info(&self) -> MutexGuard<'_, TaskPersistentInfoState> {
-        self.1.lock()
+    fn info(&self) -> &TaskPersistentInfo {
+        &self.1
     }
 }
 

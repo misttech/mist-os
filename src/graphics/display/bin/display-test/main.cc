@@ -39,6 +39,8 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/bin/display-test/display.h"
+#include "src/graphics/display/bin/display-test/virtual-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -46,8 +48,6 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
-#include "src/graphics/display/testing/client-utils/display.h"
-#include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
 using display_test::ColorLayer;
 using display_test::Display;
@@ -79,17 +79,17 @@ class CoordinatorListener final
                          OnDisplaysChangedCompleter::Sync& completer) override {
     fidl::Arena arena;
     for (const fuchsia_hardware_display::wire::Info& display : request->added) {
-      displays_.emplace(display::ToDisplayId(display.id), display);
+      displays_.emplace(display::DisplayId(display.id), display);
     }
     for (const fuchsia_hardware_display_types::wire::DisplayId& display_id : request->removed) {
-      displays_.erase(display::ToDisplayId(display_id));
+      displays_.erase(display::DisplayId(display_id));
     }
   }
   void OnVsync(OnVsyncRequestView request, OnVsyncCompleter::Sync& completer) override {
     vsync_count_++;
-    latest_config_stamp_ = display::ToConfigStamp(request->applied_config_stamp);
-    if (display::ToVsyncAckCookie(request->cookie) != display::kInvalidVsyncAckCookie) {
-      pending_vsync_cookie_ = display::ToVsyncAckCookie(request->cookie);
+    latest_config_stamp_ = display::ConfigStamp(request->applied_config_stamp);
+    if (display::VsyncAckCookie(request->cookie) != display::kInvalidVsyncAckCookie) {
+      pending_vsync_cookie_ = display::VsyncAckCookie(request->cookie);
     }
   }
   void OnClientOwnershipChange(OnClientOwnershipChangeRequestView request,
@@ -198,7 +198,8 @@ static bool bind_display(const char* coordinator, async::Loop& coordinator_liste
 
   while (g_coordinator_listener.displays().empty()) {
     printf("Waiting for display\n");
-    zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+    zx_status_t status =
+        coordinator_listener_loop.Run(zx::time_monotonic::infinite(), /*once=*/true);
     if (status != ZX_OK || g_coordinator_listener.vsync_count() > 0) {
       printf("Got unexpected message\n");
       return false;
@@ -265,10 +266,10 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
     std::vector<fuchsia_hardware_display::wire::LayerId> current_layers_fidl_id;
     current_layers_fidl_id.reserve(current_layers->size());
     for (const display::LayerId& layer_id : *current_layers) {
-      current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
+      current_layers_fidl_id.push_back(layer_id.ToFidl());
     }
     if (!dc->SetDisplayLayers(
-               ToFidlDisplayId(display.id()),
+               display.id().ToFidl(),
                fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(
                    current_layers_fidl_id))
              .ok()) {
@@ -305,7 +306,7 @@ zx_status_t apply_config(fuchsia_hardware_display::wire::ConfigStamp stamp) {
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
                            fuchsia_hardware_display::wire::ConfigStamp expected_stamp) {
-  zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+  zx_status_t status = coordinator_listener_loop.Run(zx::time_monotonic::infinite(), /*once=*/true);
   if (status != ZX_OK) {
     printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
            zx_status_get_string(status));
@@ -325,7 +326,7 @@ zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
     (void)dc->AcknowledgeVsync(pending_vsync_cookie.value());
   }
 
-  if (g_coordinator_listener.latest_config_stamp() < display::ToConfigStamp(expected_stamp)) {
+  if (g_coordinator_listener.latest_config_stamp() < display::ConfigStamp(expected_stamp)) {
     return ZX_ERR_NEXT;
   }
   return ZX_OK;
@@ -360,7 +361,7 @@ zx_status_t capture_setup(Display& display) {
     printf("Could not duplicate event %d\n", status);
     return status;
   }
-  auto event_status = dc->ImportEvent(std::move(e2), display::ToFidlEventId(kEventId));
+  auto event_status = dc->ImportEvent(std::move(e2), kEventId.ToFidl());
   if (event_status.status() != ZX_OK) {
     printf("Could not import event: %s\n", event_status.FormatDescription().c_str());
     return event_status.status();
@@ -410,8 +411,8 @@ zx_status_t capture_setup(Display& display) {
   }
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)token->Sync();
-  auto import_resp = dc->ImportBufferCollection(
-      display::ToFidlBufferCollectionId(kBufferCollectionId), display_token.TakeClientEnd());
+  auto import_resp =
+      dc->ImportBufferCollection(kBufferCollectionId.ToFidl(), display_token.TakeClientEnd());
   if (import_resp.status() != ZX_OK) {
     printf("Could not import token: %s\n", import_resp.FormatDescription().c_str());
     return import_resp.status();
@@ -421,8 +422,8 @@ zx_status_t capture_setup(Display& display) {
   fuchsia_hardware_display_types::wire::ImageBufferUsage image_buffer_usage = {
       .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
   };
-  auto constraints_resp = dc->SetBufferCollectionConstraints(
-      display::ToFidlBufferCollectionId(kBufferCollectionId), image_buffer_usage);
+  auto constraints_resp =
+      dc->SetBufferCollectionConstraints(kBufferCollectionId.ToFidl(), image_buffer_usage);
   if (constraints_resp.status() != ZX_OK) {
     printf("Could not set capture constraints %s\n", constraints_resp.FormatDescription().c_str());
     return constraints_resp.status();
@@ -494,13 +495,8 @@ zx_status_t capture_setup(Display& display) {
                      .height = display.mode().active_area.height},
       .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
   };
-  fidl::WireResult import_capture_result = dc->ImportImage(
-      capture_metadata,
-      fuchsia_hardware_display::wire::BufferId{
-          .buffer_collection_id = display::ToFidlBufferCollectionId(kBufferCollectionId),
-          .buffer_index = 0,
-      },
-      display::ToFidlImageId(kCaptureImageId));
+  fidl::WireResult import_capture_result =
+      dc->ImportImage(capture_metadata, kBufferCollectionId.ToFidl(), 0, kCaptureImageId.ToFidl());
   if (import_capture_result.status() != ZX_OK) {
     printf("Failed to start capture: %s\n", import_capture_result.FormatDescription().c_str());
     return import_capture_result.status();
@@ -511,7 +507,7 @@ zx_status_t capture_setup(Display& display) {
 zx_status_t capture_start() {
   // start capture
   fidl::WireResult start_capture_result =
-      dc->StartCapture(display::ToFidlEventId(kEventId), display::ToFidlImageId(kCaptureImageId));
+      dc->StartCapture(kEventId.ToFidl(), kCaptureImageId.ToFidl());
   if (start_capture_result.status() != ZX_OK) {
     printf("Could not start capture: %s\n", start_capture_result.FormatDescription().c_str());
     return start_capture_result.status();
@@ -623,9 +619,9 @@ bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
 
 void capture_release() {
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseImage(display::ToFidlImageId(kCaptureImageId));
+  (void)dc->ReleaseImage(kCaptureImageId.ToFidl());
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId));
+  (void)dc->ReleaseBufferCollection(kBufferCollectionId.ToFidl());
 }
 
 void usage(void) {
@@ -1064,7 +1060,7 @@ int main(int argc, const char* argv[]) {
 
           if (vsync_status == ZX_OK) {
             ZX_ASSERT(g_coordinator_listener.latest_config_stamp() ==
-                      display::ToConfigStamp(last_applied_stamp));
+                      display::ConfigStamp(last_applied_stamp));
             break;
           } else if (vsync_status == ZX_ERR_NEXT) {
             zx::nanosleep(zx::deadline_after(zx::msec(100)));
@@ -1075,7 +1071,7 @@ int main(int argc, const char* argv[]) {
         }
       }
 
-      if (!layer->ReadyToRender(display::ToConfigStamp(last_applied_stamp))) {
+      if (!layer->ReadyToRender(display::ConfigStamp(last_applied_stamp))) {
         printf("Buffer failed to become free\n");
         return -1;
       }

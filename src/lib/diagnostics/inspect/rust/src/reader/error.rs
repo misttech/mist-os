@@ -75,4 +75,7 @@ pub enum ReaderError {
 
     #[error("Offset out of bounds while reading")]
     OffsetOutOfBounds,
+
+    #[error("Internal error in the reader library, used to avoid crashing Archivist")]
+    Internal,
 }

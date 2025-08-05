@@ -161,6 +161,8 @@ tables_generator_tests_*.txt
 /third_party/crashpad/src
 !/third_party/chromiumos-xorg-conf
 /third_party/chromiumos-xorg-conf/src
+!/third_party/gflags
+/third_party/gflags/src
 !/third_party/ubpf
 /third_party/ubpf/src
 !/third_party/github.com/google/cppdap

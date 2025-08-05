@@ -1181,7 +1181,7 @@ mod tests {
         let event_stream_2 = test.new_event_stream(vec![EventType::Started]).await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
-        test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
+        test.mock_runner.add_host_fn("test:///system", out_dir.host_fn());
 
         // Open exposed directory of child.
         let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
@@ -1222,7 +1222,7 @@ mod tests {
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 
         // Verify topology matches expectations.
-        let expected_urls = &["test:///root_resolved", "test:///system_resolved"];
+        let expected_urls = &["test:///root", "test:///system"];
         test.mock_runner.wait_for_urls(expected_urls).await;
         assert_eq!("(system)", test.hook.print());
     }
@@ -1254,7 +1254,7 @@ mod tests {
         let event_stream_2 = test.new_event_stream(vec![EventType::Started]).await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
-        test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
+        test.mock_runner.add_host_fn("test:///system", out_dir.host_fn());
 
         // Add "system" to collection.
         let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 
         // Verify topology matches expectations.
-        let expected_urls = &["test:///root_resolved", "test:///system_resolved"];
+        let expected_urls = &["test:///root", "test:///system"];
         test.mock_runner.wait_for_urls(expected_urls).await;
         assert_eq!("(coll:system)", test.hook.print());
     }

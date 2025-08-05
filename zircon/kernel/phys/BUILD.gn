@@ -627,6 +627,7 @@ if (toolchain_environment == "kernel.phys" ||
       ":symbolize",
       ":zbitl-allocation",
       "$arch_phys:arch-handoff-prep",
+      "//src/lib/elfldltl",
       "//src/lib/llvm-profdata",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/boot-options",

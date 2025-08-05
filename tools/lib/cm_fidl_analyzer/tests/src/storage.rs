@@ -154,7 +154,7 @@ mod tests {
     /// storage and is not in the component ID index.
     #[fuchsia::test]
     async fn use_restricted_storage_failure() {
-        let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let parent_consumer_instance_id = InstanceId::new_random(&mut rand::rng());
         let index = {
             let mut index = component_id_index::Index::default();
             index

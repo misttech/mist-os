@@ -101,6 +101,26 @@ pub enum TargetEvent {
     Removed(TargetHandle),
 }
 
+impl TargetEvent {
+    /// Returns the inner [TargetHandle] reference with the lifetime of this object.
+    pub fn as_handle<'a>(&'a self) -> &'a TargetHandle {
+        match self {
+            Self::Added(ref h) => h,
+            Self::Removed(ref h) => h,
+        }
+    }
+
+    /// Returns true if this is a `Self::Added` enum.
+    pub fn is_added(&self) -> bool {
+        matches!(self, Self::Added(_))
+    }
+
+    /// Returns true if this is a `Self::Removed` enum.
+    pub fn is_removed(&self) -> bool {
+        matches!(self, Self::Removed(_))
+    }
+}
+
 pub(crate) fn target_event_from_mdns_event(
     event: ffx::MdnsEventType,
 ) -> Option<Result<TargetEvent>> {

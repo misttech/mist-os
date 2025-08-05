@@ -10,7 +10,7 @@ import pathlib
 import shutil
 import sys
 
-from power import gonk, monsoon
+from power import gonk, powerserver
 from trace_processing import trace_importing, trace_model
 
 
@@ -46,8 +46,8 @@ def merge_trace(
         else:
             gonk.merge_gonk_data_without_gpio(gonk_samples, output, rail_names)
     else:
-        samples = monsoon.read_power_samples(power)
-        monsoon.merge_power_data(model, samples, output)
+        samples = powerserver.read_power_samples(power)
+        powerserver.merge_power_data(model, samples, output)
 
 
 def main() -> None:

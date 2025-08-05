@@ -39,7 +39,9 @@ class IoBufferSharedRegionDispatcher
 
   IoBufferSharedRegionDispatcher(fbl::RefPtr<VmObjectPaged> vmo, fbl::RefPtr<VmMapping> mapping,
                                  zx_vaddr_t base)
-      : vmo_(ktl::move(vmo)), mapping_(ktl::move(mapping)), base_(base) {}
+      : vmo_(ktl::move(vmo)), mapping_(ktl::move(mapping)), base_(base) {
+    vmo_->set_user_id(get_koid());
+  }
 
   Header* GetHeader() const { return reinterpret_cast<Header*>(base_); }
 

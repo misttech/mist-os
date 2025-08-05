@@ -4,7 +4,7 @@
 
 use diagnostics_message::MonikerWithUrl;
 use flyweights::FlyStr;
-use moniker::ExtendedMoniker;
+use moniker::{ExtendedMoniker, Moniker};
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
@@ -30,6 +30,12 @@ impl Hash for ComponentIdentity {
 impl PartialEq for ComponentIdentity {
     fn eq(&self, other: &Self) -> bool {
         self.moniker == other.moniker
+    }
+}
+
+impl PartialEq<Moniker> for ComponentIdentity {
+    fn eq(&self, other: &Moniker) -> bool {
+        matches!(&self.moniker, ExtendedMoniker::ComponentInstance(moniker) if moniker == other)
     }
 }
 

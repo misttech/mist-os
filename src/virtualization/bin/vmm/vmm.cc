@@ -330,48 +330,6 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
     }
   }
 
-  // Setup wayland device.
-  if (cfg.has_wayland_device()) {
-    wl_ = std::make_unique<VirtioWl>(guest_->phys_mem());
-    const size_t wl_dev_mem_size = cfg.wayland_device().memory;
-    const zx_gpaddr_t wl_dev_mem_offset = AllocDeviceAddr(wl_dev_mem_size);
-    if (!dev_mem.AddRange(wl_dev_mem_offset, wl_dev_mem_size)) {
-      FX_LOGS(INFO) << "Could not reserve device memory range for wayland device";
-      return fit::error(GuestError::INTERNAL_ERROR);
-    }
-    zx::vmar wl_vmar;
-    status = guest_->CreateSubVmar(wl_dev_mem_offset, wl_dev_mem_size, &wl_vmar);
-    if (status != ZX_OK) {
-      FX_LOGS(INFO) << "Could not create VMAR for wayland device";
-      return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-    }
-    status = pci_bus_->Connect(wl_->pci_device(), dispatcher);
-    if (status != ZX_OK) {
-      FX_LOGS(INFO) << "Could not connect wayland device";
-      return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-    }
-    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator = nullptr;
-    status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
-                                  sysmem_allocator.NewRequest().TakeChannel().release());
-    if (status != ZX_OK) {
-      FX_LOGS(INFO) << "Could not connect to sysmem allocator service";
-      return fit::error(GuestError::FAILED_SERVICE_CONNECT);
-    }
-    fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator = nullptr;
-    status = fdio_service_connect("/svc/fuchsia.ui.composition.Allocator",
-                                  scenic_allocator.NewRequest().TakeChannel().release());
-    if (status != ZX_OK) {
-      FX_LOGS(INFO) << "Could not connect to scenic allocator service";
-      return fit::error(GuestError::FAILED_SERVICE_CONNECT);
-    }
-    status = wl_->Start(guest_->object(), std::move(wl_vmar), std::move(sysmem_allocator),
-                        std::move(scenic_allocator), context, dispatcher);
-    if (status != ZX_OK) {
-      FX_LOGS(INFO) << "Could not start wayland device";
-      return fit::error(GuestError::DEVICE_START_FAILURE);
-    }
-  }
-
   // Setup sound device.
   if (cfg.has_virtio_sound() && cfg.virtio_sound()) {
     sound_ = std::make_unique<VirtioSound>(guest_->phys_mem());

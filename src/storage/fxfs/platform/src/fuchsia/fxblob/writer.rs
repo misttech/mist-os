@@ -399,24 +399,28 @@ impl DeliveryBlobWriter {
             _ => return Err(FxfsError::Inconsistent.into()),
         };
 
-        transaction
+        let deferred_work = transaction
             .commit_with_callback(|_| {
                 let handle = self.stage.complete();
-                if let Some((old_id, reservation)) = replacing {
+                self.parent.did_add(&name, None);
+                replacing.and_then(|(old_id, reservation)| {
                     self.parent.did_remove(&name);
                     // If the blob is in the cache, then we need to swap it.
-                    if let Some(old_blob) = handle.owner().cache().get(old_id) {
+                    handle.owner().cache().get(old_id).and_then(|old_blob| {
                         let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
-                        let new_blob =
-                            old_blob.overwrite_me(handle, compression_info) as Arc<dyn FxNode>;
+                        let (new_blob, deferred_work) =
+                            old_blob.overwrite_me(handle, compression_info);
                         old_blob.mark_to_be_purged();
-                        reservation.commit(&new_blob);
-                    }
-                }
-                self.parent.did_add(&name, None);
+                        reservation.commit(&(new_blob as Arc<dyn FxNode>));
+                        deferred_work
+                    })
+                })
             })
             .await
             .context("Failed to commit transaction!")?;
+        if let Some(deferred_work) = deferred_work {
+            deferred_work.await;
+        }
         Ok(())
     }
 
@@ -658,7 +662,6 @@ mod tests {
     use fidl_fuchsia_io::UnlinkOptions;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
-    use rand::{thread_rng, Rng};
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
         let mut list_of_writes = vec![];
@@ -780,7 +783,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 65536];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let mut compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -814,7 +817,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -925,7 +928,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1001,7 +1004,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 1024921];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1049,7 +1052,7 @@ mod tests {
 
         // It doesn't matter if these blobs are compressed. We just need to fragment space.
         for _ in 0..NUM_BLOBS {
-            thread_rng().fill(&mut data[..]);
+            rand::fill(&mut data[..]);
             let hash = fixture.write_blob(&data, CompressionMode::Never).await;
             hashes.push(hash);
         }
@@ -1067,7 +1070,7 @@ mod tests {
         // Create one large blob (reusing fragmented extents).
         {
             let mut data = vec![1; 1024921];
-            thread_rng().fill(&mut data[..]);
+            rand::fill(&mut data[..]);
 
             let hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1111,7 +1114,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
         // Generate a delivery blob (size doesn't matter).
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
         let hash = fuchsia_merkle::from_slice(&data).root();
         let blob_data = Type1Blob::generate(&data, CompressionMode::Always);
         // To simplify the test, we make sure to write enough bytes on the first call to bytes_ready
@@ -1256,6 +1259,7 @@ mod tests {
             connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(fixture.volume_out_dir())
                 .expect("failed to connect to the BlobCreator service");
         let hash_cpy = hash;
+        let graveyard = fixture.fs().graveyard().clone();
         // Repeatedly overwrite the blob.
         let overwrite_loop = fasync::Task::spawn(async move {
             let hash = hash_cpy;
@@ -1278,6 +1282,8 @@ mod tests {
                     .await
                     .expect("transport error on bytes_ready")
                     .expect("failed to write data to vmo");
+                // Await graveyard so that we don't fill up the disk.
+                graveyard.flush().await;
             }
         });
 

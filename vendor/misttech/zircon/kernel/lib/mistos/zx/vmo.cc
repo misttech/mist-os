@@ -5,6 +5,7 @@
 
 #include "lib/mistos/zx/vmo.h"
 
+#include <lib/zircon-internal/align.h>
 #include <trace.h>
 
 #include <object/process_dispatcher.h>
@@ -105,7 +106,8 @@ zx_status_t vmo::transfer_data(uint32_t options, uint64_t offset, uint64_t lengt
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(length) || !IS_PAGE_ALIGNED(src_offset)) {
+  if (!ZX_IS_PAGE_ALIGNED(offset) || !ZX_IS_PAGE_ALIGNED(length) ||
+      !ZX_IS_PAGE_ALIGNED(src_offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 

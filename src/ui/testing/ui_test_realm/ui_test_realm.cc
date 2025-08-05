@@ -330,6 +330,7 @@ void UITestRealm::ConfigureScenic() {
   realm_builder_.AddRoute({
       .capabilities =
           {
+              component_testing::Config{.name = "fuchsia.scenic.FrameCounterOverlay"},
               component_testing::Config{
                   .name = "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs"},
               component_testing::Config{.name = "fuchsia.scenic.FramePredictionMarginInUs"},

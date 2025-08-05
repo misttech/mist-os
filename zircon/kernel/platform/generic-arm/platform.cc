@@ -70,7 +70,7 @@
 #include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
-#include <platform/ram_mappable_crashlog.h>
+#include <platform/mapped_crashlog.h>
 
 #define LOCAL_TRACE 0
 
@@ -82,9 +82,8 @@ static bool cpu_suspend_supported = false;
 
 namespace {
 
-lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
-                    lazy_init::Destructor::Disabled>
-    ram_mappable_crashlog;
+lazy_init::LazyInit<MappedCrashlog, lazy_init::CheckType::None, lazy_init::Destructor::Disabled>
+    mapped_crashlog;
 
 }  // namespace
 
@@ -141,17 +140,11 @@ void platform_halt_cpu(void) {
 
 bool platform_supports_suspend_cpu() { return cpu_suspend_supported; }
 
-// TODO(https://fxbug.dev/414456459): Expand to include a deadline parameter
+// TODO(https://fxbug.dev/417558115): Expand to include a deadline parameter
 // that's used to wake the CPU based on the boot time clock.
-//
-// TODO(https://fxbug.dev/414456459): Consider adding a parameter that indicates
-// how deep of a suspend state we want to enter.  Then, on platforms and CPUs
-// that support multiple PSCI power states, we can choose the state that matches
-// the request.  That way this same function can be used to implement both "deep
-// suspend" and "deep idle".
-zx_status_t platform_suspend_cpu() {
-  LTRACEF("platform_suspend_cpu cpu-%u current_boot_time=%ld\n", arch_curr_cpu_num(),
-          current_boot_time());
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain) {
+  LTRACEF("platform_suspend_cpu cpu-%u current_boot_time=%ld allow_domain=%d\n",
+          arch_curr_cpu_num(), current_boot_time(), static_cast<int>(allow_domain));
 
   DEBUG_ASSERT(!Thread::Current::Get()->preemption_state().PreemptIsEnabled());
   DEBUG_ASSERT(arch_ints_disabled());
@@ -165,16 +158,11 @@ zx_status_t platform_suspend_cpu() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // TODO(https://fxbug.dev/414456459): Rejigger |platform_suspend_cpu| to track how many CPUs in
-  // this power domain (or cluster?) are still running and use that to decide what scope to request
-  // of psci_cpu_suspend.  The idea being that the last CPU to suspend can+should request that the
-  // domain/cluster be powered down rather than just the calling CPU.
-
-  // TODO(https://fxbug.dev/414456459): Expose a PSCI function that looks at the
-  // power_state value and determines if it's considered a "power down state" in
-  // the PSCI sense of the term.  Or perhaps make that an attribute that's
-  // supplied by the PSCI driver.
-  const bool is_power_down = true;
+  const PsciCpuSuspendMaxScope max_scope = static_cast<bool>(allow_domain)
+                                               ? PsciCpuSuspendMaxScope::CpuAndMore
+                                               : PsciCpuSuspendMaxScope::CpuOnly;
+  const uint32_t power_state = psci_get_cpu_suspend_power_state(max_scope);
+  const bool is_power_down = psci_is_powerdown_power_state(power_state);
 
   if (is_power_down) {
     lockup_percpu_shutdown();
@@ -186,7 +174,7 @@ zx_status_t platform_suspend_cpu() {
           arch_curr_cpu_num(), current_boot_time());
 
   // The following call may not return for an arbitrartily long time.
-  const PsciCpuSuspendResult result = psci_cpu_suspend();
+  const PsciCpuSuspendResult result = psci_cpu_suspend(power_state);
   LTRACEF("psci_cpu_suspend for cpu-%u, status %d\n", arch_curr_cpu_num(), result.status_value());
 
   DEBUG_ASSERT(arch_ints_disabled());
@@ -322,7 +310,7 @@ static void init_topology(uint level) {
 
 LK_INIT_HOOK(init_topology, init_topology, LK_INIT_LEVEL_VM)
 
-static void allocate_persistent_ram(paddr_t pa, size_t length) {
+static void allocate_persistent_ram(const MappedMemoryRange& range) {
   // Figure out how to divide up our persistent RAM.  Right now there are
   // three potential users:
   //
@@ -345,7 +333,7 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   {
     // start by figuring out how many chunks of RAM we have available to
     // us total.
-    size_t persistent_chunks_available = length / kPersistentRamAllocationGranularity;
+    size_t persistent_chunks_available = range.size_bytes() / kPersistentRamAllocationGranularity;
 
     // If we have not already configured a non-trivial crashlog implementation
     // for the platform, make sure that crashlog gets its minimum allocation, or
@@ -379,34 +367,31 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   // Configure up the crashlog RAM
   if (crashlog_size > 0) {
     dprintf(INFO, "Crashlog configured with %" PRIu64 " bytes\n", crashlog_size);
-    ram_mappable_crashlog.Initialize(pa, crashlog_size);
-    PlatformCrashlog::Bind(ram_mappable_crashlog.Get());
+    mapped_crashlog.Initialize(ktl::span{range.data(), crashlog_size});
+    PlatformCrashlog::Bind(mapped_crashlog.Get());
   }
-  size_t offset = crashlog_size;
+
+  ktl::byte* leftover_base = range.data() + crashlog_size;
 
   // Configure the persistent debuglog RAM (if we have any)
   if (pdlog_size > 0) {
     dprintf(INFO, "Persistent debug logging enabled and configured with %" PRIu64 " bytes\n",
             pdlog_size);
-    persistent_dlog_set_location(paddr_to_physmap(pa + offset), pdlog_size);
-    offset += pdlog_size;
+    persistent_dlog_set_location(leftover_base, pdlog_size);
+    leftover_base += pdlog_size;
   }
 
   // Do _not_ attempt to set the location of the debug trace buffer if this is
   // not a persistent debug trace buffer.  The location of a non-persistent
   // trace buffer would have been already set during (very) early init.
   if constexpr (kJTraceIsPersistent == jtrace::IsPersistent::Yes) {
-    jtrace_set_location(paddr_to_physmap(pa + offset), jtrace_size);
-    offset += jtrace_size;
+    jtrace_set_location(reinterpret_cast<void*>(leftover_base), jtrace_size);
   }
 }
 
 void platform_early_init(void) {
   if (gPhysHandoff->nvram) {
-    const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
-    dprintf(INFO, "NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n", nvram.base,
-            nvram.length);
-    allocate_persistent_ram(nvram.base, nvram.length);
+    allocate_persistent_ram(gPhysHandoff->nvram.value());
   }
 
   // is the cmdline option to bypass dlog set ?
@@ -437,7 +422,7 @@ void platform_init(void) {
       }
     }
 
-    // TODO(https://fxbug.dev/414456459): Flip this flag to enable based on presence of ZBI config.
+    // TODO(https://fxbug.dev/417558115): Flip this flag to enable based on presence of ZBI config.
     cpu_suspend_supported = false;
   }
   dprintf(INFO, "platform_suspend_cpu support %s\n",

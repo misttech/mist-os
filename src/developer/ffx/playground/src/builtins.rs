@@ -210,7 +210,7 @@ impl Interpreter {
                             path.clone(),
                             fs_root.duplicate(),
                             pwd,
-                            fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::MODE,
+                            fio::NodeAttributesQuery::PROTOCOLS,
                             SymlinkPolicy::Follow,
                         )
                         .await?;
@@ -237,21 +237,13 @@ impl Interpreter {
                     } else if protocols.contains(fio::NodeProtocolKinds::SYMLINK) {
                         unreachable!("path_info was supposed to traverse symlinks but didn't!");
                     } else {
-                        let mode = info.attributes.mutable_attributes.mode.unwrap_or(0);
                         let name = path.rsplit_once("/").unwrap().1.to_owned();
-                        let kind = match mode & fio::MODE_TYPE_MASK {
-                            fio::MODE_TYPE_BLOCK_DEVICE => fio::DirentType::BlockDevice,
-                            fio::MODE_TYPE_SERVICE => fio::DirentType::Service,
-                            fio::MODE_TYPE_FILE => fio::DirentType::File,
-                            _ => {
-                                if protocols.contains(fio::NodeProtocolKinds::FILE) {
-                                    fio::DirentType::File
-                                } else if protocols.contains(fio::NodeProtocolKinds::CONNECTOR) {
-                                    fio::DirentType::Service
-                                } else {
-                                    fio::DirentType::Unknown
-                                }
-                            }
+                        let kind = if protocols.contains(fio::NodeProtocolKinds::FILE) {
+                            fio::DirentType::File
+                        } else if protocols.contains(fio::NodeProtocolKinds::CONNECTOR) {
+                            fio::DirentType::Service
+                        } else {
+                            fio::DirentType::Unknown
                         };
 
                         Ok(Value::Object(vec![

@@ -4,6 +4,8 @@
 
 use crate::protocol::{self, ParameterValue, ReportFormat, Value, MAX_PACKET_SIZE};
 use anyhow::{bail, format_err, Error};
+use fuchsia_async::TimeoutExt;
+use futures::{AsyncReadExt, AsyncWriteExt};
 use serde::{Deserialize, Serialize};
 use serde_json as json;
 use std::cell::RefCell;
@@ -13,7 +15,7 @@ use std::os::raw::{c_uchar, c_ushort};
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
-use usb_bulk::{InterfaceInfo, Open};
+use usb_rs::bulk_interface::BulkInterface;
 
 const GOOGLE_VENDOR_ID: c_ushort = 0x18d1;
 const ZEDMON_PRODUCT_ID: c_ushort = 0xaf00;
@@ -21,29 +23,15 @@ const VENDOR_SPECIFIC_CLASS_ID: c_uchar = 0xff;
 const ZEDMON_SUBCLASS_ID: c_uchar = 0xff;
 const ZEDMON_PROTOCOL_ID: c_uchar = 0x00;
 
-/// Determines if `ifc` is a Zedmon device. If so, the Zedmon's serial is returned. Otherwise, None.
-fn zedmon_match(ifc: &InterfaceInfo) -> Option<String> {
-    if (ifc.dev_vendor == GOOGLE_VENDOR_ID)
-        && (ifc.dev_product == ZEDMON_PRODUCT_ID)
-        && (ifc.ifc_class == VENDOR_SPECIFIC_CLASS_ID)
-        && (ifc.ifc_subclass == ZEDMON_SUBCLASS_ID)
-        && (ifc.ifc_protocol == ZEDMON_PROTOCOL_ID)
-    {
-        let null_pos = match ifc.serial_number.iter().position(|&c| c == 0) {
-            Some(p) => p,
-            None => {
-                eprintln!(
-                    "Warning: Detected a USB device whose serial number was not null-terminated:"
-                );
-                eprintln!("{}", &(*String::from_utf8_lossy(&ifc.serial_number)));
-                return None;
-            }
-        };
-        let serial = (*String::from_utf8_lossy(&ifc.serial_number[..null_pos])).to_string();
-        Some(serial)
-    } else {
-        None
-    }
+fn zedmon_match(
+    usb_device: &usb_rs::DeviceDescriptor,
+    interface: &usb_rs::InterfaceDescriptor,
+) -> bool {
+    (usb_device.vendor == GOOGLE_VENDOR_ID)
+        && (usb_device.product == ZEDMON_PRODUCT_ID)
+        && (interface.class == VENDOR_SPECIFIC_CLASS_ID)
+        && (interface.subclass == ZEDMON_SUBCLASS_ID)
+        && (interface.protocol == ZEDMON_PROTOCOL_ID)
 }
 
 /// Used by Client to determine when data reporting should stop.
@@ -238,7 +226,7 @@ pub struct ReportingOptions {
 #[derive(Debug)]
 pub struct Client<InterfaceType>
 where
-    InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write,
+    InterfaceType: Open<InterfaceType> + Read + Write,
 {
     /// USB interface to the Zedmon device, or equivalent.
     interface: RefCell<InterfaceType>,
@@ -252,27 +240,103 @@ where
     v_bus_index: usize,
 }
 
-impl<InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write> Client<InterfaceType> {
-    /// Enumerates all connected Zedmons. Returns a `Vec<String>` of their serial numbers.
-    fn enumerate() -> Vec<String> {
-        let mut serials = Vec::new();
+pub(crate) struct ZedmonInterface {
+    inner: BulkInterface,
+}
 
-        // Instead of matching any devices, this callback extracts Zedmon serial numbers as
-        // InterfaceType::open iterates through them. InterfaceType::open is expected to return an
-        // error because no devices match.
-        let mut cb = |info: &InterfaceInfo| -> bool {
-            if let Some(serial) = zedmon_match(info) {
-                serials.push(serial);
+impl ZedmonInterface {
+    /// How many URBs to allocate for each device we communicate with.
+    const URB_POOL_SIZE: usize = 32;
+
+    fn new(inner: BulkInterface) -> Self {
+        Self { inner }
+    }
+}
+
+impl Read for ZedmonInterface {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        futures::executor::block_on(async {
+            self.inner
+                .read(buf)
+                .on_timeout(std::time::Duration::from_millis(500), || {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "Timed out reading from bulk interface",
+                    ))
+                })
+                .await
+        })
+    }
+}
+
+impl Write for ZedmonInterface {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        futures::executor::block_on(async { self.inner.write(buf).await })
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        futures::executor::block_on(async { self.inner.flush().await })
+    }
+}
+
+pub(crate) trait Open<T> {
+    fn open(serial: &String) -> Result<T, Error>;
+    fn enumerate_serials() -> Vec<String>;
+}
+
+impl Open<ZedmonInterface> for ZedmonInterface {
+    fn open(serial: &String) -> Result<ZedmonInterface, Error> {
+        let devices = usb_rs::enumerate_devices()?;
+        for device in devices {
+            if device.serial() == Some(serial.clone()) {
+                // Okay we match on serial number lets scan the interfaces
+                let interface = match device
+                    .scan_interfaces(Self::URB_POOL_SIZE, |usb_device, interface| {
+                        zedmon_match(usb_device, interface)
+                    }) {
+                    Ok(iface) => iface,
+                    Err(usb_rs::Error::InterfaceNotFound) => {
+                        return Err(anyhow::anyhow!("Interface not found"));
+                    }
+                    Err(e) => {
+                        return Err(e.into());
+                    }
+                };
+                return Ok(ZedmonInterface::new(BulkInterface::new(interface)));
             }
+        }
+        Err(anyhow::anyhow!("Interface not found"))
+    }
 
-            false
+    fn enumerate_serials() -> Vec<String> {
+        let mut serials: Vec<String> = vec![];
+        let Ok(devices) = usb_rs::enumerate_devices() else {
+            return serials;
         };
 
-        assert!(
-            InterfaceType::open(&mut cb).is_err(),
-            "open() should return an error, as the supplied callback cannot match any devices."
-        );
+        for device in devices {
+            let Some(serial) = device.serial() else {
+                continue;
+            };
+
+            let valid = match device.scan_interfaces(Self::URB_POOL_SIZE, zedmon_match) {
+                Ok(_) => true,
+                Err(_) => false,
+            };
+
+            if valid {
+                serials.push(serial);
+            }
+        }
+
         serials
+    }
+}
+
+impl<InterfaceType: Open<InterfaceType> + Read + Write> Client<InterfaceType> {
+    /// Enumerates all connected Zedmons. Returns a `Vec<String>` of their serial numbers.
+    fn enumerate() -> Vec<String> {
+        InterfaceType::enumerate_serials()
     }
 
     // Number of USB packets that can be queued in Zedmon's USB interface, based on STM32F072
@@ -739,7 +803,30 @@ impl<InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write> Client<Interfa
 
 /// Lists the serial numbers of all connected Zedmons.
 pub fn list() -> Vec<String> {
-    Client::<usb_bulk::Interface>::enumerate()
+    let mut serials: Vec<String> = vec![];
+    let Ok(devices) = usb_rs::enumerate_devices() else {
+        return serials;
+    };
+
+    for device in devices {
+        let Some(serial) = device.serial() else {
+            continue;
+        };
+
+        let valid = match device
+            .scan_interfaces(ZedmonInterface::URB_POOL_SIZE, |usb_device, interface| {
+                zedmon_match(usb_device, interface)
+            }) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+
+        if valid {
+            serials.push(serial);
+        }
+    }
+
+    serials
 }
 
 #[derive(Debug, Error)]
@@ -763,14 +850,14 @@ pub enum InitError {
 /// default.
 ///
 /// If `serial` is not specified and multiple Zedmon devices are attached then an error is returned.
-pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitError> {
+pub fn zedmon(serial: Option<&str>) -> Result<Client<ZedmonInterface>, InitError> {
     const MAX_ATTEMPTS: u32 = 3;
 
     // Figure out the serial of the Zedmon device we intend to connect with
     let target_serial = if let Some(s) = serial {
         s.to_string()
     } else {
-        let mut attached_serials = Client::<usb_bulk::Interface>::enumerate();
+        let mut attached_serials = Client::<ZedmonInterface>::enumerate();
         match attached_serials.len() {
             0 => Err(InitError::NoDevices),
             1 => Ok(attached_serials.remove(0)),
@@ -780,11 +867,7 @@ pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitE
 
     for attempt in 1..=MAX_ATTEMPTS {
         let interface =
-            usb_bulk::Interface::open(&mut |ifc: &InterfaceInfo| match zedmon_match(ifc) {
-                Some(serial) => serial == target_serial,
-                None => false,
-            })
-            .map_err(|_| InitError::MissingDevice)?;
+            ZedmonInterface::open(&target_serial).map_err(|_| InitError::MissingDevice)?;
 
         match Client::new(interface) {
             Ok(z) => return Ok(z),
@@ -804,6 +887,7 @@ pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use num_traits::FromPrimitive;
     use protocol::tests::serialize_reports;
     use protocol::{PacketType, Report, ScalarType};
@@ -821,26 +905,30 @@ mod tests {
         serial_number: &'a str,
     }
 
-    fn interface_info(short: ShortInterface<'_>) -> InterfaceInfo {
-        let mut serial = [0; 256];
-        for (i, c) in short.serial_number.as_bytes().iter().enumerate() {
-            serial[i] = *c;
-        }
+    struct MockIface {
+        serial: String,
+        usb_device: usb_rs::DeviceDescriptor,
+        interface: usb_rs::InterfaceDescriptor,
+    }
 
-        InterfaceInfo {
-            dev_vendor: short.dev_vendor,
-            dev_product: short.dev_product,
-            dev_class: 0,
-            dev_subclass: 0,
-            dev_protocol: 0,
-            ifc_class: short.ifc_class,
-            ifc_subclass: short.ifc_subclass,
-            ifc_protocol: short.ifc_protocol,
-            has_bulk_in: 0,
-            has_bulk_out: 0,
-            writable: 0,
-            serial_number: serial,
-            device_path: [0; 256usize],
+    fn to_mockiface(iface: &ShortInterface<'_>) -> MockIface {
+        MockIface {
+            serial: iface.serial_number.to_string(),
+            usb_device: usb_rs::DeviceDescriptor {
+                vendor: iface.dev_vendor,
+                product: iface.dev_product,
+                class: iface.ifc_class,
+                subclass: iface.ifc_subclass,
+                protocol: iface.ifc_protocol,
+            },
+            interface: usb_rs::InterfaceDescriptor {
+                id: 0,
+                class: iface.ifc_class,
+                subclass: iface.ifc_subclass,
+                protocol: iface.ifc_protocol,
+                alternate: 0,
+                endpoints: vec![],
+            },
         }
     }
 
@@ -850,30 +938,40 @@ mod tests {
         // test is single-threaded, so a thread-local static provides the most appropriate safe
         // interface.
         thread_local! {
-            static AVAILABLE_DEVICES: RefCell<Vec<InterfaceInfo>> = RefCell::new(Vec::new());
+            static AVAILABLE_DEVICES: RefCell<Vec<MockIface>> = RefCell::new(Vec::new());
         }
         fn push_device(short: ShortInterface<'_>) {
             AVAILABLE_DEVICES.with(|devices| {
-                devices.borrow_mut().push(interface_info(short));
+                devices.borrow_mut().push(to_mockiface(&short));
             });
         }
 
         struct FakeEnumerationInterface {}
 
-        impl usb_bulk::Open<FakeEnumerationInterface> for FakeEnumerationInterface {
-            fn open<F>(matcher: &mut F) -> Result<FakeEnumerationInterface, usb_bulk::Error>
-            where
-                F: FnMut(&InterfaceInfo) -> bool,
-            {
+        impl Open<FakeEnumerationInterface> for FakeEnumerationInterface {
+            fn open(serial: &String) -> Result<FakeEnumerationInterface, Error> {
                 AVAILABLE_DEVICES.with(|devices| {
                     let devices = devices.borrow();
                     for device in devices.iter() {
-                        if matcher(device) {
+                        if device.serial == *serial {
                             return Ok(FakeEnumerationInterface {});
                         }
                     }
-                    Err(usb_bulk::Error::NoDeviceMatched)
+                    return Err(anyhow!("No Device Matched"));
                 })
+            }
+
+            fn enumerate_serials() -> Vec<String> {
+                let mut serials = vec![];
+                AVAILABLE_DEVICES.with(|devices| {
+                    let devices = devices.borrow();
+                    for device in devices.iter() {
+                        if zedmon_match(&device.usb_device, &device.interface) {
+                            serials.push(device.serial.clone());
+                        }
+                    }
+                });
+                serials
             }
         }
 
@@ -1088,12 +1186,12 @@ mod tests {
             next_read: Option<NextRead>,
         }
 
-        impl usb_bulk::Open<FakeZedmonInterface> for FakeZedmonInterface {
-            fn open<F>(_matcher: &mut F) -> Result<FakeZedmonInterface, usb_bulk::Error>
-            where
-                F: FnMut(&InterfaceInfo) -> bool,
-            {
-                Err(usb_bulk::Error::NoDeviceMatched)
+        impl Open<FakeZedmonInterface> for FakeZedmonInterface {
+            fn open(_serial: &String) -> Result<FakeZedmonInterface, Error> {
+                Err(anyhow!("No Device matched"))
+            }
+            fn enumerate_serials() -> Vec<String> {
+                vec![]
             }
         }
 
@@ -1263,9 +1361,7 @@ mod tests {
         report_queue
     }
 
-    fn run_zedmon_reporting_with_options<
-        InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write,
-    >(
+    fn run_zedmon_reporting_with_options<InterfaceType: Open<InterfaceType> + Read + Write>(
         zedmon: &Client<InterfaceType>,
         test_duration: Duration,
         options: ReportingOptions,
@@ -1303,7 +1399,7 @@ mod tests {
         Ok(output)
     }
 
-    fn run_zedmon_reporting<InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write>(
+    fn run_zedmon_reporting<InterfaceType: Open<InterfaceType> + Read + Write>(
         zedmon: &Client<InterfaceType>,
         test_duration: Duration,
         reporting_interval: Option<Duration>,
@@ -1350,12 +1446,12 @@ mod tests {
             }
         }
 
-        impl usb_bulk::Open<StillReportingInterface> for StillReportingInterface {
-            fn open<F>(_matcher: &mut F) -> Result<StillReportingInterface, usb_bulk::Error>
-            where
-                F: FnMut(&InterfaceInfo) -> bool,
-            {
-                Err(usb_bulk::Error::NoDeviceMatched)
+        impl Open<StillReportingInterface> for StillReportingInterface {
+            fn open(_string: &String) -> Result<StillReportingInterface, Error> {
+                Err(anyhow!("No Device matched"))
+            }
+            fn enumerate_serials() -> Vec<String> {
+                vec![]
             }
         }
 
@@ -1425,12 +1521,13 @@ mod tests {
         }
     }
 
-    impl usb_bulk::Open<TransientFailureInterface> for TransientFailureInterface {
-        fn open<F>(_matcher: &mut F) -> Result<TransientFailureInterface, usb_bulk::Error>
-        where
-            F: FnMut(&InterfaceInfo) -> bool,
-        {
-            Err(usb_bulk::Error::NoDeviceMatched)
+    impl Open<TransientFailureInterface> for TransientFailureInterface {
+        fn open(_serial: &String) -> Result<TransientFailureInterface, Error> {
+            Err(anyhow!("No Device matched"))
+        }
+
+        fn enumerate_serials() -> Vec<String> {
+            vec![]
         }
     }
 

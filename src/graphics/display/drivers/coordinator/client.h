@@ -31,12 +31,10 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
@@ -48,8 +46,8 @@ class ClientProxy;
 
 // Manages the state associated with a display coordinator client connection.
 //
-// This class is not thread-safe. After initialization, all methods must be
-// executed on the same thread.
+// This class is not thread-safe. The constructor, destructor and all methods
+// must run on the coordinator driver dispatcher.
 class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
  public:
   // `controller` must outlive both this client and `proxy`.
@@ -79,7 +77,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
       std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
       std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
   fidl::Status NotifyOwnershipChange(bool client_has_ownership);
-  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time timestamp,
+  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                            display::ConfigStamp config_stamp,
                            display::VsyncAckCookie vsync_ack_cookie);
 
@@ -193,7 +191,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for display.
   zx_status_t ImportImageForDisplay(const display::ImageMetadata& image_metadata,
-                                    display::BufferId buffer_id, display::ImageId image_id);
+                                    display::BufferCollectionId buffer_collection_id,
+                                    uint32_t buffer_index, display::ImageId image_id);
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
   // images.
@@ -201,7 +200,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for capture.
   zx_status_t ImportImageForCapture(const display::ImageMetadata& image_metadata,
-                                    display::BufferId buffer_id, display::ImageId image_id);
+                                    display::BufferCollectionId buffer_collection_id,
+                                    uint32_t buffer_index, display::ImageId image_id);
 
   // Discards all the draft configs on all displays and layers.
   void DiscardConfig();
@@ -252,10 +252,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   Layer::Map layers_;
 
-  // TODO(fxbug.com/129082): Move to Controller, so values issued using this
-  // counter are globally unique. Do not pass to display::DriverLayerId values to drivers
-  // until this issue is fixed.
-  display::DriverLayerId next_driver_layer_id = display::DriverLayerId(1);
+  // TODO(https://fxbug.dev/430976567): Move to client-managed LayerId values.
+  display::LayerId next_layer_id_ = display::LayerId(1);
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);

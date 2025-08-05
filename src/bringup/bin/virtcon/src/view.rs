@@ -437,7 +437,7 @@ impl VirtualConsoleViewAssistant {
                         let admin = AdminSynchronousProxy::new(client_end);
                         match admin.perform_reboot(
                             &RebootOptions {
-                                reasons: Some(vec![RebootReason2::UserRequest]),
+                                reasons: Some(vec![RebootReason2::DeveloperRequest]),
                                 ..Default::default()
                             },
                             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),

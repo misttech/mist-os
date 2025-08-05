@@ -12,19 +12,19 @@ use starnix_core::task::{
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::{
     parse_i32_file, parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps,
     SimpleFileNode,
 };
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
+    fs_node_impl_dir_readonly, CallbackSymlinkNode, CloseFreeSafe, DirectoryEntryType, DirentSink,
+    FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
+    FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -120,7 +120,7 @@ impl Deref for TaskDirectoryNode {
 
 impl TaskDirectory {
     fn new(fs: &FileSystemHandle, task: &TempRef<'_, Task>, scope: TaskEntryScope) -> FsNodeHandle {
-        let creds = task.creds().euid_as_fscred();
+        let creds = task.real_creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
         fs.create_node_and_allocate_node_id(
             TaskDirectoryNode(Arc::new(TaskDirectory {
@@ -213,31 +213,32 @@ impl FsNodeOps for TaskDirectoryNode {
                 Box::new(CommFile::new_node(task_weak, task.persistent_info.clone()))
             }
             b"attr" => {
-                let mut subdir = StaticDirectoryBuilder::new(&fs);
-                subdir.dir_creds(creds);
-                for (attr, name) in [
-                    (security::ProcAttr::Current, "current"),
-                    (security::ProcAttr::Exec, "exec"),
-                    (security::ProcAttr::FsCreate, "fscreate"),
-                    (security::ProcAttr::KeyCreate, "keycreate"),
-                    (security::ProcAttr::SockCreate, "sockcreate"),
-                ] {
-                    subdir.entry_etc(
-                        name,
-                        AttrNode::new(task_weak.clone(), attr),
-                        mode!(IFREG, 0o666),
+                let dir = SimpleDirectory::new();
+                dir.edit(&fs, |dir| {
+                    for (attr, name) in [
+                        (security::ProcAttr::Current, "current"),
+                        (security::ProcAttr::Exec, "exec"),
+                        (security::ProcAttr::FsCreate, "fscreate"),
+                        (security::ProcAttr::KeyCreate, "keycreate"),
+                        (security::ProcAttr::SockCreate, "sockcreate"),
+                    ] {
+                        dir.entry_etc(
+                            name.into(),
+                            AttrNode::new(task_weak.clone(), attr),
+                            mode!(IFREG, 0o666),
+                            DeviceType::NONE,
+                            creds,
+                        );
+                    }
+                    dir.entry_etc(
+                        "prev".into(),
+                        AttrNode::new(task_weak, security::ProcAttr::Previous),
+                        mode!(IFREG, 0o444),
                         DeviceType::NONE,
                         creds,
                     );
-                }
-                subdir.entry_etc(
-                    "prev",
-                    AttrNode::new(task_weak, security::ProcAttr::Previous),
-                    mode!(IFREG, 0o444),
-                    DeviceType::NONE,
-                    creds,
-                );
-                subdir.build_ops()
+                });
+                Box::new(dir)
             }
             b"ns" => Box::new(NsDirectory { task: task_weak }),
             b"mountinfo" => Box::new(ProcMountinfoFile::new_node(task_weak)),
@@ -264,6 +265,8 @@ impl FsNodeOps for TaskDirectoryNode {
     }
 }
 
+/// `TaskDirectory` doesn't implement the `close` method.
+impl CloseFreeSafe for TaskDirectory {}
 impl FileOps for TaskDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
@@ -365,7 +368,7 @@ impl FsNodeOps for FdDirectory {
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
-            FsNodeInfo::new(mode!(IFLNK, 0o777), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), task.real_fscred()),
         ))
     }
 }
@@ -497,7 +500,7 @@ impl FsNodeOps for NsDirectory {
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }
-            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred());
+            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.real_fscred());
             let fallback = || {
                 node.fs().create_node_and_allocate_node_id(BytesFile::new_node(vec![]), node_info())
             };
@@ -554,7 +557,7 @@ impl FsNodeOps for NsDirectory {
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
-                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.as_fscred()),
+                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.real_fscred()),
             ))
         }
     }
@@ -605,7 +608,7 @@ impl FsNodeOps for FdInfoDirectory {
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
         Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(data),
-            FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), task.real_fscred()),
         ))
     }
 }
@@ -834,7 +837,7 @@ impl FileOps for CommFile {
 pub struct CommFileSource(TaskPersistentInfo);
 impl DynamicFileSource for CommFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        sink.write(self.0.lock().command().as_bytes());
+        sink.write(self.0.command().as_bytes());
         sink.write(b"\n");
         Ok(())
     }
@@ -1182,13 +1185,12 @@ impl DynamicFileSource for StatusFile {
                 // Collect everything stored in info in this block.  There is a lock ordering
                 // issue with the task lock acquired below, and cloning info is
                 // expensive.
-                let info = task.persistent_info.lock();
                 write!(sink, "Name:\t")?;
-                sink.write(info.command().as_bytes());
-                let creds = info.creds();
+                sink.write(task.persistent_info.command().as_bytes());
+                let creds = task.persistent_info.real_creds();
                 (
-                    Some(info.pid()),
-                    Some(info.tid()),
+                    Some(task.persistent_info.pid()),
+                    Some(task.persistent_info.tid()),
                     Some(format!(
                         "Uid:\t{}\t{}\t{}\t{}\nGid:\t{}\t{}\t{}\t{}\nGroups:\t{}",
                         creds.uid,

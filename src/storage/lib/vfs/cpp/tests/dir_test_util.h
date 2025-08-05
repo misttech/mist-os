@@ -12,6 +12,7 @@
 #include <cstring>
 
 #include <gtest/gtest.h>
+#include <src/storage/lib/vfs/cpp/vfs_types.h>
 
 namespace fs {
 // Helper class to check entries of a directory
@@ -21,9 +22,9 @@ namespace fs {
 //    size_t len;
 //    EXPECT_EQ(test->Readdir(&cookie, buffer, sizeof(buffer), &len), ZX_OK);
 //    fs::DirentChecker dc(buffer, len);
-//    dc.ExpectEntry(".", V_TYPE_DIR);
-//    dc.ExpectEntry("SampleDir", V_TYPE_DIR);
-//    dc.ExpectEntry("SampleFile",V_TYPE_FILE);
+//    dc.ExpectEntry(".", fuchsia_io::DirentType::kDirectory);
+//    dc.ExpectEntry("SampleDir", fuchsia_io::DirentType::kDirectory);
+//    dc.ExpectEntry("SampleFile",fuchsia_io::DirentType::kFile);
 //    dc.ExpectEnd();
 //
 class DirentChecker {
@@ -32,18 +33,15 @@ class DirentChecker {
 
   void ExpectEnd() const { EXPECT_EQ(0u, remaining_); }
 
-  void ExpectEntry(const char* name, uint32_t vtype) {
+  void ExpectEntry(std::string_view name, fuchsia_io::DirentType type) {
     ASSERT_NE(0u, remaining_);
-    auto entry = reinterpret_cast<const vdirent_t*>(current_);
-    size_t entry_size = entry->size + sizeof(vdirent_t);
+    auto entry = reinterpret_cast<const fs::DirectoryEntry*>(current_);
+    size_t entry_size = entry->name_length + sizeof(fs::DirectoryEntry);
     ASSERT_GE(remaining_, entry_size);
     current_ += entry_size;
     remaining_ -= entry_size;
-    EXPECT_EQ(memcmp(reinterpret_cast<const uint8_t*>(name),
-                     reinterpret_cast<const uint8_t*>(entry->name), strlen(name)),
-              0)
-        << "name";
-    EXPECT_EQ(VTYPE_TO_DTYPE(vtype), entry->type);
+    EXPECT_EQ(name, std::string_view(entry->name, entry->name_length));
+    EXPECT_EQ(type, entry->type);
   }
 
  private:

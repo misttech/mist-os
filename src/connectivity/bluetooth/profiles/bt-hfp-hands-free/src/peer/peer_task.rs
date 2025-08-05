@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use bt_hfp::call::{indicators as call_indicators, Direction};
+use bt_hfp::call::indicators as call_indicators;
 use bt_hfp::codec_id::CodecId;
 use bt_hfp::{a2dp, audio, sco};
 use fuchsia_bluetooth::types::{Channel, PeerId};
@@ -15,9 +15,13 @@ use vigil::{DropWatch, Vigil};
 use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
-use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator, CallIndicator};
+use crate::peer::ag_indicators::{
+    AgIndicator, AgIndicatorTranslator, BatteryChargeIndicator, CallIndicator,
+    NetworkInformationIndicator,
+};
 use crate::peer::at_connection::{self, Response as AtResponse};
-use crate::peer::calls::Calls;
+use crate::peer::calls::{CallOutput, Calls};
+use crate::peer::indicated_state::IndicatedState;
 use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
 
@@ -29,6 +33,7 @@ pub struct PeerTask {
     peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
     at_connection: at_connection::Connection,
     ag_indicator_translator: AgIndicatorTranslator,
+    indicated_state: IndicatedState,
     calls: Calls,
     sco_connector: sco::Connector,
     sco_state: sco::InspectableState,
@@ -49,6 +54,7 @@ impl PeerTask {
         let at_connection = at_connection::Connection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
         let ag_indicator_translator = AgIndicatorTranslator::new();
+        let indicated_state = IndicatedState::default();
         let sco_state = sco::InspectableState::default();
         let a2dp_control = a2dp::Control::connect();
 
@@ -58,6 +64,7 @@ impl PeerTask {
             peer_handler_request_stream,
             at_connection,
             ag_indicator_translator,
+            indicated_state,
             calls,
             sco_connector,
             sco_state,
@@ -85,9 +92,9 @@ impl PeerTask {
     }
 
     async fn run_inner(&mut self) -> Result<()> {
-        self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartSlci {
+        self.enqueue_command_from_hf(CommandFromHf::StartSlci {
             hf_features: self.procedure_manager.procedure_manipulated_state.hf_features,
-        }));
+        });
 
         loop {
             // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
@@ -147,17 +154,15 @@ impl PeerTask {
                         self.handle_procedure_output(procedure_output).await?;
                     }
                 }
-                call_procedure_input_result_option = self.calls.next() => {
-                    info!("Received call procedure input {:?} for peer {:}", call_procedure_input_result_option, self.peer_id);
+                call_output_option = self.calls.next() => {
+                    info!("Received call output {:?} for peer {:}", call_output_option, self.peer_id);
 
                     drop(sco_state);
 
-                    let call_procedure_input_result =
-                        call_procedure_input_result_option
+                    let call_output =
+                        call_output_option
                             .ok_or_else(|| format_err!("Calls stream closed for peer {:}", self.peer_id))?;
-                    let call_procedure_input = call_procedure_input_result?;
-
-                    self.procedure_manager.enqueue(call_procedure_input)
+                    self.handle_call_output(call_output);
                 }
                 sco_connection_result = sco_state.on_connected() => {
                     info!("Received SCO connection for peer {:}", self.peer_id);
@@ -182,64 +187,59 @@ impl PeerTask {
     }
 
     fn handle_peer_handler_request(&mut self, peer_handler_request: fidl_hfp::PeerHandlerRequest) {
-        // TODO(b/321278917) Refactor this method to be testable. Maybe move it to calls.rs
-        // TODO(fxbug.dev/136796) asynchronously respond to requests when a procedure completes.
-        let (command_from_hf, responder) = match peer_handler_request {
+        debug!("Got peer handler request {:?} from peer {:}", peer_handler_request, self.peer_id);
+
+        match peer_handler_request {
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::DialFromNumber(number),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    Some(number.clone().into()),
-                    Direction::MobileOriginated,
-                );
-                (CommandFromHf::CallActionDialFromNumber { number }, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromNumber { number });
             }
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::DialFromLocation(memory),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    /* number = */ None,
-                    Direction::MobileOriginated,
-                );
-                (CommandFromHf::CallActionDialFromMemory { memory }, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromMemory { memory });
             }
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::RedialLast(_),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    /* number = */ None,
-                    Direction::MobileOriginated,
-                );
-                (CommandFromHf::CallActionRedialLast, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionRedialLast);
+            }
+            fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
+                action: fidl_hfp::CallAction::TransferActive(_),
+                responder,
+            } => {
+                self.start_audio_connection();
+                self.log_responder_error(responder.send(Ok(())));
             }
             fidl_hfp::PeerHandlerRequest::WatchNextCall { responder } => {
                 self.calls.handle_watch_next_call(responder);
-                // TODO(b/321278917) Clean up this control flow.
-                return;
+            }
+            fidl_hfp::PeerHandlerRequest::WatchNetworkInformation { responder } => {
+                self.indicated_state.handle_watch_network_information(responder);
             }
             other => {
                 error!(
                     "Unimplemented PeerHandler FIDL request {:?} for peer {:}",
                     other, self.peer_id
                 );
-                // TODO(b/321278917) Clean up this control flow.
-                return;
             }
         };
+    }
 
-        // TODO(fxbug.dev/136796) asynchronously respond to this request when the procedure
-        // completes.
-        let send_result = responder.send(Ok(()));
+    fn log_responder_error(&self, send_result: Result<(), fidl::Error>) {
         if let Err(err) = send_result {
             warn!("Error {:?} sending result to peer {:}", err, self.peer_id);
         }
+    }
 
+    fn enqueue_command_from_hf(&mut self, command_from_hf: CommandFromHf) {
         self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
     }
 
@@ -285,10 +285,25 @@ impl PeerTask {
             AgIndicator::Call(call_indicator) => {
                 self.calls.set_call_state_by_indicator(call_indicator)
             }
-            // TODO(https://fxbug.dev/131814) Handle NetworkInformation indicators.
-            // TODO(https://fxbug.dev/131815) Handle BatteryCharge indicators.
-            _ => {
-                error!("Handling indicator {:?} unimplemented.", indicator);
+            AgIndicator::NetworkInformation(network_indicator) => {
+                self.handle_network_information_indicator(network_indicator)
+            }
+            AgIndicator::BatteryCharge(BatteryChargeIndicator { percent }) => {
+                self.indicated_state.set_ag_battery_level(percent)
+            }
+        }
+    }
+
+    fn handle_network_information_indicator(&mut self, indicator: NetworkInformationIndicator) {
+        match indicator {
+            NetworkInformationIndicator::ServiceAvailable(service) => {
+                self.indicated_state.set_service_available(service)
+            }
+            NetworkInformationIndicator::SignalStrength(signal) => {
+                self.indicated_state.set_signal_strength(signal)
+            }
+            NetworkInformationIndicator::Roaming(roaming) => {
+                self.indicated_state.set_roaming(roaming)
             }
         }
     }
@@ -313,7 +328,7 @@ impl PeerTask {
         Ok(())
     }
 
-    fn set_initial_ag_indicator_values(&self, ordered_values: Vec<i64>) -> Result<()> {
+    fn set_initial_ag_indicator_values(&mut self, ordered_values: Vec<i64>) -> Result<()> {
         // Indices are 1-indexed.
         let indices_and_values = std::iter::zip(1i64.., ordered_values.into_iter());
 
@@ -350,20 +365,34 @@ impl PeerTask {
                 }
                 AgIndicator::Call(_) => { // Nothing to do
                 }
-                AgIndicator::NetworkInformation(_) => {
-                    // TODO(https://fxbug.dev/131814) Set initial NetworkInformation indicator value from
-                    // SetInitialIndicatorValues procedure output.
+                AgIndicator::NetworkInformation(network_indicator) => {
+                    self.handle_network_information_indicator(network_indicator);
                 }
-                AgIndicator::BatteryCharge(_) => {
-                    // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
-                    // SetInitialIndicatorValues procedure output.
+                AgIndicator::BatteryCharge(BatteryChargeIndicator { percent }) => {
+                    self.indicated_state.set_ag_battery_level(percent)
                 }
             }
         }
+
+        self.indicated_state.initial_indicators_set();
+
         Ok(())
     }
 
+    fn handle_call_output(&mut self, call_output: CallOutput) {
+        match call_output {
+            CallOutput::ProcedureInput(call_procedure_input) => {
+                self.procedure_manager.enqueue(call_procedure_input)
+            }
+            CallOutput::TransferCallToAg => {
+                self.close_sco();
+            }
+        }
+    }
+
     async fn handle_sco_connection(&mut self, sco_connection: sco::Connection) -> Result<()> {
+        self.calls.set_sco_connected(true);
+
         let pause_token = self.pause_a2dp_audio().await?;
         let vigil = self.watch_active_sco(&sco_connection, pause_token);
         self.start_hfp_audio(sco_connection)?;
@@ -419,11 +448,14 @@ impl PeerTask {
         vigil
     }
 
-    // TODO(https://fxbug.dev/134161) Implement call setup and call transfers.
-    #[allow(unused)]
     fn start_audio_connection(&mut self) {
-        self.procedure_manager
-            .enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartAudioConnection))
+        self.enqueue_command_from_hf(CommandFromHf::StartAudioConnection);
+    }
+
+    fn close_sco(&mut self) {
+        // Drop SCO connection before awaiting a new one.
+        self.sco_state.iset(sco::State::Inactive);
+        self.await_remote_sco();
     }
 
     fn get_selected_codec(&self) -> CodecId {
@@ -432,6 +464,8 @@ impl PeerTask {
     }
 
     fn await_remote_sco(&mut self) {
+        self.calls.set_sco_connected(false);
+
         let codecs = vec![self.get_selected_codec()];
         let fut = self.sco_connector.accept(self.peer_id.clone(), codecs);
         self.sco_state.iset(sco::State::AwaitingRemote(Box::pin(fut)));

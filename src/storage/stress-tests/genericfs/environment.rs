@@ -212,7 +212,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         open_dir_at_root("home1").sync_directory().await.unwrap();
 
         let file_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let uncompressed_size = UncompressedSize::InRange(ONE_MIB, FOUR_MIB);
             let compressibility = Compressibility::Compressible;
             let factory = FileFactory::new(rng, uncompressed_size, compressibility);
@@ -222,7 +222,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             Arc::new(FuturesMutex::new(file_actor))
         };
         let deletion_actor = {
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let home_dir = open_dir_at_root("home1");
             Arc::new(FuturesMutex::new(DeletionActor::new(rng, home_dir)))
         };

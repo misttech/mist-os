@@ -28,11 +28,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.device.NameProvider" ],
-            from: "parent",
-            to: [ "#netstack" ],
-        },
-        {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
             to: [ "#dhcpd" ],

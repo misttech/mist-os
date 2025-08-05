@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
-use rand::distributions::Alphanumeric;
+use rand::distr::Alphanumeric;
 use rand::Rng;
 use std::sync::Arc;
 use {
@@ -66,7 +66,7 @@ impl PowerElement {
         // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
         let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
         let random_string: String =
-            rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
+            rand::rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
         let power_element_context = Arc::new(
             PowerElementContext::builder(
                 &topology,

@@ -19,10 +19,7 @@ use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::{IpAddressState, PreferredLifetime};
 use thiserror::Error;
-use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_interfaces_ext as finterfaces_ext,
-};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as finterfaces_ext};
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::util::{ErrorLogExt, IntoFidl, ResultExt as _, TryIntoFidl as _};
@@ -128,7 +125,7 @@ impl EventQueue {
                     has_default_ipv6_route: *has_default_ipv6_route,
                     port_class: *port_class,
                 }
-                .into_fidl_backwards_compatible(),
+                .into(),
             );
             apply_interest_options(&mut event, watcher_options);
             event
@@ -680,7 +677,7 @@ impl Worker {
                                 has_default_ipv4_route,
                                 has_default_ipv6_route,
                             }
-                            .into_fidl_backwards_compatible(),
+                            .into(),
                         ),
                         ChangedAddressProperties::InterestNotApplicable,
                     ))),
@@ -996,58 +993,6 @@ impl WorkerInterfaceSink {
     }
 }
 
-/// A helper to convert to the backing FIDL type, while maintaining
-/// backwards compatibility of removed fields.
-trait IntoFidlBackwardsCompatible<F> {
-    fn into_fidl_backwards_compatible(self) -> F;
-}
-
-// TODO(https://fxbug.dev/42157740): Remove this implementation.
-impl<I: finterfaces_ext::FieldInterests> IntoFidlBackwardsCompatible<finterfaces::Properties>
-    for finterfaces_ext::Properties<I>
-{
-    fn into_fidl_backwards_compatible(self) -> finterfaces::Properties {
-        // `device_class` has been replaced by `port_class`.
-        let device_class = match &self.port_class {
-            finterfaces_ext::PortClass::Loopback => {
-                finterfaces::DeviceClass::Loopback(finterfaces::Empty)
-            }
-            finterfaces_ext::PortClass::Blackhole => {
-                // `device_class` has no `Blackhole` variant, so report it as a virtual device.
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
-            }
-            finterfaces_ext::PortClass::Virtual => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
-            }
-            finterfaces_ext::PortClass::Ethernet => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet)
-            }
-            finterfaces_ext::PortClass::WlanClient => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan)
-            }
-            finterfaces_ext::PortClass::WlanAp => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::WlanAp)
-            }
-            finterfaces_ext::PortClass::Ppp => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ppp)
-            }
-            finterfaces_ext::PortClass::Bridge => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Bridge)
-            }
-            // NB: `Lowpan` doesn't have a corresponding `DeviceClass` variant.
-            // Claim it's a virtual device for backwards compatibility.
-            finterfaces_ext::PortClass::Lowpan => {
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
-            }
-        };
-
-        finterfaces::Properties {
-            device_class: Some(device_class),
-            ..finterfaces::Properties::from(self)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1143,7 +1088,7 @@ mod tests {
                     has_default_ipv6_route: false,
                     name: IFACE1_NAME.to_string(),
                 }
-                .into_fidl_backwards_compatible()
+                .into()
             ))
         );
 
@@ -1238,7 +1183,7 @@ mod tests {
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: false,
                 }
-                .into_fidl_backwards_compatible()
+                .into()
             ))
         );
         assert_eq!(new_watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
@@ -1330,7 +1275,7 @@ mod tests {
                         has_default_ipv4_route: false,
                         has_default_ipv6_route: false,
                     }
-                    .into_fidl_backwards_compatible()
+                    .into()
                 ),
                 ChangedAddressProperties::InterestNotApplicable
             )))

@@ -6,9 +6,9 @@
 #define SRC_UI_EXAMPLES_SCREEN_RECORDING_SCREEN_CAPTURE_HELPER_H_
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 
 namespace screen_recording_example {
 
@@ -31,7 +31,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage);
 

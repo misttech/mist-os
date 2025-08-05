@@ -135,7 +135,7 @@ mod test {
         for k in &keys {
             fs::write(k, "")?;
         }
-        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(&keys)).await?;
+        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(&keys))?;
         let addr = TargetIpAddr::from_str("127.0.0.1:34522")?;
         let cmd = SshCommand { sshconfig: None, command: vec![] };
         let ssh_cmd = make_ssh_command(cmd, addr)?;
@@ -169,7 +169,7 @@ mod test {
         for k in &keys {
             fs::write(k, "")?;
         }
-        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(keys)).await?;
+        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(keys))?;
         let addr = TargetIpAddr::from_str("[fe80::1%1]:22")?;
         let cmd = SshCommand {
             sshconfig: Some("/foo/bar/baz.conf".to_string()),

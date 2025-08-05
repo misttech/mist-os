@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
-    PackageArchiveBuilder, PackageManifestError, PackageName, PackagePath, PackageVariant,
+    BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, PackageArchiveBuilder,
+    PackageManifestError, PackageName, PackagePath, PackageVariant,
 };
 use anyhow::{Context, Result};
 use camino::Utf8Path;
@@ -21,6 +21,7 @@ use std::path::Path;
 use std::str;
 use tempfile_ext::NamedTempFileExt as _;
 use utf8_path::{path_relative_from_file, resolve_path_from_file};
+use version_history::AbiRevision;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
@@ -147,6 +148,12 @@ impl PackageManifest {
         self.blobs().iter().find(|blob| blob.path == Self::META_FAR_BLOB_PATH).unwrap().merkle
     }
 
+    pub fn abi_revision(&self) -> Option<AbiRevision> {
+        match &self.0 {
+            VersionedPackageManifest::Version1(manifest) => manifest.abi_revision,
+        }
+    }
+
     pub fn delivery_blob_type(&self) -> Option<DeliveryBlobType> {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => manifest.delivery_blob_type,
@@ -206,6 +213,18 @@ impl PackageManifest {
         let meta_package = meta_far.read_file(MetaPackage::PATH)?;
         let meta_package = MetaPackage::deserialize(meta_package.as_slice())?;
 
+        let abi_revision = match meta_far.read_file(AbiRevision::PATH) {
+            Ok(bytes) => Some(AbiRevision::from_bytes(
+                bytes.as_slice().try_into().map_err(crate::errors::AbiRevisionError::from)?,
+            )),
+            Err(fuchsia_archive::Error::PathNotPresent(_)) => {
+                return Err(PackageManifestError::AbiRevision(
+                    crate::errors::AbiRevisionError::Missing,
+                ))
+            }
+            Err(e) => return Err(e.into()),
+        };
+
         let meta_subpackages = match meta_far.read_file(MetaSubpackages::PATH) {
             Ok(meta_subpackages) => {
                 let meta_subpackages =
@@ -235,8 +254,9 @@ impl PackageManifest {
         }
 
         // Build the PackageManifest of this package.
-        let mut builder =
-            PackageManifestBuilder::new(meta_package).delivery_blob_type(delivery_blob_type);
+        let mut builder = PackageManifestBuilder::new(meta_package)
+            .delivery_blob_type(delivery_blob_type)
+            .abi_revision(abi_revision);
 
         // Add the meta.far blob. We add this first since some scripts assume the first entry is the
         // meta.far entry.
@@ -338,32 +358,33 @@ impl PackageManifest {
         PackageManifest::from_blobs_dir(blobs_dir, None, meta_far_hash, out_manifest_dir)
     }
 
-    /// Given a Package, verify that all blob and subpackage paths are valid and return the PackageManifest.
-    pub(crate) fn from_package(
-        package: Package,
+    /// Verify that all blob and subpackage paths are valid and return the PackageManifest.
+    pub(crate) fn from_parts(
+        meta_package: MetaPackage,
         repository: Option<String>,
+        mut package_blobs: BTreeMap<String, BlobEntry>,
+        package_subpackages: Vec<crate::SubpackageEntry>,
+        abi_revision: AbiRevision,
     ) -> Result<Self, PackageManifestError> {
-        let mut blobs = Vec::with_capacity(package.blobs().len());
+        let mut blobs = Vec::with_capacity(package_blobs.len());
 
         let mut push_blob = |blob_path, blob_entry: BlobEntry| {
-            let source_path = blob_entry.source_path();
+            let source_path = blob_entry.source_path;
 
             blobs.push(BlobInfo {
                 source_path: source_path.into_os_string().into_string().map_err(|source_path| {
                     PackageManifestError::InvalidBlobPath {
-                        merkle: blob_entry.hash(),
+                        merkle: blob_entry.hash,
                         source_path: source_path.into(),
                     }
                 })?,
                 path: blob_path,
-                merkle: blob_entry.hash(),
-                size: blob_entry.size(),
+                merkle: blob_entry.hash,
+                size: blob_entry.size,
             });
 
             Ok::<(), PackageManifestError>(())
         };
-
-        let mut package_blobs = package.blobs();
 
         // Add the meta.far blob. We add this first since some scripts assume the first entry is the
         // meta.far entry.
@@ -375,8 +396,6 @@ impl PackageManifest {
         for (blob_path, blob_entry) in package_blobs {
             push_blob(blob_path, blob_entry)?;
         }
-
-        let package_subpackages = package.subpackages();
 
         let mut subpackages = Vec::with_capacity(package_subpackages.len());
 
@@ -399,14 +418,15 @@ impl PackageManifest {
 
         let manifest_v1 = PackageManifestV1 {
             package: PackageMetadata {
-                name: package.meta_package().name().to_owned(),
-                version: package.meta_package().variant().to_owned(),
+                name: meta_package.name().to_owned(),
+                version: meta_package.variant().to_owned(),
             },
             blobs,
             repository,
             blob_sources_relative: Default::default(),
             subpackages,
             delivery_blob_type: None,
+            abi_revision: Some(abi_revision),
         };
         Ok(PackageManifest(VersionedPackageManifest::Version1(manifest_v1)))
     }
@@ -527,6 +547,7 @@ impl PackageManifestBuilder {
                 blob_sources_relative: Default::default(),
                 subpackages: vec![],
                 delivery_blob_type: None,
+                abi_revision: None,
             },
         }
     }
@@ -548,6 +569,11 @@ impl PackageManifestBuilder {
 
     pub fn add_subpackage(mut self, info: SubpackageInfo) -> Self {
         self.manifest.subpackages.push(info);
+        self
+    }
+
+    pub fn abi_revision(mut self, abi_revision: Option<AbiRevision>) -> Self {
+        self.manifest.abi_revision = abi_revision;
         self
     }
 
@@ -585,6 +611,8 @@ struct PackageManifestV1 {
     /// uncompressed blobs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_blob_type: Option<DeliveryBlobType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    abi_revision: Option<AbiRevision>,
 }
 
 impl PackageManifestV1 {
@@ -761,13 +789,12 @@ fn resolve_subpackage_manifest_path(
 mod tests {
     use super::*;
     use crate::path_to_string::PathToStringExt;
-    use crate::PackageBuilder;
+    use crate::{BlobEntry, MetaPackage, PackageBuilder};
     use assert_matches::assert_matches;
     use camino::Utf8PathBuf;
     use fuchsia_url::RelativePackageUrl;
     use pretty_assertions::assert_eq;
     use serde_json::{json, Value};
-    use std::path::PathBuf;
     use tempfile::{NamedTempFile, TempDir};
 
     const FAKE_ABI_REVISION: version_history::AbiRevision =
@@ -828,6 +855,7 @@ mod tests {
             repository: None,
             blob_sources_relative: Default::default(),
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         assert_eq!(
@@ -866,6 +894,7 @@ mod tests {
             repository: Some("testrepository.org".into()),
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: Some(FAKE_ABI_REVISION),
         }));
 
         assert_eq!(
@@ -886,7 +915,8 @@ mod tests {
                             "size": 1
                         },
                     ],
-                    "blob_sources_relative": "file"
+                    "blob_sources_relative": "file",
+                    "abi_revision": "0x323dd69d73d957a7",
                 }
             )
         );
@@ -931,6 +961,7 @@ mod tests {
                 repository: Some("testrepository.org".into()),
                 blob_sources_relative: Default::default(),
                 delivery_blob_type: None,
+                abi_revision: None,
             })
         );
 
@@ -949,7 +980,8 @@ mod tests {
                         "size": 1
                     },
                 ],
-                "blob_sources_relative": "file"
+                "blob_sources_relative": "file",
+                "abi_revision": "0x323dd69d73d957a7",
             }
         ))
         .expect("valid json");
@@ -971,23 +1003,26 @@ mod tests {
                 repository: None,
                 blob_sources_relative: RelativeTo::File,
                 delivery_blob_type: None,
+                abi_revision: Some(FAKE_ABI_REVISION),
             })
         )
     }
 
     #[test]
-    fn test_create_package_manifest_from_package() {
-        let mut package_builder = Package::builder("package-name".parse().unwrap());
-        package_builder.add_entry(
-            String::from("bin/my_prog"),
-            HASH_0,
-            PathBuf::from("src/bin/my_prog"),
-            1,
+    fn test_create_package_manifest_from_parts() {
+        let meta_package = MetaPackage::from_name_and_variant_zero("package-name".parse().unwrap());
+        let mut blobs = BTreeMap::new();
+        blobs.insert(
+            "bin/my_prog".to_string(),
+            BlobEntry { source_path: "src/bin/my_prog".into(), hash: HASH_0, size: 1 },
         );
-        let package = package_builder.build().unwrap();
-        let package_manifest = PackageManifest::from_package(package, None).unwrap();
+        let package_manifest =
+            PackageManifest::from_parts(meta_package, None, blobs, vec![], FAKE_ABI_REVISION)
+                .unwrap();
+
         assert_eq!(&"package-name".parse::<PackageName>().unwrap(), package_manifest.name());
         assert_eq!(None, package_manifest.repository());
+        assert_eq!(Some(FAKE_ABI_REVISION), package_manifest.abi_revision());
     }
 
     #[test]
@@ -1069,6 +1104,7 @@ mod tests {
                 repository: None,
                 blob_sources_relative: RelativeTo::WorkingDir,
                 delivery_blob_type: Some(DeliveryBlobType::Type1),
+                abi_revision: Some(FAKE_ABI_REVISION),
             }))
         );
     }
@@ -1098,6 +1134,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::WorkingDir,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let manifest_file = File::create(&env.manifest_path).unwrap();
@@ -1143,6 +1180,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let manifest_file = File::create(&env.manifest_path).unwrap();
@@ -1170,6 +1208,7 @@ mod tests {
                 repository: None,
                 blob_sources_relative: RelativeTo::WorkingDir,
                 delivery_blob_type: None,
+                abi_revision: None,
             }))
         );
     }
@@ -1197,6 +1236,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let manifest_file = File::create(&env.manifest_path).unwrap();
@@ -1217,6 +1257,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let sub_manifest_file = File::create(&env.subpackage_path).unwrap();
@@ -1268,6 +1309,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let manifest_file = File::create(&env.manifest_path).unwrap();
@@ -1300,6 +1342,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let sub_manifest_file = File::create(&env.subpackage_path).unwrap();
@@ -1321,6 +1364,7 @@ mod tests {
                 repository: None,
                 blob_sources_relative: RelativeTo::File,
                 delivery_blob_type: None,
+                abi_revision: None,
             }));
 
         let sub_sub_manifest_file = File::create(expected_subsubpackage_manifest_path).unwrap();
@@ -1428,6 +1472,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let manifest_file = File::create(&env.manifest_path).unwrap();
@@ -1456,6 +1501,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         serde_json::to_writer(File::create(&env.subpackage_path).unwrap(), &sub_manifest).unwrap();
@@ -1676,6 +1722,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::File,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let result_manifest = manifest.clone().write_with_relative_paths(&manifest_path).unwrap();
@@ -1742,6 +1789,7 @@ mod tests {
             repository: None,
             blob_sources_relative: RelativeTo::WorkingDir,
             delivery_blob_type: None,
+            abi_revision: None,
         }));
 
         let result_manifest = manifest.write_with_relative_paths(&manifest_path).unwrap();

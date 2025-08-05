@@ -100,8 +100,8 @@ void TestBoard::DdkRelease() { delete this; }
 // This function is driver_integration_test::GetBootItem.
 zx_status_t TestBoard::FetchAndDeserialize() {
   size_t metadata_size;
-  zx_status_t status = DdkGetMetadataSize(DEVICE_METADATA_BOARD_PRIVATE, &metadata_size);
-  if (status != ZX_OK) {
+  zx_status_t status = DdkGetMetadata(DEVICE_METADATA_BOARD_PRIVATE, nullptr, 0, &metadata_size);
+  if (status != ZX_ERR_BUFFER_TOO_SMALL) {
     return status;
   }
   if (metadata_size < sizeof(DeviceList)) {
@@ -206,22 +206,14 @@ zx_status_t TestBoard::Start() {
 }
 
 zx_status_t TestBoard::Create(void* ctx, zx_device_t* parent) {
-  auto endpoints = fdf::CreateEndpoints<fpbus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
+  zx::result client = DdkConnectRuntimeProtocol<fpbus::Service::PlatformBus>(parent);
+  if (client.is_error()) {
+    return client.status_value();
   }
 
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to platform bus: %s", zx_status_get_string(status));
-    return status;
-  }
+  auto board = std::make_unique<TestBoard>(parent, std::move(client.value()));
 
-  auto board = std::make_unique<TestBoard>(parent, std::move(endpoints->client));
-
-  status = board->FetchAndDeserialize();
+  zx_status_t status = board->FetchAndDeserialize();
   if (status != ZX_OK) {
     zxlogf(ERROR, "TestBoard::Create: FetchAndDeserialize failed: %d", status);
     return status;

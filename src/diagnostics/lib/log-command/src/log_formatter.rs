@@ -27,15 +27,6 @@ pub use diagnostics_data::Timestamp;
 
 pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 
-/// Type of an FFX event
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum EventType {
-    /// Overnet connection to logger started
-    LoggingStarted,
-    /// Overnet connection to logger lost
-    TargetDisconnected,
-}
-
 /// Type of data in a log entry
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum LogData {

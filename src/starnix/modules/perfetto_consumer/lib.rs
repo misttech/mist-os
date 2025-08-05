@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use anyhow::bail;
-use fuchsia_async as fasync;
 use fuchsia_trace::{
     category_enabled, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,
 };
@@ -22,7 +23,7 @@ use perfetto_trace_protos::perfetto::protos::frame_timeline_event::{
 use perfetto_trace_protos::perfetto::protos::ftrace_event::Event::Print;
 use perfetto_trace_protos::perfetto::protos::{trace_packet, Trace};
 use prost::Message;
-use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::task::{CurrentTask, Kernel, LockedAndTask};
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, log_info, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
@@ -263,9 +264,15 @@ impl CallbackState {
                                         // Ignore a failure to write the packet here. We don't
                                         // return immediately because we want to allow the
                                         // remaining records to be recorded as dropped.
-                                        if self.forward_packet(blob_name_ref, rewritten).is_none() {
-                                            log_error!("perfetto_consumer packet was not forwarded successfully");
-                                        }
+                                        //
+                                        // Once we fill a buffer in oneshot mode, we expect to drop
+                                        // the remaining packets here.
+                                        //
+                                        // Rather than logging here, allow the trace system to
+                                        // aggregate the number of records dropped and we can query
+                                        // the trace system later to determine if we dropped
+                                        // records when it's more efficient to do so.
+                                        let _ = self.forward_packet(blob_name_ref, rewritten);
                                     }
                                 }
                             } else {
@@ -491,34 +498,33 @@ pub fn start_perfetto_consumer_thread(kernel: &Kernel, socket_path: FsString) ->
     // 2) When a trace ends, we repeatedly do blocking reads on the socket until we read and
     //    forward all the trace data. This servicing of trace data would hold the executor for
     //    several seconds. See `perfetto::Consumer::next_frame_blocking`.
-    kernel.kthreads.spawner().spawn(|locked, current_task| {
-        let mut executor = fasync::LocalExecutor::new();
-        executor.run_singlethreaded(async move {
-            let observer = TraceObserver::new();
-            let mut callback_state = CallbackState {
-                prev_state: TraceState::Stopped,
-                socket_path,
-                connection: None,
-                prolonged_context: None,
-                packet_data: Vec::new(),
-                pid_map: HashMap::new(),
-            };
-            while let Ok(state) = observer.on_state_changed().await {
-                if state == TraceState::Stopping {
-                    // Generate the pid to koid mapping table before we read the perfetto data.
-                    // This is a best-effort to map the linux pids to Fuchsia koids. It is possible
-                    // for a linux process to emit trace data and then exit during the trace. This
-                    // would result in the kernel pid table not having a mapping. This is assumed to
-                    // be a rare occurrence for processes that are of interest in the trace. If it does
-                    // happen, one possible fix would be to capture the pid-koid mapping when starting
-                    // the trace as well.
-                    callback_state.generate_pid_mapping(current_task.kernel.clone());
-                }
-                callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
-                    log_error!("perfetto_consumer callback error: {:?}", e);
-                })
+    kernel.kthreads.spawner().spawn_async(async move |locked_and_task: LockedAndTask<'_>| {
+        let observer = TraceObserver::new();
+        let mut callback_state = CallbackState {
+            prev_state: TraceState::Stopped,
+            socket_path,
+            connection: None,
+            prolonged_context: None,
+            packet_data: Vec::new(),
+            pid_map: HashMap::new(),
+        };
+        while let Ok(state) = observer.on_state_changed().await {
+            let locked = &mut locked_and_task.unlocked();
+            let current_task = locked_and_task.current_task();
+            if state == TraceState::Stopping {
+                // Generate the pid to koid mapping table before we read the perfetto data.
+                // This is a best-effort to map the linux pids to Fuchsia koids. It is possible
+                // for a linux process to emit trace data and then exit during the trace. This
+                // would result in the kernel pid table not having a mapping. This is assumed to
+                // be a rare occurrence for processes that are of interest in the trace. If it does
+                // happen, one possible fix would be to capture the pid-koid mapping when starting
+                // the trace as well.
+                callback_state.generate_pid_mapping(current_task.kernel.clone());
             }
-        });
+            callback_state.on_state_change(locked, state, current_task).unwrap_or_else(|e| {
+                log_error!("perfetto_consumer callback error: {:?}", e);
+            })
+        }
     });
 
     Ok(())

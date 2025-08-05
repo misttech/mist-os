@@ -396,7 +396,6 @@ pub enum ElementTypeDef {
     Delay,
     Equalizer,
     SampleRateConversion,
-    Endpoint,
     RingBuffer,
     DaiInterconnect,
     #[serde(skip)]

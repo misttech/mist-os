@@ -29,22 +29,6 @@ type PortId = struct {
     salt uint8;
 };
 
-/// Network device class.
-///
-/// # Deprecation
-///
-/// Replaced by `PortClass`. Scheduled for removal in 2025.
-// TODO(https://fxbug.dev/42157740): Remove this type.
-@available(deprecated=22, removed=23)
-type DeviceClass = strict enum : uint16 {
-    VIRTUAL = 0;
-    ETHERNET = 1;
-    WLAN = 2;
-    PPP = 3;
-    BRIDGE = 4;
-    WLAN_AP = 5;
-};
-
 /// Network port class.
 ///
 /// *Note*: Device implementers are encouraged to propose additions to this

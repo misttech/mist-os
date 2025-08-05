@@ -8,7 +8,7 @@
 
 namespace wlan::simulation {
 
-void FakeAp::SetChannel(const wlan_common::WlanChannel& channel) {
+void FakeAp::SetChannel(const wlan_ieee80211::WlanChannel& channel) {
   // Time until next beacon.
   zx::duration diff_to_next_beacon = beacon_state_.next_beacon_time - environment_->GetTime();
 
@@ -78,7 +78,7 @@ zx_status_t FakeAp::SetSecurity(struct Security sec) {
   return ZX_OK;
 }
 
-bool FakeAp::CanReceiveChannel(const wlan_common::WlanChannel& channel) {
+bool FakeAp::CanReceiveChannel(const wlan_ieee80211::WlanChannel& channel) {
   // For now, require an exact match
   return ((channel.primary == tx_info_.channel.primary) && (channel.cbw == tx_info_.channel.cbw) &&
           (channel.secondary80 == tx_info_.channel.secondary80));

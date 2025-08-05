@@ -288,6 +288,7 @@ mod tests {
     use futures::StreamExt;
 
     use crate::rfcomm::inspect::CREDIT_FLOW_CONTROL;
+    use crate::rfcomm::session::channel::Credits;
 
     #[test]
     fn negotiate_session_parameters() {
@@ -323,6 +324,11 @@ mod tests {
 
         let dlci = DLCI::try_from(9).unwrap();
         let (sender, _receiver) = mpsc::channel(0);
+        // Establish a channel with credit flow control.
+        let _ = multiplexer.find_or_create_session_channel(dlci);
+        multiplexer
+            .set_flow_control(dlci, FlowControlMode::CreditBased(Credits::new(10, 10)))
+            .expect("can set flow control");
         let mut user_rfcomm_channel =
             multiplexer.establish_session_channel(dlci, sender).expect("can register");
         assert!(multiplexer.dlc_established());

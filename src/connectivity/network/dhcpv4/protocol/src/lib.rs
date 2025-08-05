@@ -401,7 +401,7 @@ pub mod identifier {
                     return Err(anyhow::anyhow!(
                         "client id string contained unexpected fields: {}",
                         v
-                    ))
+                    ));
                 }
             };
             let id = hex::decode(id)?;
@@ -2355,7 +2355,6 @@ mod tests {
     use super::*;
     use net_declare::net::prefix_length_v4;
     use net_declare::std::ip_v4;
-    use rand::Rng as _;
     use std::str::FromStr;
     use test_case::test_case;
 
@@ -2757,10 +2756,7 @@ mod tests {
     }
 
     fn random_ipv4_generator() -> Ipv4Addr {
-        let octet1: u8 = rand::thread_rng().r#gen();
-        let octet2: u8 = rand::thread_rng().r#gen();
-        let octet3: u8 = rand::thread_rng().r#gen();
-        let octet4: u8 = rand::thread_rng().r#gen();
+        let (octet1, octet2, octet3, octet4) = rand::random();
         Ipv4Addr::new(octet1, octet2, octet3, octet4)
     }
 

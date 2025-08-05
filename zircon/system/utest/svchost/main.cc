@@ -96,7 +96,7 @@ TEST(SvchostTest, FuchsiaKernelStatsPresent) {
 
   auto cpu_stats = cpu_result.Unwrap();
   ASSERT_GT(cpu_stats->stats.actual_num_cpus, 0);
-  ASSERT_EQ(cpu_stats->stats.actual_num_cpus, cpu_stats->stats.per_cpu_stats.count());
+  ASSERT_EQ(cpu_stats->stats.actual_num_cpus, cpu_stats->stats.per_cpu_stats.size());
 }
 
 }  // namespace

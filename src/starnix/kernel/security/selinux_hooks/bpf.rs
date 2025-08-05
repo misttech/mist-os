@@ -6,7 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 use super::{
-    check_permission, check_self_permission, task_effective_sid, BpfMapState, BpfProgState,
+    check_permission, check_self_permission, current_task_state, BpfMapState, BpfProgState,
 };
 
 use crate::bpf::program::Program;
@@ -21,13 +21,13 @@ use zerocopy::FromBytes;
 /// Returns the security state to be assigned to a BPF map. This is defined as the security
 /// context of the creating task.
 pub(in crate::security) fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
-    BpfMapState { sid: task_effective_sid(current_task) }
+    BpfMapState { sid: current_task_state(current_task).lock().current_sid }
 }
 
 /// Returns the security state to be assigned to a BPF program. This is defined as the
 /// security context of the creating task.
 pub(in crate::security) fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
-    BpfProgState { sid: task_effective_sid(current_task) }
+    BpfProgState { sid: current_task_state(current_task).lock().current_sid }
 }
 
 /// Returns whether `current_task` can perform the bpf `cmd`.
@@ -40,7 +40,7 @@ pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let sid: SecurityId = task_effective_sid(current_task);
+    let sid: SecurityId = current_task_state(current_task).lock().current_sid;
     let permission = match cmd {
         bpf_cmd_BPF_MAP_CREATE => BpfPermission::MapCreate,
         bpf_cmd_BPF_PROG_LOAD => BpfPermission::ProgLoad,
@@ -66,7 +66,7 @@ pub(in crate::security) fn check_bpf_map_access(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     let mut permissions = Vec::new();
     if flags.contains(PermissionFlags::READ) {
         permissions.push(BpfPermission::MapRead);
@@ -96,7 +96,7 @@ pub fn check_bpf_prog_access(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     check_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),

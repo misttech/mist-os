@@ -232,7 +232,7 @@ void ExpectHitRegionDumpCount(const std::vector<std::string>& line_dump, int exp
 
 void ExpectHitRegionDump(const std::vector<std::string>& line_dump,
                          const flatland::TransformHandle& transform,
-                         const fuchsia::math::RectF& hit_region) {
+                         const types::RectangleF& hit_region) {
   size_t hit_region_line = 0;
   for (size_t i = 0; i < line_dump.size(); ++i) {
     if (line_dump[i].find(kHitRegionsDumpLineIdentifierToken) != std::string::npos) {
@@ -241,15 +241,26 @@ void ExpectHitRegionDump(const std::vector<std::string>& line_dump,
     }
   }
 
-  std::ostringstream transform_line;
-  transform_line << "transform: (" << transform.GetInstanceId() << ":" << transform.GetTransformId()
-                 << ")";
-  EXPECT_NE(line_dump[hit_region_line + 1].find(transform_line.str()), std::string::npos);
+  {
+    std::ostringstream expected_transform_line;
+    expected_transform_line << "transform: (" << transform.GetInstanceId() << ":"
+                            << transform.GetTransformId() << ")";
+    const std::string& transform_line = line_dump[hit_region_line + 1];
+    EXPECT_NE(transform_line.find(expected_transform_line.str()), std::string::npos)
+        << "Failed to find \"" << expected_transform_line.str() << "\" in:\n"
+        << transform_line;
+  }
 
-  std::ostringstream region_line;
-  region_line << "region: {x=" << hit_region.x << ", y=" << hit_region.y
-              << ", width=" << hit_region.width << ", height=" << hit_region.height << "}";
-  EXPECT_NE(line_dump[hit_region_line + 2].find(region_line.str()), std::string::npos);
+  {
+    std::ostringstream expected_region_line;
+    expected_region_line << "region: {x=" << hit_region.x() << ", y=" << hit_region.y()
+                         << ", width=" << hit_region.width() << ", height=" << hit_region.height()
+                         << "}";
+    const std::string& region_line = line_dump[hit_region_line + 2];
+    EXPECT_NE(region_line.find(expected_region_line.str()), std::string::npos)
+        << "Failed to find \"" << expected_region_line.str() << "\" in:\n"
+        << region_line;
+  }
 }
 
 // Find the line number containing an image dump (and also |kImageDumpLineIdentifierToken|). Returns
@@ -326,7 +337,7 @@ TEST(SceneDumperTest, TopologyTree) {
   MakeLink(links, 5);  // 0:5 - 5:0
 
   const TransformHandle hit_region_transform(2, 0);
-  const fuchsia::math::RectF hit_region({.x = 1.f, .y = 2.f, .width = 3.f, .height = 4.f});
+  const types::RectangleF hit_region({.x = 1.f, .y = 2.f, .width = 3.f, .height = 4.f});
   uber_structs.begin()->second->local_hit_regions_map[hit_region_transform].emplace_back(
       hit_region);
 

@@ -6,9 +6,7 @@ use crate::policy::arrays::Context;
 use crate::policy::extensible_bitmap::ExtensibleBitmapSpan;
 use crate::policy::index::PolicyIndex;
 use crate::policy::symbols::MlsLevel;
-use crate::policy::{
-    CategoryId, ParseStrategy, ParsedPolicy, RoleId, SensitivityId, TypeId, UserId,
-};
+use crate::policy::{CategoryId, ParsedPolicy, RoleId, SensitivityId, TypeId, UserId};
 
 use crate::NullessByteStr;
 use bstr::BString;
@@ -53,9 +51,7 @@ impl SecurityContext {
     }
 
     /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
-    pub(super) fn new_from_policy_context<PS: ParseStrategy>(
-        context: &Context<PS>,
-    ) -> SecurityContext {
+    pub(super) fn new_from_policy_context(context: &Context) -> SecurityContext {
         let low_level = SecurityLevel::new_from_mls_level(context.low_level());
         let high_level =
             context.high_level().as_ref().map(|x| SecurityLevel::new_from_mls_level(x));
@@ -128,8 +124,8 @@ impl SecurityContext {
     ///
     /// Returns an error if the [`security_context`] is not a syntactically valid
     /// Security Context string, or the fields are not valid under the current policy.
-    pub(super) fn parse<PS: ParseStrategy>(
-        policy_index: &PolicyIndex<PS>,
+    pub(super) fn parse(
+        policy_index: &PolicyIndex,
         security_context: NullessByteStr<'_>,
     ) -> Result<Self, SecurityContextError> {
         let as_str = std::str::from_utf8(security_context.as_bytes())
@@ -181,7 +177,7 @@ impl SecurityContext {
     }
 
     /// Returns this Security Context serialized to a byte string.
-    pub(super) fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
+    pub(super) fn serialize(&self, policy_index: &PolicyIndex) -> Vec<u8> {
         let mut levels = self.low_level.serialize(policy_index.parsed_policy());
         if let Some(high_level) = &self.high_level {
             levels.push(b'-');
@@ -198,10 +194,7 @@ impl SecurityContext {
 
     /// Validates that this `SecurityContext`'s fields are consistent with policy constraints
     /// (e.g. that the role is valid for the user).
-    pub(super) fn validate<PS: ParseStrategy>(
-        &self,
-        policy_index: &PolicyIndex<PS>,
-    ) -> Result<(), SecurityContextError> {
+    pub(super) fn validate(&self, policy_index: &PolicyIndex) -> Result<(), SecurityContextError> {
         let user = policy_index.parsed_policy().user(self.user);
 
         // Validation of the user/role/type relationships is skipped for the special "object_r"
@@ -277,7 +270,7 @@ impl SecurityLevel {
 
     /// Helper used by `initial_context()` to create a
     /// [`crate::SecurityLevel`] instance from the policy fields.
-    pub(super) fn new_from_mls_level<PS: ParseStrategy>(level: &MlsLevel<PS>) -> SecurityLevel {
+    pub(super) fn new_from_mls_level(level: &MlsLevel) -> SecurityLevel {
         SecurityLevel::new(
             level.sensitivity(),
             level.category_spans().map(|span| span.into()).collect(),
@@ -285,10 +278,7 @@ impl SecurityLevel {
     }
 
     /// Returns a new instance parsed from the supplied string slice.
-    fn parse<PS: ParseStrategy>(
-        policy_index: &PolicyIndex<PS>,
-        level: &str,
-    ) -> Result<Self, SecurityContextError> {
+    fn parse(policy_index: &PolicyIndex, level: &str) -> Result<Self, SecurityContextError> {
         if level.is_empty() {
             return Err(SecurityContextError::InvalidSyntax);
         }
@@ -354,8 +344,8 @@ impl SecurityLevel {
         Ok(Self { sensitivity, categories: normalized })
     }
 
-    fn category_id_by_name<PS: ParseStrategy>(
-        policy_index: &PolicyIndex<PS>,
+    fn category_id_by_name(
+        policy_index: &PolicyIndex,
         name: &str,
     ) -> Result<CategoryId, SecurityContextError> {
         Ok(policy_index
@@ -377,7 +367,7 @@ pub trait Level<'a, T: Into<CategorySpan> + Clone, IterT: 'a + Iterator<Item = T
 
     /// Returns a byte string describing the security level sensitivity and
     /// categories.
-    fn serialize<PS: ParseStrategy>(&'a self, parsed_policy: &ParsedPolicy<PS>) -> Vec<u8> {
+    fn serialize(&'a self, parsed_policy: &ParsedPolicy) -> Vec<u8> {
         let sensitivity = parsed_policy.sensitivity(self.sensitivity()).name_bytes();
         let categories = self
             .category_spans()
@@ -520,7 +510,7 @@ impl CategorySpan {
     }
 
     /// Returns a byte string describing the category, or category range.
-    fn serialize<PS: ParseStrategy>(&self, parsed_policy: &ParsedPolicy<PS>) -> Vec<u8> {
+    fn serialize(&self, parsed_policy: &ParsedPolicy) -> Vec<u8> {
         match self.low == self.high {
             true => parsed_policy.category(self.low).name_bytes().into(),
             false => [
@@ -588,16 +578,16 @@ pub enum SecurityContextError {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{parse_policy_by_reference, ByRef, Policy};
+    use super::super::{parse_policy_by_value, Policy};
     use super::*;
 
     use std::num::NonZeroU32;
 
-    type TestPolicy = Policy<ByRef<&'static [u8]>>;
+    type TestPolicy = Policy;
     fn test_policy() -> TestPolicy {
         const TEST_POLICY: &[u8] =
             include_bytes!("../../testdata/micro_policies/security_context_tests_policy.pp");
-        parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap()
+        parse_policy_by_value(TEST_POLICY.to_vec()).unwrap().0.validate().unwrap()
     }
 
     // Represents a `CategorySpan`.

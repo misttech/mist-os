@@ -36,6 +36,7 @@
         {
             name: "bt-host-collection",
             durability: "single_run",
+            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
@@ -90,19 +91,6 @@
             from: "parent",
             to: [ "#bt-host-collection" ],
             availability: "optional",
-        },
-        {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
-            // been migrated to services. The service capability has been added below.
-            directory: "dev-bt-hci",
-            from: "parent",
-            to: [ "#bt-host-collection" ],
-        },
-        {
-            // This service replaces the directory capability above.
-            service: "fuchsia.hardware.bluetooth.Service",
-            from: "parent",
-            to: [ "#bt-host-collection" ],
         },
         {
             protocol: [ "fuchsia.bluetooth.host.Receiver" ],

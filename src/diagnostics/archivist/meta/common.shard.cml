@@ -7,7 +7,11 @@
     include: [ "//src/diagnostics/archivist/meta/config.shard.cml" ],
     program: {
         runner: "elf",
+        binary: "bin/archivist",
         lifecycle: { stop_event: "notify" },
+        forward_stdout_to: "none",
+        forward_stderr_to: "none",
+        use_next_vdso: "true",
     },
     capabilities: [
         {
@@ -16,6 +20,7 @@
         },
         {
             protocol: [
+                "fuchsia.diagnostics.LogFlusher",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.diagnostics.system.SerialLogControl",
@@ -54,6 +59,7 @@
     expose: [
         {
             protocol: [
+                "fuchsia.diagnostics.LogFlusher",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.diagnostics.system.SerialLogControl",

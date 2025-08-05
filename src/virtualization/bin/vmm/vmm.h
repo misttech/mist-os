@@ -21,7 +21,6 @@
 #include "src/virtualization/bin/vmm/controller/virtio_rng.h"
 #include "src/virtualization/bin/vmm/controller/virtio_sound.h"
 #include "src/virtualization/bin/vmm/controller/virtio_vsock.h"
-#include "src/virtualization/bin/vmm/controller/virtio_wl.h"
 #include "src/virtualization/bin/vmm/guest.h"
 #include "src/virtualization/bin/vmm/interrupt_controller.h"
 #include "src/virtualization/bin/vmm/platform_device.h"
@@ -105,7 +104,6 @@ class Vmm : public fuchsia::virtualization::Guest {
   std::unique_ptr<VirtioMem> mem_;
   std::unique_ptr<VirtioRng> rng_;
   std::unique_ptr<controller::VirtioVsock> vsock_;
-  std::unique_ptr<VirtioWl> wl_;
   std::unique_ptr<VirtioSound> sound_;
   std::vector<std::unique_ptr<VirtioNet>> net_devices_;
 

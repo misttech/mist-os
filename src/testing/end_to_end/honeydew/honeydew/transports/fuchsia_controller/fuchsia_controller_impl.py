@@ -68,13 +68,13 @@ class FuchsiaControllerImpl(fuchsia_controller_interface.FuchsiaController):
             config: dict[str, str] = {}
             if self._ffx_config_data.logs_level:
                 level = self._ffx_config_data.logs_level
-                _LOGGER.debug(f"log.level set to {level}")
+                _LOGGER.debug("log.level set to %s", level)
                 config["log.level"] = level
             else:
                 _LOGGER.debug("log level not set.")
             if self._ffx_config_data.logs_dir:
                 log_dir = self._ffx_config_data.logs_dir
-                _LOGGER.debug(f"log.dir set to {log_dir}")
+                _LOGGER.debug("log.dir set to %s", log_dir)
                 config["log.dir"] = log_dir
             else:
                 _LOGGER.debug("log dir not set.")

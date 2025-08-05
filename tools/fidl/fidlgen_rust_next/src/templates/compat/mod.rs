@@ -78,11 +78,19 @@ mod filters {
 
     pub use crate::templates::filters::*;
 
-    pub fn compat_snake(id: &Id) -> askama::Result<String> {
-        Ok(escape_compat(id.snake(), id))
+    pub fn escape_compat_snake(id: &Id) -> String {
+        escape_compat(id.snake(), id)
     }
 
-    pub fn compat_camel(id: &Id) -> askama::Result<String> {
-        Ok(escape_compat(id.camel(), id))
+    pub fn escape_compat_camel(id: &Id) -> String {
+        escape_compat(id.camel(), id)
+    }
+
+    pub fn compat_snake(id: &Id, _: &dyn askama::Values) -> askama::Result<String> {
+        Ok(escape_compat_snake(id))
+    }
+
+    pub fn compat_camel(id: &Id, _: &dyn askama::Values) -> askama::Result<String> {
+        Ok(escape_compat_camel(id))
     }
 }

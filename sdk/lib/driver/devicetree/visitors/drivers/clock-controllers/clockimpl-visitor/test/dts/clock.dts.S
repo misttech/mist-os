@@ -11,7 +11,7 @@
     #address-cells = <2>;
     #size-cells = <2>;
 
-    clkA: clock-controller@ffffa000 {
+    clkA: my-clock-device@ffffa000 {
       compatible = "fuchsia,clock";
       reg = <0x0 0xffffa000 0x0 0x1000>;
       #clock-cells = <1>;

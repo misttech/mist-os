@@ -8,17 +8,17 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
-#include "src/devices/lib/broadcom/include/wifi/wifi-config.h"
+#include "src/devices/lib/broadcom/commands.h"
 #include "zircon/errors.h"
 
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
 
-const wlan_common::WlanChannel kAp0Channel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-const wlan_common::WlanChannel kAp1Channel = {
-    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+const wlan_ieee80211::WlanChannel kAp0Channel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+const wlan_ieee80211::WlanChannel kAp1Channel = {
+    .primary = 11, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const simulation::WlanTxInfo kAp0TxInfo = {.channel = kAp0Channel};
 
 const common::MacAddr kAp0Bssid("12:34:56:78:9a:bc");
@@ -161,8 +161,6 @@ TEST_F(ReassocTest, RoamTimeoutWhenNoReassocResponseReceived) {
   // Check that there were not multiple connects.
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
-  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
 }
 
 TEST_F(ReassocTest, DisconnectOnFirmwareReassocCommandFailure) {
@@ -229,8 +227,6 @@ TEST_F(ReassocTest, DisconnectOnRoamSuccessWhenDriverCannotSyncChannel) {
   // Check that there were not multiple connects.
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
-  // Current implementation only sends disconnect for original BSS in this scenario.
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
 }
 
 // Verify that on successful roam, the connection ID returned by GetIfaceStats is updated.

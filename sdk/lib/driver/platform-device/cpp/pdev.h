@@ -109,7 +109,7 @@ class PDev {
   /// `fdf_power::ApplyPowerConfiguration`, see its documentation for additional
   /// information.
   fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> GetAndApplyPowerConfiguration(
-      const fdf::Namespace& ns);
+      const fdf::Namespace& ns, bool use_element_runner = true);
 
   bool is_valid() const { return pdev_.is_valid(); }
 

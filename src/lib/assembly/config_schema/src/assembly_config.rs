@@ -12,6 +12,7 @@ use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
 use image_assembly_config::PartialKernelConfig;
+use product_input_bundle::ProductInputBundle;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,6 +34,10 @@ pub struct AssemblyConfig {
     #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
+    #[walk_paths]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(skip)]
+    pub product_input_bundles: BTreeMap<String, ProductInputBundle>,
 }
 
 impl AssemblyConfig {

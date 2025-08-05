@@ -412,7 +412,7 @@ TEST(VmoSliceTestCase, CowPageSourceThroughSlices) {
   if (result == ZX_OK) {
     // Attempt to write to this child. This will require propagating page through both hidden and
     // non hidden VMOs.
-    uint8_t val;
+    uint8_t val = 1;
     EXPECT_OK(cow_child2.write(&val, 0, 1));
   } else {
     EXPECT_EQ(result, ZX_ERR_NOT_SUPPORTED);

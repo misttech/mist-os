@@ -1,15 +1,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_types::{NamespacePath, Path};
+use cm_types::{NamespacePath, Path, RelativePath};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, EntryError, Namespace, NamespaceError, Tree};
-use sandbox::{Capability, Dict, Directory, RemotableCapability};
+use router_error::Explain;
+use sandbox::{Capability, Dict, RouterResponse};
 use thiserror::Error;
 use vfs::directory::entry::serve_directory;
 use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
@@ -95,7 +96,8 @@ impl NamespaceBuilder {
             Capability::Directory(_)
             | Capability::Dictionary(_)
             | Capability::DirEntry(_)
-            | Capability::DirConnector(_) => {}
+            | Capability::DirConnector(_)
+            | Capability::DirConnectorRouter(_) => {}
             _ => return Err(NamespaceError::EntryError(EntryError::UnsupportedType).into()),
         }
         self.entries.add(path, cap)?;
@@ -105,40 +107,85 @@ impl NamespaceBuilder {
     pub fn serve(self: Self) -> Result<Namespace, BuildNamespaceError> {
         let mut entries = vec![];
         for (path, cap) in self.entries.flatten() {
-            let directory = match cap {
-                Capability::Directory(d) => d,
+            let client_end: ClientEnd<fio::DirectoryMarker> = match cap {
+                Capability::Directory(d) => d.into(),
                 Capability::DirConnector(c) => {
-                    let (directory, server) =
+                    let (client, server) =
                         fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-                    let _ = c.send(server);
-                    Directory::new(directory)
+                    // We don't wait to sit around for the results of this task, so we drop the
+                    // fuchsia_async::JoinHandle which causes the task to be detached.
+                    let _ = self.namespace_scope.spawn(async move {
+                        let res =
+                            fasync::OnSignals::new(&server, fidl::Signals::OBJECT_READABLE).await;
+                        if res.is_err() {
+                            return;
+                        }
+                        // We set the rights to `None` because no rights are given to us by the
+                        // client for this operation (opening a directory in their namespace). The
+                        // `DirConnector` should apply the "default" rights for this connection, as
+                        // determined by capability routing.
+                        let _ = c.send(server, RelativePath::dot(), None);
+                    });
+                    client
                 }
-                cap @ Capability::Dictionary(_) => {
-                    let entry =
-                        cap.try_into_directory_entry(self.namespace_scope.clone()).map_err(
-                            |err| BuildNamespaceError::Conversion { path: path.clone(), err },
-                        )?;
+                Capability::DirConnectorRouter(c) => {
+                    let (client, server) =
+                        fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+                    // We don't wait to sit around for the results of this task, so we drop the
+                    // fuchsia_async::JoinHandle which causes the task to be detached.
+                    let _ = self.namespace_scope.spawn(async move {
+                        let res =
+                            fasync::OnSignals::new(&server, fidl::Signals::OBJECT_READABLE).await;
+                        if res.is_err() {
+                            return;
+                        }
+                        match c.route(None, false).await {
+                            Ok(RouterResponse::Capability(dir_connector)) => {
+                                // See the comment in the `DirConnector` branch for why rights are
+                                // `None`.
+                                let _ = dir_connector.send(server, RelativePath::dot(), None);
+                            }
+                            Ok(RouterResponse::Unavailable) => {
+                                let _ = server.close_with_epitaph(fidl::Status::NOT_FOUND);
+                            }
+                            Ok(RouterResponse::Debug(_)) => {
+                                panic!("debug response wasn't requested");
+                            }
+                            Err(e) => {
+                                // Error logging will be performed by the ErrorReporter router set
+                                // up by sandbox construction, so we don't need to log about
+                                // routing errors here.
+                                let _ = server.close_with_epitaph(e.as_zx_status());
+                            }
+                        }
+                    });
+                    client
+                }
+                Capability::Dictionary(dict) => {
+                    let entry = dict
+                        .try_into_directory_entry_oneshot(self.namespace_scope.clone())
+                        .map_err(|err| BuildNamespaceError::Conversion {
+                            path: path.clone(),
+                            err,
+                        })?;
                     if entry.entry_info().type_() != fio::DirentType::Directory {
                         return Err(BuildNamespaceError::Conversion {
                             path: path.clone(),
                             err: sandbox::ConversionError::NotSupported,
                         });
                     }
-                    sandbox::Directory::new(
-                        serve_directory(
-                            entry,
-                            &self.namespace_scope,
-                            fio::Flags::PROTOCOL_DIRECTORY
-                                | fio::PERM_READABLE
-                                | fio::Flags::PERM_INHERIT_WRITE
-                                | fio::Flags::PERM_INHERIT_EXECUTE,
-                        )
-                        .map_err(|err| BuildNamespaceError::Serve { path: path.clone(), err })?,
+                    serve_directory(
+                        entry,
+                        &self.namespace_scope,
+                        fio::Flags::PROTOCOL_DIRECTORY
+                            | fio::PERM_READABLE
+                            | fio::Flags::PERM_INHERIT_WRITE
+                            | fio::Flags::PERM_INHERIT_EXECUTE,
                     )
+                    .map_err(|err| BuildNamespaceError::Serve { path: path.clone(), err })?
                 }
                 _ => return Err(NamespaceError::EntryError(EntryError::UnsupportedType).into()),
             };
-            let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
             entries.push(NamespaceEntry { path, directory: client_end.into() })
         }
         let ns = entries.try_into()?;

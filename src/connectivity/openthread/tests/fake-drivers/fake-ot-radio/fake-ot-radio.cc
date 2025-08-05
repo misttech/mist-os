@@ -132,7 +132,7 @@ void FakeOtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestVi
     if (!event_result.ok()) {
       zxlogf(ERROR, "OnError failed to send: %s", event_result.FormatDescription().c_str());
     }
-  } else if (request->data.count() > kMaxFrameSize) {
+  } else if (request->data.size() > kMaxFrameSize) {
     const fidl::Status event_result =
         fidl::WireSendEvent((*ot_radio_obj_.fidl_binding_))
             ->OnError(lowpan_spinel_fidl::wire::Error::kOutboundFrameTooLarge, false);
@@ -149,7 +149,7 @@ void FakeOtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestVi
     // Send out the frame.
     fbl::AutoLock lock(&ot_radio_obj_.radiobound_lock_);
     std::vector<uint8_t> radiobound_bytes;
-    radiobound_bytes.assign(request->data.data(), request->data.data() + request->data.count());
+    radiobound_bytes.assign(request->data.data(), request->data.data() + request->data.size());
     ot_radio_obj_.radiobound_queue_.push(std::move(radiobound_bytes));
     lock.release();
     async::PostTask(ot_radio_obj_.loop_.dispatcher(),

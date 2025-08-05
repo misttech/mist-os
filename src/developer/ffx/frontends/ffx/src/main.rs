@@ -287,7 +287,7 @@ async fn main() {
 
 fn show_mac_deprecation_warning(is_machine: bool) {
     if let Some(msg) = get_mac_deprecation_warning(is_machine) {
-        println!("{}", msg);
+        eprintln!("{}", msg);
     }
 }
 

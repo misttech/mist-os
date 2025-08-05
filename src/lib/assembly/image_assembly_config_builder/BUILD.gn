@@ -28,6 +28,7 @@ rustc_library("image_assembly_config_builder") {
     "//src/lib/assembly/package_utils",
     "//src/lib/assembly/platform_artifacts",
     "//src/lib/assembly/platform_configuration",
+    "//src/lib/assembly/product_input_bundle",
     "//src/lib/assembly/release_info",
     "//src/lib/assembly/shell_commands",
     "//src/lib/assembly/structured_config",

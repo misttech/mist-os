@@ -16,9 +16,9 @@ zx_library("platform") {
     "efi_test.cc",
     "halt_helper.cc",
     "hw_reboot_reason.cc",
+    "mapped_crashlog.cc",
     "mexec.cc",
     "power.cc",
-    "ram_mappable_crashlog.cc",
   ]
   deps = [
     ":tests",

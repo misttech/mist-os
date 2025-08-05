@@ -1,0 +1,57 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+
+executable("interactive_debian_guest_impl") {
+  # The client code here hasn't been considered for production usage,
+  # and should at a minimum be audited for resource leaks before
+  # considered for usage outside of test environments.
+  testonly = true
+  output_name = "interactive_debian_guest_impl"
+
+  sources = [
+    "interactive_debian_guest_impl.cc",
+    "interactive_debian_guest_impl.h",
+    "main.cc",
+    "running_guest.cc",
+    "running_guest.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/zxio",
+    "//src/lib/fuchsia-async",
+    "//src/virtualization/lib/guest_interaction:fuchsia.virtualization.guest.interaction_cpp",
+    "//src/virtualization/lib/guest_interaction:guest_interaction_client",
+    "//src/virtualization/lib/guest_interaction:platform_interface_posix",
+  ]
+
+  deps = [
+    "//sdk/lib/fdio",
+    "//src/virtualization/lib/grpc:grpc",
+    "//src/virtualization/lib/guest_interaction:common",
+    "//src/virtualization/tests/lib:guest_console",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_test_component("interactive_debian_guest") {
+  testonly = true
+  component_name = "interactive_debian_guest"
+  manifest = "meta/interactive_debian_guest.cml"
+  deps = [ ":interactive_debian_guest_impl" ]
+}
+
+fuchsia_package("interactive_debian_guest_pkg") {
+  testonly = true
+  package_name = "interactive-debian-guest"
+  deps = [ ":interactive_debian_guest" ]
+  subpackages =
+      [ "//src/virtualization/bin/guest_manager:debian_guest_manager" ]
+}

@@ -13,12 +13,13 @@ use crate::mm::syscalls::{do_mmap, sys_mremap};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
 use crate::task::container_namespace::ContainerNamespace;
-use crate::task::{CurrentTask, Kernel, SchedulerManager, Task, TaskBuilder};
+use crate::task::{CurrentTask, Kernel, KernelOrTask, SchedulerManager, Task, TaskBuilder};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
-    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsContext, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, Namespace,
+    DirEntry, FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsContext, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
+    FsStr, Namespace, NamespaceNode,
 };
 use fidl_fuchsia_io as fio;
 use selinux::SecurityServer;
@@ -568,6 +569,15 @@ impl From<TaskBuilder> for AutoReleasableTask {
     }
 }
 
+impl<'a> KernelOrTask<'a> for &'a AutoReleasableTask {
+    fn kernel(&self) -> &'a Kernel {
+        (self as &Task).kernel()
+    }
+    fn maybe_task(&self) -> Option<&'a CurrentTask> {
+        Some(&self)
+    }
+}
+
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
         // TODO(mariagl): Find a way to avoid creating a new locked context here.
@@ -676,4 +686,12 @@ pub fn create_fs_node_for_testing(fs: &FileSystemHandle, ops: impl FsNodeOps) ->
     let ino = fs.allocate_ino();
     let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
     FsNode::new_uncached(ino, ops, fs, info)
+}
+
+pub fn create_namespace_node_for_testing(
+    fs: &FileSystemHandle,
+    ops: impl FsNodeOps,
+) -> NamespaceNode {
+    let node = create_fs_node_for_testing(fs, ops);
+    NamespaceNode::new_anonymous(DirEntry::new_unrooted(node))
 }

@@ -14,7 +14,6 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>

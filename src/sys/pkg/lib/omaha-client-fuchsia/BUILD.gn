@@ -27,6 +27,7 @@ rustc_library("omaha-client-fuchsia") {
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:url",
   ]
 
   test_deps = [

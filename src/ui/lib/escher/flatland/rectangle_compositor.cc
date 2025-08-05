@@ -213,7 +213,7 @@ void TraverseBatch(CommandBuffer* cmd_buf, vec3 bounds, ShaderProgramPtr program
 
   // Translucent, back to front.
   {
-    cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+    cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
     cmd_buf->SetDepthTestAndWrite(true, false);
     float z = static_cast<float>(rectangles.size());
     for (int64_t i = 0; i < num_renderables; i++) {
@@ -513,7 +513,7 @@ void RectangleCompositor::WarmPipelineCache(vk::Format output_format,
     WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
                       immutable_samplers);
 
-    cbps.SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+    cbps.SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
     cbps.SetDepthTestAndWrite(true, false);
     WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
                       immutable_samplers);
@@ -541,7 +541,7 @@ void RectangleCompositor::WarmPipelineCache(vk::Format output_format,
                       immutable_samplers);
 
     // Draw transluscent rects.
-    cbps.SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+    cbps.SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
     cbps.SetDepthTestAndWrite(true, false);
     WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
                       immutable_samplers);

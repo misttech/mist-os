@@ -53,39 +53,6 @@ void main() {
             matches(RegExp(r'-test-trace-trace.fxt$')),
           ]));
     });
-
-    test('get trace data without writing to file', () async {
-      final traceSession = await performance.initializeTracing();
-      await traceSession.start();
-      await Future.delayed(Duration(seconds: 2));
-      await traceSession.stop();
-      final traceData = await traceSession.terminateAndDownloadAsBytes();
-      expect(traceData, isNotEmpty);
-      final jsonTraceData =
-          await performance.convertTraceDataToJson(_trace2jsonPath, traceData);
-      // Checking for the { at the end ensures that at least one trace event was
-      // read from the collected trace data.
-      expect(jsonTraceData,
-          startsWith('{"displayTimeUnit":"ns","traceEvents":[{'));
-    });
-
-    test('get trace containing system metrics data', () async {
-      await performance.stopSystemMetricsLogging();
-      final traceSession = await performance
-          .initializeTracing(categories: ['system_metrics_logger']);
-      await performance.startSystemMetricsLogging(
-          interval: Duration(milliseconds: 100),
-          duration: Duration(minutes: 1));
-      await traceSession.start();
-      await Future.delayed(Duration(seconds: 2));
-      await traceSession.stop();
-      await performance.stopSystemMetricsLogging();
-      final traceData = await traceSession.terminateAndDownloadAsBytes();
-      expect(traceData, isNotEmpty);
-      final jsonTraceData =
-          await performance.convertTraceDataToJson(_trace2jsonPath, traceData);
-      expect(jsonTraceData, contains('system_metrics_logger'));
-    });
   }, timeout: Timeout(_timeout));
 }
 

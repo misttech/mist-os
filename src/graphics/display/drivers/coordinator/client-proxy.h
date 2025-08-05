@@ -56,12 +56,13 @@ class ClientProxy {
                               fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
                                   coordinator_listener_client_end);
 
-  // Schedule a task on the controller loop to close this ClientProxy and
-  // have it be freed.
-  void CloseOnControllerLoop();
+  // Tears down the `Client` instance.
+  //
+  // Must be called on the driver dispatcher.
+  void TearDown();
 
   // Requires holding `controller_.mtx()` lock.
-  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
                              display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
@@ -148,13 +149,13 @@ class ClientProxy {
 
   struct VsyncMessageData {
     display::DisplayId display_id;
-    zx_time_t timestamp;
+    zx_instant_mono_t timestamp;
     display::ConfigStamp config_stamp;
   };
 
   fbl::RingBuffer<VsyncMessageData, kVsyncBufferSize> buffered_vsync_messages_;
-  display::VsyncAckCookie initial_cookie_ = display::VsyncAckCookie(0);
-  display::VsyncAckCookie cookie_sequence_ = display::VsyncAckCookie(0);
+  uint64_t vsync_cookie_salt_ = 0;
+  uint64_t vsync_cookie_sequence_ = 0;
 
   uint64_t number_of_vsyncs_sent_ = 0;
   display::VsyncAckCookie last_cookie_sent_ = display::kInvalidVsyncAckCookie;

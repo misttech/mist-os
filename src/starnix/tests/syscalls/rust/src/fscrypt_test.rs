@@ -12,7 +12,6 @@ mod tests {
         FSCRYPT_MODE_AES_256_HCTR2, FSCRYPT_MODE_AES_256_XTS, FSCRYPT_POLICY_FLAGS_PAD_16,
         FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
     };
-    use rand::Rng;
     use serial_test::serial;
     use std::env::VarError;
     use std::ffi::OsString;
@@ -26,7 +25,7 @@ mod tests {
         let mut arg_vec = arg.as_bytes().to_vec();
         let mut random_vector: [u8; 64] = [0; 64];
         for i in 0..64 {
-            let rand_u8: u8 = rand::thread_rng().gen();
+            let rand_u8: u8 = rand::random();
             random_vector[i] = rand_u8;
         }
         arg_vec.extend(random_vector);
@@ -126,7 +125,7 @@ mod tests {
         let root_dir = std::fs::File::open(&root_path).expect("open failed");
         let mut random_vector: [u8; 16] = [0; 16];
         for i in 0..16 {
-            let rand_u8: u8 = rand::thread_rng().gen();
+            let rand_u8: u8 = rand::random();
             random_vector[i] = rand_u8;
         }
         let ret = remove_encryption_key(&root_dir, random_vector);
@@ -466,7 +465,7 @@ mod tests {
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let mut random_vector: [u8; 16] = [0; 16];
         for i in 0..16 {
-            let rand_u8: u8 = rand::thread_rng().gen();
+            let rand_u8: u8 = rand::random();
             random_vector[i] = rand_u8;
         }
 
@@ -502,7 +501,7 @@ mod tests {
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let mut random_vector: [u8; 16] = [0; 16];
         for i in 0..16 {
-            let rand_u8: u8 = rand::thread_rng().gen();
+            let rand_u8: u8 = rand::random();
             random_vector[i] = rand_u8;
         }
         let ret = set_encryption_policy(&dir, random_vector);

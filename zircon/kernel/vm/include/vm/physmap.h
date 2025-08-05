@@ -16,6 +16,8 @@
 // how much to map but it's usually a fairly large chunk at the base of the kernel
 // address space.
 
+// TODO(https://fxbug.dev/42164859): Use kArchHandoffVirtualAddress and a
+// handed off value for the size of the physmap instead of these constants.
 #define PHYSMAP_BASE (KERNEL_ASPACE_BASE)
 #define PHYSMAP_SIZE (ARCH_PHYSMAP_SIZE)
 #define PHYSMAP_BASE_PHYS (0)
@@ -61,50 +63,6 @@ static inline paddr_t physmap_to_paddr(const void* addr) {
 }
 
 __END_CDECLS
-
-struct pmm_arena_info;
-
-// Invokes |func| on each non-arena backed region of the physmap in ascending order of base address,
-// making sure to avoid any NVRAM range which would not be tracked by the PMM.
-//
-// No locks are held while calling |func|.
-//
-// TODO(https://fxbug.dev/42164859): When set up by physboot, the would-be gaps will be protected
-// or left unmapped from the get-go and redefined more holistically to avoid any NVRAM range.
-void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> func,
-                          pmm_arena_info* arenas, size_t num_arenas,
-                          ktl::optional<zbi_nvram_t> nvram = {});
-
-// Protects all the regions of the physmap that are not backed by a PMM arena.
-//
-// Should not be called before the VM is up and running.
-//
-// Why does this function exist?
-//
-// The physmap is mapped early in boot and contains a contiguous mapping of a large portion of the
-// physical address space, which may include device memory regions (think MMIO).  If the device
-// memory remains mapped, hardware based memory prefetching might attempt to read from device
-// memory.  That would be bad.  Ideally, we wouldn't map the device memory in the first place, but
-// that's easier said that done (https://fxbug.dev/42124648).
-//
-// The second best thing is to unmap the non-arena memory.  There are two problems with that
-// approach.  One, on arm64 the physmap was mapped using 1GB pages.  However, the arm64 MMU Unmap
-// code does not yet know how to deal with (i.e. split) 1GB pages (https://fxbug.dev/42124720). Two,
-// Unmap attempts to free pages by returning them to the PMM.  However, the pages backing the
-// phsymap's page tables didn't come from the PMM.  They came from the bootalloc.
-//
-// So that leaves us with the third best approach: change the protection bits on the non-arena
-// regions to prevent caching.
-//
-// TODO(https://fxbug.dev/42124648): Change the way the physmap is initially mapped.  Ideally, we
-// would parse the boot data (ZBI) early on and only map the parts of the physmap that correspond to
-// normal memory. As it stands, we are still susceptible to problems arising from hardware
-// prefetching device memory from the physmap.
-void physmap_protect_non_arena_regions();
-
-// Indicates that the caller is using the physmap for MMIO and that non RAM regions may therefore
-// not be unmapped. Must be called prior to physmap_protect_non_arena_regions.
-void physmap_preserve_gaps_for_mmio();
 
 #endif  // !__ASSEMBLER__
 

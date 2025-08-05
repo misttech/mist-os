@@ -69,29 +69,12 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 		if len(s.Summary.Tests) > 0 {
 			continue
 		}
-		platform, err := testBotPlatform(s.HostCPU())
+		platform, err := testBotPlatform(s.HostCPU)
 		if err != nil {
 			return err
 		}
-		toolDeps := []string{"botanist", "bootserver_new", "ssh"}
-		for _, variant := range buildMetadata.Variants {
-			// Builders running with the coverage variants produce profiles that need to
-			// be merged on the host, so we need to provide the appropriate llvm-profdata
-			// tool to botanist so it can do so (the clang version for clang coverage builders
-			// and rust version for rust).
-			if variant == "coverage" {
-				toolDeps = append(toolDeps, "llvm-profdata")
-			} else if variant == "coverage-rust" {
-				toolDeps = append(toolDeps, "llvm-profdata-rust")
-			}
-		}
-		if s.Env.TargetsEmulator() {
-			// The fvm tool is used to dynamically extend fvm.blk to fit downloaded
-			// test packages.
-			// The zbi tool is used to embed the ssh key into the zbi.
-			toolDeps = append(toolDeps, "fvm", "zbi")
-		}
-		if s.HostCPU() == "x64" {
+		toolDeps := []string{"ssh"}
+		if s.HostCPU == "x64" {
 			// Relevant for automatic symbolization of things running on
 			// host. Only the x64 variation is available in the checkout and
 			// we have nothing that runs on an arm host that needs

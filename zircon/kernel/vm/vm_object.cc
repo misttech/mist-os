@@ -153,7 +153,7 @@ uint32_t VmObject::share_count() const {
 }
 
 void VmObject::SetChildObserver(VmObjectChildObserver* child_observer) {
-  Guard<Mutex> guard{&child_observer_lock_};
+  Guard<Mutex> guard{ChildObserverLock::Get()};
   child_observer_ = child_observer;
 }
 
@@ -181,9 +181,9 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
   canary_.Assert();
 
   // The observer may call back into this object so we must release the shared lock to prevent any
-  // self-deadlock. We explicitly release the lock prior to acquiring the child_observer_lock as
+  // self-deadlock. We explicitly release the lock prior to acquiring the ChildObserverLock as
   // otherwise we have lock ordering issue, since we already allow the shared lock to be acquired
-  // whilst holding the child_observer_lock.
+  // whilst holding the ChildObserverLock.
   {
     Guard<CriticalMutex> guard{AdoptLock, ChildListLock::Get(), ktl::move(adopt)};
     AssertHeld(*ChildListLock::Get());
@@ -195,7 +195,7 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
   }
 
   {
-    Guard<Mutex> observer_guard{&child_observer_lock_};
+    Guard<Mutex> observer_guard{ChildObserverLock::Get()};
 
     // Signal the dispatcher that there are no more child VMOS
     if (child_observer_ != nullptr) {
@@ -256,8 +256,8 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
 void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op) {
   canary_.Assert();
   DEBUG_ASSERT(len != 0);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
 
   const uint64_t last_offset = offset + (len - 1);
 

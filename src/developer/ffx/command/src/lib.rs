@@ -105,11 +105,34 @@ impl std::str::FromStr for MachineFormat {
     }
 }
 
-pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
-    let mut return_args_info = false;
-    let mut return_help: Option<Error> = None;
-    let cmd = match ffx::FfxCommandLine::from_env() {
-        Ok(c) => c,
+/// Indicates whether [`init_cmd`] discovered that we should return help info of
+/// some kind. This could also be done with returning `Err(Error::Help .. )` but
+/// [`run`] has to do some additional processing to return complete help output.
+#[derive(Debug, Default)]
+pub enum HelpState {
+    /// We should return machine-readable argument info.
+    ReturnArgsInfo,
+    /// We should append our subcommands to this help info and return it.
+    ReturnHelp { command: Vec<String>, output: String, code: i32 },
+    #[default]
+    None,
+}
+
+pub struct InitializedCmd {
+    pub cmd: ffx::FfxCommandLine,
+    pub context: ffx_config::EnvironmentContext,
+    pub help_state: HelpState,
+}
+
+/// Creates an `FfxCommandLine` and `EnvironmentContext` from the environment,
+/// and initializes config.
+pub fn init_cmd(exe_kind: ExecutableKind) -> Result<InitializedCmd> {
+    match ffx::FfxCommandLine::from_env() {
+        Ok(c) => {
+            let context = c.global.load_context(exe_kind)?;
+            ffx_config::init(&context)?;
+            Ok(InitializedCmd { cmd: c, context, help_state: HelpState::None })
+        }
         Err(Error::Help { command, output, code }) => {
             // Check for machine json output and  help
             // This is a little bit messy since the command line is not returned
@@ -117,22 +140,26 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
             // and either `help` or `--help` or `-h`.
             let argv = Vec::from_iter(std::env::args());
             let c = ffx::FfxCommandLine::from_args_for_help(&argv)?;
+            let context = c.global.load_context(exe_kind)?;
+            ffx_config::init(&context)?;
             if find_machine_and_help(&c).is_some() {
-                return_args_info = true;
-                c
+                Ok(InitializedCmd { cmd: c, context, help_state: HelpState::ReturnArgsInfo })
             } else {
-                return_help = Some(Error::Help { command, output, code });
-                c
+                Ok(InitializedCmd {
+                    cmd: c,
+                    context,
+                    help_state: HelpState::ReturnHelp { command, output, code },
+                })
             }
         }
 
-        Err(e) => return Err(e),
-    };
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
+    let InitializedCmd { cmd, context, help_state } = init_cmd(exe_kind)?;
     let app = &cmd.global;
-
-    let context = app.load_context(exe_kind)?;
-
-    ffx_config::init(&context)?;
 
     // Everything that needs to use the config must be after loading the config.
     if !context.has_no_environment() {
@@ -163,20 +190,20 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     let tools = T::from_env(&context)?;
 
-    if return_args_info {
-        // This handles the top level ffx command information and prints the information
-        // for all subcommands.
-        let args = tools.get_args_info().await?;
-        let output = match cmd.global.machine.unwrap() {
-            MachineFormat::Json => serde_json::to_string(&args),
-            MachineFormat::JsonPretty => serde_json::to_string_pretty(&args),
-            MachineFormat::Raw => Ok(format!("{args:#?}")),
-        };
-        println!("{}", output.bug_context("Error serializing args")?);
-        return Ok(ExitStatus::from_raw(0));
-    }
-    match return_help {
-        Some(Error::Help { command, output, code }) => {
+    match help_state {
+        HelpState::ReturnArgsInfo => {
+            // This handles the top level ffx command information and prints the information
+            // for all subcommands.
+            let args = tools.get_args_info().await?;
+            let output = match cmd.global.machine.unwrap() {
+                MachineFormat::Json => serde_json::to_string(&args),
+                MachineFormat::JsonPretty => serde_json::to_string_pretty(&args),
+                MachineFormat::Raw => Ok(format!("{args:#?}")),
+            };
+            println!("{}", output.bug_context("Error serializing args")?);
+            return Ok(ExitStatus::from_raw(0));
+        }
+        HelpState::ReturnHelp { command, output, code } => {
             let mut commands: String = Default::default();
             tools
                 .print_command_list(&mut commands)
@@ -185,7 +212,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
             let full_output = format!("{output}\n{commands}");
             return Err(Error::Help { command, output: full_output, code });
         }
-        _ => (),
+        HelpState::None => (),
     };
 
     // If the schema is requested, then find the tool runner for the requested tool

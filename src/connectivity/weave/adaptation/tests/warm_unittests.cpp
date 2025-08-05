@@ -519,8 +519,7 @@ class WarmTest : public testing::WeaveTestFixture<> {
     // TODO(https://fxbug.dev/42062982) Delete this once Weavestack no longer
     // relies on the root API.
     context_provider_.service_directory_provider()->AddService(
-        fake_net_stack_.GetRootHandler(dispatcher()),
-        "fuchsia.net.root.Interfaces_OnlyForWeavestack");
+        fake_net_stack_.GetRootHandler(dispatcher()), "fuchsia.net.root.Interfaces");
 
     PlatformMgrImpl().SetComponentContextForProcess(context_provider_.TakeContext());
     ConfigurationMgrImpl().SetDelegate(std::make_unique<TestConfigurationManager>());

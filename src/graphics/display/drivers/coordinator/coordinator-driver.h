@@ -40,7 +40,7 @@ class CoordinatorDriver : public fdf::DriverBase {
  private:
   void ConnectProvider(fidl::ServerEnd<fuchsia_hardware_display::Provider> provider_request);
 
-  fdf::SynchronizedDispatcher client_dispatcher_;
+  fdf::SynchronizedDispatcher controller_engine_listener_dispatcher_;
   std::unique_ptr<Controller> controller_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;

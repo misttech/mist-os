@@ -1097,6 +1097,7 @@ where
             link_metrics_manager_enabled: Some(
                 driver_state.ot_instance.link_metrics_manager_is_enabled(),
             ),
+            epskc_enabled: Some(driver_state.is_epskc_enabled()),
             ..Default::default()
         })
     }
@@ -1123,6 +1124,10 @@ where
 
         if let Some(link_metrics_manager_enabled) = config.link_metrics_manager_enabled {
             driver_state.ot_instance.link_metrics_manager_set_enabled(link_metrics_manager_enabled);
+        }
+
+        if let Some(epskc_enabled) = config.epskc_enabled {
+            driver_state.set_epskc_enabled(epskc_enabled);
         }
 
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(

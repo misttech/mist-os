@@ -70,7 +70,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModes) {
   };
   static constexpr cpp20::span<const display::PixelFormat> kEmptyPixelFormats;
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
 
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
@@ -109,7 +109,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithEdidBytes) {
     edid_bytes[i] = static_cast<uint8_t>(i);
   }
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
 
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
@@ -135,7 +135,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPixelFormats) {
       display::PixelFormat::kB8G8R8A8, display::PixelFormat::kR8G8B8A8,
       display::PixelFormat::kR8G8B8, display::PixelFormat::kB8G8R8};
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
   static constexpr fuchsia_images2_pixel_format_enum_value_t kExpectedBanjoPixelFormats[] = {
       kPixelFormats[0].ToBanjo(), kPixelFormats[1].ToBanjo(), kPixelFormats[2].ToBanjo(),
       kPixelFormats[3].ToBanjo()};
@@ -194,7 +194,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModeAndEdidBytes
       display::PixelFormat::kB8G8R8A8, display::PixelFormat::kR8G8B8A8,
       display::PixelFormat::kR8G8B8, display::PixelFormat::kB8G8R8};
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
   static constexpr fuchsia_images2_pixel_format_enum_value_t kExpectedBanjoPixelFormats[] = {
       kPixelFormats[0].ToBanjo(), kPixelFormats[1].ToBanjo(), kPixelFormats[2].ToBanjo(),
       kPixelFormats[3].ToBanjo()};
@@ -261,10 +261,10 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayRemovedWithNoListener) {
 
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
-  mock_.ExpectOnDisplayVsync([&](uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+  mock_.ExpectOnDisplayVsync([&](uint64_t banjo_display_id, zx_instant_mono_t banjo_timestamp,
                                  const config_stamp_t* banjo_config_stamp) {
     EXPECT_EQ(42u, banjo_display_id);
     EXPECT_EQ(42'4242u, banjo_timestamp);
@@ -275,7 +275,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
 
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsyncWithNoListener) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   banjo_adapter_.SetListener(nullptr);

@@ -22,6 +22,7 @@ use crate::vfs::{
 };
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_types::ownership::ReleaseGuard;
+use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::user_address::ArchSpecific;
 
 use fidl::HandleBased;
@@ -158,11 +159,11 @@ pub fn derive_wrapping_key(
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 pub trait FileOps: Send + Sync + AsAny + 'static {
-    /// Called when the FileObject is closed.
+    /// Called when the FileObject is destroyed.
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
     }
@@ -446,14 +447,17 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 }
 
-impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
+/// Marker trait for implementation of FileOps that do not need to implement `close` and can
+/// then pass a wrapper object as the `FileOps` implementation.
+pub trait CloseFreeSafe {}
+impl<T: FileOps + CloseFreeSafe, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
     fn close(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
+        self: Box<Self>,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObjectState,
+        _current_task: &CurrentTask,
     ) {
-        self.deref().close(locked, file, current_task)
+        // This method cannot be delegated. T being `CloseFreeSafe` this is fine.
     }
 
     fn flush(
@@ -1032,7 +1036,7 @@ pub fn default_ioctl(
             }
             let key = current_task
                 .read_memory_to_vec(key_ref_addr, fscrypt_add_key_arg.raw_size as usize)?;
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             let (key_identifier, wrapping_key) = derive_wrapping_key(key.as_bytes());
             current_task.kernel().crypt_service.add_wrapping_key(
                 key_identifier,
@@ -1072,7 +1076,7 @@ pub fn default_ioctl(
                     policy.filenames_encryption_mode
                 );
             }
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             if user_id != file.node().info().uid {
                 security::check_task_capable(current_task, CAP_FOWNER)
                     .map_err(|_| errno!(EACCES))?;
@@ -1121,7 +1125,7 @@ pub fn default_ioctl(
                 track_stub!(TODO("https://fxbug.dev/375648306"), "fscrypt descriptor type");
                 return error!(ENOTSUP);
             }
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             let identifier = unsafe { fscrypt_remove_key_arg.key_spec.u.identifier.value };
             current_task.kernel().crypt_service.forget_wrapping_key(identifier, user_id)?;
             Ok(SUCCESS)
@@ -1219,33 +1223,10 @@ impl FileOps for OPathOps {
 
 pub struct ProxyFileOps(pub FileHandle);
 
-macro_rules! delegate {
-    {
-        $delegate_to:expr;
-        $(
-            fn $name:ident(&$self:ident, $file:ident: &FileObject $(, $arg_name:ident: $arg_type:ty)*$(,)?) $(-> $ret:ty)?;
-        )*
-    } => {
-        $(
-            fn $name(&$self, _file: &FileObject $(, $arg_name: $arg_type)*) $(-> $ret)? {
-                $delegate_to.ops().$name(&$delegate_to $(, $arg_name)*)
-            }
-        )*
-    }
-}
-
 impl FileOps for ProxyFileOps {
-    delegate! {
-        self.0;
-        fn fcntl(
-            &self,
-            file: &FileObject,
-            current_task: &CurrentTask,
-            cmd: u32,
-            arg: u64,
-        ) -> Result<SyscallResult, Errno>;
-        fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
-    }
+    // `close` is not delegated because the last reference to a `ProxyFileOps` is not
+    // necessarily the last reference of the proxied file. If this is the case, the
+    // releaser will handle it.
     // These don't take &FileObject making it too hard to handle them properly in the macro
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
@@ -1257,21 +1238,13 @@ impl FileOps for ProxyFileOps {
         self.0.ops().is_seekable()
     }
     // These take &mut Locked<L> as a second argument
-    fn close(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-    ) {
-        self.0.ops().close(locked, &self.0, current_task);
-    }
     fn flush(
         &self,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
-        self.0.ops().close(locked, &self.0, current_task);
+        self.0.ops().flush(locked, &self.0, current_task);
     }
     fn wait_async(
         &self,
@@ -1322,6 +1295,15 @@ impl FileOps for ProxyFileOps {
     ) -> Result<SyscallResult, Errno> {
         self.0.ops().ioctl(locked, &self.0, current_task, request, arg)
     }
+    fn fcntl(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        cmd: u32,
+        arg: u64,
+    ) -> Result<SyscallResult, Errno> {
+        self.0.ops().fcntl(&self.0, current_task, cmd, arg)
+    }
     fn readdir(
         &self,
         locked: &mut Locked<FileOpsCore>,
@@ -1330,6 +1312,12 @@ impl FileOps for ProxyFileOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         self.0.ops().readdir(locked, &self.0, current_task, sink)
+    }
+    fn sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.0.ops().sync(&self.0, current_task)
+    }
+    fn data_sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.0.ops().sync(&self.0, current_task)
     }
     fn get_memory(
         &self,
@@ -1422,14 +1410,24 @@ impl FileObjectId {
 /// that is specific to this sessions whereas the underlying FsNode contains
 /// the state that is shared between all the sessions.
 pub struct FileObject {
+    ops: Box<dyn FileOps>,
+    state: FileObjectState,
+}
+
+impl std::ops::Deref for FileObject {
+    type Target = FileObjectState;
+    fn deref(&self) -> &Self::Target {
+        &self.state
+    }
+}
+
+pub struct FileObjectState {
     /// Weak reference to the `FileHandle` of this `FileObject`. This allows to retrieve the
     /// `FileHandle` from a `FileObject`.
     pub weak_handle: WeakFileHandle,
 
     /// A unique identifier for this file object.
     pub id: FileObjectId,
-
-    ops: Box<dyn FileOps>,
 
     /// The NamespaceNode associated with this FileObject.
     ///
@@ -1467,6 +1465,39 @@ pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub type FileHandle = Arc<FileReleaser>;
 pub type WeakFileHandle = Weak<FileReleaser>;
 pub type FileHandleKey = WeakKey<FileReleaser>;
+
+impl FileObjectState {
+    /// The FsNode from which this FileObject was created.
+    pub fn node(&self) -> &FsNodeHandle {
+        &self.name.entry.node
+    }
+
+    pub fn flags(&self) -> OpenFlags {
+        *self.flags.lock()
+    }
+
+    pub fn can_read(&self) -> bool {
+        // TODO: Consider caching the access mode outside of this lock
+        // because it cannot change.
+        self.flags.lock().can_read()
+    }
+
+    pub fn can_write(&self) -> bool {
+        // TODO: Consider caching the access mode outside of this lock
+        // because it cannot change.
+        self.flags.lock().can_write()
+    }
+
+    /// Returns false if the file was opened from a "noexec" mount.
+    pub fn can_exec(&self) -> bool {
+        !self.name.to_passive().mount.flags().contains(MountFlags::NOEXEC)
+    }
+
+    // Notifies watchers on the current node and its parent about an event.
+    pub fn notify(&self, event_mask: InotifyMask) {
+        self.name.notify(event_mask)
+    }
+}
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
@@ -1512,18 +1543,20 @@ impl FileObject {
         let security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
-                weak_handle: weak_handle.clone(),
-                id,
-                name: name.into_active(),
-                fs,
                 ops,
-                offset: Mutex::new(0),
-                flags: Mutex::new(flags - OpenFlags::CREAT),
-                async_owner: Default::default(),
-                epoll_files: Default::default(),
-                lease: Default::default(),
-                _file_write_guard: file_write_guard,
-                security_state,
+                state: FileObjectState {
+                    weak_handle: weak_handle.clone(),
+                    id,
+                    name: name.into_active(),
+                    fs,
+                    offset: Mutex::new(0),
+                    flags: Mutex::new(flags - OpenFlags::CREAT),
+                    async_owner: Default::default(),
+                    epoll_files: Default::default(),
+                    lease: Default::default(),
+                    _file_write_guard: file_write_guard,
+                    security_state,
+                },
             }
             .into()
         });
@@ -1531,25 +1564,11 @@ impl FileObject {
         Ok(file)
     }
 
-    /// The FsNode from which this FileObject was created.
-    pub fn node(&self) -> &FsNodeHandle {
-        &self.name.entry.node
-    }
-
-    pub fn can_read(&self) -> bool {
-        // TODO: Consider caching the access mode outside of this lock
-        // because it cannot change.
-        self.flags.lock().can_read()
-    }
-
-    pub fn can_write(&self) -> bool {
-        // TODO: Consider caching the access mode outside of this lock
-        // because it cannot change.
-        self.flags.lock().can_write()
-    }
-
     pub fn max_access_for_memory_mapping(&self) -> Access {
-        let mut access = Access::EXEC;
+        let mut access = Access::EXIST;
+        if self.can_exec() {
+            access |= Access::EXEC;
+        }
         let flags = self.flags.lock();
         if flags.can_read() {
             access |= Access::READ;
@@ -1858,7 +1877,9 @@ impl FileObject {
         if prot.contains(ProtectionFlags::WRITE) && !self.can_write() {
             return error!(EACCES);
         }
-        // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+        if prot.contains(ProtectionFlags::EXEC) && !self.can_exec() {
+            return error!(EPERM);
+        }
         self.ops().get_memory(locked.cast_locked::<FileOpsCore>(), self, current_task, length, prot)
     }
 
@@ -1886,7 +1907,9 @@ impl FileObject {
         {
             return error!(EACCES);
         }
-        // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+        if prot_flags.contains(ProtectionFlags::EXEC) && !self.can_exec() {
+            return error!(EPERM);
+        }
         self.ops().mmap(
             locked,
             self,
@@ -2021,10 +2044,6 @@ impl FileObject {
         *flags = OpenFlags::from_bits_truncate(bits);
     }
 
-    pub fn flags(&self) -> OpenFlags {
-        *self.flags.lock()
-    }
-
     /// Get the async owner of this file.
     ///
     /// See fcntl(F_GETOWN)
@@ -2115,11 +2134,6 @@ impl FileObject {
         self.ops().flush(locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
-    // Notifies watchers on the current node and its parent about an event.
-    pub fn notify(&self, event_mask: InotifyMask) {
-        self.name.notify(event_mask)
-    }
-
     fn update_atime(&self) {
         if !self.flags().contains(OpenFlags::NOATIME) {
             self.name.update_atime();
@@ -2170,11 +2184,13 @@ impl Releasable for FileObject {
             }
         }
         let locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().close(locked, &self, current_task);
-        self.name.entry.node.on_file_closed(&self);
+        let ops = self.ops;
+        let state = self.state;
+        ops.close(locked, &state, current_task);
+        state.name.entry.node.on_file_closed(&state);
         let event =
-            if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
-        self.notify(event);
+            if state.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
+        state.notify(event);
     }
 }
 
@@ -2276,7 +2292,7 @@ mod tests {
                 &mount,
                 "test".into(),
                 |locked, dir, mount, name| {
-                    dir.mknod(
+                    dir.create_node(
                         locked,
                         &current_task,
                         mount,

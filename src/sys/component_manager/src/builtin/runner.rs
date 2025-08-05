@@ -210,7 +210,7 @@ mod tests {
         universe.start_instance(&Moniker::root()).await.expect("bind failed");
 
         // Ensure the instance starts up.
-        mock_runner.wait_for_url("test:///a_resolved").await;
+        mock_runner.wait_for_url("test:///a").await;
     }
 
     //   (cm)
@@ -250,6 +250,6 @@ mod tests {
         universe.start_instance(&["b"].try_into().unwrap()).await.expect("bind failed");
 
         // Ensure the instances started up.
-        mock_runner.wait_for_urls(&["test:///b_resolved"]).await;
+        mock_runner.wait_for_urls(&["test:///b"]).await;
     }
 }

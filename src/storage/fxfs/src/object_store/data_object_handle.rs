@@ -1796,7 +1796,6 @@ mod tests {
     use fxfs_crypto::{Crypt, KeyPurpose};
     use fxfs_insecure_crypto::InsecureCrypt;
     use mundane::hash::{Digest, Hasher, Sha256};
-    use rand::Rng;
     use std::ops::Range;
     use std::sync::Arc;
     use std::time::Duration;
@@ -3333,7 +3332,7 @@ mod tests {
             });
             let cloned_object = object.clone();
             let reader = fasync::Task::spawn(async move {
-                let wait_time = rand::thread_rng().gen_range(0..5);
+                let wait_time = rand::random_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 let mut buf = cloned_object.allocate_buffer(10).await;
                 buf.as_mut_slice().fill(23);

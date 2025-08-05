@@ -10,10 +10,10 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/vfs.h>
 #include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zircon/errors.h>
@@ -233,7 +233,7 @@ TEST_F(MinfsFvmTest, QueryInitialState) {
 void GetFileBlocks(int fd, uint64_t* blocks) {
   struct stat stats;
   ASSERT_EQ(fstat(fd, &stats), 0);
-  off_t size = stats.st_blocks * VNATTR_BLKSIZE;
+  off_t size = stats.st_blocks * DEV_BSIZE;
   ASSERT_EQ(size % minfs::kMinfsBlockSize, 0);
   *blocks = static_cast<uint64_t>(size / minfs::kMinfsBlockSize);
 }

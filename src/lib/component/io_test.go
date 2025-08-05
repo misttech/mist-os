@@ -71,6 +71,23 @@ func TestHandleClosedOnOpenFailure(t *testing.T) {
 	}
 }
 
+func TestDirOpenWithClosedChannelNoError(t *testing.T) {
+	dir := component.DirectoryWrapper{
+		Directory: &mockDirImpl{},
+	}
+	req, proxy, err := io.NewNodeWithCtxInterfaceRequest()
+	if err != nil {
+		t.Fatalf("io.NewNodeWithCtxInterfaceRequest() = %s", err)
+	}
+	if err := proxy.Channel.Close(); err != nil {
+		t.Fatalf("proxy.Channel.Close() = %s", err)
+	}
+
+	if err := dir.GetDirectory().Open(context.Background(), "non-existing node", io.Flags(0), io.Options{}, req.ToChannel()); err != nil {
+		t.Fatalf("dir.GetDirecory.Open(...) = %s", err)
+	}
+}
+
 var _ component.File = (*vmoFileImpl)(nil)
 
 type vmoFileImpl struct {

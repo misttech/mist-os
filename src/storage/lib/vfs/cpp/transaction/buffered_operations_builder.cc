@@ -4,11 +4,18 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include <storage/buffer/block_buffer.h>
+#include <storage/operation/operation.h>
+
 namespace fs {
 namespace {
 // Check if |operation| is a mergeable type. Write requests requiring flush or fua should not be
 // merged with other operations.
-static bool IsMergeableIoType(const storage::Operation& operation) {
+bool IsMergeableIoType(const storage::Operation& operation) {
   return operation.type == storage::OperationType::kWrite ||
          operation.type == storage::OperationType::kRead;
 }
@@ -17,7 +24,7 @@ static bool IsMergeableIoType(const storage::Operation& operation) {
 
 BufferedOperationsBuilder& BufferedOperationsBuilder::Add(const storage::Operation& new_operation,
                                                           storage::BlockBuffer* buffer) {
-  // TODO(rvargas): consider unifying the logic with UnbuffeerdOperationsBuilder.
+  // TODO(rvargas): consider unifying the logic with UnbufferedOperationsBuilder.
   for (auto& old_operation : operations_) {
     storage::Operation& operation = old_operation.op;
     if (operation.type != new_operation.type || !IsMergeableIoType(operation) ||
@@ -32,9 +39,7 @@ BufferedOperationsBuilder& BufferedOperationsBuilder::Add(const storage::Operati
     if (operation.vmo_offset == new_operation.vmo_offset &&
         operation.dev_offset == new_operation.dev_offset) {
       // Take the longer of the operations (if operating on the same blocks).
-      if (operation.length <= new_operation.length) {
-        operation.length = new_operation.length;
-      }
+      operation.length = std::max(operation.length, new_operation.length);
       return *this;
     }
     if ((operation.vmo_offset + operation.length == new_operation.vmo_offset) &&

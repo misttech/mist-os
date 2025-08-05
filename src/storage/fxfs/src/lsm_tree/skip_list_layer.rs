@@ -9,8 +9,8 @@ use crate::drop_event::DropEvent;
 use crate::log::*;
 use crate::lsm_tree::merge::{self, MergeFn};
 use crate::lsm_tree::types::{
-    BoxedLayerIterator, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
-    LayerValue, OrdLowerBound, OrdUpperBound,
+    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerValue,
+    OrdLowerBound, OrdUpperBound,
 };
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
@@ -243,8 +243,8 @@ impl<K: Key, V: LayerValue> Layer<K, V> for SkipListLayer<K, V> {
         self.close_event.lock().clone()
     }
 
-    fn estimated_len(&self) -> ItemCount {
-        ItemCount::Precise(self.inner.lock().item_count)
+    fn len(&self) -> usize {
+        self.inner.lock().item_count
     }
 
     async fn close(&self) {
@@ -493,13 +493,13 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
 
     fn insert(&mut self, item: Item<K, V>) {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let max_pointers = self.skip_list.pointers.len();
         // This chooses a random number of pointers such that each level has half the number of
         // pointers of the previous one.
         let pointer_count = max_pointers
             - min(
-                (rng.gen_range(0..2u32.pow(max_pointers as u32) - 1) as f32).log2() as usize,
+                (rng.random_range(0..2u32.pow(max_pointers as u32) - 1) as f32).log2() as usize,
                 max_pointers - 1,
             );
         let node = Box::leak(self.skip_list.alloc_node(item, pointer_count));

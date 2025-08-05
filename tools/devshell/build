@@ -408,7 +408,6 @@ function main {
 checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
 job_count: $concurrency
-quiet: ${quiet:-false}
 ")
   else
     if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
@@ -499,7 +498,7 @@ quiet: ${quiet:-false}
   fi
 
   declare -r end_time="${EPOCHREALTIME/./}"
-  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${is_no_op}" "${is_clean_build}"&
+  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${is_no_op}" "${is_clean_build}" "${quiet}"&
   exit-with-message
 }
 

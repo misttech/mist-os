@@ -806,7 +806,7 @@ class TestConnection {
                               std::chrono::steady_clock::now() - start)
                               .count());
 
-    uint32_t dummy;
+    uint32_t dummy = 0;
     EXPECT_EQ(ZX_OK, remote.write(0 /* flags */, &dummy, sizeof(dummy), nullptr /* handles */,
                                   0 /* num_handles*/));
 

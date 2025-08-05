@@ -64,7 +64,9 @@ bootstrap_user_platform_aib_names = [
   "fshost_non_recovery",
   "fshost_non_storage_host",
   "fshost_storage",
+  "fshost_storage_host_fvm_minfs",
   "fshost_storage_host_fxfs",
+  "fshost_storage_host_gpt_fvm_minfs",
   "fshost_recovery",
   "paver_legacy",
 
@@ -152,8 +154,6 @@ bootstrap_eng_platform_aib_names = [
 
   # Storage
   "fshost_eng",
-  "fshost_storage_host_gpt_fvm_minfs",
-  "fshost_storage_host_fvm_minfs",
   "partitioning_tools",
 
   # Testing Support
@@ -423,9 +423,6 @@ eng_only_platform_aib_names =
 
       # Testing Support
       "testing_support",
-
-      # Networking test support
-      "networking_test_collection",
 
       # UI
       "ui_eng",

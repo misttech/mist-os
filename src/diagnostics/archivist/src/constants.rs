@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Divide total batch timeout duration by this value to get the duration that should be allowed
-// on individual lazy nodes/values.
-pub const LAZY_NODE_TIMEOUT_PROPORTION: i64 = 2;
-
 /// The maximum number of bytes in a formatted content VMO.
 pub const FORMATTED_CONTENT_CHUNK_SIZE_TARGET: u64 = 1 << 20; // 1 MiB
 

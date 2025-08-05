@@ -12,7 +12,7 @@ use crate::templates::reserved::escape;
 #[derive(Template)]
 #[template(path = "union.askama", whitespace = "preserve")]
 pub struct UnionTemplate<'a> {
-    union: &'a Union,
+    union_: &'a Union,
     context: Context<'a>,
 
     is_static: bool,
@@ -30,12 +30,12 @@ pub struct UnionTemplate<'a> {
 }
 
 impl<'a> UnionTemplate<'a> {
-    pub fn new(union: &'a Union, context: Context<'a>) -> Self {
-        let is_static = union.shape.max_out_of_line == 0;
-        let base_name = union.name.decl_name().camel();
+    pub fn new(union_: &'a Union, context: Context<'a>) -> Self {
+        let is_static = union_.shape.max_out_of_line == 0;
+        let base_name = union_.name.decl_name().camel();
         let wire_name = format!("Wire{base_name}");
         let wire_optional_name = format!("WireOptional{base_name}");
-        let mod_name = union.name.decl_name().snake();
+        let mod_name = union_.name.decl_name().snake();
 
         let (de, static_, phantom, decode_unknown, decode_as, encode_as) = if is_static {
             ("", "", "()", "decode_unknown_static", "decode_as_static", "encode_as_static")
@@ -51,7 +51,7 @@ impl<'a> UnionTemplate<'a> {
         };
 
         Self {
-            union,
+            union_,
             context,
 
             is_static,
@@ -70,7 +70,7 @@ impl<'a> UnionTemplate<'a> {
     }
 
     fn has_only_static_members(&self) -> bool {
-        self.union.members.iter().all(|m| m.ty.shape.max_out_of_line == 0)
+        self.union_.members.iter().all(|m| m.ty.shape.max_out_of_line == 0)
     }
 }
 

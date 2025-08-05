@@ -19,5 +19,17 @@
             to: "#bootfs_recovery",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+            ],
+            from: "parent",
+            to: "#bootfs_recovery",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#bootfs_recovery",
+        },
     ]
 }

@@ -18,12 +18,11 @@ use crate::logs::serial::{launch_serial, SerialSink};
 use crate::logs::servers::*;
 use crate::pipeline::PipelineManager;
 use archivist_config::Config;
-use fidl_fuchsia_diagnostics_system::SerialLogControlRequestStream;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
 use log::{debug, error, info, warn};
 use moniker::ExtendedMoniker;
@@ -53,6 +52,9 @@ pub struct Archivist {
     /// The server handling fuchsia.logger.Log
     log_server: Arc<LogServer>,
 
+    /// The server handling fuchsia.diagnostics.system.LogFlush
+    flush_server: Arc<LogFlushServer>,
+
     /// The server handling fuchsia.diagnostics.LogStream
     log_stream_server: Arc<LogStreamServer>,
 
@@ -68,15 +70,15 @@ pub struct Archivist {
     /// All tasks for FIDL servers that ingest data into the Archivist must run in this scope.
     servers_scope: fasync::Scope,
 
-    /// Freeze sender, for sending the log freeze channel over when we get FDIO requests
-    freeze_sender: UnboundedSender<SerialLogControlRequestStream>,
+    /// Freeze server.
+    freeze_server: LogFreezeServer,
 }
 
 impl Archivist {
     /// Creates new instance, sets up inspect and adds 'archive' directory to output folder.
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
-    pub async fn new(config: Config) -> Self {
+    pub async fn new(ring_buffer: ring_buffer::Reader, config: Config) -> Self {
         let general_scope = fasync::Scope::new_with_name("general");
         let servers_scope = fasync::Scope::new_with_name("servers");
 
@@ -104,12 +106,13 @@ impl Archivist {
                     .ok()
             });
         let logs_repo = LogsRepository::new(
-            config.logs_max_cached_original_bytes,
+            ring_buffer,
             initial_interests,
             component::inspector().root(),
             general_scope.new_child_with_name("logs_repository"),
         );
-        let (freeze_sender, freeze_receiver) = unbounded::<SerialLogControlRequestStream>();
+        let (freeze_server, freeze_receiver) = LogFreezeServer::new();
+        let (flush_sender, flush_receiver) = unbounded();
         if !config.allow_serial_logs.is_empty() {
             let logs_repo_clone = Arc::clone(&logs_repo);
             general_scope.spawn(async move {
@@ -119,6 +122,7 @@ impl Archivist {
                     logs_repo_clone,
                     SerialSink,
                     freeze_receiver,
+                    flush_receiver,
                 )
                 .await;
             });
@@ -140,6 +144,11 @@ impl Archivist {
             config.maximum_concurrent_snapshots_per_reader,
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
             servers_scope.new_child_with_name("ArchiveAccessor"),
+        ));
+
+        let flush_server = Arc::new(LogFlushServer::new(
+            servers_scope.new_child_with_name("LogFlush"),
+            flush_sender,
         ));
 
         let log_server = Arc::new(LogServer::new(
@@ -198,6 +207,7 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
+            flush_server,
             log_stream_server,
             event_router,
             _inspect_sink_server: inspect_sink_server,
@@ -206,7 +216,7 @@ impl Archivist {
             logs_repository: logs_repo,
             general_scope,
             servers_scope,
-            freeze_sender,
+            freeze_server,
             incoming_events_scope,
         }
     }
@@ -277,9 +287,10 @@ impl Archivist {
             _inspect_sink_server,
             general_scope,
             incoming_events_scope,
-            freeze_sender: _freeze_sender,
+            freeze_server: _freeze_server,
             servers_scope,
             event_router,
+            flush_server: _flush_server,
         } = self;
 
         // Start ingesting events.
@@ -341,12 +352,22 @@ impl Archivist {
             log_server.spawn(stream);
         });
 
-        let sender = self.freeze_sender.clone();
+        // Serve fuchsia.diagnostics.system.LogFlush
+        let flush_server = Arc::clone(&self.flush_server);
+        svc_dir.add_fidl_service(move |stream| {
+            debug!("fuchsia.diagnostics.system.LogFlush connection");
+            flush_server.spawn(stream);
+        });
+
+        let server = self.freeze_server.clone();
+        let scope = self.general_scope.clone();
 
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.diagnostics.system.SerialLogControl connection");
-            // Let the channel close if the server has stopped running.
-            let _ = sender.unbounded_send(stream);
+            let server = server.clone();
+            scope.spawn(async move {
+                let _ = server.handle_requests(stream).await;
+            });
         });
 
         // Server fuchsia.logger.LogStream

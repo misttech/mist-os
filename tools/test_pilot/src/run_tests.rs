@@ -277,7 +277,7 @@ async fn run_command<W1: io::Write + Send, W2: io::Write + Send>(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use rand::distributions::Alphanumeric;
+    use rand::distr::Alphanumeric;
     use rand::Rng;
     use serde_json::{from_reader, json, Value};
     use std::collections::HashMap;
@@ -325,7 +325,7 @@ mod tests {
         let mut stdout_buf = Cursor::new(Vec::new());
         let mut stderr_buf = Cursor::new(Vec::new());
         let mut cmd = Command::new("echo");
-        let s: String = rand::thread_rng()
+        let s: String = rand::rng()
             .sample_iter(&Alphanumeric)
             .take(STDIO_BUFFER_SIZE * 10 - 10)
             .map(char::from)
@@ -349,7 +349,7 @@ mod tests {
     async fn test_run_command_large_stderr() {
         let mut stdout_buf = Cursor::new(Vec::new());
         let mut stderr_buf = Cursor::new(Vec::new());
-        let s: String = rand::thread_rng()
+        let s: String = rand::rng()
             .sample_iter(&Alphanumeric)
             .take(STDIO_BUFFER_SIZE * 10 - 10)
             .map(char::from)

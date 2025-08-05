@@ -16,10 +16,11 @@ use starnix_core::task::CurrentTask;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
-pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
+pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
@@ -31,7 +32,7 @@ where
             "Could not connect to hvdcp_opti server {}. This is expected on everything but Sorrel.",
             e
         );
-            return;
+            return Ok(());
         }
     };
 
@@ -51,7 +52,7 @@ where
         DeviceMetadata::new("qbg".into(), DeviceType::new(484, 0), DeviceMode::Char),
         qdb_class,
         create_qbg_device,
-    );
+    )?;
 
     // /dev/qbg_battery
     registry.register_device(
@@ -61,7 +62,7 @@ where
         DeviceMetadata::new("qbg_battery".into(), DeviceType::new(485, 0), DeviceMode::Char),
         registry.objects.get_or_create_class("qbg_battery".into(), registry.objects.virtual_bus()),
         create_battery_profile_device,
-    );
+    )?;
 
     // /sys/bus/iio/devices/iio:device
     // IIO devices should not show up under /sys/class. This makes it show up under /sys/class,
@@ -96,4 +97,5 @@ where
 
     // /sys/class/power_supply/bms
     registry.add_numberless_device(locked, "bms".into(), power_supply, build_device_directory);
+    Ok(())
 }
