@@ -33,6 +33,8 @@ use crate::lib::std::collections::HashMap;
 #[cfg(feature = "std")]
 use crate::lib::std::collections::HashSet;
 #[cfg(feature = "alloc")]
+use crate::lib::std::collections::VecDeque;
+#[cfg(feature = "alloc")]
 use crate::lib::std::string::String;
 #[cfg(feature = "alloc")]
 use crate::lib::std::vec::Vec;
@@ -384,9 +386,9 @@ impl<'i> Stream for &'i str {
 
     #[inline(always)]
     fn next_token(&mut self) -> Option<Self::Token> {
-        let c = self.chars().next()?;
-        let offset = c.len();
-        *self = &self[offset..];
+        let mut iter = self.chars();
+        let c = iter.next()?;
+        *self = iter.as_str();
         Some(c)
     }
 
@@ -1546,6 +1548,21 @@ where
     #[inline(always)]
     fn accumulate(&mut self, key: K) {
         self.insert(key);
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'i, T: Clone> Accumulate<&'i [T]> for VecDeque<T> {
+    #[inline(always)]
+    fn initial(capacity: Option<usize>) -> Self {
+        match capacity {
+            Some(capacity) => VecDeque::with_capacity(clamp_capacity::<T>(capacity)),
+            None => VecDeque::new(),
+        }
+    }
+    #[inline(always)]
+    fn accumulate(&mut self, acc: &'i [T]) {
+        self.extend(acc.iter().cloned());
     }
 }
 

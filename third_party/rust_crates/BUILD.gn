@@ -2036,7 +2036,7 @@ rustc_library("askama_parser-v0_14_0") {
   deps += [ ":memchr-v2_7_4" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
-  deps += [ ":winnow-v0_7_11" ]
+  deps += [ ":winnow-v0_7_12" ]
 
   rustenv = []
 
@@ -20702,16 +20702,16 @@ rustc_library("windows-targets-v0_48_5") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("winnow-v0_7_11.license") {
+license("winnow-v0_7_12.license") {
   public_package_name = "winnow"
   license_files =
-      [ "//third_party/rust_crates/vendor/winnow-0.7.11/LICENSE-MIT" ]
+      [ "//third_party/rust_crates/vendor/winnow-0.7.12/LICENSE-MIT" ]
 }
 
-rustc_library("winnow-v0_7_11") {
+rustc_library("winnow-v0_7_12") {
   crate_name = "winnow"
-  source_root = "//third_party/rust_crates/vendor/winnow-0.7.11/src/lib.rs"
-  output_name = "winnow-6a025558765f1c2d"
+  source_root = "//third_party/rust_crates/vendor/winnow-0.7.12/src/lib.rs"
+  output_name = "winnow-57853aa61cdfa9cc"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -20724,8 +20724,8 @@ rustc_library("winnow-v0_7_11") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=6a025558765f1c2d",
-    "-Cextra-filename=-6a025558765f1c2d",
+    "-Cmetadata=57853aa61cdfa9cc",
+    "-Cextra-filename=-57853aa61cdfa9cc",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
@@ -20733,7 +20733,7 @@ rustc_library("winnow-v0_7_11") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":winnow-v0_7_11.license" ]
+  applicable_licenses = [ ":winnow-v0_7_12.license" ]
 }
 
 license("x509-cert-v0_2_5.license") {

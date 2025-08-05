@@ -82,6 +82,6 @@ rust_library(
     deps = [
         "//third_party/rust_crates/ask2patch/memchr",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
-        "//third_party/rust_crates/vendor/winnow-0.7.11:winnow",
+        "//third_party/rust_crates/vendor/winnow-0.7.12:winnow",
     ],
 )
