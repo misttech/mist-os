@@ -1108,6 +1108,7 @@ mod tests {
 
     use super::test_utils::FAKE_IFACE_RESPONSE;
     use super::*;
+    use crate::security::wep::WepKeys;
     use fidl::endpoints::create_proxy_and_stream;
     use futures::channel::mpsc;
     use futures::task::Poll;
@@ -1606,6 +1607,15 @@ mod tests {
         assert_matches!(event, TelemetryEvent::SmeTimeout);
     }
 
+    /// Build a WEP credential with the provided key saved as key 0. The key needs to be 5 or 13
+    /// bytes or it will fail.
+    fn build_wep_credential(key: Vec<u8>) -> Credential {
+        let mut wep_keys = WepKeys::new();
+        wep_keys.set_key(key, 0).expect("Failed to build WEP key for test");
+        wep_keys.set_index(0).expect("Failed to set WEP key for test");
+        Credential::WepKey(wep_keys)
+    }
+
     #[test_case(
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
@@ -1640,6 +1650,32 @@ mod tests {
             credentials: None
         };
         "bssid_specified"
+    )]
+    #[test_case(
+        FakeProtectionCfg::Wpa1,
+        vec![fidl_security::Protocol::Wpa1],
+        Credential::Password(b"password".to_vec()),
+        false,
+        fidl_security::Authentication {
+            protocol: fidl_security::Protocol::Wpa1,
+            credentials: Some(Box::new(fidl_security::Credentials::Wpa(
+                fidl_security::WpaCredentials::Passphrase(b"password".to_vec())
+            )))
+        };
+        "wpa1_any_bssid"
+    )]
+    #[test_case(
+        FakeProtectionCfg::Wep,
+        vec![fidl_security::Protocol::Wep],
+        build_wep_credential([1; wlan_common::security::wep::WEP40_KEY_BYTES].to_vec()),
+        false,
+        fidl_security::Authentication {
+            protocol: fidl_security::Protocol::Wep,
+            credentials: Some(Box::new(fidl_security::Credentials::Wep(
+                fidl_security::WepCredentials{ key: [1; wlan_common::security::wep::WEP40_KEY_BYTES].into() }
+            )))
+        };
+        "wep_any_bssid"
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_to_network(

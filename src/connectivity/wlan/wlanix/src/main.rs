@@ -740,11 +740,32 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 }
             }
         }
+        fidl_wlanix::SupplicantStaNetworkRequest::SetWepTxKeyIdx { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaNetworkRequest::SetWepTxKeyIdx");
+            let index = payload.key_idx.ok_or_else(|| format_err!("WEP key index is None"))?;
+            let mut sta_network = sta_network_state.lock();
+
+            match sta_network.credential {
+                Credential::None => {
+                    warn!("Setting WEP key index unexpectedly before setting WEP key");
+                    let mut wep_keys = WepKeys::new();
+                    wep_keys.set_index(index as usize)?;
+                    sta_network.credential = Credential::WepKey(wep_keys);
+                }
+                Credential::WepKey(ref mut wep_keys) => {
+                    wep_keys.set_index(index as usize)?;
+                }
+                Credential::Password(_) => {
+                    warn!("SetWepTxKeyIdx was called when the credential has been set to Password; ignoring.");
+                }
+            }
+        }
         fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {
             info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
             let (ssid, credential, bssid) = {
                 let state = sta_network_state.lock();
-                (state.ssid.clone(), state.credential.clone(), state.bssid)
+                let credential = state.credential.clone();
+                (state.ssid.clone(), credential, state.bssid)
             };
             let (result, status_code, connected_bssid, connection_ctx) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], credential, bssid).await {
@@ -2658,12 +2679,32 @@ mod tests {
         );
         assert_matches!(result, Ok(()));
 
-        let key = [b'w', b'e', b'p', b'k', b'e'];
-        let index = 0;
+        // Save first WEP key
+        let key1 = [b'w', b'e', b'p', b'k', b'e'];
+        let index1 = 0;
         let result = test_helper.supplicant_sta_network_proxy.set_wep_key(
             &fidl_wlanix::SupplicantStaNetworkSetWepKeyRequest {
-                key: Some(key.to_vec()),
-                key_idx: Some(index),
+                key: Some(key1.to_vec()),
+                key_idx: Some(index1),
+                ..Default::default()
+            },
+        );
+        assert_matches!(result, Ok(()));
+
+        // Save a second WEP key and set this as the one to use
+        let key2 = [b'o', b't', b'h', b'e', b'r'];
+        let index2 = 2;
+        let result = test_helper.supplicant_sta_network_proxy.set_wep_key(
+            &fidl_wlanix::SupplicantStaNetworkSetWepKeyRequest {
+                key: Some(key2.to_vec()),
+                key_idx: Some(index2),
+                ..Default::default()
+            },
+        );
+        assert_matches!(result, Ok(()));
+        let result = test_helper.supplicant_sta_network_proxy.set_wep_tx_key_idx(
+            &fidl_wlanix::SupplicantStaNetworkSetWepTxKeyIdxRequest {
+                key_idx: Some(index2),
                 ..Default::default()
             },
         );
@@ -2685,8 +2726,9 @@ mod tests {
             ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
+        // Verify that the credential to use is the one that was designated as the index to use.
         assert_matches!(credential, Credential::WepKey(keys) => {
-            assert_eq!(keys.get_key(), Some(WepKey::Wep40(key)));
+            assert_eq!(keys.get_key(), Some(WepKey::Wep40(key2)));
         });
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
