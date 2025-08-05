@@ -3,8 +3,12 @@
 // found in the LICENSE file.
 
 use super::parser::PolicyCursor;
-use super::{array_type, array_type_validate_deref_both, Counted, Validate, ValidateArray};
+use super::{
+    array_type, array_type_validate_deref_both, Counted, PolicyValidationContext, Validate,
+    ValidateArray,
+};
 use crate::policy::error::ValidateError;
+
 use crate::policy::Array;
 use std::cmp::Ordering;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
@@ -138,9 +142,9 @@ impl Iterator for ExtensibleBitmapSpansIterator<'_> {
 impl Validate for Vec<ExtensibleBitmap> {
     type Error = <ExtensibleBitmap as Validate>::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for extensible_bitmap in self.iter() {
-            extensible_bitmap.validate()?;
+            extensible_bitmap.validate(context)?;
         }
 
         Ok(())
@@ -152,7 +156,7 @@ impl Validate for Metadata {
 
     /// Validates that [`ExtensibleBitmap`] metadata is internally consistent with data
     /// representation assumptions.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         // Only one size for `MapItem` instances is supported.
         let found_size = self.map_item_size_bits.get();
         if found_size != MAP_NODE_BITS {
@@ -222,7 +226,7 @@ impl Validate for [MapItem] {
 
     /// All [`MapItem`] validation requires access to [`Metadata`]; validation performed in
     /// `ExtensibleBitmap<PS>::validate()`.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -233,7 +237,11 @@ impl ValidateArray<Metadata, MapItem> for ExtensibleBitmap {
     /// Validates that `metadata` and `data` are internally consistent. [`MapItem`] objects are
     /// expected to be stored in ascending order (by `start_bit`), and their bit ranges must fall
     /// within the range `[0, metadata.high_bit())`.
-    fn validate_array<'a>(metadata: &'a Metadata, data: &'a [MapItem]) -> Result<(), Self::Error> {
+    fn validate_array(
+        _context: &mut PolicyValidationContext,
+        metadata: &Metadata,
+        items: &[MapItem],
+    ) -> Result<(), Self::Error> {
         let found_size = metadata.map_item_size_bits.get();
         let found_high_bit = metadata.high_bit.get();
 
@@ -242,7 +250,7 @@ impl ValidateArray<Metadata, MapItem> for ExtensibleBitmap {
         // Note: If sorted order assumption is violated `ExtensibleBitmap::binary_search_items()` will
         // misbehave and `ExtensibleBitmap` will need to be refactored accordingly.
         let mut min_start: u32 = 0;
-        for map_item in data.iter() {
+        for map_item in items.iter() {
             let found_start_bit = map_item.start_bit.get();
             if found_start_bit % found_size != 0 {
                 return Err(ValidateError::MisalignedExtensibleBitmapItemStartBit {
@@ -278,26 +286,27 @@ impl ValidateArray<Metadata, MapItem> for ExtensibleBitmap {
 mod tests {
     use super::*;
     use crate::policy::error::ParseError;
-    use crate::policy::parser::PolicyCursor;
+    use crate::policy::parser::{PolicyCursor, PolicyData};
     use crate::policy::testing::{as_parse_error, as_validate_error};
     use crate::policy::Parse;
     use std::borrow::Borrow;
     use std::sync::Arc;
 
     macro_rules! parse_test {
-        ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
+        ($parse_output:ident, $data:expr, $result:tt, $policy_data:tt, $check_impl:block) => {{
             let data = Arc::new($data);
             fn check_by_value(
                 $result: Result<
                     ($parse_output, PolicyCursor),
                     <$parse_output as crate::policy::Parse>::Error,
                 >,
+                $policy_data: &PolicyData,
             ) -> Option<($parse_output, PolicyCursor)> {
                 $check_impl
             }
 
-            let by_value_result = $parse_output::parse(PolicyCursor::new(data));
-            let _ = check_by_value(by_value_result);
+            let by_value_result = $parse_output::parse(PolicyCursor::new(data.clone()));
+            let _ = check_by_value(by_value_result, &data);
         }};
     }
 
@@ -347,6 +356,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());
@@ -376,6 +386,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());
@@ -412,14 +423,17 @@ mod tests {
             ]
             .concat(),
             result,
+            policy_data,
             {
                 let (parsed, tail) = result.expect("parsed");
                 assert_eq!(0, tail.len());
+                let mut context =
+                    crate::policy::PolicyValidationContext { data: policy_data.clone() };
                 assert_eq!(
                     Err(ValidateError::InvalidExtensibleBitmapItemSize {
                         found_size: MAP_NODE_BITS - 1
                     }),
-                    parsed.validate().map_err(as_validate_error)
+                    parsed.validate(&mut context).map_err(as_validate_error)
                 );
                 Some((parsed, tail))
             }
@@ -438,15 +452,18 @@ mod tests {
             ]
             .concat(),
             result,
+            policy_data,
             {
                 let (parsed, tail) = result.expect("parsed");
                 assert_eq!(0, tail.len());
+                let mut context =
+                    crate::policy::PolicyValidationContext { data: policy_data.clone() };
                 assert_eq!(
                     Err(ValidateError::MisalignedExtensibleBitmapHighBit {
                         found_size: MAP_NODE_BITS,
                         found_high_bit: (MAP_NODE_BITS * 10) + 1
                     }),
-                    parsed.validate().map_err(as_validate_error),
+                    parsed.validate(&mut context).map_err(as_validate_error),
                 );
                 Some((parsed, tail))
             }
@@ -465,6 +482,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
                     // `PolicyCursor` attempts to read `Vec` one item at a time.
@@ -501,10 +519,13 @@ mod tests {
             ]
             .concat(),
             result,
+            policy_data,
             {
                 let (parsed, tail) = result.expect("parsed");
                 assert_eq!(0, tail.len());
-                match parsed.validate().map_err(as_validate_error) {
+                let mut context =
+                    crate::policy::PolicyValidationContext { data: policy_data.clone() };
+                match parsed.validate(&mut context).map_err(as_validate_error) {
                     Err(ValidateError::MisalignedExtensibleBitmapItemStartBit {
                         found_start_bit,
                         ..
@@ -536,11 +557,14 @@ mod tests {
             ]
             .concat(),
             result,
+            policy_data,
             {
                 let (parsed, tail) = result.expect("parsed");
                 assert_eq!(0, tail.len());
+                let mut context =
+                    crate::policy::PolicyValidationContext { data: policy_data.clone() };
                 assert_eq!(
-                    parsed.validate().map_err(as_validate_error),
+                    parsed.validate(&mut context).map_err(as_validate_error),
                     Err(ValidateError::OutOfOrderExtensibleBitmapItems {
                         found_start_bit: MAP_NODE_BITS * 2,
                         min_start: (MAP_NODE_BITS * 7) + MAP_NODE_BITS,
@@ -563,6 +587,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
                     // `PolicyCursor` attempts to read `Vec` one item at a time.
@@ -606,6 +631,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());
@@ -639,6 +665,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());
@@ -669,6 +696,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());
@@ -700,6 +728,7 @@ mod tests {
             ]
             .concat(),
             result,
+            _policy_data,
             {
                 let (extensible_bitmap, tail) = result.expect("parse");
                 assert_eq!(0, tail.len());

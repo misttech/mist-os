@@ -47,10 +47,6 @@ impl PolicyCursor {
         self.data.len() - self.offset as usize
     }
 
-    pub fn into_inner(self) -> PolicyData {
-        self.data
-    }
-
     /// Returns a slice of remaining data.
     fn remaining_slice(&self) -> &[u8] {
         let s: &[u8] = self.data.as_ref();

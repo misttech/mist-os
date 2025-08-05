@@ -200,8 +200,9 @@ impl SecurityServer {
     pub fn load_policy(&self, binary_policy: Vec<u8>) -> Result<(), anyhow::Error> {
         // Parse the supplied policy, and reject the load operation if it is
         // malformed or invalid.
-        let (parsed, binary) = parse_policy_by_value(binary_policy)?;
-        let parsed = Arc::new(parsed.validate()?);
+        let unvalidated_policy = parse_policy_by_value(binary_policy)?;
+        let parsed = Arc::new(unvalidated_policy.validate()?);
+        let binary = parsed.binary().clone();
 
         let exceptions = self.exceptions.iter().map(String::as_str).collect::<Vec<&str>>();
         let exceptions = ExceptionsConfig::new(&parsed, &exceptions)?;
