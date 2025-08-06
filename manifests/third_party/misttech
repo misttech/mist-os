@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <projects>
+    <!-- Third Party -->
+    <project name="third_party/acpica"
+             gitsubmoduleof="mist-os"
+             path="third_party/acpica"
+             remote="https://github.com/misttech/acpica"
+             revision="b92d6b4dd2d927f8bc117a54deae30e78e983515"/>
+    <project name="third_party/lk"
+             gitsubmoduleof="mist-os"
+             path="third_party/lk"
+             remote="https://github.com/misttech/lk"
+             revision="c1d834accb741beac0b34e78f8e1b45767af4394"/>
+    <project name="misttech/third_party/lwip"
+             gitsubmoduleof="mist-os"
+             path="vendor/misttech/third_party/lwip/src"
+             remote="https://github.com/misttech/lwip"
+             revision="77dcd25a72509eb83f72b033d219b1d40cd8eb95"/>
+  </projects>
+</manifest>

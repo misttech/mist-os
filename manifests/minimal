@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <!--
-  A minimal checkout including only fuchsia.git itself.
+  A minimal checkout including only mist-os.git itself.
 
   This manifest is intended to be used by rollers that need to update
-  fuchsia.git. It uses a shallow clone of fuchsia.git to avoid downloading
+  mist-os.git. It uses a shallow clone of mist-os.git to avoid downloading
   history that's not needed for a simple roll CL.
 
-  This duplicates the fuchsia.git manifest entry in the `platform` manifest
+  This duplicates the mist-os.git manifest entry in the `platform` manifest
   because that one has a `githooks` entry pointing into //integration, but we
-  want to be able to check out fuchsia without integration.
+  want to be able to check out mist-os without integration.
   -->
   <projects>
-    <project name="fuchsia"
+    <project name="mist-os"
              path="."
-             remote="https://fuchsia.googlesource.com/fuchsia"
-             gerrithost="https://fuchsia-review.googlesource.com"
+             remote="https://github.com/mist-os"
              historydepth="2"/>
   </projects>
 </manifest>
