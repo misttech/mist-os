@@ -7,7 +7,7 @@
   <projects>
     <project name="mist-os"
              path="."
-             remote="https://github.com/mist-os"
+             remote="https://github.com/misttech/mist-os.git"
              githooks="integration/git-hooks"/>
   </projects>
   <hooks>
