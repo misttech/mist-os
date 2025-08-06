@@ -21,15 +21,10 @@ jobs:
             export PATH=$PWD/.jiri_root/bin:$PATH
             jiri init -analytics-opt=true
             jiri import -name=integration flower https://github.com/misttech/integration
-      - run:
-          name: Retrieve jiri.lock to temp folder
-          command: |
-            mkdir -p tmp
-            curl -o tmp/jiri.lock "https://raw.githubusercontent.com/misttech/integration/refs/heads/main/jiri.lock"
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-{{ checksum "tmp/jiri.lock" }}
+            - &jiri-cache jiri-{{ checksum "manifests/jiri.lock" }}
       - run:
           name: Jiri project config
           command: | 
