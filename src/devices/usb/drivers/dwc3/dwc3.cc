@@ -5,11 +5,13 @@
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.interconnect/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
+#include <fidl/fuchsia.hardware.vreg/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -20,6 +22,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
+#include <string>
 #include <unordered_map>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -29,11 +32,13 @@
 
 namespace dwc3 {
 
+namespace fclock = fuchsia_hardware_clock;
 namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
-namespace fpdev = fuchsia_hardware_platform_device;
 namespace fhi = fuchsia_hardware_interconnect;
+namespace fpdev = fuchsia_hardware_platform_device;
+namespace fvreg = fuchsia_hardware_vreg;
 
 namespace {
 
@@ -44,40 +49,88 @@ class QualcommExtension final : public PlatformExtension {
  public:
   static std::unique_ptr<QualcommExtension> Create(Dwc3* parent);
 
-  QualcommExtension(std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> clients)
-      : clients_(std::move(clients)) {}
+  QualcommExtension(std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> interconnect_clients,
+                    std::unordered_map<std::string, fidl::ClientEnd<fvreg::Vreg>> regulator_clients,
+                    std::unordered_map<std::string, fidl::ClientEnd<fclock::Clock>> clock_clients)
+      : interconnect_clients_{std::move(interconnect_clients)},
+        regulator_clients_{std::move(regulator_clients)},
+        clock_clients_{std::move(clock_clients)} {}
 
   // PlatformExtension interface implementation.
-  zx::result<> Start() override { return VoteBandwidth(State::kSvs); }
-  zx::result<> Suspend() override { return VoteBandwidth(State::kNone); }
-  zx::result<> Resume() override { return VoteBandwidth(State::kSvs); }
+  zx::result<> Start() override { return VoteCommon(State::kSvs, true); }
+  zx::result<> Suspend() override { return VoteCommon(State::kNone, false); }
+  zx::result<> Resume() override { return VoteCommon(State::kSvs, true); }
 
  private:
+  zx::result<> VoteCommon(State state, bool on) {
+    zx::result clocks = VoteClocks(on);
+    if (clocks.is_error()) {
+      return clocks.take_error();
+    }
+
+    zx::result voltage = VoteVoltage(on);
+    if (voltage.is_error()) {
+      return voltage.take_error();
+    }
+
+    return VoteBandwidth(state);
+  }
+
   zx::result<> VoteBandwidth(State state);
+  zx::result<> VoteVoltage(bool on);
+  zx::result<> VoteClocks(bool on);
 
   State state_ = State::kNone;
-  std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> clients_;
+  std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> interconnect_clients_;
+  std::unordered_map<std::string, fidl::ClientEnd<fvreg::Vreg>> regulator_clients_;
+  std::unordered_map<std::string, fidl::ClientEnd<fclock::Clock>> clock_clients_;
 };
 
 std::unique_ptr<QualcommExtension> QualcommExtension::Create(Dwc3* parent) {
   // Get all resources.
-  static const std::unordered_map<BusPath, const char*> kBusPathNames = {
+  static const std::unordered_map<BusPath, const std::string> kBusPathNames{
       {BusPath::kUsbDdr, "interconnect-usb-ddr"},
       {BusPath::kUsbIpa, "interconnect-usb-ipa"},
       {BusPath::kDdrUsb, "interconnect-ddr-usb"}};
 
-  std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> clients;
+  static const std::vector<std::string> kRegulatorNames{"regulator-core", "regulator-vdd18"};
+  // TODO(b/429753599): enable regulator-vdd33 when fixed.
 
-  for (const auto& [path, instance_name] : kBusPathNames) {
-    zx::result client = parent->incoming()->Connect<fhi::PathService::Path>(instance_name);
+  static const std::vector<std::string> kClockNames{"core-clk", "iface-clk", "bus-aggr-clk",
+                                                    "xo",       "sleep-clk", "utmi-clk"};
+
+  std::unordered_map<BusPath, fidl::ClientEnd<fhi::Path>> interconnect_clients;
+  for (const auto& [path, node_name] : kBusPathNames) {
+    zx::result client = parent->incoming()->Connect<fhi::PathService::Path>(node_name);
     if (client.is_error()) {
-      fdf::info("Failed to get interconnect clients, assuming not qualcomm chipset.");
+      fdf::info("Failed to get interconnect {}, assuming not qualcomm chipset", node_name);
       return nullptr;
     }
-    clients[path] = std::move(client.value());
+    interconnect_clients[path] = std::move(*client);
   }
 
-  return std::make_unique<QualcommExtension>(std::move(clients));
+  std::unordered_map<std::string, fidl::ClientEnd<fvreg::Vreg>> regulator_clients;
+  for (const auto& name : kRegulatorNames) {
+    zx::result client = parent->incoming()->Connect<fvreg::Service::Vreg>(name);
+    if (client.is_error()) {
+      fdf::info("Failed to get regulator {}, assuming not qualcomm chipset", name);
+      return nullptr;
+    }
+    regulator_clients[name] = std::move(*client);
+  }
+
+  std::unordered_map<std::string, fidl::ClientEnd<fclock::Clock>> clock_clients;
+  for (const auto& name : kClockNames) {
+    zx::result client = parent->incoming()->Connect<fclock::Service::Clock>(name);
+    if (client.is_error()) {
+      fdf::info("Failed to get clock {}, assuming not qualcomm chipset", name);
+      return nullptr;
+    }
+    clock_clients[name] = std::move(*client);
+  }
+
+  return std::make_unique<QualcommExtension>(
+      std::move(interconnect_clients), std::move(regulator_clients), std::move(clock_clients));
 }
 
 zx::result<> QualcommExtension::VoteBandwidth(State state) {
@@ -125,7 +178,7 @@ zx::result<> QualcommExtension::VoteBandwidth(State state) {
 
   for (const auto& [path, vote] : kVoteMap.at(state_)) {
     const auto& [average, peak] = vote;
-    fidl::Result result = fidl::Call(clients_.at(path))
+    fidl::Result result = fidl::Call(interconnect_clients_.at(path))
                               ->SetBandwidth({{
                                   .average_bandwidth_bps = average,
                                   .peak_bandwidth_bps = peak,
@@ -136,6 +189,80 @@ zx::result<> QualcommExtension::VoteBandwidth(State state) {
     }
   }
 
+  return zx::ok();
+}
+
+zx::result<> QualcommExtension::VoteVoltage(bool on) {
+  // clang-format off
+  const static std::unordered_map<std::string, uint32_t> kVoltages{
+      {"regulator-core", 904000},
+      {"regulator-vdd18", 1800000},
+      // {"regulator-vdd33", 3080000},
+  };
+  // clang-format on
+
+  if (on) {
+    for (const auto& [name, voltage] : kVoltages) {
+      fidl::Result params = fidl::Call(regulator_clients_.at(name))->GetRegulatorParams();
+      if (params.is_error()) {
+        fdf::error("could not get regulator params for {}: {}", name, params.error_value());
+        continue;
+      }
+
+      uint32_t steps = (voltage - params->min_uv()) / params->step_size_uv();
+      if (steps > params->num_steps()) {
+        fdf::warn("{}: requesting out-of-range voltage, ignoring", name);
+        continue;
+      }
+
+      fidl::Result set =
+          fidl::Call(regulator_clients_.at(name))->SetState({{.step = steps, .enable = true}});
+      if (set.is_error()) {
+        fdf::error("failed to enable regulator {}: {}", name, set.error_value());
+      }
+    }
+    return zx::ok();
+  }
+
+  // It's possible regulator-disable logic will follow.
+  return zx::ok();
+}
+
+zx::result<> QualcommExtension::VoteClocks(bool on) {
+  enum class ClockAction : uint8_t { kEnable, kNoVote, kOff };
+  // clang-format off
+  const static std::unordered_map<std::string, ClockAction> kVoteMap{
+      {"core-clk",     ClockAction::kEnable},
+      {"iface-clk",    ClockAction::kEnable},
+      {"bus-aggr-clk", ClockAction::kNoVote},
+      {"xo",           ClockAction::kNoVote},
+      {"sleep-clk",    ClockAction::kOff},
+      {"utmi-clk",     ClockAction::kEnable},
+  };
+  // clang-format on
+
+  if (on) {
+    for (const auto& [name, action] : kVoteMap) {
+      switch (action) {
+        case ClockAction::kNoVote:
+          break;
+        case ClockAction::kOff: {
+          fidl::Result disable = fidl::Call(clock_clients_.at(name))->Disable();
+          if (disable.is_error()) {
+            fdf::error("could not disable clk {}: {}", name, disable.error_value());
+          }
+          break;
+        }
+        case ClockAction::kEnable: {
+          fidl::Result enable = fidl::Call(clock_clients_.at(name))->Enable();
+          if (enable.is_error()) {
+            fdf::error("could not enable clk {}: {}", name, enable.error_value());
+          }
+          break;
+        }
+      }
+    }
+  }
   return zx::ok();
 }
 
@@ -272,8 +399,7 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
   bti_ = std::move(*bti);
 
-  // TODO(https://fxbug.dev/413142699) use syscalls-next.h when available.
-  auto irq = pdev_.GetInterrupt(0, /* ZX_INTERRUPT_WAKE_VECTOR*/ ((uint32_t)0x20));
+  auto irq = pdev_.GetInterrupt(0);
   if (irq.is_error()) {
     FDF_LOG(ERROR, "GetInterrupt failed: %s", irq.status_string());
     return irq.error_value();
@@ -607,6 +733,7 @@ void Dwc3::HandleDisconnectedEvent() {
 }
 
 void Dwc3::Stop() {
+  FDF_LOG(INFO, "Stop()");
   irq_handler_.Cancel();
   ReleaseResources();
 }

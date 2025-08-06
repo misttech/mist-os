@@ -559,7 +559,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         }
     }
 
-    for expose_bundle in group_expose_aggregates(&decl.exposes).into_iter() {
+    for expose_bundle in group_expose_aggregates(&decl.exposes) {
         let first_expose = expose_bundle.first().unwrap();
         match first_expose {
             cm_rust::ExposeDecl::Service(_)
@@ -829,18 +829,18 @@ fn new_aggregate_capability_source(
 /// Groups together a set of offers into sub-sets of those that have the same target and target
 /// name. This is useful for identifying which offers are part of an aggregation of capabilities,
 /// and which are for standalone routes.
-fn group_offer_aggregates(offers: &Vec<cm_rust::OfferDecl>) -> Vec<Vec<&cm_rust::OfferDecl>> {
+fn group_offer_aggregates(offers: &[cm_rust::OfferDecl]) -> Vec<Vec<&cm_rust::OfferDecl>> {
     let mut groupings = HashMap::new();
-    for offer in offers.iter() {
+    for offer in offers {
         groupings.entry((offer.target(), offer.target_name())).or_insert(vec![]).push(offer);
     }
     groupings.into_iter().map(|(_key, grouping)| grouping).collect()
 }
 
 /// Identical to `group_offer_aggregates`, but for exposes.
-fn group_expose_aggregates(exposes: &Vec<cm_rust::ExposeDecl>) -> Vec<Vec<&cm_rust::ExposeDecl>> {
+fn group_expose_aggregates(exposes: &[cm_rust::ExposeDecl]) -> Vec<Vec<&cm_rust::ExposeDecl>> {
     let mut groupings = HashMap::new();
-    for expose in exposes.iter() {
+    for expose in exposes {
         groupings.entry((expose.target(), expose.target_name())).or_insert(vec![]).push(expose);
     }
     groupings.into_iter().map(|(_key, grouping)| grouping).collect()
@@ -952,10 +952,10 @@ fn build_environment<C: ComponentInstanceInterface + 'static>(
 /// Extends the given `target_input` to contain the capabilities described in `dynamic_offers`.
 pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    static_offers: &Vec<cm_rust::OfferDecl>,
+    static_offers: &[cm_rust::OfferDecl],
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
-    dynamic_offers: &Vec<cm_rust::OfferDecl>,
+    dynamic_offers: &[cm_rust::OfferDecl],
     program_output_dict: &Dict,
     framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,

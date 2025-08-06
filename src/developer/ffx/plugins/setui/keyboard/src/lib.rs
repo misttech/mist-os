@@ -62,7 +62,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const NUM: i64 = 7;
 
@@ -88,7 +88,7 @@ mod test {
             autorepeat_period: Some(-2),
         }; "Test keyboard invalid autorepeat inputs."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_keyboard_failure(expected_keyboard: Keyboard) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
@@ -124,7 +124,7 @@ mod test {
             autorepeat_period: Some(4),
         }; "Test keyboard set() output with different values."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_keyboard_set_output(expected_keyboard: Keyboard) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
@@ -154,7 +154,7 @@ mod test {
             autorepeat_period: Some(8),
         }; "Test keyboard watch() output with non-empty Keyboard."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_keyboard_watch_output(expected_keyboard: Keyboard) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             KeyboardRequest::Set { .. } => {

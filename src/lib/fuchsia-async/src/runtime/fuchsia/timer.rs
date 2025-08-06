@@ -787,7 +787,7 @@ impl Heap {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{LocalExecutor, SendExecutor, Task, TestExecutor};
+    use crate::{LocalExecutor, SendExecutorBuilder, Task, TestExecutor};
     use assert_matches::assert_matches;
     use futures::channel::oneshot::channel;
     use futures::future::Either;
@@ -836,7 +836,7 @@ mod test {
     }
 
     fn test_shorter_fires_first_multithreaded<T: TestTimeInterface>() {
-        SendExecutor::new(4).run(async {
+        SendExecutorBuilder::new().num_threads(4).build().run(async {
             let shorter = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_millis(100))));
             let longer = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_seconds(1))));
             match future::select(shorter, longer).await {
@@ -1070,7 +1070,7 @@ mod test {
     #[test]
     fn test_reset() {
         // This is a test for https://fxbug.dev/418235546.
-        SendExecutor::new(2).run(async {
+        SendExecutorBuilder::new().num_threads(2).build().run(async {
             const TIMER_DELAY: zx::MonotonicDuration = zx::Duration::from_micros(100);
             let mut timer = pin!(Timer::new(MonotonicInstant::after(TIMER_DELAY)));
             for _ in 0..10000 {

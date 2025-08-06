@@ -3,73 +3,34 @@
 // found in the LICENSE file.
 
 use std::fmt::Debug;
-use std::io::{Cursor, Seek as _, SeekFrom};
+use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Unaligned};
 
-/// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.
-pub trait ParseCursor: Sized {
-    /// The inner representation that owns the underlying data.
-    type Inner;
-
-    /// The error returned when seeking forward fails on this cursor.
-    type Error;
-
-    /// Returns a slice of remaining data.
-    fn remaining_slice(&self) -> &[u8];
-
-    /// Returns the number of bytes remaining to be parsed by this [`ParseCursor`].
-    fn len(&self) -> usize;
-
-    /// Seeks forward by `num_bytes`, returning a `Self::Error` if seeking fails.
-    fn seek_forward(&mut self, num_bytes: usize) -> Result<(), Self::Error>;
-
-    /// Consumes self and returns the inner representation of the complete parse input.
-    #[allow(dead_code)]
-    fn into_inner(self) -> Self::Inner;
-}
-
-impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
-    type Inner = T;
-    type Error = std::io::Error;
-
-    fn remaining_slice(&self) -> &[u8] {
-        let s: &[u8] = self.get_ref().as_ref();
-        let p = self.position() as usize;
-        &s[p..]
-    }
-
-    fn len(&self) -> usize {
-        let position = self.position() as usize;
-        self.get_ref().as_ref().len() - position
-    }
-
-    fn seek_forward(&mut self, num_bytes: usize) -> Result<(), Self::Error> {
-        self.seek(SeekFrom::Current(num_bytes as i64)).map(|_| ())
-    }
-
-    #[allow(dead_code)]
-    fn into_inner(self) -> Self::Inner {
-        self.into_inner()
-    }
-}
+pub type PolicyData = Arc<Vec<u8>>;
+pub type PolicyOffset = u32;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct PolicyCursor(Cursor<Vec<u8>>);
+pub struct PolicyCursor {
+    data: PolicyData,
+    offset: PolicyOffset,
+}
 
 impl PolicyCursor {
     /// Returns a new [`PolicyCursor`] that wraps `data` in a [`Cursor`] for parsing.
-    pub fn new(data: Vec<u8>) -> Self {
-        Self(Cursor::new(data))
+    pub fn new(data: PolicyData) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    pub fn new_at(data: PolicyData, offset: PolicyOffset) -> Self {
+        Self { data, offset }
     }
 
     /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
     pub fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         mut self,
     ) -> Option<(P, Self)> {
-        let (output, _) = P::read_from_prefix(ParseCursor::remaining_slice(&self.0)).ok()?;
-        if self.0.seek_forward(std::mem::size_of_val(&output)).is_err() {
-            return None;
-        }
+        let (output, _) = P::read_from_prefix(self.remaining_slice()).ok()?;
+        self.seek_forward(std::mem::size_of_val(&output)).ok()?;
         Some((output, self))
     }
 
@@ -79,23 +40,35 @@ impl PolicyCursor {
         mut self,
         count: usize,
     ) -> Option<(Vec<PS>, Self)> {
-        let (slice, _) =
-            <[PS]>::ref_from_prefix_with_elems(ParseCursor::remaining_slice(&self.0), count)
-                .ok()?;
+        let (slice, _) = <[PS]>::ref_from_prefix_with_elems(self.remaining_slice(), count).ok()?;
         let size = std::mem::size_of_val(&slice);
         let slice = slice.to_owned();
-        if self.0.seek_forward(size).is_err() {
-            return None;
-        }
+        self.seek_forward(size).ok()?;
         Some((slice, self))
     }
 
-    pub fn len(&self) -> usize {
-        self.0.len()
+    pub fn offset(&self) -> PolicyOffset {
+        self.offset
     }
 
-    pub fn into_inner(self) -> Vec<u8> {
-        self.0.into_inner()
+    pub fn len(&self) -> usize {
+        self.data.len() - self.offset as usize
+    }
+
+    /// Returns a slice of remaining data.
+    fn remaining_slice(&self) -> &[u8] {
+        let s: &[u8] = self.data.as_ref();
+        let p = self.offset as usize;
+        &s[p..]
+    }
+
+    /// Seeks forward by `num_bytes`, returning a `std::io::Error` if seeking fails.
+    pub fn seek_forward(&mut self, num_bytes: usize) -> Result<(), std::io::Error> {
+        if num_bytes > self.len() {
+            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
+        }
+        self.offset += num_bytes as PolicyOffset;
+        Ok(())
     }
 }
 
@@ -119,14 +92,14 @@ mod tests {
     >(
         data: Vec<u8>,
     ) -> (T, PolicyCursor) {
-        let parser = PolicyCursor::new(data);
+        let parser = PolicyCursor::new(Arc::new(data));
         parser.parse::<T>().expect("some numbers")
     }
     fn do_slice_by_value<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         data: Vec<u8>,
         count: usize,
     ) -> (Vec<T>, PolicyCursor) {
-        let parser = PolicyCursor::new(data);
+        let parser = PolicyCursor::new(Arc::new(data));
         parser.parse_slice::<T>(count).expect("some numbers")
     }
 
@@ -136,8 +109,8 @@ mod tests {
         let (some_numbers, parser) = do_by_value::<SomeNumbers>(bytes);
         assert_eq!(0, some_numbers.a);
         assert_eq!(7, some_numbers.d);
-        assert_eq!(8, parser.0.position());
-        assert_eq!(8, parser.into_inner().len());
+        assert_eq!(8, parser.offset);
+        assert_eq!(8, parser.data.len());
     }
 
     #[test]
@@ -151,6 +124,6 @@ mod tests {
         assert_eq!(15, some_numbers[1].d);
         assert_eq!(16, some_numbers[2].a);
         assert_eq!(23, some_numbers[2].d);
-        assert_eq!(24, parser.into_inner().len());
+        assert_eq!(24, parser.data.len());
     }
 }

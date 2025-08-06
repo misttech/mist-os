@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::usb_config::*;
+use assembly_config_schema::platform_settings::usb_config::*;
 
 pub(crate) struct UsbSubsystemConfig;
 
@@ -32,7 +32,7 @@ impl DefineSubsystemConfiguration<UsbConfig> for UsbSubsystemConfig {
         )?;
 
         // Include xHCI driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::xhci") {
+        if context.board_config.provides_feature("fuchsia::xhci") {
             builder.platform_bundle("xhci_driver");
         }
 

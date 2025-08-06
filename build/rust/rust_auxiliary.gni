@@ -155,6 +155,11 @@ template("rust_auxiliary") {
            "clippy targets should have an original name")
     _original_target_name = target_name
   }
+  if (defined(invoker.rustdoc_parts_dir)) {
+    _rustdoc_parts_dir = invoker.rustdoc_parts_dir
+  } else {
+    _rustdoc_parts_dir = "$target_gen_dir/${target_name}.doc.parts"
+  }
 
   _define_rustdoc =
       !(defined(invoker.disable_rustdoc) && invoker.disable_rustdoc) &&
@@ -207,7 +212,7 @@ template("rust_auxiliary") {
       # Some clippy targets leak the output dir, but these aren't run remotely, nor are they depended
       # on by anything which does. So just opt out all clippy targets.
       # TODO(b/42084027): plug output dir leaks for remote clippy
-      no_output_dir_leaks = false
+      check_for_output_dir_leaks = false
       forward_variables_from(invoker,
                              [
                                "testonly",
@@ -423,6 +428,13 @@ template("rust_auxiliary") {
         # rustdoc will receive remaining arguments
         rebase_path(crate_root, root_build_dir),
         "-Zunstable-options",
+
+        # Do not attempt to append to existing files in the documentation destination.
+        "--merge=none",
+
+        # Output information to be consumed by `fx rustdoc-link`.
+        "--parts-out-dir",
+        rebase_path(_rustdoc_parts_dir, root_build_dir),
         "--out-dir",
         rebase_path(_rustdoc_out_dir, root_build_dir),
         "@" + rebase_path(_transdeps_output, root_build_dir),
@@ -454,6 +466,7 @@ template("rust_auxiliary") {
     not_needed([
                  "_crate_name",
                  "_invoker_deps",
+                 "_rustdoc_parts_dir",
                  "rustflags",
                  "aliased_deps",
                ])
@@ -528,6 +541,8 @@ template("rust_auxiliary") {
             extern = "--extern=${_crate_name}=${_rlib_path}"
             searchdir = "-Ldependency=${_searchdir_path}"
           }
+          rustdoc_parts_dir = rebase_path(_rustdoc_parts_dir, root_build_dir)
+          target_is_fuchsia = is_fuchsia
           target = current_target_tuple
           clippy_output = rebase_path(_clippy_output, root_build_dir)
           src = []

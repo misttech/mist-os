@@ -26,10 +26,10 @@ rustc_library("wlan-storage") {
     "//third_party/rust_crates:serde_json",
   ]
   test_deps = [
-    "//src/connectivity/wlan/lib/common/rust/:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
   ]

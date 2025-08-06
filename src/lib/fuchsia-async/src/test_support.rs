@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::TimeoutExt;
+#[cfg(target_os = "fuchsia")]
+use crate::TestExecutorBuilder;
+use crate::{LocalExecutorBuilder, SendExecutorBuilder, TimeoutExt};
 use futures::prelude::*;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -71,7 +73,7 @@ impl<E: Send + 'static + std::fmt::Debug> TestResult for Result<(), E> {
         test: &(dyn Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>),
         cfg: Config,
     ) -> Self {
-        cfg.run(1, |run| crate::LocalExecutor::new().run_singlethreaded(test(run)))
+        cfg.run(1, |run| LocalExecutorBuilder::new().build().run_singlethreaded(test(run)))
     }
 
     #[cfg(target_os = "fuchsia")]
@@ -85,11 +87,7 @@ impl<E: Send + 'static + std::fmt::Debug> TestResult for Result<(), E> {
     ) -> Self {
         let test = apply_timeout!(cfg, |run| test(run));
         cfg.run(1, |run| {
-            let mut executor = if fake_time {
-                crate::TestExecutor::new_with_fake_time()
-            } else {
-                crate::TestExecutor::new()
-            };
+            let mut executor = TestExecutorBuilder::new().fake_time(fake_time).build();
             match executor.run_until_stalled(&mut std::pin::pin!(test(run))) {
                 Poll::Ready(result) => result,
                 Poll::Pending => panic!(
@@ -114,7 +112,9 @@ impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
         let test = apply_timeout!(cfg, |run| test(run));
         // Fuchsia's SendExecutor actually uses an extra thread, but it doesn't do anything, so we
         // don't count it.
-        cfg.run(threads, |run| crate::SendExecutor::new(threads).run(test(run)))
+        cfg.run(threads, |run| {
+            SendExecutorBuilder::new().num_threads(threads).build().run(test(run))
+        })
     }
 
     fn is_ok(&self) -> bool {
@@ -128,7 +128,7 @@ impl TestResult for () {
         cfg: Config,
     ) -> Self {
         let _ = cfg.run(1, |run| {
-            crate::LocalExecutor::new().run_singlethreaded(test(run));
+            LocalExecutorBuilder::new().build().run_singlethreaded(test(run));
             Ok::<(), ()>(())
         });
     }
@@ -169,7 +169,7 @@ impl MultithreadedTestResult for () {
         // Fuchsia's SendExecutor actually uses an extra thread, but it doesn't do anything, so we
         // don't count it.
         let _ = cfg.run(threads, |run| {
-            crate::SendExecutor::new(threads).run(test(run));
+            SendExecutorBuilder::new().num_threads(threads).build().run(test(run));
             Ok::<(), ()>(())
         });
     }

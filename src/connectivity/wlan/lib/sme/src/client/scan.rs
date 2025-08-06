@@ -350,6 +350,7 @@ const SUPPORTED_20_MHZ_CHANNELS: &[u8] = &[
 mod tests {
     use super::*;
     use crate::test_utils;
+    use assert_matches::assert_matches;
     use fuchsia_inspect::Inspector;
 
     use ieee80211::MacAddr;
@@ -359,7 +360,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::test_utils::fake_capabilities::fake_5ghz_band_capability;
     use wlan_common::test_utils::fake_features::fake_spectrum_management_support_empty;
-    use wlan_common::{assert_variant, fake_bss_description, fake_fidl_bss_description};
+    use wlan_common::{fake_bss_description, fake_fidl_bss_description};
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();
@@ -387,7 +388,7 @@ mod tests {
                 },
             })
             .expect("expect scan result received");
-        assert_variant!(
+        assert_matches!(
             sched.on_mlme_scan_result(fidl_mlme::ScanResult {
                 txn_id: txn_id + 100, // mismatching transaction id
                 timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
@@ -408,7 +409,7 @@ mod tests {
                 },
             })
             .expect("expect scan result received");
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -416,7 +417,7 @@ mod tests {
             Ok((scan_end, mlme_req)) => (scan_end, mlme_req)
         );
         assert!(mlme_req.is_none());
-        let (tokens, bss_description_list) = assert_variant!(
+        let (tokens, bss_description_list) = assert_matches!(
             scan_end,
             ScanEnd {
                 tokens,
@@ -483,7 +484,7 @@ mod tests {
                 })
                 .expect("expect scan result received");
         }
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -491,7 +492,7 @@ mod tests {
             Ok((scan_end, mlme_req)) => (scan_end, mlme_req)
         );
         assert!(mlme_req.is_none());
-        let (tokens, bss_description_list) = assert_variant!(
+        let (tokens, bss_description_list) = assert_matches!(
             scan_end,
             ScanEnd {
                 tokens,
@@ -536,7 +537,7 @@ mod tests {
                 bss,
             })
             .expect("expect scan result received");
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -544,7 +545,7 @@ mod tests {
             Ok((scan_end, mlme_req)) => (scan_end, mlme_req)
         );
         assert!(mlme_req.is_none());
-        let (tokens, bss_description_list) = assert_variant!(
+        let (tokens, bss_description_list) = assert_matches!(
             scan_end,
             ScanEnd {
                 tokens,
@@ -688,7 +689,7 @@ mod tests {
                 },
             })
             .expect("expect scan result received");
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -754,7 +755,7 @@ mod tests {
                 },
             })
             .expect("expect scan result received");
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -782,7 +783,7 @@ mod tests {
                 },
             })
             .expect("expect scan result received");
-        let (scan_end, mlme_req) = assert_variant!(
+        let (scan_end, mlme_req) = assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -808,7 +809,7 @@ mod tests {
         let txn_id = mlme_req.txn_id;
 
         // Report scan result with wrong txn id
-        assert_variant!(
+        assert_matches!(
             sched.on_mlme_scan_result(fidl_mlme::ScanResult {
                 txn_id: txn_id + 1,
                 timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
@@ -824,7 +825,7 @@ mod tests {
     #[test]
     fn test_discovery_scan_result_not_scanning() {
         let mut sched = create_sched();
-        assert_variant!(
+        assert_matches!(
             sched.on_mlme_scan_result(fidl_mlme::ScanResult {
                 txn_id: 0,
                 timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
@@ -848,7 +849,7 @@ mod tests {
             .expect("expected a ScanRequest");
         let txn_id = mlme_req.txn_id;
 
-        assert_variant!(
+        assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id: txn_id + 1, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -861,7 +862,7 @@ mod tests {
     fn test_discovery_scan_end_not_scanning() {
         let mut sched = create_sched();
         let (_inspector, sme_inspect) = sme_inspect();
-        assert_variant!(
+        assert_matches!(
             sched.on_mlme_scan_end(
                 fidl_mlme::ScanEnd { txn_id: 0, code: fidl_mlme::ScanResultCode::Success },
                 &sme_inspect,
@@ -875,7 +876,7 @@ mod tests {
         expected_tokens: Vec<i32>,
         expected_ssids: Vec<Ssid>,
     ) {
-        let (tokens, bss_description_list) = assert_variant!(
+        let (tokens, bss_description_list) = assert_matches!(
             scan_end,
             ScanEnd {
                 tokens,

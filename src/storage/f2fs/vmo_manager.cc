@@ -7,6 +7,8 @@
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
 
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+
 namespace f2fs {
 namespace {
 

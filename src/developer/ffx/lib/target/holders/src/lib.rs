@@ -20,6 +20,7 @@ pub mod fdomain;
 mod from_toolbox;
 mod remote_control_proxy;
 mod target_info;
+mod target_info_query;
 mod target_proxy;
 mod with_moniker;
 
@@ -29,6 +30,7 @@ use from_toolbox::WithToolbox;
 pub use from_toolbox::{toolbox, toolbox_or};
 pub use remote_control_proxy::{fake_async_proxy, fake_proxy, RemoteControlProxyHolder};
 pub use target_info::TargetInfoHolder;
+pub use target_info_query::TargetInfoQueryHolder;
 pub use target_proxy::TargetProxyHolder;
 
 const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);

@@ -36,7 +36,7 @@ const MINIMUM_REBOOT_WAIT: std::time::Duration = std::time::Duration::from_secs(
 pub fn main() -> Result<(), Error> {
     info!("starting system-update-committer");
 
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     let () = executor.run_singlethreaded(main_async()).map_err(|err| {
         // Use anyhow to print the error chain.
         let err = anyhow!(err);

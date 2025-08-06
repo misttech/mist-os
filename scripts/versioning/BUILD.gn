@@ -3,17 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/config/fuchsia/platform_version.gni")
-import("//build/config/fuchsia/versioning.gni")
 import("//build/python/python_host_test.gni")
 
 assert(is_host)
 
 group("versioning") {
   testonly = true
-
-  if (bump_api_level) {
-    deps = [ ":bump_api_level" ]
-  }
 }
 
 # To make the tests buildable, include `--with-host //scripts/versioning:tests`
@@ -21,93 +16,12 @@ group("versioning") {
 group("tests") {
   testonly = true
 
-  deps = [ ":update_platform_version_tests" ]
+  deps = [ ":create_api_level_tests" ]
 }
 
 # Run using the following command:
-# fx test //scripts/versioning:update_platform_version_tests
-python_host_test("update_platform_version_tests") {
-  main_source = "update_platform_version_tests.py"
-  sources = [ "update_platform_version.py" ]
-}
-
-if (bump_api_level) {
-  import("//build/testing/config.gni")
-  if (!update_goldens) {
-    print()
-    print(
-        "WARNING: It is strongly recommended that `update_goldens` be true to ensure all goldens will be updated.")
-    print("Bumping the API level anyways, but this may not go well...")
-  }
-
-  # Adds a new in-development API level that is one greater than the highest
-  # existing numbered API level.
-  #
-  # A new ABI revision is generated and associated with the new API level, and
-  # the golden files used for static compatibility checks are generated.
-  #
-  # This target is a tool for managing the platform version. It should only be
-  # built by an infra bot or a human manually bumping the platform version, as
-  # it updates several files in the checkout.
-  #
-  # To use this tool manually, run the following:
-  #   fx set bringup.x64 --with-host //scripts/versioning --args=bump_api_level=true
-  #   fx build --host //scripts/versioning:bump_api_level
-  action("bump_api_level") {
-    testonly = true
-
-    # The target below generates and checks the golden files for all Supported
-    # and Sunset API levels. When `bump_api_level=true`, it also generates
-    # golden files for the new API level. Since the levels are determined by GN
-    # args whose values are generated from the version_history file before it
-    # can be modified, the target below can be built before this target modifies
-    # the version_history file.
-    deps = [ "//sdk:generate_compatibility_goldens($default_toolchain)" ]
-
-    # To enable rapid development of this script, comment out the deps above.
-    # Before each run, `git checkout` the first two files below.
-    script = "//scripts/versioning/update_platform_version.py"
-
-    _version_history_file = "//sdk/version_history.json"
-    _availability_levels_file_path =
-        "//zircon/system/public/zircon/availability_levels.inc"
-    _stamp_file = "$target_out_dir/$target_name.status"
-
-    # The next API level is the last frozen API level + 1.
-    # This assumes that the greatest numbered API level is frozen, which is a
-    # prerequisite for bumping. After determining the next API level, verify
-    # that it does not already exist.
-    _max_frozen_api_level = 0
-    foreach(level, platform_version.frozen_api_levels) {
-      if (level > _max_frozen_api_level) {
-        _max_frozen_api_level = level
-      }
-    }
-    foreach(level, platform_version.all_numbered_api_levels) {
-      if (level > _max_frozen_api_level) {
-        # Although this should not happen, the platform-version-roller, like
-        # all fint recipes, runs a `gn check` after the build, which causes
-        # this condition to be hit now that the level has been added to
-        # version_history.json.
-        print(
-            "WARNING: The previous API level must be frozen before adding a new one. If this is not a post-build GN check, something is wrong.")
-      }
-    }
-    _next_numbered_api_level = _max_frozen_api_level + 1
-
-    args = [
-      "--root-source-dir",
-      rebase_path("//", root_build_dir),
-      "--sdk-version-history-path",
-      rebase_path(_version_history_file, root_build_dir),
-      "--availability-levels-file-path",
-      rebase_path(_availability_levels_file_path, root_build_dir),
-      "--new-api-level",
-      "$_next_numbered_api_level",
-    ]
-
-    inputs = [ _version_history_file ]
-
-    outputs = [ _stamp_file ]
-  }
+# fx test //scripts/versioning:create_api_level_tests
+python_host_test("create_api_level_tests") {
+  main_source = "create_api_level_tests.py"
+  sources = [ "create_api_level.py" ]
 }

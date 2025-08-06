@@ -1201,14 +1201,21 @@ impl Component {
         }
 
         let volume = MountedVolume::new(block_server);
-        if check_disk_format && caps[1].to_string() == "minfs" {
+        if check_disk_format {
+            let expected_format = match &caps[1] {
+                "minfs" => Some(DiskFormat::Minfs),
+                "f2fs" => Some(DiskFormat::F2fs),
+                _ => None,
+            };
             // It's relatively normal to try to mount a filesystem, discover it's not the right
-            // format, and reformat it so it is. If this filesystem is supposed to be minfs,
-            // spot-check that this partition is the right format before we try serving, and
-            // return the proper error without logging scary things if it is not.
-            let block_proxy = volume.connect_block()?.into_proxy();
-            let detected_format = detect_disk_format(block_proxy).await;
-            ensure!(detected_format == DiskFormat::Minfs, zx::Status::WRONG_TYPE);
+            // format, and reformat it so it is. If this filesystem is supposed to be a data
+            // filesystem, spot-check that this partition is the right format before we try serving,
+            // and return the proper error without logging scary things if it is not.
+            if let Some(expected_format) = expected_format {
+                let block_proxy = volume.connect_block()?.into_proxy();
+                let detected_format = detect_disk_format(block_proxy).await;
+                ensure!(detected_format == expected_format, zx::Status::WRONG_TYPE);
+            }
         }
         let fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string(), start_options));
         Ok((volume, fs))

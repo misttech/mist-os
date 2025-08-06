@@ -41,7 +41,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set() {
         const TRUE: bool = true;
         let proxy = fake_proxy(move |req| match req {
@@ -84,7 +84,7 @@ mod test {
         };
         "Test set other settings with different inputs."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_accessibility_set(expected_set: SetArgs) -> Result<()> {
         let set_clone = expected_set.clone();
         let proxy = fake_proxy(move |req| match req {

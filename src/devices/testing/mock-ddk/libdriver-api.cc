@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/ddk/debug.h>
-#include <lib/syslog/global.h>
-#include <lib/syslog/logger.h>
+#include <lib/syslog/cpp/log_message_impl.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
@@ -22,19 +22,14 @@ namespace {
 // This mutex ensures all calls into the mock-ddk are synchronized.
 std::mutex libdriver_lock;
 
-// We will use a separate mutex for the logging related functions.
-// This is because the other libdriver functions may log while they already
-// have the libdriver_lock.
-std::mutex libdriver_logger_lock;
-
 }  // namespace
 
 namespace mock_ddk {
 
 __EXPORT void SetMinLogSeverity(fx_log_severity_t severity) {
-  std::lock_guard guard(libdriver_logger_lock);
-  fx_logger_t* logger = fx_log_get_logger();
-  fx_logger_set_min_severity(logger, severity);
+  fuchsia_logging::LogSettingsBuilder()
+      .WithMinLogSeverity(static_cast<fuchsia_logging::RawLogSeverity>(severity))
+      .BuildAndInitialize();
 }
 
 }  // namespace mock_ddk
@@ -241,17 +236,19 @@ zx_handle_t get_msi_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 extern "C" bool driver_log_severity_enabled_internal(const zx_driver_t* drv,
                                                      fx_log_severity_t flag) {
-  std::lock_guard guard(libdriver_logger_lock);
-  fx_logger_t* logger = fx_log_get_logger();
-  return fx_logger_get_min_severity(logger) <= flag;
+  return static_cast<fx_log_severity_t>(fuchsia_logging::GetMinLogSeverity()) <= flag;
 }
 
 extern "C" void driver_logvf_internal(const zx_driver_t* drv, fx_log_severity_t flag,
                                       const char* tag, const char* file, int line, const char* msg,
                                       va_list args) {
-  std::lock_guard guard(libdriver_logger_lock);
-  fx_logger_t* logger = fx_log_get_logger();
-  fx_logger_logvf_with_source(logger, flag, tag, file, line, msg, args);
+  char buffer[1024];
+  if (vsnprintf(buffer, sizeof(buffer), msg, args) > 0) {
+    fuchsia_logging::LogMessage(static_cast<fuchsia_logging::RawLogSeverity>(flag), file, line,
+                                nullptr, tag)
+            .stream()
+        << buffer;
+  }
 }
 
 extern "C" void driver_logf_internal(const zx_driver_t* drv, fx_log_severity_t flag,

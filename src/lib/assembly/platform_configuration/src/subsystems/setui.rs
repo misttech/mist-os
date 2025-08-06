@@ -6,7 +6,7 @@ use std::fs::File;
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::platform_config::setui_config::{ICUType, SetUiConfig};
+use assembly_config_schema::platform_settings::setui_config::{ICUType, SetUiConfig};
 use assembly_constants::FileEntry;
 
 pub(crate) struct SetUiSubsystem;

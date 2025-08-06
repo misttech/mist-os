@@ -40,6 +40,9 @@ class PlatformBus : public fdf::DriverBase,
   PlatformBus(fdf::DriverStartArgs start_args,
               fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
+  ~PlatformBus() { FDF_LOG(INFO, "~PlatformBus()"); }
+  void Stop() override { FDF_LOG(INFO, "Stop()"); }
+
   using fdf::DriverBase::dispatcher;
   using fdf::DriverBase::driver_dispatcher;
   using fdf::DriverBase::outgoing;
@@ -84,7 +87,7 @@ class PlatformBus : public fdf::DriverBase,
   void GetInterruptControllerInfo(GetInterruptControllerInfoCompleter::Sync& completer) override;
   void GetSerialNumber(GetSerialNumberCompleter::Sync& completer) override;
 
-  zx::result<zx::bti> GetBti(uint32_t iommu_index, uint32_t bti_id);
+  zx::result<zx::bti> GetBti(uint32_t iommu_index, uint32_t bti_id, std::string_view name);
 
   zx::unowned_resource GetIrqResource() const;
   zx::unowned_resource GetMmioResource() const;

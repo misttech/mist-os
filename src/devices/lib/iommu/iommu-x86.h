@@ -5,9 +5,9 @@
 #ifndef SRC_DEVICES_LIB_IOMMU_IOMMU_X86_H_
 #define SRC_DEVICES_LIB_IOMMU_IOMMU_X86_H_
 
+#include <lib/ddk/debug.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
-#include <lib/syslog/logger.h>
 #include <lib/zx/iommu.h>
 #include <zircon/syscalls/iommu.h>
 

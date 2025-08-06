@@ -6,7 +6,7 @@
 import itertools
 import logging
 import sys
-from typing import Any, Iterable, Iterator, Self, Sequence, TypeAlias
+from typing import Any, Iterable, Iterator, MutableSequence, Self, TypeAlias
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
@@ -53,7 +53,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         all_events: Iterator[trace_model.Event] = model.all_events()
         cpu_usage_events: Iterable[
             trace_model.CounterEvent

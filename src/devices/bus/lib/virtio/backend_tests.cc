@@ -17,6 +17,7 @@
 #include <lib/virtio/ring.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>
+#include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/hw/pci.h>
 #include <zircon/status.h>
@@ -166,7 +167,7 @@ class AsyncState {
   component::OutgoingDirectory outgoing_;
 };
 
-fx_log_severity_t kTestLogLevel = FX_LOG_INFO;
+fx_log_severity_t kTestLogLevel = DDK_LOG_INFO;
 class VirtioTests : public zxtest::Test {
  public:
   static constexpr uint16_t kQueueSize = 1u;
@@ -507,8 +508,8 @@ int main(int argc, char* argv[]) {
   while (!v_position && (opt = getopt(argc, argv, "hv")) != -1) {
     switch (opt) {
       case 'v':
-        if (kTestLogLevel > FX_LOG_TRACE) {
-          kTestLogLevel -= FX_LOG_SEVERITY_STEP_SIZE;
+        if (kTestLogLevel > DDK_LOG_TRACE) {
+          kTestLogLevel -= (DDK_LOG_DEBUG - DDK_LOG_TRACE);
         }
 
         v_position = optind - 1;

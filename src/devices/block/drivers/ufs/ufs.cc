@@ -16,9 +16,10 @@
 
 #include <array>
 #include <mutex>
-#include <vector>
 
 #include <safemath/safe_conversions.h>
+
+#include "src/devices/block/drivers/ufs/server.h"
 
 namespace ufs {
 namespace {
@@ -142,17 +143,6 @@ zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> Ufs::AcquireLeas
     return zx::error(ZX_ERR_BAD_STATE);
   }
   return zx::ok(std::move(result->value()->lease_control));
-}
-
-void Ufs::UpdatePowerLevel(
-    const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
-    fuchsia_power_broker::PowerLevel power_level) {
-  const fidl::WireResult result = current_level_client->Update(power_level);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Call to Update failed: %s", result.status_string());
-  } else if (result->is_error()) {
-    FDF_LOG(ERROR, "Update returned failure.");
-  }
 }
 
 zx::result<> Ufs::NotifyEventCallback(NotifyEvent event, uint64_t data) {
@@ -1348,8 +1338,12 @@ zx::result<> Ufs::ConfigurePowerManagement() {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
+    fidl::Endpoints<fuchsia_power_broker::ElementRunner> element_runner =
+        fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
     fdf_power::ElementDesc description =
-        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+        fdf_power::ElementDescBuilder(config, std::move(tokens.value()))
+            .SetElementRunner(std::move(element_runner.client))
+            .Build();
     auto result = fdf_power::AddElement(power_broker.value(), description);
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to add power element: %s",
@@ -1366,23 +1360,18 @@ zx::result<> Ufs::ConfigurePowerManagement() {
               std::move(description.element_control_client.value()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client.value()));
-      hardware_power_current_level_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
-      hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client.value()), driver_async_dispatcher());
+      hardware_power_element_runner_server_binding_.emplace(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(element_runner.server),
+          &this->hardware_power_element_runner_server_, fidl::kIgnoreBindingClosure);
     } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client.value()));
-      wake_on_request_current_level_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
-      wake_on_request_required_level_client_ =
-          fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-              std::move(description.required_level_client.value()), driver_async_dispatcher());
+      wake_on_request_element_runner_server_binding_.emplace(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(element_runner.server),
+          &this->wake_on_request_element_runner_server_, fidl::kIgnoreBindingClosure);
     } else {
       FDF_LOG(ERROR, "Unexpected power element: %s", std::string(config.element.name).c_str());
       return zx::error(ZX_ERR_BAD_STATE);
@@ -1399,141 +1388,79 @@ zx::result<> Ufs::ConfigurePowerManagement() {
   }
   hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
 
-  // Start continuous monitoring of the required level and adjusting of the hardware's power level.
-  WatchHardwareRequiredLevel();
-  WatchWakeOnRequestRequiredLevel();
-
   return zx::success();
 }
 
-void Ufs::WatchHardwareRequiredLevel() {
-  fidl::Arena<> arena;
-  hardware_power_required_level_client_.buffer(arena)->Watch().Then(
-      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        bool delay_before_next_watch = true;
+void Ufs::HardwareElementRunner::SetLevel(
+    fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+    SetLevelCompleter::Sync& set_level_completer) {
+  const fuchsia_power_broker::PowerLevel required_level = request.level();
+  switch (required_level) {
+    case kPowerLevelOn: {
+      const zx::time start = zx::clock::get_monotonic();
 
-        auto defer = fit::defer([&]() {
-          if ((result.status() == ZX_ERR_CANCELED) || (result.status() == ZX_ERR_PEER_CLOSED)) {
-            FDF_LOG(WARNING, "Watch returned %s. Stop monitoring required power level.",
-                    zx_status_get_string(result.status()));
-          } else {
-            if (delay_before_next_watch) {
-              // TODO(b/339826112): Determine how to handle errors when communicating with the Power
-              // Broker. For now, avoid overwhelming the Power Broker with calls.
-              zx::nanosleep(zx::deadline_after(zx::msec(1)));
-            }
-            // Recursively call self to watch the required hardware power level again. The Watch()
-            // call blocks until the required power level has changed.
-            WatchHardwareRequiredLevel();
-          }
-        });
+      // Actually raise the hardware's power level.
+      zx::result result = parent_.device_manager_->ResumePower();
+      if (result.is_error()) {
+        const zx::duration duration = zx::clock::get_monotonic() - start;
+        FDF_LOG(ERROR, "Failed to resume power after %ld us: %s", duration.to_usecs(),
+                result.status_string());
+        set_level_completer.Close(ZX_ERR_INTERNAL);
+        return;
+      }
 
-        if (!result.ok()) {
-          FDF_LOG(ERROR, "Call to Watch failed: %s", result.status_string());
-          return;
-        }
-        if (result->is_error()) {
-          switch (result->error_value()) {
-            case fuchsia_power_broker::RequiredLevelError::kInternal:
-              FDF_LOG(ERROR, "Watch returned internal error.");
-              break;
-            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
-              FDF_LOG(ERROR, "Watch returned not authorized error.");
-              break;
-            default:
-              FDF_LOG(ERROR, "Watch returned unknown error.");
-              break;
-          }
-          return;
-        }
+      // Communicate to Power Broker that the hardware power level has been raised.
+      set_level_completer.Reply();
 
-        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
-        switch (required_level) {
-          case kPowerLevelOn: {
-            const zx::time start = zx::clock::get_monotonic();
+      const zx::duration duration = zx::clock::get_monotonic() - start;
+      parent_.properties_.wake_latency_us.Insert(duration.to_usecs());
 
-            // Actually raise the hardware's power level.
-            zx::result result = device_manager_->ResumePower();
-            if (result.is_error()) {
-              const zx::duration duration = zx::clock::get_monotonic() - start;
-              FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
-                       duration.to_usecs(), result.status_string());
-              return;
-            }
+      parent_.wait_for_power_resumed_.Signal();
+      break;
+    }
+    case kPowerLevelOff: {
+      // Actually lower the hardware's power level.
+      zx::result result = parent_.device_manager_->SuspendPower();
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to suspend power: %s", result.status_string());
+        set_level_completer.Close(ZX_ERR_INTERNAL);
+        return;
+      }
 
-            // Communicate to Power Broker that the hardware power level has been raised.
-            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
-
-            const zx::duration duration = zx::clock::get_monotonic() - start;
-            properties_.wake_latency_us.Insert(duration.to_usecs());
-
-            wait_for_power_resumed_.Signal();
-            break;
-          }
-          case kPowerLevelOff: {
-            // Actually lower the hardware's power level.
-            zx::result result = device_manager_->SuspendPower();
-            if (result.is_error()) {
-              FDF_LOG(ERROR, "Failed to suspend power: %s", result.status_string());
-              return;
-            }
-
-            // Communicate to Power Broker that the hardware power level has been lowered.
-            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
-            break;
-          }
-          default:
-            FDF_LOG(ERROR, "Unexpected power level for hardware power element: %u", required_level);
-            return;
-        }
-
-        delay_before_next_watch = false;
-      });
+      // Communicate to Power Broker that the hardware power level has been lowered.
+      set_level_completer.Reply();
+      break;
+    }
+    default:
+      FDF_LOG(ERROR, "Unexpected power level for hardware power element: %u", required_level);
+      set_level_completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+  }
 }
 
-void Ufs::WatchWakeOnRequestRequiredLevel() {
-  fidl::Arena<> arena;
-  wake_on_request_required_level_client_.buffer(arena)->Watch().Then(
-      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        auto defer = fit::defer([&]() {
-          if (result.status() == ZX_ERR_CANCELED) {
-            FDF_LOG(WARNING,
-                    "Watch returned canceled error. Stop monitoring required power level.");
-          } else {
-            // Recursively call self to watch the required wake-on-request power level again. The
-            // Watch() call blocks until the required power level has changed.
-            WatchWakeOnRequestRequiredLevel();
-          }
-        });
+void Ufs::HardwareElementRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "ElementRunner received unknown method %lu", metadata.method_ordinal);
+}
 
-        if (!result.ok()) {
-          FDF_LOG(ERROR, "Call to Watch failed: %s", result.status_string());
-          return;
-        }
-        if (result->is_error()) {
-          switch (result->error_value()) {
-            case fuchsia_power_broker::RequiredLevelError::kInternal:
-              FDF_LOG(ERROR, "Watch returned internal error.");
-              break;
-            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
-              FDF_LOG(ERROR, "Watch returned not authorized error.");
-              break;
-            default:
-              FDF_LOG(ERROR, "Watch returned unknown error.");
-              break;
-          }
-          return;
-        }
+void Ufs::WakeOnRequestElementRunner::SetLevel(
+    fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+    SetLevelCompleter::Sync& set_level_completer) {
+  const fuchsia_power_broker::PowerLevel required_level = request.level();
+  if ((required_level != kPowerLevelOn) && (required_level != kPowerLevelOff)) {
+    FDF_LOG(ERROR, "Unexpected power level for wake-on-request power element: %u", required_level);
+    set_level_completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
 
-        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
-        if ((required_level != kPowerLevelOn) && (required_level != kPowerLevelOff)) {
-          FDF_LOG(ERROR, "Unexpected power level for wake-on-request power element: %u",
-                  required_level);
-          return;
-        }
+  set_level_completer.Reply();
+}
 
-        UpdatePowerLevel(wake_on_request_current_level_client_, required_level);
-      });
+void Ufs::WakeOnRequestElementRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "ElementRunner received unknown method %lu", metadata.method_ordinal);
 }
 
 zx::result<> Ufs::Start() {
@@ -1642,55 +1569,9 @@ void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
   completer(zx::ok());
 }
 
-void Ufs::Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server) {
-  bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
-}
-
-// TODO(b/379889262): Planned for implementation of the fuchsia_hardware_ufs::Ufs protocol.
-// Currently not supported. The following methods are placeholders for future functionality.
-
-void Ufs::ReadDescriptor(ReadDescriptorRequestView request,
-                         ReadDescriptorCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::WriteDescriptor(WriteDescriptorRequestView request,
-                          WriteDescriptorCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ReadFlag(ReadFlagRequestView request, ReadFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::SetFlag(SetFlagRequestView request, SetFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ClearFlag(ClearFlagRequestView request, ClearFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ToggleFlag(ToggleFlagRequestView request, ToggleFlagCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::ReadAttribute(ReadAttributeRequestView request, ReadAttributeCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::WriteAttribute(WriteAttributeRequestView request,
-                         WriteAttributeCompleter::Sync& completer) {
-  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
-}
-
-void Ufs::SendUicCommand(SendUicCommandRequestView request,
-                         SendUicCommandCompleter::Sync& completer) {
-  completer.Reply(0);
-}
-
-void Ufs::Request(RequestRequestView request, RequestCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+void Ufs::Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server_end) {
+  auto server_impl = std::make_unique<UfsServer>(this);
+  fidl::BindServer(dispatcher(), std::move(server_end), std::move(server_impl));
 }
 
 }  // namespace ufs

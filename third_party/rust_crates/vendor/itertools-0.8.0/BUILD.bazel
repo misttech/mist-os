@@ -78,6 +78,6 @@ rust_library(
     }),
     version = "0.8.0",
     deps = [
-        "//third_party/rust_crates/vendor/either-1.14.0:either",
+        "//third_party/rust_crates/vendor/either-1.15.0:either",
     ],
 )

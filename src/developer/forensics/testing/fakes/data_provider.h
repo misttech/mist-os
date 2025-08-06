@@ -20,8 +20,6 @@ class DataProvider : public fuchsia::feedback::DataProvider {
                       GetAnnotationsCallback callback) override;
   void GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
                    GetSnapshotCallback callback) override;
-  void GetScreenshot(fuchsia::feedback::ImageEncoding encoding,
-                     GetScreenshotCallback callback) override;
 };
 
 }  // namespace fakes

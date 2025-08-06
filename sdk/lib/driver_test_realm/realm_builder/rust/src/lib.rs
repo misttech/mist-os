@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
+use cm_rust::push_box;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
@@ -116,16 +117,19 @@ impl DriverTestRealmBuilder for RealmBuilder {
                 .parse::<cm_types::Name>()
                 .expect("Not a valid capability name");
 
-            decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
-                source: cm_rust::ExposeSource::Collection(
-                    "realm_builder".parse::<cm_types::Name>().unwrap(),
-                ),
-                source_name: expose_parsed.clone(),
-                source_dictionary: Default::default(),
-                target_name: expose_parsed.clone(),
-                target: cm_rust::ExposeTarget::Parent,
-                availability: cm_rust::Availability::Required,
-            }));
+            push_box(
+                &mut decl.exposes,
+                cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
+                    source: cm_rust::ExposeSource::Collection(
+                        "realm_builder".parse::<cm_types::Name>().unwrap(),
+                    ),
+                    source_name: expose_parsed.clone(),
+                    source_dictionary: Default::default(),
+                    target_name: expose_parsed.clone(),
+                    target: cm_rust::ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }),
+            );
         }
         self.replace_component_decl(COMPONENT_NAME, decl).await?;
 
@@ -165,17 +169,20 @@ impl DriverTestRealmBuilder for RealmBuilder {
                 .parse::<cm_types::Name>()
                 .expect("Not a valid capability name");
 
-            decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                source: cm_rust::OfferSource::Parent,
-                source_name: offer_parsed.clone(),
-                source_dictionary: Default::default(),
-                target_name: offer_parsed.clone(),
-                target: cm_rust::OfferTarget::Collection(
-                    "realm_builder".parse::<cm_types::Name>().unwrap(),
-                ),
-                dependency_type: cm_rust::DependencyType::Strong,
-                availability: cm_rust::Availability::Required,
-            }));
+            push_box(
+                &mut decl.offers,
+                cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                    source: cm_rust::OfferSource::Parent,
+                    source_name: offer_parsed.clone(),
+                    source_dictionary: Default::default(),
+                    target_name: offer_parsed.clone(),
+                    target: cm_rust::OfferTarget::Collection(
+                        "realm_builder".parse::<cm_types::Name>().unwrap(),
+                    ),
+                    dependency_type: cm_rust::DependencyType::Strong,
+                    availability: cm_rust::Availability::Required,
+                }),
+            );
         }
         self.replace_component_decl(COMPONENT_NAME, decl).await?;
 

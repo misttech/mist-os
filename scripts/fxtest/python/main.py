@@ -9,6 +9,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
+import enum
 import functools
 import gzip
 import json
@@ -598,12 +599,22 @@ class AsyncMain:
 
         # Check if we have a running package server. We do this here so that we
         # can fail early before running a full build.
-        if not (
-            flags.list_runtime_deps or flags.list
-        ) and not await self._check_if_package_server_needed(
-            selections, exec_env, recorder
-        ):
-            return 1
+        package_server_task: asyncio.Task[typing.Any] | None = None
+        package_server_event: asyncio.Event | None = None
+        if not (flags.list_runtime_deps or flags.list):
+            package_server_behavior = (
+                await self._check_if_package_server_needed(selections, exec_env)
+            )
+            match package_server_behavior:
+                case self._PackageServerBehavior.FAIL:
+                    return 1
+                case self._PackageServerBehavior.PRESENT:
+                    pass
+                case self._PackageServerBehavior.START:
+                    (
+                        package_server_task,
+                        package_server_event,
+                    ) = self._start_package_server()
 
         # If enabled, try to build and update the selected tests.
         if flags.build and not await self._do_build(selections):
@@ -706,6 +717,10 @@ class AsyncMain:
             recorder.emit_end("Failed to run all tests")
 
             return 1
+
+        if package_server_event is not None and package_server_task is not None:
+            package_server_event.set()
+            await package_server_task
 
         recorder.emit_end()
         return 0
@@ -1256,23 +1271,41 @@ class AsyncMain:
 
         return True
 
+    class _PackageServerBehavior(enum.Enum):
+        # The package server is present, continue.
+        PRESENT = 1
+        # The package server is not present, fail.
+        FAIL = 2
+        # The package server is not present, start a temporary one.
+        START = 3
+
     async def _check_if_package_server_needed(
         self,
         tests: selection_types.TestSelections,
         exec_env: environment.ExecutionEnvironment,
-        recorder: event.EventRecorder,
-    ) -> bool:
-        if tests.has_device_test() and not await has_device_connected(
-            exec_env,
-            recorder,
-        ):
-            recorder.emit_instruction_message(
-                "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+    ) -> _PackageServerBehavior:
+        flags = self._flags
+        recorder = self._recorder
+        if (
+            tests.has_device_test()
+            and not await has_package_server_connected_to_device(
+                exec_env,
+                recorder,
             )
-            recorder.emit_end("Could not find a running package server.")
-            return False
+        ):
+            if not flags.allow_temporary_package_server:
+                recorder.emit_instruction_message(
+                    "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+                )
+                recorder.emit_end("Could not find a running package server.")
+                return self._PackageServerBehavior.FAIL
+            else:
+                recorder.emit_instruction_message(
+                    "\nYou do not seem to have a package server running. A temporary one will be started for the duration of this execution."
+                )
+                return self._PackageServerBehavior.START
         else:
-            return True
+            return self._PackageServerBehavior.PRESENT
 
     async def _run_all_tests(
         self,
@@ -1640,9 +1673,36 @@ class AsyncMain:
                 f"{len(failed_enumeration_names)} tests could not be enumerated"
             )
 
+    def _start_package_server(
+        self,
+    ) -> tuple[asyncio.Task[typing.Any], asyncio.Event]:
+        """
+        Start a temporary package server.
+
+        Returns:
+            tuple[Task, Event]: A tuple of the asynchronous task and the event used to cancel it.
+        """
+        recorder = self._recorder
+        exec_env = self._exec_env
+        assert exec_env is not None
+
+        cancel_event = asyncio.Event()
+
+        return (
+            asyncio.create_task(
+                execution.run_command(
+                    *exec_env.fx_cmd_line("serve"),
+                    recorder=recorder,
+                    abort_signal=cancel_event,
+                    quiet_mode=True,
+                )
+            ),
+            cancel_event,
+        )
+
 
 @functools.lru_cache
-async def has_device_connected(
+async def has_package_server_connected_to_device(
     exec_env: environment.ExecutionEnvironment,
     recorder: event.EventRecorder,
     parent: event.Id | None = None,

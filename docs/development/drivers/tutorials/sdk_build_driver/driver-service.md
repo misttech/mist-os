@@ -3,7 +3,8 @@
 Driver components offer the features and services they provide to other drivers
 and non-driver components through [capabilities][concepts-capabilities].
 This enables Fuchsia's component framework to route those capabilities to the
-target component when necessary.
+target component when necessary. For more details, see the
+[Driver Communication][driver-communication] guide.
 
 In this section, you'll expose the `qemu_edu` driver's factorial capabilities
 and consume those from a component running elsewhere in the system.
@@ -34,10 +35,11 @@ include the necessary build rules from the Fuchsia SDK:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/fidl/BUILD.bazel" region_tag="imports" adjust_indentation="auto" %}
 ```
 
-## Define a driver service protocol
+## Define a device service
 
 The driver exposes the capabilities of the `edu` device using a custom FIDL
-protocol. Add a new `qemu_edu/qemu_edu.fidl` file to your project workspace with
+service. This service contains one or more protocols that clients can connect
+to. Add a new `qemu_edu/qemu_edu.fidl` file to your project workspace with
 the following contents:
 
 `qemu_edu/fidl/qemu_edu.fidl`:
@@ -47,8 +49,8 @@ the following contents:
 
 ```
 
-This FIDL protocol provides two methods to interact with the factorial
-computation and liveness check hardware registers on the `edu` device.
+This FIDL file defines the `Device` protocol with two methods, and the
+`DeviceService` which makes the `Device` protocol available to clients.
 
 Add the following build rules to the bottom of the project's build configuration
 to compile the FIDL library and generate C++ bindings:
@@ -65,10 +67,10 @@ to compile the FIDL library and generate C++ bindings:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/fidl/BUILD.bazel" region_tag="fidl_library" adjust_indentation="auto" %}
 ```
 
-## Implement the driver service protocol
+## Implement the device service
 
-With the FIDL protocol defined, you'll need to update the driver to implement
-and serve this protocol to other components.
+With the FIDL service defined, you'll need to update the driver to implement
+the `Device` protocol and serve the `DeviceService` to other components.
 
 After you complete this section, the project should have the following directory
 structure:
@@ -90,7 +92,7 @@ structure:
 Create the new `qemu_edu/drivers/edu_server.h` file in your project directory
 with the following contents to include the FIDL bindings for the
 `examples.qemuedu` library and create a new `QemuEduServer` class to
-implement the server end of the FIDL protocol:
+implement the server end of the `Device` protocol:
 
 `qemu_edu/drivers/edu_server.h`:
 
@@ -129,19 +131,6 @@ protocol methods and map them to the device resource methods:
 
 ```
 
-Update the driver's component manifest to declare and expose the FIDL protocol
-as a capability:
-
-`qemu_edu/drivers/meta/qemu_edu.cml`:
-
-```json5
-{
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="driver" %}
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="use_capabilities" exclude_regexp="protocol" %}
-{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="expose_capabilities" %}{{ '</strong>' }}
-}
-```
-
 Update the driver's build configuration to depend on the FIDL bindings for the
 new `examples.qemuedu` library:
 
@@ -155,36 +144,39 @@ new `examples.qemuedu` library:
 {{ build_bazel_snippet|replace("//src/qemu_edu","//fuchsia-codelab/qemu_edu")|trim() }}
 ```
 
-## Export and serve the protocol
+## Export and serve the service
 
-The `qemu_edu` driver makes the `examples.qemuedu/Device` protocol
-discoverable to other components using devfs. To discover which driver services
-are available in the system, a non-driver component would look up the device
-filesystem (usually mounted to `/dev` in a component’s namespace) and scan for
-the directories and files under this filesystem.
+The `qemu_edu` driver makes the `fuchsia.examples.qemuedu.DeviceService`
+discoverable to other components by serving it from its outgoing directory.
+To do this, the driver must:
 
-Driver manager can alias entries in devfs to a specific **device class** entry
-(for example, `/dev/class/input`) when a matching **protocol ID** to a known
-device class is provided. If a non-driver component does not know the exact path
-of the driver service in devfs, but rather a specific type.
-For this exercise, the `edu` device does not conform to a known class so you'll
-configure this entry as an **unclassified device**.
+ - Declare this service as a `capability` in its component manifest.
+ - `expose` this capability to the component framework in its component manifest.
 
-Update the driver component's manifest to request the `fuchsia.devics.fs.Exporter`
-capability:
+This allows other components, including non-driver components, to request the
+service by its type without needing to know the topological path of the
+driver. The component framework is responsible for routing the service connection
+from the client to the driver that provides it.
+
+Update the driver's component manifest to declare and expose the device service
+as a capability:
 
 `qemu_edu/drivers/meta/qemu_edu.cml`:
 
 ```json5
 {
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="driver" %}
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="use_capabilities" highlight="2" %}
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="expose_capabilities" %}
+{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="use_capabilities" exclude_regexp="protocol" %}
+{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/meta/qemu_edu.cml" region_tag="expose_capabilities" %}{{ '</strong>' }}
 }
 ```
 
-Update the driver's `Start()` method to begin serving the `examples.qemuedu/Device` protocol
-to a new devfs entry that matches the device node's topological path:
+With the manifest updated, the component framework can now route requests for
+this service. The final step is for the driver to implement the server for the
+service and serve it on its outgoing directory.
+
+Update the driver's `Start()` method to begin serving the `fuchsia.examples.qemuedu.DeviceService`
+from the component's outgoing directory:
 
 `qemu_edu/drivers/qemu_edu.cc`:
 
@@ -199,8 +191,6 @@ to a new devfs entry that matches the device node's topological path:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="device_registers" %}
 
 {{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="serve_outgoing" %}{{ '</strong>' }}
-
-{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="devfs_export" %}{{ '</strong>' }}
 
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="start_method_end" adjust_indentation="auto" %}
 ```
@@ -221,4 +211,5 @@ Congratulations! You've successfully exposed FIDL services from a Fuchsia driver
 <!-- Reference links -->
 
 [concepts-capabilities]: /docs/concepts/components/v2/capabilities/README.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
 [fidl-cpp-bindings]: /docs/reference/fidl/bindings/cpp-bindings.md

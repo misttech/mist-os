@@ -20,6 +20,7 @@ use snapshot::AttributionSnapshot;
 use stalls::StallProvider;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
+use zx::{BootInstant, MonotonicInstant};
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -158,6 +159,17 @@ async fn serve_client_stream(
                     control_handle.shutdown_with_epitaph(zx::Status::INTERNAL);
                 }
             }
+            fattribution_plugin::MemoryMonitorRequest::GetSystemStatistics { responder } => {
+                if let Err(err) = provide_statistics(
+                    kernel_stats_proxy.clone(),
+                    stall_provider.clone(),
+                    responder,
+                )
+                .await
+                {
+                    error!(err:%; "");
+                }
+            }
             fattribution_plugin::MemoryMonitorRequest::_UnknownMethod { .. } => {
                 stream.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
@@ -209,4 +221,34 @@ fn read_bucket_definitions() -> Vec<BucketDefinition> {
                 .ok()
         })
         .unwrap_or_default()
+}
+
+async fn provide_statistics(
+    kernel_stats_proxy: fkernel::StatsProxy,
+    stall_provider: Arc<impl StallProvider>,
+    responder: fattribution_plugin::MemoryMonitorGetSystemStatisticsResponder,
+) -> Result<(), anyhow::Error> {
+    let kernel_stats = fattribution_plugin::KernelStatistics {
+        memory_stats: Some(kernel_stats_proxy.get_memory_stats().await?),
+        compression_stats: Some(kernel_stats_proxy.get_memory_stats_compression().await?),
+        ..Default::default()
+    };
+
+    let memory_stalls = stall_provider.get_stall_info()?;
+
+    responder.send(&fattribution_plugin::MemoryStatistics {
+        time: Some(fattribution_plugin::Time {
+            boot_time: Some(BootInstant::get()),
+            monotonic_time: Some(MonotonicInstant::get()),
+            ..Default::default()
+        }),
+        kernel_statistics: Some(kernel_stats),
+        performance_metrics: Some(fattribution_plugin::PerformanceImpactMetrics {
+            some_memory_stalls_ns: Some(memory_stalls.some.as_nanos().try_into()?),
+            full_memory_stalls_ns: Some(memory_stalls.full.as_nanos().try_into()?),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    Ok(())
 }

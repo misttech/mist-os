@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::digest;
-use attribution_processing::summary::ComponentProfileResult;
+use attribution_processing::summary::ComponentSummaryProfileResult;
 use digest::processed;
 use serde::Serialize;
 
@@ -26,7 +26,7 @@ pub struct ProcessesMemoryUsage {
 pub enum ProfileMemoryOutput {
     CompleteDigest(processed::Digest),
     ProcessDigest(ProcessesMemoryUsage),
-    ComponentDigest(ComponentProfileResult),
+    ComponentDigest(ComponentSummaryProfileResult),
 }
 
 /// Returns a ProfileMemoryOutput that only contains information related to the process identified by `koid`.

@@ -79,7 +79,7 @@ impl FfxMain for SnapshotTool {
             match snapshot_impl(self.data_provider_proxy, self.cmd, self.context).await {
                 Ok(filepath) => writer.machine_or(
                     &CommandStatus::Snapshot { output_file: filepath.clone() },
-                    format!("Exported {}", filepath.to_string_lossy()),
+                    format!("\nExported {}", filepath.to_string_lossy()),
                 ),
                 Err(Error::User(e)) => writer.machine_or_else(
                     &CommandStatus::UserError { message: e.to_string() },
@@ -291,7 +291,7 @@ async fn upload_snapshot(file_path: &PathBuf, context: EnvironmentContext) -> Re
         match client.upload(&bucket, &object_name, file_path).await.context("uploading snapshot.") {
             Ok(result) => {
                 println!(
-                    "Snapshot uploaded. Check it here:\n\t {}/?from={}",
+                    "Snapshot uploaded. View it here:\n\n\t {}/?from={}",
                     web_viewer_base,
                     result.as_str()
                 );
@@ -418,7 +418,6 @@ mod test {
                 let _ignore = params;
                 responder.send(&annotations).unwrap();
             }
-            _ => assert!(false),
         })
     }
 

@@ -14,7 +14,7 @@ use net_declare::fidl_ip_v6;
 use netcfg::NetworkTokenExt;
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::ndp::send_ra_with_router_lifetime;
-use netstack_testing_common::realms::{Manager, ManagerConfig, Netstack, NetstackExt};
+use netstack_testing_common::realms::{self, Manager, ManagerConfig, Netstack, NetstackExt};
 use netstack_testing_common::{wait_for_component_stopped, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, RecursiveDnsServer};
@@ -379,14 +379,14 @@ async fn test_track_dns_changes<N: Netstack, M: Manager>(name: &str) -> Result<(
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &realm,
-                    M::MANAGEMENT_AGENT.get_component_name(),
+                    realms::constants::netcfg::COMPONENT_NAME,
                     None,
                 )
                 .fuse();
                 let mut wait_for_netmgr = pin!(wait_for_netmgr);
                 let default_network = realm
                     .connect_to_protocol_from_child::<fnp_properties::DefaultNetworkMarker>(
-                        M::MANAGEMENT_AGENT.get_component_name(),
+                        realms::constants::netcfg::COMPONENT_NAME,
                     )
                     .expect("failed to connect to DefaultNetwork");
                 default_network
@@ -396,7 +396,7 @@ async fn test_track_dns_changes<N: Netstack, M: Manager>(name: &str) -> Result<(
                     .expect("protocol error");
                 let networks = realm
                     .connect_to_protocol_from_child::<fnp_properties::NetworksMarker>(
-                        M::MANAGEMENT_AGENT.get_component_name(),
+                        realms::constants::netcfg::COMPONENT_NAME,
                     )
                     .expect("failed to connect to Networks");
                 let network = networks

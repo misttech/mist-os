@@ -72,7 +72,7 @@ pub fn get_deprecated_configurator() -> Result<wlan_deprecated::DeprecatedConfig
 fn main() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
 
-    let mut exec = fasync::LocalExecutor::new();
+    let mut exec = fasync::LocalExecutorBuilder::new().build();
 
     let fut = async {
         match opt {

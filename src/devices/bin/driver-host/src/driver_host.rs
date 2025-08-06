@@ -23,8 +23,6 @@ use {
 
 /// Any stored data is removed after this amount of time
 const EXCEPTIONS_CLEANUP_DEADLINE_SECONDS: i64 = 600;
-/// The period of time to wait between checking for stalled threads
-const THREAD_MONITOR_TIME_SECONDS: i64 = 5;
 
 /// We use Weak<Driver> to avoid accidentally extending the lifetime of the Driver. Driver must be
 /// droped and have it's destroy hook called in the driver runtime's shutdown observer callback in
@@ -203,12 +201,10 @@ impl DriverHost {
     pub fn run_thread_monitor_task(&self) {
         self.scope.spawn_local(async move {
             loop {
-                Timer::new(zx::MonotonicDuration::from_seconds(THREAD_MONITOR_TIME_SECONDS)).await;
                 // SAFETY: this call does not use any memory allocated by rust and only does
                 // anything if the fdf_env is currently set up, otherwise it does nothing.
-                unsafe {
-                    fdf_sys::fdf_env_scan_threads_for_stalls();
-                }
+                let next_wait = unsafe { fdf_sys::fdf_env_scan_threads_for_stalls_wait_time() };
+                Timer::new(zx::MonotonicDuration::from_nanos(next_wait)).await;
             }
         });
     }

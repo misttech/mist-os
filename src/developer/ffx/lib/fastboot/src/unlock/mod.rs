@@ -45,7 +45,7 @@ mod test {
     use crate::file_resolver::resolvers::EmptyResolver;
     use ffx_fastboot_interface::test::setup;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_unlocked_device_throws_err() -> Result<()> {
         let (state, mut proxy) = setup();
         {
@@ -60,7 +60,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_missing_creds_throws_err() -> Result<()> {
         let (state, mut proxy) = setup();
         {

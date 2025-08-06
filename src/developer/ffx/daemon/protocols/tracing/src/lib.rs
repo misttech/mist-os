@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use async_fs::File;
 use async_lock::{Mutex, MutexGuard};
 use async_trait::async_trait;
@@ -110,32 +110,6 @@ impl TracingProtocol {
         match task_map.output_file_to_nodename.entry(output_file.clone()) {
             Entry::Occupied(_) => return Err(ffx::RecordingError::DuplicateTraceFile),
             Entry::Vacant(e) => {
-                // Expand any configuration groups defined in config.
-                let expanded_categories = match trace_config.categories.clone() {
-                    Some(categories) => {
-                        let context = match ffx_config::global_env_context()
-                            .context("Discovering ffx environment context")
-                        {
-                            Ok(c) => c,
-                            Err(e) => {
-                                log::error!("Could not get global env context: {e}");
-                                return Err(ffx::RecordingError::RecordingStart);
-                            }
-                        };
-
-                        match ffx_trace::expand_categories(&context, categories) {
-                            Ok(expanded_categories) => Some(expanded_categories),
-                            Err(e) => {
-                                log::error!("Could not expand categories: {e}");
-                                return Err(ffx::RecordingError::RecordingStart);
-                            }
-                        }
-                    }
-                    None => None,
-                };
-                let config_with_expanded_categories =
-                    trace::TraceConfig { categories: expanded_categories, ..trace_config.clone() };
-
                 let writer = match File::create(output_file.clone()).await {
                     Ok(f) => f,
                     Err(e) => {
@@ -147,12 +121,13 @@ impl TracingProtocol {
                     // Use the target info as the task name
                     format!("{target_info:?}"),
                     writer,
-                    config_with_expanded_categories,
+                    trace_config,
                     options.duration_ns.map(|d| Duration::from_nanos(d as u64)),
                     options
                         .triggers
                         .map(|tv| tv.iter().map(from_ffx_trigger).collect())
                         .unwrap_or(vec![]),
+                    options.requested_categories,
                     provisioner,
                 )
                 .await
@@ -244,7 +219,7 @@ impl FidlProtocol for TracingProtocol {
                 };
                 let output_file = task_entry.output_file.clone();
                 let target_info = task_entry.target_info.clone();
-                let categories = task_entry.task.config().categories.unwrap_or_default();
+                let categories = task_entry.task.requested_categories();
                 responder
                     .send(match task_entry.task.shutdown().await {
                         Ok(ref result) => Ok((&target_info, &output_file, &categories, result)),

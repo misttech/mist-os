@@ -50,18 +50,18 @@ struct percpu;
 
 // Performance scale of a CPU relative to the highest performance CPU in the
 // system.
-using SchedPerformanceScale = ffl::Fixed<int64_t, 31>;
+using SchedProcessingRate = ffl::Fixed<int64_t, 31>;
 
-// Converts a userspace CPU performance scale to a SchedPerformanceScale value.
-constexpr SchedPerformanceScale ToSchedPerformanceScale(zx_cpu_performance_scale_t value) {
+// Converts a userspace CPU performance scale to a SchedProcessingRate value.
+constexpr SchedProcessingRate ToSchedProcessingRate(zx_cpu_performance_scale_t value) {
   const size_t FractionaBits = sizeof(value.fractional_part) * 8;
-  const SchedPerformanceScale performance_scale = ffl::FromRaw<FractionaBits>(
+  const SchedProcessingRate performance_scale = ffl::FromRaw<FractionaBits>(
       uint64_t{value.integral_part} << FractionaBits | value.fractional_part);
-  return ktl::min(performance_scale, SchedPerformanceScale{1});
+  return ktl::min(performance_scale, SchedProcessingRate{1});
 }
 
-// Converts a SchedPerformanceScale value to a userspace CPU performance scale.
-constexpr zx_cpu_performance_scale_t ToUserPerformanceScale(SchedPerformanceScale value) {
+// Converts a SchedProcessingRate value to a userspace CPU performance scale.
+constexpr zx_cpu_performance_scale_t ToUserPerformanceScale(SchedProcessingRate value) {
   using UserScale = ffl::Fixed<uint64_t, 32>;
   const UserScale user_scale{value};
   const uint64_t integral = user_scale.Integral().raw_value() >> UserScale::Format::FractionalBits;
@@ -161,26 +161,30 @@ class Scheduler {
   // is associated with.
   size_t cluster() const { return cluster_; }
 
-  // Returns the lock-free value of the predicted queue time for the CPU this
-  // scheduler instance is associated with.
-  SchedDuration predicted_queue_time_ns() const {
-    return exported_total_expected_runtime_ns_.load();
+  // Returns the lock-free value of the estimated queue time for the CPU this
+  // scheduler is associated with.
+  SchedDuration exported_queue_time_ns() const { return exported_queue_time_ns_.load(); }
+
+  // Returns the lock-free value of the estimated deadline utilization for the
+  // CPU this scheduler is associated with.
+  SchedUtilization exported_deadline_utilization() const {
+    return exported_deadline_utilization_.load();
   }
 
-  // Returns the lock-free value of the predicted deadline utilization for the
-  // CPU this scheduler instance is associated with.
-  SchedUtilization predicted_deadline_utilization() const {
-    return exported_total_deadline_utilization_.load();
-  }
+  // Returns the lock-free value of the processing rate for the CPU this
+  // scheduler is associated with.
+  SchedProcessingRate exported_processing_rate() const { return exported_processing_rate_.load(); }
 
-  // Returns the performance scale of the CPU this scheduler instance is
+  // Returns the processing rate of the CPU this scheduler instance is
   // associated with.
-  SchedPerformanceScale performance_scale() const TA_REQ(queue_lock_) { return performance_scale_; }
+  SchedProcessingRate processing_rate() const TA_REQ(queue_lock_) {
+    return power_level_control_.processing_rate();
+  }
 
-  // Returns the reciprocal performance scale of the CPU this scheduler instance
+  // Returns the reciprocal processing rate of the CPU this scheduler instance
   // is associated with.
-  SchedPerformanceScale performance_scale_reciprocal() const TA_REQ(queue_lock_) {
-    return performance_scale_reciprocal_;
+  SchedProcessingRate processing_rate_reciprocal() const TA_REQ(queue_lock_) {
+    return power_level_control_.processing_rate_reciprocal();
   }
 
   int32_t runnable_task_count() const TA_REQ(queue_lock_) {
@@ -319,7 +323,7 @@ class Scheduler {
   // if they are below the minimum safe values for the respective CPUs.
   //
   // Requires |count| <= num CPUs.
-  static void UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t count)
+  static void UpdateProcessingRates(zx_cpu_performance_info_t* info, size_t count)
       TA_EXCL(queue_lock_);
 
   // Gets the performance scales of up to count CPUs. Returns the last values
@@ -428,20 +432,23 @@ class Scheduler {
 
   // Updates the current power level for this CPU with the value reported by the power level
   // controller. Called by kernel tests and sys_system_set_processor_power_state.
-  zx::result<> SetPowerLevel(uint8_t power_level) TA_EXCL(queue_lock_) {
+  zx::result<> UpdateActivePowerLevel(uint8_t power_level) TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
-    return power_level_control_.UpdatePowerLevel(power_level);
+    return power_level_control_.UpdateActivePowerLevel(power_level);
   }
 
   // Returns the current active power level, if any.
-  ktl::optional<uint8_t> GetPowerLevel() const TA_EXCL(queue_lock_) {
+  ktl::optional<uint8_t> GetActivePowerLevel() const TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
-    return power_level_control_.GetPowerLevel();
+    return power_level_control_.active_power_level();
   }
+
   // Sends a power level request through this scheduler's power level controller for testing. This
   // method is called from thread and IRQ context to ensure that the underlying machinery can be
   // safely called within Block, Unblock, and other scheduling operations.
-  void RequestPowerLevelForTesting(uint8_t power_level) TA_EXCL(queue_lock_);
+  //
+  // Returns true if the request was sent, false otherwise.
+  bool RequestPowerLevelForTesting(uint8_t power_level) TA_EXCL(queue_lock_);
 
   // Returns the current power domain for this scheduler instance.
   fbl::RefPtr<PowerDomain> GetPowerDomainForTesting() TA_EXCL(queue_lock_) {
@@ -454,6 +461,7 @@ class Scheduler {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
     return power_level_control_.active_power_coefficient_nw();
   }
+
   // Returns the max idle power coefficient.
   ktl::optional<uint64_t> GetMaxIdlePowerCoefficientNwForTesting() const TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
@@ -488,7 +496,7 @@ class Scheduler {
 
   // Sets the initial values of the CPU performance scales for this Scheduler
   // instance.
-  void InitializePerformanceScale(SchedPerformanceScale scale);
+  void InitializeProcessingRate(SchedProcessingRate scale);
 
   static inline void RescheduleMask(cpu_mask_t cpus_to_reschedule_mask);
   static void PreemptLocked(Thread* current_thread)
@@ -512,7 +520,7 @@ class Scheduler {
   // requirement that any threads we lock in this method are not discoverable
   // and lockable from another scheduler that is also holding the "sched token."
   // Failure to meet this requirement will result in deadlock.
-  void ProcessSaveStateList(SchedTime now) TA_REQ(chainlock_transaction_token);
+  void ProcessSaveStateList() TA_REQ(chainlock_transaction_token);
 
   // Returns true if the given thread needs to be migrated from one CPU to another.
   static bool NeedsMigration(Thread* thread)
@@ -552,6 +560,24 @@ class Scheduler {
 
   // Returns the current system time as a SchedTime value.
   static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
+
+  // A coherent pair of corresponding time/ticks values in the monotonic and
+  // boot timelines.
+  struct SchedMonoTimeAndBootTicks {
+    SchedTime mono_time;
+    zx_instant_boot_ticks_t boot_ticks;
+  };
+
+  // Returns the current monotonic time / boot ticks using coherent samples of
+  // the respective timelines.
+  // TODO(eieio): Look into making this non-static and requiring the queue lock
+  // of the respective scheduler to ensure this is always called with the queue
+  // lock held.
+  static SchedMonoTimeAndBootTicks CurrentMonoTimeAndBootTicks() {
+    InstantMonoTimeAndBootTicks mono_time_and_boot_ticks = current_mono_time_and_boot_ticks();
+    return {.mono_time = SchedTime{mono_time_and_boot_ticks.mono_time},
+            .boot_ticks = mono_time_and_boot_ticks.boot_ticks};
+  }
 
   // Returns the Scheduler instance for the current CPU.
   static Scheduler* Get();
@@ -629,9 +655,8 @@ class Scheduler {
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
   // Common logic for reschedule API.
-  void RescheduleCommon(Thread* current_thread, SchedTime now,
-                        EndTraceCallback end_outer_trace = nullptr) TA_EXCL(queue_lock_)
-      TA_REQ(chainlock_transaction_token, current_thread->get_lock());
+  void RescheduleCommon(Thread* current_thread, EndTraceCallback end_outer_trace = nullptr)
+      TA_EXCL(queue_lock_) TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // A utility result type to help avoid missing updates to a thread's
   // start/finish times when dequeuing from a run queue with a variable
@@ -816,7 +841,7 @@ class Scheduler {
   // Attempts to steal work from other busy CPUs. Returns nullptr if no work was
   // stolen, otherwise returns a pointer to the stolen thread that is partially
   // associated with the local Scheduler instance.
-  DequeueResult StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
+  DequeueResult StealWork(SchedTime now, SchedProcessingRate processing_rate)
       TA_REQ(chainlock_transaction_token) TA_EXCL(queue_lock_);
 
   // Returns the time that the next deadline task will become eligible or infinite
@@ -939,10 +964,14 @@ class Scheduler {
   // shadow variable for cross-CPU readers.
   inline void UpdateTotalDeadlineUtilization(SchedUtilization delta_ns) TA_REQ(queue_lock_);
 
+  // Updates the processing rate and exports the atomic shadow variable for
+  // cross-CPU readers.
+  inline bool UpdateProcessingRate() TA_REQ(queue_lock_);
+
   // Computes the estimated energy consumed since the last reschedule and
   // updates the current thread and CPU energy accumulators.
-  inline void UpdateEstimatedEnergyConsumption(Thread* current_thread,
-                                               SchedDuration actual_runtime_ns)
+  void UpdateEstimatedEnergyConsumption(Thread* current_thread, SchedMonoTimeAndBootTicks now,
+                                        SchedDuration actual_runtime_ns)
       TA_REQ(current_thread->get_lock(), queue_lock_);
 
   // Utilities to scale up or down the given value by the performance scale of the CPU.
@@ -1280,11 +1309,6 @@ class Scheduler {
   TA_GUARDED(queue_lock_)
   SchedDuration total_expected_runtime_ns_{0};
 
-  // The sum of the worst case utilization of all active deadline threads on
-  // this CPU.
-  TA_GUARDED(queue_lock_)
-  SchedUtilization total_deadline_utilization_{0};
-
 #if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   // Scheduling period in which every runnable task executes once in units of
   // minimum granularity.
@@ -1302,22 +1326,6 @@ class Scheduler {
   TA_GUARDED(queue_lock_)
   SchedDuration target_latency_grans_{kDefaultTargetLatency / kDefaultMinimumGranularity};
 #endif  // !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
-
-  // Performance scale of this CPU relative to the highest performance CPU. This
-  // value is initially determined from the system topology, when available, and
-  // by userspace performance/thermal management at runtime.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_ { 1 };
-  TA_GUARDED(queue_lock_)
-  RelaxedAtomic<SchedPerformanceScale> performance_scale_reciprocal_{SchedPerformanceScale{1}};
-
-  // Performance scale requested by userspace. The operational performance scale
-  // is updated to this value (possibly adjusted for the minimum allowed value)
-  // on the next reschedule, after the current thread's accounting is updated.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_ { 1 };
-
-  // Default performance scale, determined from the system topology, when
-  // available.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_ { 1 };
 
   // The CPU this scheduler instance is associated with.
   // NOTE: This member is not initialized to prevent clobbering the value set
@@ -1348,13 +1356,18 @@ class Scheduler {
   // CPUs.
   // TODO(eieio): Look at cache line alignment for these members to optimize
   // cache performance.
-  RelaxedAtomic<SchedDuration> exported_total_expected_runtime_ns_{SchedNs(0)};
-  RelaxedAtomic<SchedUtilization> exported_total_deadline_utilization_{SchedUtilization{0}};
+  RelaxedAtomic<SchedDuration> exported_queue_time_ns_{SchedNs(0)};
+  RelaxedAtomic<SchedUtilization> exported_deadline_utilization_{SchedUtilization{0}};
+  RelaxedAtomic<SchedProcessingRate> exported_processing_rate_{SchedProcessingRate{1}};
 
   // The thread which ran just before this thread was scheduled.  Used by
   // Scheduler::LockHandoff to release the previous thread's lock after a
   // context switch operation has fully completed.
   Thread* previous_thread_{nullptr};
+
+  // Utility type that tracks values used for comparing candidate thread
+  // placements when finding a target CPU for a waking or migrating thread.
+  class CandidatePlacement;
 
   // PowerLevelControl encapsulates the CPU energy model and power level control interface for
   // energy aware scheduling.
@@ -1369,17 +1382,66 @@ class Scheduler {
       // Clear the request to ensure that a DPC racing with a domain change cannot latch a pending
       // request intended for the previous domain and the new domain ref pointer together.
       pending_update_request_.reset();
+
+      // Set the processing rate back to default. If domain is empty the energy model has been
+      // cleared by userspace and the actual processing rate is unclear. If the domain is being
+      // replaced/updated, userspace is expected to send an update to set the active power level,
+      // which will also update the processing rate.
+      updated_processing_rate_ = default_processing_rate_;
+
       return power_state_.SetOrUpdateDomain(ktl::move(domain));
     }
 
-    // Returns the current active power level.
-    ktl::optional<uint8_t> GetPowerLevel() const { return power_state_.active_power_level(); }
+    // Called by the power level controller server (e.g. the userspace component servicing the
+    // kernel power level control interface) for the domain associated with this scheduler to
+    // acknowledge that a power level request has been completed.
+    zx::result<> UpdateActivePowerLevel(uint8_t power_level) {
+      const zx::result result = power_state_.UpdateActivePowerLevel(power_level);
+      if (result.is_ok()) {
+        updated_processing_rate_ = ToProcessingRate(power_state_.active_processing_rate());
+      }
+      return result;
+    }
 
-    // Called by power level controller server (e.g. the userspace component servicing the kernel
-    // power level control interface) for the domain associated with this scheduler to acknowledge
-    // that a power level request has been completed.
-    zx::result<> UpdatePowerLevel(uint8_t power_level) {
-      return power_state_.UpdateActivePowerLevel(power_level);
+    // Sets the processing rate on systems that don't provide an energy model and manage OPPs
+    // exclusively from userspace. User requests are ignored if an energy model is set.
+    void UserSetProcessingRate(SchedProcessingRate processing_rate) {
+      if (!domain()) {
+        updated_processing_rate_ = processing_rate;
+      }
+    }
+
+    // Sets the initial processing rate from topology data during early boot.
+    void TopologySetDefaultProcessingRate(SchedProcessingRate processing_rate) {
+      DEBUG_ASSERT(processing_rate > 0);
+      DEBUG_ASSERT(!domain());
+      processing_rate_ = processing_rate;
+      default_processing_rate_ = processing_rate;
+      updated_processing_rate_ = processing_rate;
+      processing_rate_reciprocal_ = 1 / processing_rate;
+    }
+
+    // Returns true if the given power level is a valid active power level.
+    bool IsValidActivePowerLevel(uint8_t power_level) const {
+      return power_state_.IsValidActivePowerLevel(power_level);
+    }
+
+    // Updates the current processing rate and reciprocal to the updated value and returns the new
+    // processing rate. Called by RescheduleCommon after accounting is performed for the time spent
+    // at the previous rate.
+    SchedProcessingRate UpdateProcessingRate() {
+      if (is_processing_rate_update_pending()) {
+        processing_rate_ = updated_processing_rate_;
+        processing_rate_reciprocal_ = 1 / processing_rate_;
+      }
+      return processing_rate_;
+    }
+
+    // Updates the normalized utilization for this processor and the total normalized utilization
+    // for the domain it belongs to with the given delta. Returns the updated utilization for this
+    // processor.
+    SchedUtilization UpdateNormalizedUtilization(SchedUtilization delta) {
+      return SchedUtilization::FromRaw(power_state_.UpdateUtilization(delta.raw_value()));
     }
 
     // Called by the scheduler to request a power level change for the domain associated with this
@@ -1395,15 +1457,54 @@ class Scheduler {
       }
     }
 
-    // Gets the power domain associated with this scheduler.
+    // Returns the power domain associated with this scheduler.
     const fbl::RefPtr<PowerDomain>& domain() const { return power_state_.domain(); }
 
+    // Returns the id of the domain associated with this scheduler.
+    ktl::optional<uint32_t> domain_id() const { return power_state_.domain_id(); }
+
+    // Returns the current active power level.
+    ktl::optional<uint8_t> active_power_level() const { return power_state_.active_power_level(); }
+
+    // Returns the power coefficient for the current active power level.
     uint64_t active_power_coefficient_nw() const {
       return power_state_.active_power_coefficient_nw();
     }
 
+    // Returns the power coefficient of the maximum idle power level (e.g. clock gating).
     uint64_t max_idle_power_coefficient_nw() const {
       return power_state_.max_idle_power_coefficient_nw();
+    }
+
+    // Returns the normalized utilization of this processor.
+    SchedUtilization normalized_utilization() const {
+      return SchedUtilization::FromRaw(power_state_.normalized_utilization());
+    }
+
+    // Returns the total normalized utilization of the domain this processor belongs to.
+    SchedUtilization total_normalized_utilization() const {
+      return SchedUtilization::FromRaw(power_state_.total_normalized_utilization());
+    }
+
+    // Returns the normalized processing rate of this processor at its current active power level.
+    SchedProcessingRate processing_rate() const { return processing_rate_; }
+
+    // Returns the reciprocal of the normalized processing rate.
+    SchedProcessingRate processing_rate_reciprocal() const { return processing_rate_reciprocal_; }
+
+    // Returns the potentially pending update to the normalized processing rate. This value is set
+    // whenever the power level controller acknowledges completion of a power level change request.
+    SchedProcessingRate updated_processing_rate() const { return updated_processing_rate_; }
+
+    // Returns the maximum processing rate of this processor. Initially set from the CPU topology
+    // data and updated whenever the energy model is set/updated by userspace.
+    SchedProcessingRate default_processing_rate() const { return default_processing_rate_; }
+
+    // Returns true if there is a pending update to the processing rate that has not yet been
+    // processed by the scheduler. Checked by RescheduleCommon after accounting has been updated for
+    // the runtime segment covering the previous processing rate.
+    bool is_processing_rate_update_pending() const {
+      return processing_rate_ != updated_processing_rate_;
     }
 
    private:
@@ -1413,13 +1514,31 @@ class Scheduler {
     static void TimerHandler(Timer* timer, zx_instant_mono_t now, void* arg);
     static void DpcHandler(Dpc* dpc);
 
+    // TODO(eieio): The processing rate in the energy model is ultimately supposed to be defined
+    // relative to the max system processing rate:
+    //
+    //   R = active_power_level.processing_rate() / max_system_power_level.processing_rate()
+    //
+    // However, it is currently inconvenient to determine the maximum system power level. For now,
+    // consider the processing rate to map from [0, 1000] in the energy model representation to
+    // [0.0, 1.0] in the fixed point representation.
+    static SchedProcessingRate ToProcessingRate(uint64_t processing_rate) {
+      return ffl::FromRatio<uint64_t>(processing_rate, 1000);
+    }
+
+    SchedProcessingRate processing_rate_{1};
+    SchedProcessingRate processing_rate_reciprocal_{1};
+    SchedProcessingRate updated_processing_rate_{1};
+    SchedProcessingRate default_processing_rate_{1};
+
     power_management::PowerState power_state_;
     ktl::optional<power_management::PowerLevelUpdateRequest> pending_update_request_;
     Timer request_timer_;
     Dpc request_dpc_;
   };
 
-  TA_GUARDED(queue_lock_) PowerLevelControl power_level_control_ { this };
+  TA_GUARDED(queue_lock_)
+  PowerLevelControl power_level_control_{this};
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

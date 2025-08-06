@@ -19,8 +19,11 @@ group("tests") {
     "metadata/cpp:tests",
     "mmio/rust:tests",
     "mock-mmio/cpp:tests",
+    "mock-mmio/rust:tests",
     "platform-device/cpp:tests",
+    "platform-device/rust:tests",
     "power:tests",
+    "power/cpp:tests",
     "runtime/rust:tests",
   ]
 }

@@ -418,7 +418,7 @@ pub(super) fn request_with_dictionary_replacement(
     Ok(request.as_ref().map(|r| r.try_clone()).transpose()?.map(|r| {
         let _ = r.metadata.insert(
             Name::new(METADATA_KEY_TYPE).unwrap(),
-            Capability::Data(Data::String(CapabilityTypeName::Dictionary.to_string())),
+            Capability::Data(Data::String(CapabilityTypeName::Dictionary.to_string().into())),
         );
         r
     }))

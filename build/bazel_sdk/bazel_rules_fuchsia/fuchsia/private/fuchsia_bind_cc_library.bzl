@@ -5,9 +5,10 @@
 """A cc_library generated from a bind library."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load(":providers.bzl", "FuchsiaBindLibraryInfo")
 load(":fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+load(":providers.bzl", "FuchsiaBindLibraryInfo")
 
 def _codegen_impl(ctx):
     bindc = get_fuchsia_sdk_toolchain(ctx).bindc
@@ -66,7 +67,7 @@ def fuchsia_bind_cc_library(name, library, deps = [], tags = [], **kwargs):
         library = library,
     )
 
-    native.cc_library(
+    cc_library(
         name = name,
         hdrs = [
             ":%s" % gen_name,

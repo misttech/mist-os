@@ -40,17 +40,18 @@ constexpr Error kTaskNotFound = {
     .status_ = ZX_ERR_NOT_FOUND,
 };
 
-template <typename T, T zx_info_handle_basic_t::*Member>
-T GetHandleBasicInfo(const std::map<zx_object_info_topic_t, ByteView>& info) {
+template <auto zx_info_handle_basic_t::* Member>
+auto GetHandleBasicInfo(const std::map<zx_object_info_topic_t, ByteView>& info) {
+  // Only the superroot has no cached basic info.  It's a special case.
+  zx_info_handle_basic_t handle_info = {};
+
   if (auto found = info.find(ZX_INFO_HANDLE_BASIC); found != info.end()) {
     auto [topic, data] = *found;
-    zx_info_handle_basic_t info;
-    ZX_ASSERT(data.size() >= sizeof(info));
-    memcpy(&info, data.data(), sizeof(info));
-    return info.*Member;
+    ZX_ASSERT(data.size() >= sizeof(handle_info));
+    memcpy(&handle_info, data.data(), sizeof(handle_info));
   }
-  // Only the superroot has no cached basic info.  It's a special case.
-  return T{};
+
+  return handle_info.*Member;
 }
 
 [[maybe_unused]] constexpr size_t ThreadStateSize(zx_thread_state_topic_t topic,
@@ -86,12 +87,10 @@ T GetHandleBasicInfo(const std::map<zx_object_info_topic_t, ByteView>& info) {
 
 }  // namespace
 
-zx_koid_t Object::koid() const {
-  return GetHandleBasicInfo<zx_koid_t, &zx_info_handle_basic_t::koid>(info_);
-}
+zx_koid_t Object::koid() const { return GetHandleBasicInfo<&zx_info_handle_basic_t::koid>(info_); }
 
 zx_obj_type_t Object::type() const {
-  return GetHandleBasicInfo<zx_obj_type_t, &zx_info_handle_basic_t::type>(info_);
+  return GetHandleBasicInfo<&zx_info_handle_basic_t::type>(info_);
 }
 
 fit::result<Error, ByteView> Object::get_info(zx_object_info_topic_t topic, bool refresh_live,

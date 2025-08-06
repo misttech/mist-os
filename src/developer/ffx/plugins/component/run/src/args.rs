@@ -45,8 +45,7 @@ pub struct RunComponentCommand {
     pub follow_logs: bool,
 
     #[argh(switch)]
-    /// connect stdin, stdout, and stderr to the component (requires component
-    /// to be in a collection with single_run durability)
+    /// connect stdin, stdout, and stderr to the component
     pub connect_stdio: bool,
 
     #[argh(option)]

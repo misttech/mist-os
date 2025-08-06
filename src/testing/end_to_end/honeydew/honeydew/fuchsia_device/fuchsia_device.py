@@ -12,7 +12,7 @@ from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp
 from honeydew.affordances.connectivity.bluetooth.gap import gap
 from honeydew.affordances.connectivity.bluetooth.le import le
 from honeydew.affordances.connectivity.netstack import netstack
-from honeydew.affordances.connectivity.wlan.wlan import wlan
+from honeydew.affordances.connectivity.wlan.wlan_core import wlan_core
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
 from honeydew.affordances.hello_world import hello_world
@@ -335,7 +335,7 @@ class FuchsiaDevice(abc.ABC):
 
     @properties.Affordance
     @abc.abstractmethod
-    def wlan(self) -> wlan.Wlan:
+    def wlan_core(self) -> wlan_core.WlanCore:
         """Returns a Wlan affordance object.
 
         Returns:

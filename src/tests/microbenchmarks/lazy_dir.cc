@@ -4,6 +4,7 @@
 
 #include "src/storage/lib/vfs/cpp/lazy_dir.h"
 
+#include <lib/fdio/vfs.h>
 #include <zircon/syscalls.h>
 
 #include <random>

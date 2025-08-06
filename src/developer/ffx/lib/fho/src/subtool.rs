@@ -339,7 +339,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn present_metadata() {
         let test_env = ffx_config::test_init().await.expect("Test env initialization failed");
         let tmpdir = tempfile::tempdir().expect("tempdir");

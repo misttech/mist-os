@@ -9,6 +9,7 @@
 #include "src/storage/f2fs/node_page.h"
 #include "src/storage/f2fs/segment.h"
 #include "src/storage/f2fs/vnode.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

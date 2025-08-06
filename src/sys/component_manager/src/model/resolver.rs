@@ -225,7 +225,7 @@ mod tests {
         component_url: &str,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
-        config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
+        config_parent_overrides: Option<Box<[cm_rust::ConfigOverride]>>,
         context: Arc<ModelContext>,
         parent: WeakExtendedInstance,
         hooks: Arc<Hooks>,
@@ -445,7 +445,7 @@ mod tests {
             ..Default::default()
         };
         let config_values = cm_rust::ConfigValuesData {
-            values: vec![
+            values: Box::from([
                 cm_rust::ConfigValueSpec {
                     value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
                 },
@@ -459,15 +459,15 @@ mod tests {
                 },
                 cm_rust::ConfigValueSpec {
                     value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::BoolVector(
-                        vec![true, false],
+                        Box::from([true, false]),
                     )),
                 },
                 cm_rust::ConfigValueSpec {
                     value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
-                        vec!["hello!".to_string(), "world!".to_string()],
+                        Box::from(["hello!".to_string(), "world!".to_string()]),
                     )),
                 },
-            ],
+            ]),
             checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
         };
         let data = fmem::Data::Bytes(

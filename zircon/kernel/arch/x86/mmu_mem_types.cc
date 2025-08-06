@@ -35,7 +35,7 @@ extern uint8_t g_max_paddr_width;
 #define IA32_MTRR_PHYSMASK(x) (X86_MSR_IA32_MTRR_PHYSMASK0 + 2 * (x))
 
 /* IA32_MTRRCAP read functions */
-#define MTRRCAP_VCNT(x) ((x)&0xff)
+#define MTRRCAP_VCNT(x) ((x) & 0xff)
 #define MTRRCAP_VCNT_MAX 255
 #define MTRRCAP_FIX(x) !!((x) & (1 << 8))
 #define MTRRCAP_WC(x) !!((x) & (1 << 10))
@@ -140,7 +140,7 @@ void x86_pat_sync(cpu_mask_t targets) {
 
     x86_pat_sync_task(&context);
   } else {
-    mp_sync_exec(MP_IPI_TARGET_MASK, targets, x86_pat_sync_task, &context);
+    mp_sync_exec(mp_ipi_target::MASK, targets, x86_pat_sync_task, &context);
   }
 }
 
@@ -307,7 +307,7 @@ static int cmd_memtype(int argc, const cmd_args* argv, uint32_t flags) {
     uint num_cpus = arch_max_num_cpus();
     for (cpu_num_t i = 0; i < num_cpus; ++i) {
       printf("CPU %u Page Attribute Table types:\n", i);
-      mp_sync_exec(MP_IPI_TARGET_MASK, 1u << i, print_pat_entries, nullptr);
+      mp_sync_exec(mp_ipi_target::MASK, 1u << i, print_pat_entries, nullptr);
     }
   } else {
     printf("unknown command\n");

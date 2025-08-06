@@ -452,30 +452,6 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
             zxlogf(ERROR, "failed to signal vector %#lx for device %s: %s", vector,
                    device.config()->addr(), zx_status_get_string(signal_status));
           }
-
-          // In the case of fpci::InterruptMode::kLegacyNoack, disable the legacy interrupt on
-          // a device until a driver services and acknowledges it. If we're in
-          // the NOACK mode then we update the running total we keep of
-          // interrupts per period. If they exceed the configured limit then
-          // then the interrupt will be disabled. In that case, the device has
-          // no way to re-enable it without changing IRQ modes.
-          auto& irqs = device.irqs();
-          bool disable_irq = true;
-          if (irqs.mode == PciFidl::InterruptMode::kLegacyNoack) {
-            irqs.irqs_in_period++;
-            if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
-              irqs.legacy_irq_period_start = packet.interrupt.timestamp;
-              irqs.irqs_in_period = 1;
-            }
-
-            if (irqs.irqs_in_period < kMaxIrqsPerNoAckPeriod) {
-              disable_irq = false;
-            }
-          }
-
-          if (disable_irq) {
-            device.DisableLegacyIrq();
-          }
         }
       }
 

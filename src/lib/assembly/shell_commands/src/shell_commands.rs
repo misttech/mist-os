@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_config_schema::assembly_config::ShellCommands;
+use assembly_config_schema::product_config::ShellCommands;
 use assembly_constants::{BootfsPackageDestination, PackageDestination};
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::{Utf8Path, Utf8PathBuf};

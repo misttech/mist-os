@@ -82,8 +82,6 @@ pub async fn get_single_instance_from_query(
 /// * component moniker
 /// * component URL
 /// * component instance ID
-// TODO(https://fxbug.dev/42066079): `ffx component show` should use this method to get
-// component monikers when CMX support has been deprecated.
 pub async fn get_cml_monikers_from_query(
     query: &str,
     realm_query: &fsys::RealmQueryProxy,

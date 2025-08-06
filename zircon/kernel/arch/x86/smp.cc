@@ -168,7 +168,7 @@ zx_status_t x86_bringup_aps(uint32_t* apic_ids, uint32_t count) {
       ASSERT(!Scheduler::PeekIsActive(cpu));
 
       // Make sure the CPU is not marked online
-      mp.online_cpus.fetch_and(~mask);
+      mp_set_cpu_online(cpu, false);
 
       // Free the failed AP's thread, it was cancelled before it could use it.
       free_thread(bootstrap_data->per_cpu[i].thread);

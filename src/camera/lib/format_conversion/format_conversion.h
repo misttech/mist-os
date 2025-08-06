@@ -5,10 +5,6 @@
 #ifndef SRC_CAMERA_LIB_FORMAT_CONVERSION_FORMAT_CONVERSION_H_
 #define SRC_CAMERA_LIB_FORMAT_CONVERSION_FORMAT_CONVERSION_H_
 
-#ifndef _LIBCPP_ENABLE_HARDENED_MODE
-#define _LIBCPP_ENABLE_HARDENED_MODE 1
-#endif
-
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 

@@ -540,58 +540,108 @@ impl ::core::convert::From<MyStrictEnum> for WireMyStrictEnum {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::MyEmptyFlexibleEnum> for ::fidl_test_enum::MyEmptyFlexibleEnum {
-        #[inline]
-        fn from(from: crate::MyEmptyFlexibleEnum) -> Self {
-            match crate::MyEmptyFlexibleEnum::from(from) {
-                crate::MyEmptyFlexibleEnum::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+    impl ::fidl_next::CompatFrom<crate::MyEmptyFlexibleEnum> for ::fidl_test_enum::MyEmptyFlexibleEnum {
+        fn compat_from(value: crate::MyEmptyFlexibleEnum) -> Self {
+            match value {
+                crate::MyEmptyFlexibleEnum::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
             }
         }
     }
 
-    impl ::core::convert::From<crate::MyFlexibleEnum> for ::fidl_test_enum::MyFlexibleEnum {
-        #[inline]
-        fn from(from: crate::MyFlexibleEnum) -> Self {
-            match crate::MyFlexibleEnum::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_enum::MyEmptyFlexibleEnum> for crate::MyEmptyFlexibleEnum {
+        fn compat_from(value: ::fidl_test_enum::MyEmptyFlexibleEnum) -> Self {
+            match value {
+                ::fidl_test_enum::MyEmptyFlexibleEnum::__SourceBreaking {
+                    unknown_ordinal: value,
+                } => Self::UnknownOrdinal_(value),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyFlexibleEnum> for ::fidl_test_enum::MyFlexibleEnum {
+        fn compat_from(value: crate::MyFlexibleEnum) -> Self {
+            match value {
                 crate::MyFlexibleEnum::Foo => Self::Foo,
 
                 crate::MyFlexibleEnum::Bar => Self::Bar,
 
-                crate::MyFlexibleEnum::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::MyFlexibleEnum::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
             }
         }
     }
 
-    impl ::core::convert::From<crate::MyFlexibleEnumWithCustomUnknown>
+    impl ::fidl_next::CompatFrom<::fidl_test_enum::MyFlexibleEnum> for crate::MyFlexibleEnum {
+        fn compat_from(value: ::fidl_test_enum::MyFlexibleEnum) -> Self {
+            match value {
+                ::fidl_test_enum::MyFlexibleEnum::Foo => Self::Foo,
+
+                ::fidl_test_enum::MyFlexibleEnum::Bar => Self::Bar,
+
+                ::fidl_test_enum::MyFlexibleEnum::__SourceBreaking { unknown_ordinal: value } => {
+                    Self::UnknownOrdinal_(value)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyFlexibleEnumWithCustomUnknown>
         for ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown
     {
-        #[inline]
-        fn from(from: crate::MyFlexibleEnumWithCustomUnknown) -> Self {
-            match crate::MyFlexibleEnumWithCustomUnknown::from(from) {
+        fn compat_from(value: crate::MyFlexibleEnumWithCustomUnknown) -> Self {
+            match value {
                 crate::MyFlexibleEnumWithCustomUnknown::Foo => Self::Foo,
 
                 crate::MyFlexibleEnumWithCustomUnknown::Bar => Self::Bar,
 
                 crate::MyFlexibleEnumWithCustomUnknown::CustomUnknown => Self::CustomUnknown,
 
-                crate::MyFlexibleEnumWithCustomUnknown::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::MyFlexibleEnumWithCustomUnknown::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
             }
         }
     }
 
-    impl ::core::convert::From<crate::MyStrictEnum> for ::fidl_test_enum::MyStrictEnum {
-        #[inline]
-        fn from(from: crate::MyStrictEnum) -> Self {
-            match crate::MyStrictEnum::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_enum::MyFlexibleEnumWithCustomUnknown>
+        for crate::MyFlexibleEnumWithCustomUnknown
+    {
+        fn compat_from(value: ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown) -> Self {
+            match value {
+                ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown::Foo => Self::Foo,
+
+                ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown::Bar => Self::Bar,
+
+                ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown::CustomUnknown => {
+                    Self::CustomUnknown
+                }
+
+                ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown::__SourceBreaking {
+                    unknown_ordinal: value,
+                } => Self::UnknownOrdinal_(value),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyStrictEnum> for ::fidl_test_enum::MyStrictEnum {
+        fn compat_from(value: crate::MyStrictEnum) -> Self {
+            match value {
                 crate::MyStrictEnum::Foo => Self::Foo,
 
                 crate::MyStrictEnum::Bar => Self::Bar,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_enum::MyStrictEnum> for crate::MyStrictEnum {
+        fn compat_from(value: ::fidl_test_enum::MyStrictEnum) -> Self {
+            match value {
+                ::fidl_test_enum::MyStrictEnum::Foo => Self::Foo,
+
+                ::fidl_test_enum::MyStrictEnum::Bar => Self::Bar,
             }
         }
     }

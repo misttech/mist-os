@@ -10,6 +10,11 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <string_view>
+
+#if __cplusplus >= 202002L
+#include <format>
+#endif
 
 namespace display {
 
@@ -52,6 +57,9 @@ class AlphaMode {
   // and Inspect. The values have the same stability guarantees as the
   // equivalent FIDL type.
   constexpr uint32_t ValueForLogging() const;
+
+  // Returns a developer-facing string representation.
+  std::string_view ToString() const;
 
   static const AlphaMode kDisable;
   static const AlphaMode kHwMultiply;
@@ -118,5 +126,14 @@ inline constexpr const AlphaMode AlphaMode::kHwMultiply(
     fuchsia_hardware_display_types::wire::AlphaMode::kHwMultiply);
 
 }  // namespace display
+
+#if __cplusplus >= 202002L
+template <>
+struct std::formatter<display::AlphaMode> : std::formatter<std::string_view> {
+  auto format(const display::AlphaMode& mode, std::format_context& ctx) const {
+    return std::formatter<std::string_view>::format(mode.ToString(), ctx);
+  }
+};
+#endif
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_ALPHA_MODE_H_

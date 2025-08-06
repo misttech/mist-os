@@ -4,8 +4,8 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
-use assembly_config_schema::product_config::TrustedAppType::{BinderRPC, GlobalPlatform};
+use assembly_config_schema::product_settings::TrustedApp as ProductTrustedApp;
+use assembly_config_schema::product_settings::TrustedAppType::{BinderRPC, GlobalPlatform};
 use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
 use assembly_images_config::FilesystemImageMode;
 use fuchsia_tee_manager_config::TAConfig;
@@ -69,7 +69,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),

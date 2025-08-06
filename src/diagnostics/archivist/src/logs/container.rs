@@ -239,10 +239,6 @@ impl LogsArtifactsContainer {
                 next = stream.next() => {
                     let Some(next) = next else { break };
                     match next {
-                        Ok(LogSinkRequest::Connect { .. }) => {
-                            error!("Received unexpected Connect message from {:?}", self.identity);
-                            return;
-                        }
                         Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
                             self.buffer.add_socket(socket);
                         }

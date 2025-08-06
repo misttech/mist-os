@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::sysmem_config::{
+use assembly_config_schema::platform_settings::sysmem_config::{
     BoardSysmemConfig, MemorySize, PlatformSysmemConfig,
 };
 use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
@@ -47,12 +47,12 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         // BoardSysmemConfig). Here, to homogenize the handling of the two layers (board and
         // platform/product), we put any board-provideed format costs into a synthesized board-level
         // PlatformSysmemConfig, before we combine the two PlatformSysmemConfig(s) together below.
-        let sysmem_defaults: &BoardSysmemConfig = &context.board_info.platform.sysmem_defaults;
+        let sysmem_defaults: &BoardSysmemConfig = &context.board_config.platform.sysmem_defaults;
         let board_platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: sysmem_defaults.contiguous_memory_size,
             protected_memory_size: sysmem_defaults.protected_memory_size,
             contiguous_guard_pages_unused: sysmem_defaults.contiguous_guard_pages_unused,
-            format_costs: context.board_info.configuration.sysmem_format_costs.clone(),
+            format_costs: context.board_config.configuration.sysmem_format_costs.clone(),
             // Please don't use ..Default::default here - we intentionally want the build to fail
             // when we add a new field to BoardSysmemConfig so we can handle that field here (or in
             // this function).
@@ -63,7 +63,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         let mut settings = PlatformSysmemConfig::default();
         for platform_sysmem_config in [&board_platform_sysmem_config, platform_sysmem_config] {
             // All the fields are Option<T>. If a field is still None after overrides from
-            // board_info and platform config have been applied, the config capability will be
+            // board_config and platform config have been applied, the config capability will be
             // absent and the default value of the field will be as specified in
             // src/sysmem/drivers/sysmem/BUILD.gn.
             settings.format_costs.append(&mut platform_sysmem_config.format_costs.clone());
@@ -280,7 +280,7 @@ mod test {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
     use crate::{DomainConfig, DomainConfigDirectory, FileOrContents};
-    use assembly_config_schema::{BoardInformation, BoardProvidedConfig};
+    use assembly_config_schema::{BoardConfig, BoardProvidedConfig};
     use serde_json::{Number, Value};
 
     #[test]
@@ -288,7 +288,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
@@ -330,7 +330,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
@@ -372,7 +372,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
@@ -398,7 +398,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
@@ -424,8 +424,8 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+            board_config: &BoardConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
@@ -477,8 +477,8 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+            board_config: &BoardConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
@@ -530,8 +530,8 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+            board_config: &BoardConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: None,
                         protected_memory_size: None,
@@ -700,7 +700,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
+            board_config: &BoardConfig {
                 configuration: BoardProvidedConfig {
                     sysmem_format_costs: vec![BOARD_FORMAT_COSTS_FILENAME.into()],
                     ..Default::default()

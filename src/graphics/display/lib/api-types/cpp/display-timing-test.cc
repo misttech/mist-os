@@ -234,7 +234,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr display_mode_t kBanjoDisplayMode = {
+    constexpr display_timing_t kBanjoDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -247,7 +247,7 @@ TEST(DisplayTiming, FromBanjo) {
         .flags = MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_VSYNC_POSITIVE |
                  MODE_FLAG_ALTERNATING_VBLANK,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayTiming));
   }
 
   // Verify Hsync / Vsync polarities are correctly mapped.
@@ -268,7 +268,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr display_mode_t kBanjoDisplayMode = {
+    constexpr display_timing_t kBanjoDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -280,7 +280,7 @@ TEST(DisplayTiming, FromBanjo) {
         .v_blanking = 0x0c'0c,
         .flags = MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayTiming));
   }
   {
     constexpr DisplayTiming kExpected = {
@@ -299,7 +299,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr display_mode_t kBanjoDisplayMode = {
+    constexpr display_timing_t kBanjoDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -311,7 +311,7 @@ TEST(DisplayTiming, FromBanjo) {
         .v_blanking = 0x0c'0c,
         .flags = MODE_FLAG_INTERLACED | MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayTiming));
   }
 }
 
@@ -333,7 +333,7 @@ TEST(DisplayTiming, FromFidl) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kFidlDisplayMode = {
+    constexpr fuchsia_hardware_display_engine::wire::DisplayTiming kFidlDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -348,7 +348,7 @@ TEST(DisplayTiming, FromFidl) {
                  fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive |
                  fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayTiming));
   }
 
   // Verify Hsync / Vsync polarities are correctly mapped.
@@ -369,7 +369,7 @@ TEST(DisplayTiming, FromFidl) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kFidlDisplayMode = {
+    constexpr fuchsia_hardware_display_engine::wire::DisplayTiming kFidlDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -383,7 +383,7 @@ TEST(DisplayTiming, FromFidl) {
                  fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive |
                  fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayTiming));
   }
   {
     constexpr DisplayTiming kExpected = {
@@ -402,7 +402,7 @@ TEST(DisplayTiming, FromFidl) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kBanjoDisplayMode = {
+    constexpr fuchsia_hardware_display_engine::wire::DisplayTiming kBanjoDisplayTiming = {
         .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
@@ -416,7 +416,7 @@ TEST(DisplayTiming, FromFidl) {
                  fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive |
                  fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
     };
-    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
+    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayTiming));
   }
 }
 
@@ -438,18 +438,19 @@ TEST(DisplayTiming, ToBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    const display_mode_t kBanjoDisplayMode = ToBanjoDisplayMode(kDisplayTiming);
-    EXPECT_EQ(kBanjoDisplayMode.pixel_clock_hz, 0x1f'1f'1f'1f'1f);
-    EXPECT_EQ(kBanjoDisplayMode.h_addressable, 0x0f'0fu);
-    EXPECT_EQ(kBanjoDisplayMode.h_front_porch, 0x0a'0au);
-    EXPECT_EQ(kBanjoDisplayMode.h_sync_pulse, 0x01'01u);
-    EXPECT_EQ(kBanjoDisplayMode.h_blanking, 0x0d'0du);
-    EXPECT_EQ(kBanjoDisplayMode.v_addressable, 0x0b'0bu);
-    EXPECT_EQ(kBanjoDisplayMode.v_front_porch, 0x03'03u);
-    EXPECT_EQ(kBanjoDisplayMode.v_sync_pulse, 0x04'04u);
-    EXPECT_EQ(kBanjoDisplayMode.v_blanking, 0x0c'0cu);
-    EXPECT_EQ(kBanjoDisplayMode.flags, MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE |
-                                           MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK);
+    const display_timing_t kBanjoDisplayTiming = ToBanjoDisplayTiming(kDisplayTiming);
+    EXPECT_EQ(kBanjoDisplayTiming.pixel_clock_hz, 0x1f'1f'1f'1f'1f);
+    EXPECT_EQ(kBanjoDisplayTiming.h_addressable, 0x0f'0fu);
+    EXPECT_EQ(kBanjoDisplayTiming.h_front_porch, 0x0a'0au);
+    EXPECT_EQ(kBanjoDisplayTiming.h_sync_pulse, 0x01'01u);
+    EXPECT_EQ(kBanjoDisplayTiming.h_blanking, 0x0d'0du);
+    EXPECT_EQ(kBanjoDisplayTiming.v_addressable, 0x0b'0bu);
+    EXPECT_EQ(kBanjoDisplayTiming.v_front_porch, 0x03'03u);
+    EXPECT_EQ(kBanjoDisplayTiming.v_sync_pulse, 0x04'04u);
+    EXPECT_EQ(kBanjoDisplayTiming.v_blanking, 0x0c'0cu);
+    EXPECT_EQ(kBanjoDisplayTiming.flags, MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE |
+                                             MODE_FLAG_VSYNC_POSITIVE |
+                                             MODE_FLAG_ALTERNATING_VBLANK);
   }
 
   // Verify Hsync / Vsync polarities are correctly mapped.
@@ -470,8 +471,8 @@ TEST(DisplayTiming, ToBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    const display_mode_t kBanjoDisplayMode = ToBanjoDisplayMode(kDisplayTiming);
-    EXPECT_EQ(kBanjoDisplayMode.flags,
+    const display_timing_t kBanjoDisplayTiming = ToBanjoDisplayTiming(kDisplayTiming);
+    EXPECT_EQ(kBanjoDisplayTiming.flags,
               MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK);
   }
   {
@@ -491,8 +492,8 @@ TEST(DisplayTiming, ToBanjo) {
         .vblank_alternates = true,
         .pixel_repetition = 0,
     };
-    const display_mode_t kBanjoDisplayMode = ToBanjoDisplayMode(kDisplayTiming);
-    EXPECT_EQ(kBanjoDisplayMode.flags,
+    const display_timing_t kBanjoDisplayTiming = ToBanjoDisplayTiming(kDisplayTiming);
+    EXPECT_EQ(kBanjoDisplayTiming.flags,
               MODE_FLAG_INTERLACED | MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK);
   }
 }
@@ -514,7 +515,7 @@ TEST(DisplayTiming, BanjoRoundTrip) {
       .vblank_alternates = true,
       .pixel_repetition = 0,
   };
-  EXPECT_EQ(kDisplayTiming, ToDisplayTiming(ToBanjoDisplayMode(kDisplayTiming)));
+  EXPECT_EQ(kDisplayTiming, ToDisplayTiming(ToBanjoDisplayTiming(kDisplayTiming)));
 }
 
 TEST(DisplayTiming, AggregateHelpers) {

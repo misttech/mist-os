@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -28,6 +27,7 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/structured_config.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -381,7 +381,8 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_, structured_config::Config());
+    display_engine_ =
+        std::make_unique<DisplayEngine>(incoming_, &engine_events_, structured_config::Config());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
@@ -440,6 +441,8 @@ class FakeSysmemTest : public testing::Test {
 
   async::Loop loop_;
 
+  display::DisplayEngineEventsFidl engine_events_;
+
   ddk_fake::FakeMmioRegRegion vpu_mmio_ =
       ddk_fake::FakeMmioRegRegion(/*reg_size=*/4, /*reg_count=*/0x10000);
   std::unique_ptr<DisplayEngine> display_engine_;
@@ -458,14 +461,13 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
-  constexpr uint64_t kBanjoValidBufferCollectionId = kValidBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
-      kBanjoValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kValidBufferCollectionId,
+                                                    std::move(token1_endpoints->client)));
 
   // `driver_buffer_collection_id` must be unused.
-  EXPECT_EQ(display_engine_->DisplayEngineImportBufferCollection(
-                kBanjoValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
-            ZX_ERR_ALREADY_EXISTS);
+  EXPECT_STATUS(display_engine_->ImportBufferCollection(kValidBufferCollectionId,
+                                                        std::move(token2_endpoints->client)),
+                zx::error(ZX_ERR_ALREADY_EXISTS));
 
   EXPECT_TRUE(display::PollUntil(
       [&]() { return !allocator_->GetActiveBufferCollectionTokenClients().empty(); }, zx::msec(5),
@@ -495,10 +497,9 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
-  EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
-            ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
+  EXPECT_STATUS(display_engine_->ReleaseBufferCollection(kInvalidBufferCollectionId),
+                zx::error(ZX_ERR_NOT_FOUND));
+  EXPECT_OK(display_engine_->ReleaseBufferCollection(kValidBufferCollectionId));
 
   EXPECT_TRUE(display::PollUntil(
       [&]() { return allocator_->GetActiveBufferCollectionTokenClients().empty(); }, zx::msec(5),
@@ -532,61 +533,56 @@ TEST_F(FakeSysmemTest, ImportImage) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                                 token_client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_client)));
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                         kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_OK(display_engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
-  EXPECT_EQ(display_engine_->DisplayEngineSetBufferCollectionConstraints(
-                &kDisplayUsage, kBanjoInvalidBufferCollectionId),
-            ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(
+      display_engine_->SetBufferCollectionConstraints(kDisplayUsage, kInvalidBufferCollectionId),
+      zx::error(ZX_ERR_NOT_FOUND));
 
   // Invalid import: Bad image type.
-  static constexpr image_metadata_t kInvalidTilingMetadata = {
-      .dimensions = {.width = 1024, .height = 768},
-      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-  };
-  uint64_t image_handle = 0;
-  EXPECT_EQ(
-      display_engine_->DisplayEngineImportImage(&kInvalidTilingMetadata, kBanjoBufferCollectionId,
-                                                /*index=*/0, &image_handle),
-      ZX_ERR_INVALID_ARGS);
+  static constexpr display::ImageMetadata kInvalidTilingMetadata({
+      .width = 1024,
+      .height = 768,
+      .tiling_type = display::ImageTilingType::kCapture,
+  });
+  EXPECT_STATUS(display_engine_->ImportImage(kInvalidTilingMetadata, kBufferCollectionId,
+                                             /*buffer_index=*/0),
+                zx::error(ZX_ERR_INVALID_ARGS));
 
   // Invalid import: Invalid collection ID.
-  static constexpr image_metadata_t kDisplayImageMetadata = {
-      .dimensions = {.width = 1024, .height = 768},
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_EQ(display_engine_->DisplayEngineImportImage(&kDisplayImageMetadata,
-                                                      kBanjoInvalidBufferCollectionId,
-                                                      /*index=*/0, &image_handle),
-            ZX_ERR_NOT_FOUND);
+  static constexpr display::ImageMetadata kDisplayImageMetadata({
+      .width = 1024,
+      .height = 768,
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_STATUS(display_engine_->ImportImage(kDisplayImageMetadata, kInvalidBufferCollectionId,
+                                             /*buffer_index=*/0),
+                zx::error(ZX_ERR_NOT_FOUND));
 
   // Invalid import: Invalid buffer collection index.
-  constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  image_handle = 0;
-  EXPECT_EQ(
-      display_engine_->DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
-                                                kInvalidBufferCollectionIndex, &image_handle),
-      ZX_ERR_OUT_OF_RANGE);
+  constexpr uint64_t kInvalidBufferIndex = 100u;
+  EXPECT_STATUS(
+      display_engine_->ImportImage(kDisplayImageMetadata, kBufferCollectionId, kInvalidBufferIndex),
+      zx::error(ZX_ERR_OUT_OF_RANGE));
 
   // Valid import.
-  EXPECT_OK(display_engine_->DisplayEngineImportImage(&kDisplayImageMetadata,
-                                                      kBanjoBufferCollectionId,
-                                                      /*index=*/0, &image_handle));
-  EXPECT_NE(image_handle, 0u);
+  zx::result<display::DriverImageId> successful_import_result =
+      display_engine_->ImportImage(kDisplayImageMetadata, kBufferCollectionId,
+                                   /*buffer_index=*/0);
+  ASSERT_TRUE(successful_import_result.is_ok());
+  display::DriverImageId driver_image_id = std::move(successful_import_result).value();
+  EXPECT_NE(driver_image_id, display::kInvalidDriverImageId);
 
   // Release the image.
-  display_engine_->DisplayEngineReleaseImage(image_handle);
+  display_engine_->ReleaseImage(driver_image_id);
 
-  EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
+  EXPECT_OK(display_engine_->ReleaseBufferCollection(kBufferCollectionId));
 }
 
 TEST_F(FakeSysmemTest, ImportImageForCapture) {
@@ -597,40 +593,37 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                                 token_client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_client)));
 
   // Driver sets BufferCollection buffer memory constraints.
-  static constexpr image_buffer_usage_t kCaptureUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-  };
-  EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kCaptureUsage,
-                                                                         kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kCaptureUsage({
+      .tiling_type = display::ImageTilingType::kCapture,
+  });
+  EXPECT_OK(display_engine_->SetBufferCollectionConstraints(kCaptureUsage, kBufferCollectionId));
 
   // Invalid import: invalid buffer collection ID.
-  uint64_t capture_handle = 0;
-  const uint64_t kBanjoInvalidBufferCollectionId = 100;
-  EXPECT_EQ(display_engine_->DisplayEngineImportImageForCapture(kBanjoInvalidBufferCollectionId,
-                                                                /*index=*/0, &capture_handle),
-            ZX_ERR_NOT_FOUND);
+  const display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
+  EXPECT_STATUS(display_engine_->ImportImageForCapture(kInvalidBufferCollectionId,
+                                                       /*buffer_index=*/0),
+                zx::error(ZX_ERR_NOT_FOUND));
 
   // Invalid import: index out of range.
   const uint64_t kInvalidIndex = 100;
-  EXPECT_EQ(display_engine_->DisplayEngineImportImageForCapture(kBanjoBufferCollectionId,
-                                                                kInvalidIndex, &capture_handle),
-            ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(display_engine_->ImportImageForCapture(kBufferCollectionId, kInvalidIndex),
+                zx::error(ZX_ERR_OUT_OF_RANGE));
 
   // Valid import.
-  capture_handle = 0;
-  EXPECT_OK(display_engine_->DisplayEngineImportImageForCapture(kBanjoBufferCollectionId,
-                                                                /*index=*/0, &capture_handle));
-  EXPECT_NE(capture_handle, 0u);
+  zx::result<display::DriverCaptureImageId> successful_import_result =
+      display_engine_->ImportImageForCapture(kBufferCollectionId,
+                                             /*buffer_index=*/0);
+  ASSERT_OK(successful_import_result);
+  display::DriverCaptureImageId capture_image_id = std::move(successful_import_result).value();
+  EXPECT_NE(capture_image_id, display::kInvalidDriverCaptureImageId);
 
   // Release the image.
-  display_engine_->DisplayEngineReleaseCapture(capture_handle);
+  EXPECT_OK(display_engine_->ReleaseCapture(capture_image_id));
 
-  EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
+  EXPECT_OK(display_engine_->ReleaseBufferCollection(kBufferCollectionId));
 }
 
 TEST_F(FakeSysmemTest, SysmemRequirements) {
@@ -648,17 +641,14 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                                 token_client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_client)));
 
   EXPECT_TRUE(display::PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                         kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_OK(display_engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   EXPECT_TRUE(
       display::PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
@@ -675,25 +665,21 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     collection = new_buffer_collection.get();
     return new_buffer_collection;
   });
-  display_engine_->SetFormatSupportCheck([](fuchsia_images2::wire::PixelFormat format) {
-    return format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
-  });
+  display_engine_->SetFormatSupportCheck(
+      [](display::PixelFormat format) { return format == display::PixelFormat::kB8G8R8A8; });
 
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                                 token_client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_client)));
 
   EXPECT_TRUE(display::PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                         kBanjoBufferCollectionId));
+  static constexpr display::ImageBufferUsage kDisplayUsage({
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  EXPECT_OK(display_engine_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   EXPECT_TRUE(
       display::PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
@@ -736,14 +722,14 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
-                                                                 token_client.TakeChannel()));
+  EXPECT_OK(display_engine_->ImportBufferCollection(kBufferCollectionId, std::move(token_client)));
 
-  uint64_t capture_handle;
-  EXPECT_OK(display_engine_->DisplayEngineImportImageForCapture(kBanjoBufferCollectionId,
-                                                                /*index=*/0, &capture_handle));
-  EXPECT_OK(display_engine_->DisplayEngineReleaseCapture(capture_handle));
+  zx::result<display::DriverCaptureImageId> successful_import_result =
+      display_engine_->ImportImageForCapture(kBufferCollectionId,
+                                             /*buffer_index=*/0);
+  ASSERT_OK(successful_import_result);
+  display::DriverCaptureImageId capture_image_id = std::move(successful_import_result).value();
+  EXPECT_OK(display_engine_->ReleaseCapture(capture_image_id));
 
   canvas_.SyncCall(&FakeCanvasProtocol::CheckThatNoEntriesInUse);
 }

@@ -80,7 +80,7 @@ testing::AssertionResult RunSimpleProgram(std::function<void()> prelude, std::st
 }
 
 std::string GetTestResourcePath(const std::string &resource) {
-  std::filesystem::path test_file = std::filesystem::path("/data/tests") / resource;
+  std::filesystem::path test_file = std::filesystem::path("data/tests/deps") / resource;
 
   std::error_code ec;
   bool file_exists = std::filesystem::exists(test_file, ec);

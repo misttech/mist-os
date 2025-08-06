@@ -27,6 +27,7 @@ type Protocols = resource table {
     13: telemetry_provider server_end:fuchsia.lowpan.experimental.TelemetryProvider;
     14: thread_feature server_end:fuchsia.lowpan.thread.Feature;
     15: capabilities server_end:fuchsia.lowpan.thread.ThreadCapabilities;
+    16: epskc server_end:fuchsia.lowpan.thread.Epskc;
 };
 
 /// Protocol representing a LoWPAN driver instance.

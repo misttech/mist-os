@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -35,6 +34,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-listener-fidl-adapter.h"
 #include "src/graphics/display/drivers/coordinator/engine-listener.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -51,14 +51,10 @@
 namespace display_coordinator {
 
 class ClientProxy;
-class Controller;
-class ControllerTest;
 class DisplayConfig;
-class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
-                   public fidl::WireServer<fuchsia_hardware_display::Provider>,
+class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
                    public EngineListener {
  public:
   // Factory method for production use.
@@ -100,15 +96,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // Must be called after `driver_dispatcher_` is shut down.
   void Stop();
 
-  // fuchsia.hardware.display.controller/DisplayEngineListener:
-  // Runs on dispatchers owned by the display engine driver.
-  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
-                                           zx_instant_mono_t banjo_timestamp,
-                                           const config_stamp_t* banjo_config_stamp);
-  void DisplayEngineListenerOnCaptureComplete();
-
   // `EngineListener`:
   // Must run on `engine_listener_dispatcher_`.
   void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info) override;
@@ -127,9 +114,16 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void ReleaseImage(display::DriverImageId driver_image_id);
   void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
 
-  // On success, the span of DisplayTiming objects is guaranteed to be
-  // non-empty.
+  // The display modes are guaranteed to be valid as long as the display with
+  // `display_id` is valid.
   //
+  // For a valid display, it's guaranteed that at least one of
+  // `GetDisplayPreferredModes()` and `GetDisplayTimings()` is non-empty.
+  //
+  // `mtx()` must be held for as long as the return value is retained.
+  zx::result<std::span<const display::ModeAndId>> GetDisplayPreferredModes(
+      display::DisplayId display_id) __TA_REQUIRES(mtx());
+
   // The display timings are guaranteed to be valid as long as the display with
   // `display_id` is valid.
   //
@@ -170,8 +164,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
-  size_t ImportedImagesCountForTesting() const;
-
   // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(
@@ -192,10 +184,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
       OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
-  friend ControllerTest;
-  friend IntegrationTest;
-
   // Initializes logic that is not suitable for the constructor.
+  // Must not run on `engine_listener_dispatcher_`.
   zx::result<> Initialize();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
@@ -213,12 +203,20 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // Must be called on the driver dispatcher.
   void PopulateDisplayTimings(DisplayInfo& info) __TA_EXCLUDES(mtx());
 
+  // Processes a VSync signal from an engine driver.
+  //
+  // Must be called on the driver dispatcher.
+  void ProcessDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                           display::DriverConfigStamp driver_config_stamp);
+
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
 
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher_;
+
+  EngineListenerFidlAdapter engine_listener_fidl_adapter_;
 
   VsyncMonitor vsync_monitor_;
 

@@ -72,5 +72,14 @@
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
         },
+        {
+            config: "fuchsia.starnix.config.container.CrashReportThrottling",
+            key: "crash_report_throttling",
+            type: "bool",
+            default: true,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
     ],
 }

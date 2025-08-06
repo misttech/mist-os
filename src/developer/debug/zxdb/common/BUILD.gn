@@ -54,7 +54,7 @@ static_library("common") {
     "//src/lib/containers/cpp",
     "//src/lib/fxl",
     "//src/lib/unwinder",
-    "//third_party/curl:libcurl",
+    "//third_party/curl/src:libcurl",
   ]
 }
 

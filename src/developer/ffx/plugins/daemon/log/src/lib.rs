@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(std::str::from_utf8(&actual).unwrap(), "");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn display_x_most_recent_from_not_enough_logs() {
         let mut tmp = tempfile::NamedTempFile::new().unwrap();
         write_log(&mut tmp, 1..5);

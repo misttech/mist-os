@@ -7,6 +7,7 @@ use assembly_cli_args::{
     CreateSystemArgs, CreateSystemOutputs, ProductArgs, ProductAssemblyOutputs,
 };
 use assembly_tool::{PlatformToolProvider, ToolProvider};
+use camino::Utf8PathBuf;
 
 pub fn product_assembly(args: ProductArgs) -> Result<ProductAssemblyOutputs> {
     let tools = PlatformToolProvider::new(args.input_bundles_dir.clone());
@@ -27,8 +28,20 @@ pub fn create_system(args: CreateSystemArgs) -> Result<CreateSystemOutputs> {
 }
 
 pub fn assemble(args: ProductArgs) -> Result<CreateSystemOutputs> {
-    let product_outputs = product_assembly(args)?;
-    create_system(product_outputs.into())
+    // Create a temporary directory for the product assembly outputs.
+    // We cannot use the directories in `args`, because those are reserved for
+    // the system.
+    let product_tmp = tempfile::TempDir::new().unwrap();
+    let product_tmp = Utf8PathBuf::from_path_buf(product_tmp.path().to_path_buf()).unwrap();
+    let product_out = product_tmp.join("out");
+    let product_gen = product_tmp.join("gen");
+    let product_args = ProductArgs { outdir: product_out, gendir: product_gen, ..args };
+    let product_outputs = product_assembly(product_args)?;
+
+    // The system is written to the outdir/gendir passed in with `args`.
+    let create_system_args =
+        CreateSystemArgs { outdir: args.outdir, gendir: args.gendir, ..product_outputs.into() };
+    create_system(create_system_args)
 }
 
 #[cfg(test)]
@@ -45,14 +58,14 @@ mod tests {
         let assembly_tool = tools.get_tool("assembly").unwrap();
 
         let product = Utf8PathBuf::from("path/to/product");
-        let board_info = Utf8PathBuf::from("path/to/board_info");
+        let board_config = Utf8PathBuf::from("path/to/board_config");
         let outdir = Utf8PathBuf::from("path/to/outdir");
         let gendir = Utf8PathBuf::from("path/to/gendir");
         let input_bundles_dir = Utf8PathBuf::from("path/to/bundles");
 
         let args = ProductArgs {
             product: product.clone(),
-            board_info: board_info.clone(),
+            board_config: board_config.clone(),
             outdir: outdir.clone(),
             gendir: gendir.clone(),
             input_bundles_dir: input_bundles_dir.clone(),
@@ -75,8 +88,8 @@ mod tests {
                         "product",
                         "--product",
                         product,
-                        "--board-info",
-                        board_info,
+                        "--board-config",
+                        board_config,
                         "--outdir",
                         outdir,
                         "--input-bundles-dir",

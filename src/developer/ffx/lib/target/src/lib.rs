@@ -531,6 +531,9 @@ pub async fn knock_target_daemonless(
 /// the specifier to be a substring of the nodename, a network address, serial
 /// number, or vsock identifier.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
+    if let Some(ts) = context.get_overridden_target_specifier() {
+        return Ok(ts);
+    }
     let target_spec = match context
         .query(TARGET_DEFAULT_KEY)
         .level(Some(ConfigLevel::Runtime))
@@ -744,6 +747,14 @@ mod test {
         assert_eq!(target_spec, Some("runtime-default".into()));
     }
 
+    #[fuchsia::test]
+    async fn test_get_override_target_spec() {
+        let env = test_init().await.unwrap();
+        let mut context = env.context.clone();
+        context.override_target_specifier(&Some("foo".to_string()));
+        let target = get_target_specifier(&context).await.expect("get_target_specifier");
+        assert_eq!(target, Some("foo".to_string()));
+    }
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {
         let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();

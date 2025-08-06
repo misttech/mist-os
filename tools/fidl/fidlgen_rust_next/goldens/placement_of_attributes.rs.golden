@@ -1330,34 +1330,156 @@ impl ::core::fmt::Debug for WireOptionalExampleUnion {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::ExampleBits> for ::fidl_test_placementofattributes::ExampleBits {
-        #[inline]
-        fn from(from: crate::ExampleBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::ExampleBits>
+        for ::fidl_test_placementofattributes::ExampleBits
+    {
+        fn compat_from(value: crate::ExampleBits) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::ExampleEnum> for ::fidl_test_placementofattributes::ExampleEnum {
-        #[inline]
-        fn from(from: crate::ExampleEnum) -> Self {
-            match crate::ExampleEnum::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleBits>
+        for crate::ExampleBits
+    {
+        fn compat_from(value: ::fidl_test_placementofattributes::ExampleBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleEnum>
+        for ::fidl_test_placementofattributes::ExampleEnum
+    {
+        fn compat_from(value: crate::ExampleEnum) -> Self {
+            match value {
                 crate::ExampleEnum::Member => Self::Member,
             }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleEnum>
+        for crate::ExampleEnum
+    {
+        fn compat_from(value: ::fidl_test_placementofattributes::ExampleEnum) -> Self {
+            match value {
+                ::fidl_test_placementofattributes::ExampleEnum::Member => Self::Member,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleProtocolMethodRequest>
+        for ::fidl_test_placementofattributes::ExampleProtocolMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ExampleProtocolMethodRequest) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleProtocolMethodRequest>
+        for crate::ExampleProtocolMethodRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_placementofattributes::ExampleProtocolMethodRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::CompatFrom::compat_from(value.arg) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ExampleProtocol`
     /// protocol.
-    pub type ExampleProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ExampleProtocol>;
+    pub type ExampleProtocolProxy = ::fidl_next::ClientSender<crate::ExampleProtocol>;
 
-    impl ::core::convert::From<crate::ExampleProtocol>
+    impl ::fidl_next::CompatFrom<crate::ExampleProtocol>
         for ::fidl_test_placementofattributes::ExampleProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::ExampleProtocol) -> Self {
+        fn compat_from(_: crate::ExampleProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleProtocolMarker>
+        for crate::ExampleProtocol
+    {
+        fn compat_from(_: ::fidl_test_placementofattributes::ExampleProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_placementofattributes::ExampleProtocolProxy>
+        for crate::ExampleProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_placementofattributes::ExampleProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleStruct>
+        for ::fidl_test_placementofattributes::ExampleStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::ExampleStruct) -> Self {
+            Self { member: ::fidl_next::CompatFrom::compat_from(value.member) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleStruct>
+        for crate::ExampleStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_placementofattributes::ExampleStruct) -> Self {
+            Self { member: ::fidl_next::CompatFrom::compat_from(value.member) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleTable>
+        for ::fidl_test_placementofattributes::ExampleTable
+    {
+        fn compat_from(value: crate::ExampleTable) -> Self {
+            Self {
+                member: ::fidl_next::CompatFrom::compat_from(value.member),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleTable>
+        for crate::ExampleTable
+    {
+        fn compat_from(value: ::fidl_test_placementofattributes::ExampleTable) -> Self {
+            Self { member: ::fidl_next::CompatFrom::compat_from(value.member) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ExampleUnion>
+        for ::fidl_test_placementofattributes::ExampleUnion
+    {
+        fn compat_from(value: crate::ExampleUnion) -> Self {
+            match value {
+                crate::ExampleUnion::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_placementofattributes::ExampleUnion>
+        for crate::ExampleUnion
+    {
+        fn compat_from(value: ::fidl_test_placementofattributes::ExampleUnion) -> Self {
+            match value {
+                ::fidl_test_placementofattributes::ExampleUnion::Variant(value) => {
+                    Self::Variant(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
         }
     }
 }

@@ -175,9 +175,10 @@ impl GpuUsageLogger {
 
         for (index, driver) in self.drivers.iter().enumerate() {
             let sensor_name = &driver.sensor_name;
-            let driver_name = driver.alias.as_ref().map_or(sensor_name.to_string(), |alias| {
-                format!("{}(alias:{})", sensor_name, alias)
-            });
+            let driver_name = driver.alias.as_ref().map_or_else(
+                || sensor_name.to_string(),
+                |alias| format!("{}(alias:{})", sensor_name, alias),
+            );
             driver_names.push(driver_name);
 
             let query = async move {

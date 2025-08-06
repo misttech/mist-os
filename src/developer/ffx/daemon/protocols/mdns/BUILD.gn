@@ -27,6 +27,7 @@ rustc_library("ffx_daemon_protocol_mdns") {
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//src/lib/mdns/rust:mdns",
     "//src/lib/network/packet",
     "//third_party/rust_crates:lazy_static",

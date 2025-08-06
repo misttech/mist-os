@@ -233,6 +233,7 @@
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
                     "/core/testing/starnix_test_runners/starnix_test_runner/interactive-debian-guest/guest-manager/vmm",
+
                     // debug-dash-launcher is used in engineering builds to launch dash shells.
                     // It uses PackageResolver to add tool package directories into the dash
                     // environment.
@@ -283,7 +284,6 @@
                 source_name: "data",
                 capability: "directory",
                 target_monikers: [
-                    "/core/ssh-key-manager",
                     "/core/sshd-host",
                     "/core/sshd-host/shell:**",
 

@@ -107,7 +107,7 @@ template("_bazel_tool_action_target") {
                              "inputs",
                              "metadata",
                              "mnemonic",
-                             "no_output_dir_leaks",
+                             "check_for_output_dir_leaks",
                              "outputs",
                              "public_deps",
                              "repeatable",

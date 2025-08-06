@@ -39,7 +39,6 @@ cc_test_executable("unittests") {
   public_deps = [
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-default",
-    "//src/lib/fostr/fidl/fuchsia.ui.scenic",
     "//src/lib/fsl",
     "//src/ui/lib/escher",
     "//src/ui/lib/escher/test/common:gtest_escher",

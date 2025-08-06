@@ -79,6 +79,9 @@ pub(crate) fn key_to_cipher(
 ) -> Result<Option<Arc<dyn Cipher>>, zx::Status> {
     match key {
         WrappedKey::Fxfs(_) => Ok(Some(Arc::new(fxfs::FxfsCipher::new(&unwrapped_key)))),
+        WrappedKey::FscryptInoLblk32Dir { .. } => {
+            Ok(Some(Arc::new(fscrypt_ino_lblk32::FscryptInoLblk32DirCipher::new(&unwrapped_key))))
+        }
         WrappedKey::FscryptInoLblk32File { .. } => {
             Ok(Some(Arc::new(fscrypt_ino_lblk32::FscryptInoLblk32FileCipher::new(&unwrapped_key))))
         }

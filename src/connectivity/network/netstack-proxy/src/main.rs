@@ -188,13 +188,9 @@ pub async fn main() -> std::process::ExitCode {
 
     let signals = wait_signals.await;
     assert!(signals.contains(zx::Signals::PROCESS_TERMINATED));
-    // Process is terminated, loosely mimic its exit code.
+    // Process is terminated, mimic its exit code.
     let zx::ProcessInfo { return_code, .. } =
         netstack_process.info().expect("reading netstack process info");
     println!("netstack process exited with return code {return_code}");
-    if return_code == 0 {
-        std::process::ExitCode::SUCCESS
-    } else {
-        std::process::ExitCode::FAILURE
-    }
+    std::process::exit(return_code.try_into().unwrap_or(std::i32::MIN))
 }

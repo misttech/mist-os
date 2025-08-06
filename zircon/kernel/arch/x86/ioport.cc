@@ -177,7 +177,7 @@ int IoBitmap::SetIoBitmap(uint32_t port, uint32_t len, bool enable) {
 
     // Let all CPUs know about the update.
     struct ioport_update_context task_context = {.io_bitmap = this};
-    mp_sync_exec(MP_IPI_TARGET_ALL, 0, IoBitmap::UpdateTask, &task_context);
+    mp_sync_exec(mp_ipi_target::ALL, 0, IoBitmap::UpdateTask, &task_context);
 
     // Now that we've returned from |mp_sync_exec|, we know this CPU's state
     // matches the updated |bitmap_|.  It's now safe to re-enable preemption.

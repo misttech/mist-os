@@ -43,7 +43,6 @@ pub enum TypeKind {
         nullable: bool,
         #[expect(dead_code)]
         rights: HandleRights,
-        #[expect(dead_code)]
         subtype: HandleSubtype,
         #[expect(dead_code)]
         resource_identifier: String,

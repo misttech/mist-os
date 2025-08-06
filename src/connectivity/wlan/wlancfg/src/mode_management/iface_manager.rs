@@ -1574,6 +1574,7 @@ mod tests {
     use crate::util::testing::{
         generate_connect_selection, generate_random_scanned_candidate, poll_sme_req,
     };
+    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::{DurationExt, TestExecutor};
@@ -1586,7 +1587,7 @@ mod tests {
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::channel::Cbw;
-    use wlan_common::{assert_variant, RadioConfig};
+    use wlan_common::RadioConfig;
     use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_inspect as inspect};
 
     // Responses that FakePhyManager will provide
@@ -2006,7 +2007,7 @@ mod tests {
         iface_manager: &mut IfaceManagerService,
     ) {
         for mut state_machine in iface_manager.fsm_futures.iter_mut() {
-            assert_variant!(exec.run_until_stalled(&mut state_machine), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut state_machine), Poll::Pending);
         }
     }
 
@@ -2070,17 +2071,17 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         {
             let connect_fut = iface_manager.connect(connect_selection.clone());
             let mut connect_fut = pin!(connect_fut);
 
             // Expect that we have requested a client SME proxy.
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
 
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            let sme_server = assert_variant!(
+            let sme_server = assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -2106,7 +2107,7 @@ mod tests {
         run_state_machine_futures(&mut exec, &mut iface_manager);
 
         // Acknowledge the disconnection attempt.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut _sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_fuchsia_wlan_sme::UserDisconnectReason::Startup }) => {
                 responder.send().expect("could not send response")
@@ -2115,7 +2116,7 @@ mod tests {
 
         // Make sure that the connect request has been sent out.
         run_state_machine_futures(&mut exec, &mut iface_manager);
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut _sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
@@ -2164,12 +2165,12 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Initiate automatic connection selection
         {
             let mut sel_fut = pin!(initiate_automatic_connection_selection(&mut iface_manager));
-            assert_variant!(exec.run_until_stalled(&mut sel_fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut sel_fut), Poll::Ready(()));
         }
 
         // Request a connect through IfaceManager and respond to requests needed to complete it.
@@ -2180,7 +2181,7 @@ mod tests {
             let mut connect_fut = pin!(connect_fut);
 
             // Run the future for the connect request
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
         }
 
         // There should be a new connection selection future for the manual connect request,
@@ -2197,22 +2198,22 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Respond to the connection selection request
-        assert_variant!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, ConnectionSelectionRequest::NewConnectionSelection {network_id, reason, responder} => {
+        assert_matches!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, ConnectionSelectionRequest::NewConnectionSelection {network_id, reason, responder} => {
                 assert!(network_id.is_some());
                 assert_eq!(reason, client_types::ConnectReason::NewSavedNetworkAutoconnect);
                 responder.send(Some(scanned_candidate)).expect("failed to send selection");
             });
         });
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Since an AP was selected, the iface manager should request an SME handle to
         // initialize a state machine.
         let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-        assert_variant!(
+        assert_matches!(
             poll_service_req(&mut exec, &mut monitor_service_fut),
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -2224,7 +2225,7 @@ mod tests {
 
         // Check the connection selection futures receiver to see that connection selection
         // wasn't initiated again.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -2253,7 +2254,7 @@ mod tests {
         let mut disconnect_fut = pin!(disconnect_fut);
 
         // Expect that we have requested a client SME proxy.
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
         // Verify that the network selection future was dropped from the list.
         assert!(iface_manager.connection_selection_futures.is_empty());
@@ -2291,7 +2292,7 @@ mod tests {
 
         // Verify that the request to connect results in an error.
         let mut connect_fut = pin!(connect_fut);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where connect is called, but client connections are disabled.
@@ -2339,7 +2340,7 @@ mod tests {
 
         // Verify that the request to connect results in an error.
         let mut connect_fut = pin!(connect_fut);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where the PhyManager knows of a client iface, but the IfaceManager is not
@@ -2371,7 +2372,7 @@ mod tests {
         let connect_fut = iface_manager.connect(connect_selection);
 
         let mut connect_fut = pin!(connect_fut);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where disconnect is called on a configured client.
@@ -2401,7 +2402,7 @@ mod tests {
 
             // Ensure that disconnect returns a successful response.
             let mut disconnect_fut = pin!(disconnect_fut);
-            assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(_)));
         }
 
         // Verify that the ClientIfaceContainer has been moved from configured to unconfigured.
@@ -2443,7 +2444,7 @@ mod tests {
 
         // Verify that the configured client has not been affected.
         assert_eq!(iface_manager.clients.len(), 1);
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
@@ -2487,7 +2488,7 @@ mod tests {
 
         // Verify that disconnect returns immediately.
         let mut disconnect_fut = pin!(disconnect_fut);
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(_)));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(_)));
     }
 
     /// Tests the case where the call to disconnect the client fails.
@@ -2515,7 +2516,7 @@ mod tests {
             iface_manager.disconnect(network_id, client_types::DisconnectReason::NetworkUnsaved);
 
         let mut disconnect_fut = pin!(disconnect_fut);
-        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Err(_)));
     }
 
     /// Tests stop_client_connections when there is a client that is connected.
@@ -2541,7 +2542,7 @@ mod tests {
                 client_types::DisconnectReason::FidlStopClientConnectionsRequest,
             );
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
         }
 
         // Ensure that no client interfaces are accounted for.
@@ -2552,7 +2553,7 @@ mod tests {
             state: fidl_fuchsia_wlan_policy::WlanClientState::ConnectionsDisabled,
             networks: vec![],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.client_update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
@@ -2582,7 +2583,7 @@ mod tests {
                 client_types::DisconnectReason::FidlStopClientConnectionsRequest,
             );
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
         }
 
         // Ensure there are no remaining client ifaces.
@@ -2625,7 +2626,7 @@ mod tests {
 
             // Ensure stop_client_connections returns immediately and is successful.
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
         }
     }
 
@@ -2658,7 +2659,7 @@ mod tests {
                 client_types::DisconnectReason::FidlStopClientConnectionsRequest,
             );
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
         }
 
         // Ensure that no client interfaces are accounted for.
@@ -2698,7 +2699,7 @@ mod tests {
                 client_types::DisconnectReason::FidlStopClientConnectionsRequest,
             );
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
         }
 
         // Ensure that no client interfaces are accounted for.
@@ -2742,12 +2743,12 @@ mod tests {
 
             // Ensure stop_client_connections returns immediately and is successful.
             let mut stop_fut = pin!(stop_fut);
-            assert_variant!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut stop_fut), Poll::Ready(Ok(_)));
         }
 
         // Verify that telemetry event has been sent
-        let event = assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
-        assert_variant!(event, TelemetryEvent::ClearEstablishConnectionStartTime);
+        let event = assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
+        assert_matches!(event, TelemetryEvent::ClearEstablishConnectionStartTime);
     }
 
     /// Tests the case where an existing iface is marked as idle.
@@ -2764,12 +2765,12 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
         iface_manager.record_idle_client(TEST_CLIENT_IFACE_ID);
-        assert_variant!(&iface_manager.clients[0].config, ClientIfaceContainerConfig::Unconfigured);
+        assert_matches!(&iface_manager.clients[0].config, ClientIfaceContainerConfig::Unconfigured);
     }
 
     /// Tests the case where a running and configured iface is marked as idle.
@@ -2779,7 +2780,7 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
@@ -2787,7 +2788,7 @@ mod tests {
         // The request to mark the interface as idle should be ignored since the interface's state
         // machine is still running.
         iface_manager.record_idle_client(TEST_CLIENT_IFACE_ID);
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
@@ -2800,12 +2801,12 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
         iface_manager.record_idle_client(123);
-        assert_variant!(
+        assert_matches!(
             &iface_manager.clients[0].config,
             ClientIfaceContainerConfig::Configured(..)
         );
@@ -2889,11 +2890,11 @@ mod tests {
 
             // Ensure start_client_connections returns immediately and is successful.
             let mut start_fut = pin!(start_fut);
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(_)));
         }
 
         // Ensure no update is sent
-        assert_variant!(test_values.client_update_receiver.try_next(), Err(_));
+        assert_matches!(test_values.client_update_receiver.try_next(), Err(_));
     }
 
     /// Tests the case where starting client connections fails.
@@ -2918,7 +2919,7 @@ mod tests {
         {
             let start_fut = iface_manager.start_client_connections();
             let mut start_fut = pin!(start_fut);
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Err(_)));
         }
     }
 
@@ -2952,8 +2953,8 @@ mod tests {
             let mut start_fut = pin!(start_fut);
 
             // The IfaceManager will first query to determine the type of interface.
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_CLIENT_IFACE_ID, responder
@@ -2972,8 +2973,8 @@ mod tests {
             );
 
             // The request should stall out while attempting to get a client interface.
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -2985,8 +2986,8 @@ mod tests {
 
             // Expect that we have requested a client SME proxy from creating the client state
             // machine.
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -2997,7 +2998,7 @@ mod tests {
             );
 
             // The request should complete successfully.
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut start_fut), Poll::Ready(Ok(())));
         }
 
         assert!(!iface_manager.clients.is_empty());
@@ -3018,7 +3019,7 @@ mod tests {
             let fut = iface_manager.start_ap(config);
 
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
         }
 
         assert!(iface_manager.aps[0].enabled_time.is_some());
@@ -3038,7 +3039,7 @@ mod tests {
             let fut = iface_manager.start_ap(config);
 
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
     }
 
@@ -3075,7 +3076,7 @@ mod tests {
         let fut = iface_manager.start_ap(config);
 
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     /// Tests the case where stop_ap is called for a config that is accounted for by the
@@ -3093,12 +3094,12 @@ mod tests {
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
         assert!(iface_manager.aps.is_empty());
 
         // Ensure a metric was logged.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3116,12 +3117,12 @@ mod tests {
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
         assert!(!iface_manager.aps.is_empty());
 
         // Ensure no metric was logged.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+        assert_matches!(test_values.telemetry_receiver.try_next(), Err(_));
 
         // Ensure the AP start time has not been cleared.
         assert!(iface_manager.aps[0].enabled_time.is_some());
@@ -3142,13 +3143,13 @@ mod tests {
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
 
         assert!(iface_manager.aps.is_empty());
 
         // Ensure metric was logged.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3169,13 +3170,13 @@ mod tests {
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
 
         assert!(iface_manager.aps.is_empty());
 
         // Ensure metric was logged.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3210,7 +3211,7 @@ mod tests {
         );
         let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where stop_all_aps is called and it succeeds.
@@ -3240,16 +3241,16 @@ mod tests {
         {
             let fut = iface_manager.stop_all_aps();
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
         assert!(iface_manager.aps.is_empty());
 
         // Ensure metrics are logged for both AP interfaces.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3282,16 +3283,16 @@ mod tests {
         {
             let fut = iface_manager.stop_all_aps();
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
         assert!(iface_manager.aps.is_empty());
 
         // Ensure metrics are logged for both AP interfaces.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3324,16 +3325,16 @@ mod tests {
         {
             let fut = iface_manager.stop_all_aps();
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
         assert!(iface_manager.aps.is_empty());
 
         // Ensure metrics are logged for both AP interfaces.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3370,10 +3371,10 @@ mod tests {
 
         let fut = iface_manager.stop_all_aps();
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // Ensure no metrics are logged.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+        assert_matches!(test_values.telemetry_receiver.try_next(), Err(_));
     }
 
     /// Tests the case where there is a single AP interface and it is asked to start twice and then
@@ -3391,7 +3392,7 @@ mod tests {
             let fut = iface_manager.start_ap(config);
 
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
         }
 
         // Record the initial start time.
@@ -3405,25 +3406,25 @@ mod tests {
             let fut = iface_manager.start_ap(config);
 
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
         }
 
         // Verify that the start time has not been updated.
         assert_eq!(initial_start_time, iface_manager.aps[0].enabled_time);
 
         // Verify that no metric has been recorded.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+        assert_matches!(test_values.telemetry_receiver.try_next(), Err(_));
 
         // Now issue a stop command.
         {
             let fut = iface_manager.stop_all_aps();
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
         assert!(iface_manager.aps.is_empty());
 
         // Make sure the metric has been sent.
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::StopAp { .. }))
         );
@@ -3460,8 +3461,8 @@ mod tests {
             let mut fut = pin!(fut);
 
             // Expect a DeviceMonitor request an SME proxy.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -3472,7 +3473,7 @@ mod tests {
                 }
             );
 
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         assert!(!iface_manager.aps.is_empty());
@@ -3513,8 +3514,8 @@ mod tests {
             let mut fut = pin!(fut);
 
             // Expect a DeviceMonitor request an SME proxy.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -3525,7 +3526,7 @@ mod tests {
                 }
             );
 
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         assert!(!iface_manager.aps.is_empty());
@@ -3539,7 +3540,7 @@ mod tests {
             state: fidl_fuchsia_wlan_policy::WlanClientState::ConnectionsDisabled,
             networks: vec![],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.client_update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
                 assert_eq!(updates, expected_update);
@@ -3575,7 +3576,7 @@ mod tests {
             let mut fut = pin!(fut);
 
             // Verify that the future completes immediately since the interface recreation failed.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // Verify that no new client interface was created.
@@ -3612,7 +3613,7 @@ mod tests {
             let mut fut = pin!(fut);
 
             // The future should now run to completion.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         assert!(!iface_manager.clients.is_empty());
@@ -3649,7 +3650,7 @@ mod tests {
         {
             let fut = iface_manager.handle_removed_iface(1234);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         assert!(!iface_manager.clients.is_empty());
@@ -3704,11 +3705,11 @@ mod tests {
             // Notify the IfaceManager of a new interface.
             let fut = iface_manager.configure_new_iface(TEST_CLIENT_IFACE_ID);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect and interface query and notify that this is a client interface.
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_CLIENT_IFACE_ID, responder
@@ -3727,8 +3728,8 @@ mod tests {
             );
 
             // Expect that we have requested a client SME proxy from get_client.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -3738,12 +3739,12 @@ mod tests {
                 }
             );
 
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect that we have requested a client SME proxy from creating the client state
             // machine.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -3754,7 +3755,7 @@ mod tests {
             );
 
             // Run the future to completion.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
 
         // Ensure that the client interface has been added.
@@ -3793,11 +3794,11 @@ mod tests {
             // Notify the IfaceManager of a new interface.
             let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect that the interface properties are queried and notify that it is an AP iface.
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_AP_IFACE_ID, responder
@@ -3816,9 +3817,9 @@ mod tests {
             );
 
             // Run the future so that an AP SME proxy is requested.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-            let responder = assert_variant!(
+            let responder = assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
                     iface_id: TEST_AP_IFACE_ID, sme_server: _, responder
@@ -3829,7 +3830,7 @@ mod tests {
             assert!(responder.send(Ok(())).is_ok());
 
             // Run the future to completion.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
 
         // Ensure that the AP interface has been added.
@@ -3868,11 +3869,11 @@ mod tests {
             // Notify the IfaceManager of a new interface.
             let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect an iface query and send back an error
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_AP_IFACE_ID, responder
@@ -3884,7 +3885,7 @@ mod tests {
             );
 
             // Run the future to completion.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
         }
 
         // Ensure that no interfaces have been added.
@@ -3905,11 +3906,11 @@ mod tests {
         {
             let fut = iface_manager.configure_new_iface(TEST_CLIENT_IFACE_ID);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect an interface query and notify that it is a client.
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_CLIENT_IFACE_ID, responder
@@ -3928,7 +3929,7 @@ mod tests {
             );
 
             // The future should then run to completion as it finds the existing interface.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
 
         // Verify that nothing new has been appended to the clients vector or the aps vector.
@@ -3949,11 +3950,11 @@ mod tests {
         {
             let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Expect an interface query and notify that it is a client.
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                     iface_id: TEST_AP_IFACE_ID, responder
@@ -3972,7 +3973,7 @@ mod tests {
             );
 
             // The future should then run to completion as it finds the existing interface.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
         }
 
         // Verify that nothing new has been appended to the clients vector or the aps vector.
@@ -4013,7 +4014,7 @@ mod tests {
         // Service any device service requests in the event that a new client SME proxy is required
         // for the operation under test.
         let mut monitor_service_fut = monitor_service_stream.into_future();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         match poll_service_req(exec, &mut monitor_service_fut) {
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: TEST_CLIENT_IFACE_ID,
@@ -4037,17 +4038,17 @@ mod tests {
         match test_type {
             TestType::Pass => {
                 // Process the request.
-                assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+                assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
                 // Assert that the receiving end gets a successful result.
-                assert_variant!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(Ok(_))));
+                assert_matches!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(Ok(_))));
             }
             TestType::Fail => {
                 // Process the request.
-                assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+                assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
                 // Assert that the receiving end gets a successful result.
-                assert_variant!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(Err(_))));
+                assert_matches!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(Err(_))));
             }
             TestType::ClientError => {
                 // Simulate a client failure.
@@ -4056,7 +4057,7 @@ mod tests {
         }
 
         // Make sure the service keeps running.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     fn run_service_test_with_unit_return(
@@ -4085,17 +4086,17 @@ mod tests {
         match test_type {
             TestType::Pass => {
                 // Process the request.
-                assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+                assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
                 // Assert that the receiving end gets a successful result.
-                assert_variant!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(())));
+                assert_matches!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(())));
             }
             TestType::Fail => {
                 // Process the request.
-                assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+                assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
                 // Assert that the receiving end gets a successful result.
-                assert_variant!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(())));
+                assert_matches!(exec.run_until_stalled(&mut req_receiver), Poll::Ready(Ok(())));
             }
             TestType::ClientError => {
                 // Simulate a client failure.
@@ -4104,7 +4105,7 @@ mod tests {
         }
 
         // Make sure the service keeps running.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[test_case(FakeClient {disconnect_ok: true, is_alive:true, expected_connect_selection: None},
@@ -4224,10 +4225,10 @@ mod tests {
         sender.try_send(req).expect("failed to send request");
 
         // Run the service loop and expect the request to be serviced and for the loop to not exit.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Wait for the response.
-        assert_variant!(exec.run_until_stalled(&mut ack_receiver), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut ack_receiver), Poll::Ready(Ok(())));
 
         // Check if an idle interface is present.
         let (idle_iface_sender, mut idle_iface_receiver) = oneshot::channel();
@@ -4235,10 +4236,10 @@ mod tests {
         let req = IfaceManagerRequest::HasIdleIface(req);
         sender.try_send(req).expect("failed to send request");
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Make sure that the interface has been marked idle.
-        assert_variant!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Ready(Ok(true)));
+        assert_matches!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Ready(Ok(true)));
     }
 
     #[fuchsia::test]
@@ -4270,7 +4271,7 @@ mod tests {
         drop(ack_receiver);
 
         // Run the service loop and expect the request to be serviced and for the loop to not exit.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -4301,7 +4302,7 @@ mod tests {
         drop(idle_iface_receiver);
 
         // Run the service loop and expect the request to be serviced and for the loop to not exit.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -4350,13 +4351,13 @@ mod tests {
         sender.try_send(req).expect("failed to send request");
 
         // Run the service loop to begin processing the request.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Expect that the PhyManager has been notified of the interface.
         {
             let phy_manager_fut = phy_manager.lock();
             let mut phy_manager_fut = pin!(phy_manager_fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut phy_manager_fut),
                 Poll::Ready(phy_manager) => {
                     assert!(phy_manager.client_ifaces.contains(&TEST_CLIENT_IFACE_ID));
@@ -4366,7 +4367,7 @@ mod tests {
 
         // Expect an interface query and notify that this is a client interface.
         let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-        assert_variant!(
+        assert_matches!(
             poll_service_req(&mut exec, &mut monitor_service_fut),
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
                 iface_id: TEST_CLIENT_IFACE_ID, responder
@@ -4385,8 +4386,8 @@ mod tests {
         );
 
         // Expect that we have requested a client SME proxy from get_client.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             poll_service_req(&mut exec, &mut monitor_service_fut),
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -4397,8 +4398,8 @@ mod tests {
         );
 
         // Expect that we have requested a client SME proxy from creating the client state machine.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             poll_service_req(&mut exec, &mut monitor_service_fut),
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
@@ -4409,10 +4410,10 @@ mod tests {
         );
 
         // Run the service again to ensure the response is sent.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the response was received.
-        assert_variant!(exec.run_until_stalled(&mut new_iface_receiver), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut new_iface_receiver), Poll::Ready(Ok(())));
     }
 
     #[test_case(TestType::Fail; "failed to add interface")]
@@ -4755,18 +4756,18 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         let mut sme_stream = {
             let reconnect_fut = iface_manager
                 .attempt_client_reconnect(TEST_CLIENT_IFACE_ID, connect_selection.clone());
             let mut reconnect_fut = pin!(reconnect_fut);
-            assert_variant!(exec.run_until_stalled(&mut reconnect_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut reconnect_fut), Poll::Pending);
 
             // There should be a request for a client SME proxy.
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            let sme_server = assert_variant!(
+            let sme_server = assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -4777,7 +4778,7 @@ mod tests {
             );
 
             // The reconnect future should finish up.
-            assert_variant!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
 
             sme_server.into_stream().into_future()
         };
@@ -4786,14 +4787,14 @@ mod tests {
         run_state_machine_futures(&mut exec, &mut iface_manager);
 
         // Verify telemetry event has been sent.
-        let event = assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
-        assert_variant!(
+        let event = assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
+        assert_matches!(
             event,
             TelemetryEvent::StartEstablishConnection { reset_start_time: false }
         );
 
         // Acknowledge the disconnection attempt.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_fuchsia_wlan_sme::UserDisconnectReason::Startup }) => {
                 responder.send().expect("could not send response")
@@ -4802,7 +4803,7 @@ mod tests {
 
         // Make sure that the connect request has been sent out.
         run_state_machine_futures(&mut exec, &mut iface_manager);
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
@@ -4863,7 +4864,7 @@ mod tests {
             let reconnect_fut =
                 iface_manager.attempt_client_reconnect(TEST_CLIENT_IFACE_ID, connect_selection);
             let mut reconnect_fut = pin!(reconnect_fut);
-            assert_variant!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
         }
 
         // Ensure that there are no new state machines.
@@ -4895,14 +4896,14 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         {
             let reconnect_fut =
                 iface_manager.attempt_client_reconnect(TEST_CLIENT_IFACE_ID, connect_selection);
             let mut reconnect_fut = pin!(reconnect_fut);
-            assert_variant!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
         }
 
         // Ensure that there are no new state machines.
@@ -4934,7 +4935,7 @@ mod tests {
         let save_network_fut =
             test_values.saved_networks.store(network_id.clone(), credential.clone());
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Make the client state machine report that it is not alive.
         let (mut iface_manager, _sme_stream) = create_iface_manager_with_client(&test_values, true);
@@ -4965,7 +4966,7 @@ mod tests {
                 let remove_network_fut =
                     test_values.saved_networks.remove(network_id.clone(), credential);
                 let mut remove_network_fut = pin!(remove_network_fut);
-                assert_variant!(exec.run_until_stalled(&mut remove_network_fut), Poll::Ready(_));
+                assert_matches!(exec.run_until_stalled(&mut remove_network_fut), Poll::Ready(_));
             }
             NetworkSelectionMissingAttribute::NetworkSelectionInProgress => {
                 // Insert a future so that it looks like a scan is in progress.
@@ -4978,21 +4979,21 @@ mod tests {
         {
             // Run the future to completion.
             let mut fut = pin!(initiate_automatic_connection_selection(&mut iface_manager));
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // Verify telemetry event if the condition is right
         match test_type {
             NetworkSelectionMissingAttribute::AllAttributesPresent => {
                 let event =
-                    assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
-                assert_variant!(
+                    assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(ev)) => ev);
+                assert_matches!(
                     event,
                     TelemetryEvent::StartEstablishConnection { reset_start_time: false }
                 );
             }
             _ => {
-                assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+                assert_matches!(test_values.telemetry_receiver.try_next(), Err(_));
             }
         }
 
@@ -5000,11 +5001,11 @@ mod tests {
             NetworkSelectionMissingAttribute::AllAttributesPresent => {
                 // Run forward connection selection futures to kick them off.
                 iface_manager.connection_selection_futures.iter_mut().for_each(|fut| {
-                    assert_variant!(exec.run_until_stalled(fut), Poll::Pending);
+                    assert_matches!(exec.run_until_stalled(fut), Poll::Pending);
                 });
                 // Connection selector should receive request if all attributes are present.
-                assert_variant!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(request)) => {
-                    assert_variant!(request, ConnectionSelectionRequest::NewConnectionSelection {network_id, reason, responder} => {
+                assert_matches!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(request)) => {
+                    assert_matches!(request, ConnectionSelectionRequest::NewConnectionSelection {network_id, reason, responder} => {
                         assert_eq!(network_id, None);
                         assert_eq!(reason, client_types::ConnectReason::IdleInterfaceAutoconnect);
                         responder.send(Some(generate_random_scanned_candidate())).expect("failed to send selection");
@@ -5013,7 +5014,7 @@ mod tests {
             }
             _ => {
                 // No connection selection request should be sent.
-                assert_variant!(
+                assert_matches!(
                     test_values.connection_selection_request_receiver.try_next(),
                     Err(_)
                 );
@@ -5023,7 +5024,7 @@ mod tests {
         // Run all connection_selection futures to completion.
         for mut connection_selection_future in iface_manager.connection_selection_futures.iter_mut()
         {
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut connection_selection_future),
                 Poll::Ready(_)
             );
@@ -5058,7 +5059,7 @@ mod tests {
                     &mut connectivity_monitor_timer,
                 );
                 let mut fut = pin!(fut);
-                assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+                assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
             }
             assert_eq!(reconnect_monitor_interval, expected_wait_times[i]);
         }
@@ -5103,9 +5104,9 @@ mod tests {
             let mut fut = pin!(fut);
 
             // Expect a client SME proxy request
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
             let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
+            assert_matches!(
                 poll_service_req(&mut exec, &mut monitor_service_fut),
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
@@ -5118,7 +5119,7 @@ mod tests {
             );
 
             // The future should then complete.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // The reconnect attempt should have seen an idle client interface and created a new client
@@ -5171,7 +5172,7 @@ mod tests {
             drop(test_values.monitor_service_stream);
 
             // The future should then complete.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // There should still be an idle client
@@ -5212,7 +5213,7 @@ mod tests {
             );
             let mut fut = pin!(fut);
 
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
         // There should not be any idle clients.
@@ -5237,7 +5238,7 @@ mod tests {
             let save_network_fut =
                 test_values.saved_networks.store(network_id.clone(), credential.clone());
             let mut save_network_fut = pin!(save_network_fut);
-            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
+            assert_matches!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
         }
 
         // Create an interface manager with an unconfigured client interface.
@@ -5398,7 +5399,7 @@ mod tests {
         if destroy_iface_ok && set_country_ok {
             let phy_manager_fut = phy_manager.lock();
             let mut phy_manager_fut = pin!(phy_manager_fut);
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut phy_manager_fut),
                 Poll::Ready(phy_manager) => {
                     assert_eq!(phy_manager.country_code, Some([0, 0]))
@@ -5437,7 +5438,7 @@ mod tests {
             );
 
             // The future should complete immediately.
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut defect_fut),
                 Poll::Ready(IfaceManagerOperation::ReportDefect)
             );
@@ -5446,7 +5447,7 @@ mod tests {
         // Verify that the defect has been recorded.
         let phy_manager_fut = phy_manager.lock();
         let mut phy_manager_fut = pin!(phy_manager_fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut phy_manager_fut),
             Poll::Ready(phy_manager) => {
                 assert_eq!(phy_manager.defects, vec![Defect::Phy(PhyFailure::IfaceCreationFailure {phy_id: 2})])
@@ -5497,12 +5498,12 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the defect has been recorded.
         let phy_manager_fut = phy_manager.lock();
         let mut phy_manager_fut = pin!(phy_manager_fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut phy_manager_fut),
             Poll::Ready(phy_manager) => {
                 assert_eq!(phy_manager.defects, vec![Defect::Iface(IfaceFailure::ApStartFailure {iface_id: 0})])
@@ -5559,12 +5560,12 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the recovery summary has been recorded.
         let next_message = recovery_receiver.next();
         let mut next_message = pin!(next_message);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some((summary, responder))) => {
                 assert_eq!(summary, recovery::RecoverySummary { defect, action});
@@ -5621,14 +5622,14 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the recovery summary has been observed.  Hold onto the responder so that the
         // IfaceManager service loop stalls waiting for a reply.  This is used to demonstrate that
         // new IfaceManager requests are not processed.
         let next_message = recovery_receiver.next();
         let mut next_message = pin!(next_message);
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some((summary, responder))) => {
                 assert_eq!(summary, recovery::RecoverySummary { defect, action});
@@ -5646,13 +5647,13 @@ mod tests {
 
         // Run the service loop and verify that the stop all APs request has not been acknowledged
         // yet.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(stop_receiver.try_recv(), Ok(None));
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(stop_receiver.try_recv(), Ok(None));
 
         // Complete the recovery process and observe that the stop all APs request completes.
         responder.send(()).expect("failed to ack recovery");
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(stop_receiver.try_recv(), Ok(Some(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(stop_receiver.try_recv(), Ok(Some(Ok(()))));
     }
 
     #[fuchsia::test]
@@ -5703,7 +5704,7 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the recovery summary has been observed.  Hold onto the responder so that the
         // IfaceManager service loop stalls waiting for a reply.  This is used to demonstrate that
@@ -5711,7 +5712,7 @@ mod tests {
         // progress.
         let next_message = recovery_receiver.next();
         let mut next_message = pin!(next_message);
-        let responder = assert_variant!(
+        let responder = assert_matches!(
             exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some((summary, responder))) => {
                 assert_eq!(summary, recovery::RecoverySummary { defect, action});
@@ -5731,15 +5732,15 @@ mod tests {
             .expect("failed to send recovery summary");
 
         // Progress the service loop future and verify that the new summary is not received.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         let next_message = recovery_receiver.next();
         let mut next_message = pin!(next_message);
-        assert_variant!(exec.run_until_stalled(&mut next_message), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_message), Poll::Pending);
 
         // Complete the initial recovery event and verify that the next recovery summary is sent.
         responder.send(()).expect("Failed to send completion event from oneshot");
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some((summary, _))) => {
                 assert_eq!(summary, recovery::RecoverySummary { defect, action});
@@ -5774,7 +5775,7 @@ mod tests {
         // Grab the request and the token from the receiving end.
         let token = {
             let mut oneshot_stream = mpsc_receiver.get_atomic_oneshot_stream();
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut oneshot_stream.next()),
                 Poll::Ready(Some((token, ()))) => token
             )
@@ -5783,21 +5784,21 @@ mod tests {
         // Throw the future and token into the atomic operation wrapper.  Verify that the future is
         // waiting for the oneshot sender to send something.
         let mut fut = attempt_atomic_operation(fut, token);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Demonstrate that the AtomicOneshotStream is not able to produce the second request yet.
         {
             let mut oneshot_stream = mpsc_receiver.get_atomic_oneshot_stream();
-            assert_variant!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(None));
+            assert_matches!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(None));
         }
 
         // Send on the oneshot sender so that the wrapped future can run to completion and the
         // token will be dropped, allowing new requests to be received.
         oneshot_sender.send(()).expect("failed to send oneshot message");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(_));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(_));
 
         let mut oneshot_stream = mpsc_receiver.get_atomic_oneshot_stream();
-        assert_variant!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(Some(_)));
+        assert_matches!(exec.run_until_stalled(&mut oneshot_stream.next()), Poll::Ready(Some(_)));
     }
 
     fn test_atomic_operation<T: Debug>(
@@ -5861,8 +5862,8 @@ mod tests {
 
         // Make the atomic call and run the service future until it stalls.
         req_sender.try_send(req).expect("failed to make atomic request");
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Pending,);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Pending);
 
         // Make a second IfaceManager call and observe that there is no response.
         let (idle_iface_sender, mut idle_iface_receiver) = oneshot::channel();
@@ -5870,8 +5871,8 @@ mod tests {
         req_sender
             .try_send(IfaceManagerRequest::HasIdleIface(req))
             .expect("failed to send idle client check");
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Pending,);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Pending);
 
         // It doesn't matter whether the state machines respond successfully, just that the
         // operation finishes so that the atomic operation can progress.  Simply drop the receivers
@@ -5880,11 +5881,11 @@ mod tests {
         drop(ap_receiver);
 
         // The atomic portion of the operation should now complete.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(_),);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(_));
 
         // The second operation should also get a response.
-        assert_variant!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Ready(_),);
+        assert_matches!(exec.run_until_stalled(&mut idle_iface_receiver), Poll::Ready(_));
     }
 
     #[fuchsia::test]
@@ -6023,12 +6024,12 @@ mod tests {
             test_values.recovery_receiver,
         );
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the inspect data was written as a part of the recovery process.
         let read_fut = reader::read(&test_values.inspector);
         let mut read_fut = pin!(read_fut);
-        assert_variant!(exec.run_until_stalled(&mut read_fut), Poll::Ready(Ok(hierarchy)) => {
+        assert_matches!(exec.run_until_stalled(&mut read_fut), Poll::Ready(Ok(hierarchy)) => {
             assert_data_tree!(@executor exec, hierarchy, root: contains {
                 node: contains {
                     recovery_record: contains {
@@ -6080,7 +6081,7 @@ mod tests {
         {
             let connect_fut = iface_manager.handle_connect_request(connect_req);
             let mut connect_fut = pin!(connect_fut);
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
         }
 
         // Expect a "Connecting" update to be sent.
@@ -6092,7 +6093,7 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.client_update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, connecting_state_update);
@@ -6105,7 +6106,7 @@ mod tests {
                 client_types::DisconnectReason::NetworkUnsaved,
             );
             let mut disconnect_fut = pin!(disconnect_fut);
-            assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
         }
 
         // Expect a "Disconnected" update to be sent, with status "ConnectionStopped".
@@ -6117,7 +6118,7 @@ mod tests {
                 status: Some(client_types::DisconnectStatus::ConnectionStopped),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.client_update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, disconnected_state_update);

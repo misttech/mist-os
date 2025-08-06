@@ -34,21 +34,27 @@ ManualWakeLease::ManualWakeLease(async_dispatcher_t* dispatcher, std::string_vie
   if (sag) {
     sag_client_.Bind(std::move(sag));
 
-    auto [client_end, server_end] =
-        fidl::Endpoints<fuchsia_power_system::ActivityGovernorListener>::Create();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_power_system::SuspendBlocker>::Create();
     fidl::Arena arena;
-    fidl::WireResult result = sag_client_->RegisterListener(
-        fuchsia_power_system::wire::ActivityGovernorRegisterListenerRequest::Builder(arena)
-            .listener(std::move(client_end))
+    fidl::WireResult result = sag_client_->RegisterSuspendBlocker(
+        fuchsia_power_system::wire::ActivityGovernorRegisterSuspendBlockerRequest::Builder(arena)
+            .name(fidl::StringView::FromExternal(lease_name_))
+            .suspend_blocker(std::move(client_end))
             .Build());
     if (!result.ok()) {
       if (log_) {
         fdf::warn("Failed to register for sag state listener: {}", result.error());
       }
       ResetSagClient();
+    } else if (result->is_error()) {
+      if (log_) {
+        fdf::warn("Failed to register for sag state listener: {}",
+                  static_cast<uint32_t>(result->error_value()));
+      }
+      ResetSagClient();
     } else {
-      listener_binding_.emplace(dispatcher, std::move(server_end), this,
-                                [this](fidl::UnbindInfo unused) { ResetSagClient(); });
+      suspend_blocker_binding_.emplace(dispatcher, std::move(server_end), this,
+                                       [this](fidl::UnbindInfo unused) { ResetSagClient(); });
     }
   }
 
@@ -134,19 +140,19 @@ zx::result<zx::eventpair> ManualWakeLease::GetWakeLeaseCopy() {
   return zx::ok(std::move(copy));
 }
 
-// fuchsia.power.system/ActivityGovernorListener implementation. This is used to avoid creating
+// fuchsia.power.system/SuspendBlocker implementation. This is used to avoid creating
 // wake leases in cases where the system is resumed and `HandleInterrupt` is called.
-void ManualWakeLease::OnResume(OnResumeCompleter::Sync& completer) {
+void ManualWakeLease::AfterResume(AfterResumeCompleter::Sync& completer) {
   SetSuspended(false);
   completer.Reply();
 }
 
-void ManualWakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+void ManualWakeLease::BeforeSuspend(BeforeSuspendCompleter::Sync& completer) {
   SetSuspended(true);
   if (lease_ && log_) {
     // This is a bit unexpected, since we have a lease, but maybe this
     // callback was queued before we acquired the lease?
-    fdf::warn("OnSuspendStarted call while a wake lease is held.");
+    fdf::warn("BeforeSuspend call while a wake lease is held.");
   }
 
   if (active_) {
@@ -157,7 +163,7 @@ void ManualWakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& complete
 }
 
 void ManualWakeLease::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
+    fidl::UnknownMethodMetadata<fuchsia_power_system::SuspendBlocker> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   if (log_) {
     fdf::warn("Encountered unexpected method: {}", metadata.method_ordinal);

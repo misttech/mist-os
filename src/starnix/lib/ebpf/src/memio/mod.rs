@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::marker::PhantomData;
-use std::ops::Range;
+use std::ops::RangeBounds;
 use zerocopy::{FromBytes, IntoBytes};
 
 #[cfg(target_arch = "aarch64")]
@@ -73,6 +73,20 @@ impl EbpfPtr<'_, u64> {
     }
 }
 
+impl EbpfPtr<'_, u32> {
+    /// Loads the value referenced by the pointer. Atomicity is guaranteed
+    /// if and only if the pointer is 8-byte aligned.
+    pub fn load_relaxed(&self) -> u32 {
+        unsafe { arch::load_u32(self.ptr) }
+    }
+
+    /// Stores the `value` at the memory referenced by the pointer. Atomicity
+    /// is guaranteed if and only if the pointer is 8-byte aligned.
+    pub fn store_relaxed(&self, value: u32) {
+        unsafe { arch::store_u32(self.ptr, value) }
+    }
+}
+
 /// Wraps a pointer to buffer used in eBPF runtime, such as an eBPF maps
 /// entry. The referenced data may be access from multiple threads in parallel,
 /// which makes it unsafe to access it using standard Rust types.
@@ -131,16 +145,27 @@ impl<'a> EbpfBufferPtr<'a> {
 
     /// Returns pointer to the specified range in the buffer.
     /// Range bounds must be multiple of 8.
-    pub fn slice(&self, range: Range<usize>) -> Option<Self> {
-        assert!(range.start <= range.end);
-        (range.end <= self.size).then(|| {
+    pub fn slice(&self, range: impl RangeBounds<usize>) -> Option<Self> {
+        let start = match range.start_bound() {
+            std::ops::Bound::Included(&start) => start,
+            std::ops::Bound::Excluded(&start) => start + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            std::ops::Bound::Included(&end) => end + 1,
+            std::ops::Bound::Excluded(&end) => end,
+            std::ops::Bound::Unbounded => self.size,
+        };
+
+        assert!(start <= end);
+        (end <= self.size).then(|| {
             // SAFETY: Returned buffer has the same lifetime as `self`, which
             // ensures that the `ptr` stays valid for the lifetime of the
             // result.
             unsafe {
                 Self {
-                    ptr: self.ptr.byte_offset(range.start as isize),
-                    size: range.end - range.start,
+                    ptr: self.ptr.byte_offset(start as isize),
+                    size: end - start,
                     phantom: PhantomData,
                 }
             }
@@ -153,7 +178,7 @@ impl<'a> EbpfBufferPtr<'a> {
 
         for pos in (0..self.size).step_by(Self::ALIGNMENT) {
             // SAFETY: the offset is guaranteed to be within the buffer bounds.
-            let value: u64 = unsafe { self.get_ptr_internal(pos).load_relaxed() };
+            let value: u64 = unsafe { self.get_ptr_internal::<u64>(pos).load_relaxed() };
             result.extend_from_slice(value.as_bytes());
         }
 
@@ -177,14 +202,14 @@ impl<'a> EbpfBufferPtr<'a> {
         for pos in (0..end).step_by(Self::ALIGNMENT) {
             let value = u64::read_from_bytes(&data[pos..(pos + 8)]).unwrap();
             // SAFETY: pos is guaranteed to be within the buffer bounds.
-            unsafe { self.get_ptr_internal(pos).store_relaxed(value) };
+            unsafe { self.get_ptr_internal::<u64>(pos).store_relaxed(value) };
         }
 
         if tail > 0 {
             let mut value: u64 = 0;
             value.as_mut_bytes()[..tail].copy_from_slice(&data[(data.len() - tail)..]);
             // SAFETY: pos is guaranteed to be within the buffer bounds.
-            unsafe { self.get_ptr_internal(data.len() - tail).store_relaxed(value) };
+            unsafe { self.get_ptr_internal::<u64>(data.len() - tail).store_relaxed(value) };
         }
     }
 }

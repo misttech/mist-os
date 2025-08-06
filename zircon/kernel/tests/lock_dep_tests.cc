@@ -1689,7 +1689,7 @@ static bool bug_84827_regression_test() {
     // the lockdep code that our thread is re-entering a lock it is already
     // holding (even though the lock has already been dropped) triggering an OOPS.
     mp_sync_exec(
-        MP_IPI_TARGET_MASK, args.first_cpu_mask | args.second_cpu_mask,
+        mp_ipi_target::MASK, args.first_cpu_mask | args.second_cpu_mask,
         [](void* ctx) {
           TestArgs& args = *(reinterpret_cast<TestArgs*>(ctx));
 

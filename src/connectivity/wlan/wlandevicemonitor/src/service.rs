@@ -653,6 +653,7 @@ fn phy_result_to_status(
 mod tests {
     use super::*;
     use crate::device::PhyOwnership;
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle};
     use fuchsia_inspect::Inspector;
     use futures::future::BoxFuture;
@@ -663,7 +664,6 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync};
 
     struct TestValues {
@@ -774,18 +774,18 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the PHYs should complete and no PHYs should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(phys)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(phys)) => {
             assert!(phys.is_empty())
         });
 
@@ -796,13 +796,13 @@ mod tests {
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the PHYs should complete and the PHY should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(phys)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(phys)) => {
             assert_eq!(vec![0u16], phys);
         });
 
@@ -812,13 +812,13 @@ mod tests {
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the PHYs should complete and no PHYs should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(phys)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(phys)) => {
             assert!(phys.is_empty())
         });
     }
@@ -840,18 +840,18 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -866,13 +866,13 @@ mod tests {
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and the iface should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
             assert_eq!(vec![0u16], ifaces);
         });
     }
@@ -898,17 +898,17 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initiate a GetDevPath request. The returned future should not be able
         // to produce a result immediately
         let query_fut = test_values.monitor_proxy.get_dev_path(10u16);
         let mut query_fut = pin!(query_fut);
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Our original future should complete, and return the dev path.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut query_fut),
             Poll::Ready(Ok(Some(path))) => {
                 assert_eq!(path, expected_path);
@@ -933,18 +933,18 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Query a PHY's dev path.
         let query_fut = test_values.monitor_proxy.get_dev_path(0);
         let mut query_fut = pin!(query_fut);
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The attempt to query the PHY's information should fail.
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(None)));
+        assert_matches!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(None)));
     }
 
     #[fuchsia::test]
@@ -966,18 +966,18 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initiate a GetWlanMacRoles request. The returned future should not be able
         // to produce a result immediately
         let get_supported_mac_roles_fut = test_values.monitor_proxy.get_supported_mac_roles(10u16);
         let mut get_supported_mac_roles_fut = pin!(get_supported_mac_roles_fut);
-        assert_variant!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
 
         // The call above should trigger a Query message to the phy.
         // Pretend that we are the phy and read the message from the other side.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
-        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        let responder = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
                     Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetSupportedMacRoles { responder }))) => responder
         );
 
@@ -985,10 +985,10 @@ mod tests {
         responder
             .send(Ok(&[fidl_wlan_common::WlanMacRole::Client]))
             .expect("failed to send QueryResponse");
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Our original future should complete now and the client role should be reported.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut get_supported_mac_roles_fut),
             Poll::Ready(Ok(Ok(supported_mac_roles))) => {
                 assert_eq!(supported_mac_roles, vec![fidl_wlan_common::WlanMacRole::Client]);
@@ -1013,18 +1013,18 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Query a PHY's dev path.
         let get_supported_mac_roles_fut = test_values.monitor_proxy.get_supported_mac_roles(0);
         let mut get_supported_mac_roles_fut = pin!(get_supported_mac_roles_fut);
-        assert_variant!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The attempt to query the PHY's information should fail.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut get_supported_mac_roles_fut),
             Poll::Ready(Ok(Err(zx::sys::ZX_ERR_NOT_FOUND)))
         );
@@ -1050,7 +1050,7 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Watch for new devices.
         let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
@@ -1060,27 +1060,27 @@ mod tests {
             .expect("failed to watch devices");
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initially there should be no devices and the future should be pending.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
         let mut next_fut = pin!(next_fut);
-        assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // Add a PHY and make sure the update is received.
         let (phy, _phy_stream) = fake_phy();
         test_values.phys.insert(0, phy);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnPhyAdded { phy_id: 0 })))
         );
 
         // Remove the PHY and make sure the update is received.
         test_values.phys.remove(&0);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnPhyRemoved { phy_id: 0 })))
         );
@@ -1106,12 +1106,12 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Add a PHY before beginning to watch for devices.
         let (phy, _phy_stream) = fake_phy();
         test_values.phys.insert(0, phy);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
 
         // Watch for new devices.
         let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
@@ -1121,25 +1121,25 @@ mod tests {
             .expect("failed to watch devices");
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Start listening for device events.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
         let mut next_fut = pin!(next_fut);
-        assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // We should be notified of the existing PHY.
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnPhyAdded { phy_id: 0 })))
         );
 
         // Remove the PHY and make sure the update is received.
         test_values.phys.remove(&0);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnPhyRemoved { phy_id: 0 })))
         );
@@ -1165,7 +1165,7 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Watch for new devices.
         let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
@@ -1175,13 +1175,13 @@ mod tests {
             .expect("failed to watch devices");
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initially there should be no devices and the future should be pending.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
         let mut next_fut = pin!(next_fut);
-        assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // Create a generic SME proxy but drop the server since we won't use it.
         let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
@@ -1191,16 +1191,16 @@ mod tests {
             generic_sme,
         };
         test_values.ifaces.insert(0, fake_iface);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 })))
         );
 
         // Remove the PHY and make sure the update is received.
         test_values.ifaces.remove(&0);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnIfaceRemoved { iface_id: 0 })))
         );
@@ -1226,7 +1226,7 @@ mod tests {
         );
         let mut service_fut = pin!(service_fut);
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Create a generic SME proxy but drop the server since we won't use it.
         let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
@@ -1236,7 +1236,7 @@ mod tests {
             generic_sme,
         };
         test_values.ifaces.insert(0, fake_iface);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
 
         // Watch for new devices.
         let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
@@ -1246,25 +1246,25 @@ mod tests {
             .expect("failed to watch devices");
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Start listening for device events.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
         let mut next_fut = pin!(next_fut);
-        assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // We should be notified of the existing interface.
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 })))
         );
 
         // Remove the interface and make sure the update is received.
         test_values.ifaces.remove(&0);
-        assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut next_fut),
             Poll::Ready(Ok(Some(fidl_svc::DeviceWatcherEvent::OnIfaceRemoved { iface_id: 0 })))
         );
@@ -1292,7 +1292,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::SetCountry { req, responder }))) => {
                 assert_eq!(req.alpha2, alpha2.clone());
                 // Pretend to be a WLAN PHY to return the result.
@@ -1327,7 +1327,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::SetCountry { req, responder }))) => (req, responder)
         );
         assert_eq!(req.alpha2, alpha2.clone());
@@ -1360,7 +1360,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetCountry { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(
@@ -1391,7 +1391,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetCountry { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 // Right now the returned country code is not optional, so we just return garbage.
@@ -1400,7 +1400,7 @@ mod tests {
             }
         );
 
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1420,7 +1420,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::ClearCountry { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(zx::Status::OK.into_raw())
@@ -1449,7 +1449,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let responder = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::ClearCountry { responder }))) => responder
         );
 
@@ -1483,7 +1483,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::SetPowerSaveMode { req, responder }))) => {
                 assert_eq!(req, fidl_wlan_common::PowerSaveType::PsModeBalanced);
                 // Pretend to be a WLAN PHY to return the result.
@@ -1516,7 +1516,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::SetPowerSaveMode { req, responder }))) => (req, responder)
         );
         assert_eq!(req, fidl_wlan_common::PowerSaveType::PsModeLowPower);
@@ -1548,7 +1548,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerSaveMode { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(
@@ -1581,7 +1581,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerSaveMode { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 // Right now the returned country code is not optional, so we just return garbage.
@@ -1590,7 +1590,7 @@ mod tests {
             }
         );
 
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -1609,7 +1609,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerDown { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(Err(zx::Status::OK.into_raw()))
@@ -1634,7 +1634,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let responder = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerDown { responder }))) => responder
         );
 
@@ -1705,7 +1705,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerUp { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(Err(zx::Status::OK.into_raw()))
@@ -1730,7 +1730,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let responder = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerUp { responder }))) => responder
         );
 
@@ -1800,7 +1800,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::Reset { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(Err(zx::Status::OK.into_raw()))
@@ -1825,7 +1825,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let responder = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::Reset { responder }))) => responder
         );
 
@@ -1896,7 +1896,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerState { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(
@@ -1924,7 +1924,7 @@ mod tests {
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerState { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 // Right now the returned country code is not optional, so we just return garbage.
@@ -1933,7 +1933,7 @@ mod tests {
             }
         );
 
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2006,18 +2006,18 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -2033,11 +2033,11 @@ mod tests {
                 ..Default::default()
             });
         let mut create_iface_fut = pin!(create_iface_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
 
-        let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let bootstrap_channel = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
                 assert_eq!(req.init_sta_addr, sta_address);
@@ -2050,7 +2050,7 @@ mod tests {
         let mut bootstrap_stream =
             fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                 .into_stream();
-        let mut generic_sme_stream = assert_variant!(
+        let mut generic_sme_stream = assert_matches!(
         exec.run_until_stalled(&mut bootstrap_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
                 responder, generic_sme_server, ..
@@ -2063,8 +2063,8 @@ mod tests {
         );
 
         // The original future should resolve into a response.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(
         exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
                 responder
@@ -2077,15 +2077,15 @@ mod tests {
                 .expect("Failed to send GenericSme.Query response");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
+        assert_matches!(exec.run_until_stalled(&mut create_iface_fut),
         Poll::Ready(Ok(Ok(response))) => {
             assert_eq!(Some(0), response.iface_id);
         });
 
         // The new interface should be pushed into the new iface stream.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.new_iface_stream.next()),
             Poll::Ready(Some(NewIface {
                 id: 0,
@@ -2097,13 +2097,13 @@ mod tests {
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and the iface should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(mut ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(mut ifaces)) => {
             ifaces.sort();
             assert_eq!(vec![0], ifaces);
         });
@@ -2125,18 +2125,18 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -2153,11 +2153,11 @@ mod tests {
                 ..Default::default()
             });
         let mut create_iface_fut = pin!(create_iface_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-        assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
 
-        let _ = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let _ = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
         Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
             assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
             assert_eq!(req.init_sta_addr, sta_address);
@@ -2165,8 +2165,8 @@ mod tests {
             req.mlme_channel.expect("no MLME channel")
         });
 
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut create_iface_fut),
             Poll::Ready(Ok(Err(e))) => assert_eq!(e, fidl_svc::DeviceMonitorError::unknown())
         );
@@ -2188,18 +2188,18 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -2231,13 +2231,13 @@ mod tests {
         ] {
             let create_iface_fut = test_values.monitor_proxy.create_iface(&request);
             let mut create_iface_fut = pin!(create_iface_fut);
-            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut create_iface_fut),
                 Poll::Ready(Ok(Err(e))) => assert_eq!(e, fidl_svc::DeviceMonitorError::unknown())
             );
-            assert_variant!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
         }
     }
 
@@ -2257,18 +2257,18 @@ mod tests {
             &cfg,
         );
         let mut service_fut = pin!(service_fut);
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -2288,11 +2288,11 @@ mod tests {
                 },
             );
             let mut create_iface_fut = pin!(create_iface_fut);
-            assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
-            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
             // Validate the PHY request
-            let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            let bootstrap_channel = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
                 assert_eq!(req.init_sta_addr, sta_address);
@@ -2304,7 +2304,7 @@ mod tests {
             let mut bootstrap_stream =
                 fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                     .into_stream();
-            let mut generic_sme_stream = assert_variant!(
+            let mut generic_sme_stream = assert_matches!(
             exec.run_until_stalled(&mut bootstrap_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
                 responder, generic_sme_server, ..
@@ -2315,8 +2315,8 @@ mod tests {
                 generic_sme_server.into_stream()
             });
             // The original future should resolve into a response.
-            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
-            assert_variant!(
+            assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_matches!(
             exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
                 responder
@@ -2328,16 +2328,16 @@ mod tests {
                 })
                 .expect("Failed to send GenericSme.Query response");
             });
-            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-            assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
+            assert_matches!(exec.run_until_stalled(&mut create_iface_fut),
             Poll::Ready(Ok(Ok(response))) => {
                 assert_eq!(Some(sme_assigned_iface_id), response.iface_id);
             });
 
             // The new interface should be pushed into the new iface stream.
-            assert_variant!(
-                exec.run_until_stalled(&mut test_values.new_iface_stream.next()),
+            assert_matches!(
+		exec.run_until_stalled(&mut test_values.new_iface_stream.next()),
                 Poll::Ready(Some(NewIface {
                     id,
                     phy_ownership,
@@ -2346,20 +2346,19 @@ mod tests {
                     assert_eq!(sme_assigned_iface_id, id);
                     assert_eq!(phy_assigned_iface_id, phy_ownership.phy_assigned_id);
                     assert_eq!(phy_id, phy_ownership.phy_id);
-                },
-            );
+                });
         }
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
         let mut list_fut = pin!(list_fut);
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
-        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and the iface should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(mut ifaces)) => {
+        assert_matches!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(mut ifaces)) => {
             ifaces.sort();
             assert_eq!(vec![0, 1], ifaces);
         });
@@ -2384,7 +2383,7 @@ mod tests {
             &ifaces_tree,
         );
         let mut fut = pin!(fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Err(_)),
             "expected failure on invalid PHY"
@@ -2424,7 +2423,7 @@ mod tests {
         let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
-        let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
         );
 
@@ -2453,7 +2452,7 @@ mod tests {
         let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
-        let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
         );
 
@@ -2485,7 +2484,7 @@ mod tests {
         let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
-        let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
         );
 
@@ -2567,7 +2566,7 @@ mod tests {
         let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
-        let (_req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (_req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
         );
 
@@ -2608,14 +2607,14 @@ mod tests {
         // Progress the first attempt so that it acquires the lock and issues a DestroyIface
         // request.
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut first_destroy_fut));
-        let (_req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let (_req, responder) = assert_matches!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
         );
 
         // Progress the second attempt, verify that it blocks, no new attempts are made to destroy
         // the interface, and no OnIfaceRemoved events are sent.
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut second_destroy_fut));
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
         if iface_events.try_next().is_ok() {
             panic!("Received unexpected iface event.");
         }
@@ -2668,19 +2667,19 @@ mod tests {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a client SME request with a client endpoint.
-        let sme_server = assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
+        let sme_server = assert_matches!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetClientSme { sme_server, responder }))) => {
                 responder.send(Ok(())).expect("Failed to send response");
                 sme_server
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(())));
 
         // Verify that the correct endpoint is served.
         let _status_req = client_sme_proxy.status();
 
         let mut sme_stream = sme_server.into_stream();
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { .. })))
         );
@@ -2711,12 +2710,12 @@ mod tests {
 
         // Respond to a client SME request with an error.
         let mut generic_sme_stream = generic_sme_server.into_stream();
-        assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
+        assert_matches!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetClientSme { responder, .. }))) => {
                 responder.send(Err(1)).expect("Failed to send response");
             }
         );
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2740,7 +2739,7 @@ mod tests {
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 1337, client_sme_server);
         let mut req_fut = pin!(req_fut);
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -2766,7 +2765,7 @@ mod tests {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a query with appropriate info.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query { responder, .. }))) => {
                 responder.send(&fidl_sme::GenericSmeQuery {
@@ -2776,7 +2775,7 @@ mod tests {
             }
         );
         let resp =
-            assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(resp)) => resp);
+            assert_matches!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(resp)) => resp);
         assert_eq!(
             resp,
             fidl_svc::QueryIfaceResponse {
@@ -2821,21 +2820,21 @@ mod tests {
 
         let new_iface = NewIface { id, phy_ownership, generic_sme: generic_sme_proxy };
         test_values.new_iface_sink.unbounded_send(new_iface).expect("Failed to send new iface");
-        assert_variant!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
 
         let (_generic_sme_stream, generic_sme_control) =
             generic_sme_server.into_stream_and_control_handle();
         generic_sme_control.shutdown_with_epitaph(epitaph);
 
-        assert_variant!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
 
         if expect_destroy_iface {
-            assert_variant!(
+            assert_matches!(
                 exec.run_until_stalled(&mut phy_stream.next()),
                 Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { .. })))
             );
         } else {
-            assert_variant!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
         }
     }
 }

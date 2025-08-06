@@ -143,14 +143,14 @@ class Logger final {
 
   // Begins a structured logging record. You probably don't want to call
   // this directly.
-  void BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
+  void BeginRecord(fuchsia_logging::LogBuffer& buffer, FuchsiaLogSeverity severity,
                    std::optional<std::string_view> file_name, unsigned int line,
                    std::optional<std::string_view> message, uint32_t dropped);
 
   // Sends a log record to the backend. You probably don't want to call this directly.
   // This call also increments dropped_logs_, which is why we don't call FlushRecord
   // on LogBuffer directly.
-  bool FlushRecord(fuchsia_syslog::LogBuffer& buffer, uint32_t dropped);
+  bool FlushRecord(fuchsia_logging::LogBuffer& buffer, uint32_t dropped);
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
   bool IsNoOp() { return !socket_.is_valid(); }

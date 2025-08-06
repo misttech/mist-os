@@ -5,10 +5,13 @@
 use super::*;
 use fidl_fuchsia_update_installer_ext::StateId;
 use pretty_assertions::assert_eq;
+use test_case::test_case;
 
+#[test_case(UPDATE_PKG_URL)]
+#[test_case(MANIFEST_URL)]
 #[fasync::run_singlethreaded(test)]
-async fn reboot_controller_detach_causes_deferred_reboot() {
-    let env = TestEnv::builder().build().await;
+async fn reboot_controller_detach_causes_deferred_reboot(update_url: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     env.resolver
         .register_package("update", "upd4t3")
@@ -19,7 +22,7 @@ async fn reboot_controller_detach_causes_deferred_reboot() {
     // Start the system update.
     let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
-        &UPDATE_PKG_URL.parse().unwrap(),
+        &update_url.parse().unwrap(),
         default_options(),
         &env.installer_proxy(),
         Some(server_end),
@@ -38,9 +41,11 @@ async fn reboot_controller_detach_causes_deferred_reboot() {
     assert!(!env.take_interactions().contains(&Reboot));
 }
 
+#[test_case(UPDATE_PKG_URL)]
+#[test_case(MANIFEST_URL)]
 #[fasync::run_singlethreaded(test)]
-async fn reboot_controller_unblock_causes_reboot() {
-    let env = TestEnv::builder().build().await;
+async fn reboot_controller_unblock_causes_reboot(update_url: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     env.resolver
         .register_package("update", "upd4t3")
@@ -51,7 +56,7 @@ async fn reboot_controller_unblock_causes_reboot() {
     // Start the system update.
     let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
-        &UPDATE_PKG_URL.parse().unwrap(),
+        &update_url.parse().unwrap(),
         default_options(),
         &env.installer_proxy(),
         Some(server_end),
@@ -70,9 +75,11 @@ async fn reboot_controller_unblock_causes_reboot() {
     assert_eq!(env.take_interactions().last().unwrap(), &Reboot);
 }
 
+#[test_case(UPDATE_PKG_URL)]
+#[test_case(MANIFEST_URL)]
 #[fasync::run_singlethreaded(test)]
-async fn reboot_controller_dropped_causes_reboot() {
-    let env = TestEnv::builder().build().await;
+async fn reboot_controller_dropped_causes_reboot(update_url: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     env.resolver
         .register_package("update", "upd4t3")
@@ -83,7 +90,7 @@ async fn reboot_controller_dropped_causes_reboot() {
     // Start the system update.
     let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
-        &UPDATE_PKG_URL.parse().unwrap(),
+        &update_url.parse().unwrap(),
         default_options(),
         &env.installer_proxy(),
         Some(server_end),

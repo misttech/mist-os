@@ -5,69 +5,86 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+library_sources = [
+  "alpha-mode.cc",
+  "alpha-mode.h",
+  "backlight-state.cc",
+  "backlight-state.h",
+  "buffer-collection-id.h",
+  "color-conversion.cc",
+  "color-conversion.h",
+  "color.cc",
+  "color.h",
+  "config-check-result.cc",
+  "config-check-result.h",
+  "config-stamp.h",
+  "coordinate-transformation.cc",
+  "coordinate-transformation.h",
+  "dimensions.cc",
+  "dimensions.h",
+  "display-timing.cc",
+  "display-timing.h",
+  "driver-buffer-collection-id.h",
+  "driver-capture-image-id.h",
+  "driver-config-stamp.cc",
+  "driver-config-stamp.h",
+  "driver-image-id.h",
+  "driver-layer.cc",
+  "driver-layer.h",
+  "engine-info.cc",
+  "engine-info.h",
+  "event-id.h",
+  "id-type.cc",
+  "id-type.h",
+  "image-buffer-usage.cc",
+  "image-buffer-usage.h",
+  "image-id.h",
+  "image-metadata.cc",
+  "image-metadata.h",
+  "image-tiling-type.cc",
+  "image-tiling-type.h",
+  "layer-id.h",
+  "mode-and-id.cc",
+  "mode-and-id.h",
+  "mode.cc",
+  "mode.h",
+  "pixel-format.cc",
+  "pixel-format.h",
+  "rectangle.cc",
+  "rectangle.h",
+  "vsync-ack-cookie.h",
+]
+
+library_public_deps = [
+  "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+  "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
+  "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+  "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
+  "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+  "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+  "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
+  "//sdk/lib/stdcompat",
+]
+
 source_set("cpp") {
-  sources = [
-    "alpha-mode.cc",
-    "alpha-mode.h",
-    "backlight-state.cc",
-    "backlight-state.h",
-    "buffer-collection-id.h",
-    "color.cc",
-    "color.h",
-    "config-check-result.cc",
-    "config-check-result.h",
-    "config-stamp.h",
-    "coordinate-transformation.cc",
-    "coordinate-transformation.h",
-    "dimensions.cc",
-    "dimensions.h",
-    "display-timing.cc",
-    "display-timing.h",
-    "driver-buffer-collection-id.h",
-    "driver-capture-image-id.h",
-    "driver-config-stamp.cc",
-    "driver-config-stamp.h",
-    "driver-image-id.h",
-    "driver-layer.cc",
-    "driver-layer.h",
-    "engine-info.cc",
-    "engine-info.h",
-    "event-id.h",
-    "id-type.cc",
-    "id-type.h",
-    "image-buffer-usage.cc",
-    "image-buffer-usage.h",
-    "image-id.h",
-    "image-metadata.cc",
-    "image-metadata.h",
-    "image-tiling-type.cc",
-    "image-tiling-type.h",
-    "layer-id.h",
-    "mode-and-id.cc",
-    "mode-and-id.h",
-    "mode.cc",
-    "mode.h",
-    "pixel-format.cc",
-    "pixel-format.h",
-    "rectangle.cc",
-    "rectangle.h",
-    "vsync-ack-cookie.h",
-  ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
-    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
-    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
-    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
-    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
-    "//sdk/lib/stdcompat",
-  ]
+  sources = library_sources
+  public_deps = library_public_deps
+}
+
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
+source_set("cpp-cxx17") {
+  sources = library_sources
+  public_deps = library_public_deps
+
+  # Remove the C++ language specifier.
+  configs -= [ "//build/config:language" ]
+  configs += [ ":cxx17" ]
 }
 
 test_sources = [
   "alpha-mode-test.cc",
   "backlight-state-test.cc",
+  "color-conversion-test.cc",
   "color-test.cc",
   "config-check-result-test.cc",
   "coordinate-transformation-test.cc",
@@ -89,7 +106,6 @@ group("test-deps") {
   testonly = true
   visibility = [ ":*" ]
   public_deps = [
-    ":cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
@@ -100,7 +116,10 @@ group("test-deps") {
 test("unittests") {
   sources = test_sources
   output_name = "display-api-types-cpp-tests"
-  deps = [ ":test-deps" ]
+  deps = [
+    ":cpp",
+    ":test-deps",
+  ]
   visibility = [ ":*" ]
 }
 
@@ -108,7 +127,10 @@ test("unittests") {
 test("unittests-cxx17") {
   sources = test_sources
   output_name = "display-api-types-cpp17-tests"
-  deps = [ ":test-deps" ]
+  deps = [
+    ":cpp-cxx17",
+    ":test-deps",
+  ]
   visibility = [ ":*" ]
 
   # Remove the C++ language specifier.

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_priv.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -16,7 +17,6 @@
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
-#include <lib/syslog/logger.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>

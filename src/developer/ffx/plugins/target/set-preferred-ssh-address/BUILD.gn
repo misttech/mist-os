@@ -30,6 +30,6 @@ ffx_plugin("ffx_target_set_preferred_ssh_address") {
   ]
   test_deps = [
     "//src/connectivity/lib/net-declare",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
   ]
 }

@@ -108,15 +108,10 @@ _clidoc_path = get_label_info(_clidoc_label, "root_out_dir") + "/clidoc"
 # The list of tools in the IDK to be documented comes from the
 # `idk_host_tools_collection` target, which generates a manifest we
 # can use and ensures the tool executables are built before clidoc runs.
-_idk_host_tools_label = "//sdk:idk_host_tools_collection($host_toolchain)"
+_idk_host_tools_label =
+    "//sdk:idk_host_tools_collection_generate_meta_files($host_toolchain)"
 _idk_host_tools_out_dir = get_label_info(_idk_host_tools_label, "root_out_dir")
-
-# TODO(https://fxbug.dev/407083737): Update the clidoc_run.py to use an IDK
-# manifest rather than the intermediate manifest and use the following line
-# instead of the one below it.
-# _idk_host_tools_manifest = "${_idk_host_tools_out_dir}/sdk/exported/idk_host_tools_collection/meta/manifest.json"
-_idk_host_tools_manifest =
-    "${_idk_host_tools_out_dir}/sdk/manifest/idk_host_tools_collection"
+_idk_host_tools_manifest = "${_idk_host_tools_out_dir}/sdk/exported/idk_host_tools_collection/meta/manifest.json"
 
 action("invoke_clidoc") {
   script = "clidoc_run.py"

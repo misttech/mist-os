@@ -33,3 +33,31 @@ async fn cancel_update() {
         }
     );
 }
+
+#[fasync::run_singlethreaded(test)]
+async fn cancel_update_packageless() {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
+
+    let handle_ota_manifest = env.http_loader_service.block_once();
+
+    let mut attempt = env.start_packageless_update().await.unwrap();
+    assert_eq!(attempt.next().await.unwrap().unwrap(), State::Prepare);
+
+    let _resume_handle = handle_ota_manifest.await.unwrap();
+
+    env.installer_proxy().cancel_update(None).await.unwrap().unwrap();
+    assert_eq!(attempt.next().await.unwrap().unwrap(), State::Canceled);
+    assert_matches!(attempt.next().await, None);
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::Tufupdate as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Canceled
+                as u32,
+        }
+    );
+}

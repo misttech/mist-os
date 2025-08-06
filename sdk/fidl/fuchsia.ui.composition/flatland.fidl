@@ -44,6 +44,23 @@ type BlendMode = strict enum {
     SRC_OVER = 2;
 };
 
+/// The set of possible blending functions to choose from when determining how an image should
+/// be composited on top of other images.
+@available(added=NEXT)
+type BlendMode2 = flexible enum {
+    /// Indicates that the source pixels replace the destination pixels. In other words,
+    /// the source pixels are treated as opaque, regardless of what alpha values are set.
+    REPLACE = 1;
+
+    /// The source pixels are drawn over the destination pixels. The final pixel color
+    /// that is displayed is calculated as: C_src + (1.0 - alpha_src) * C_dst.
+    PREMULTIPLIED_ALPHA = 2;
+
+    /// The source pixels are drawn over the destination pixels. The final pixel color that is
+    /// displayed is calculated as: alpha_src * C_src + (1.0 - alpha_src) * C_dst.
+    STRAIGHT_ALPHA = 3;
+};
+
 /// Represents a color with alpha channel.
 /// Values are unorm (i.e. the valid range is [0,1]), and are in linear color
 /// space. They are not gamma-corrected nor premultiplied.
@@ -865,6 +882,17 @@ closed protocol Flatland {
     strict SetImageBlendingFunction(struct {
         image_id ContentId;
         blend_mode BlendMode;
+    });
+
+    /// Determines the blend function to use when rendering the content specified by
+    /// |image_id|. |image_id| must be a valid ContentId associated to a transform through
+    /// a call to |CreateImage| or |CreateFilledRect|. For details on the different blend functions
+    /// that are available, please refer to the BlendMode2 enum. If this function is not called,
+    /// the default blendmode is BlendMode2::REPLACE.
+    @available(added=NEXT)
+    strict SetImageBlendMode(struct {
+        image_id ContentId;
+        blend_mode BlendMode2;
     });
 
     /// Sets an opacity in linear space to be applied to a flatland image. Opacity values must

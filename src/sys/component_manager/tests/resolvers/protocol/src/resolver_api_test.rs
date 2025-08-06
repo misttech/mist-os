@@ -8,6 +8,7 @@
 //! still occur. The test URLs in this test should match the normalized values.)
 
 use anyhow::{Context as _, Error};
+use cm_rust::push_box;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::server;
 use fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder};
@@ -53,17 +54,23 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
 
     // Provide and expose the resolver capability from the resolver to the test realm
     let mut resolver_decl = builder.get_component_decl(RESOLVER_NAME).await?;
-    resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::ExposeTarget::Parent,
-        target_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
-    }));
-    resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
-        name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
-        source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-    }));
+    push_box(
+        &mut resolver_decl.exposes,
+        cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
+            source_dictionary: Default::default(),
+            target: cm_rust::ExposeTarget::Parent,
+            target_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
+        }),
+    );
+    push_box(
+        &mut resolver_decl.capabilities,
+        cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
+            name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
+            source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
+        }),
+    );
     builder.replace_component_decl(RESOLVER_NAME, resolver_decl).await?;
 
     // Make sure all children to be resolved via this test resolver are added to
@@ -72,18 +79,21 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
 
     // Add the resolver to the environment the child will be launched in.
     let mut realm_decl = builder.get_realm_decl().await?;
-    realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: ENVIRONMENT_NAME.parse().unwrap(),
-        extends: fcdecl::EnvironmentExtends::Realm,
-        resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
-            source: cm_rust::RegistrationSource::Child(String::from(RESOLVER_NAME)),
-            scheme: String::from(RESOLVER_SCHEME),
-        }],
-        runners: vec![],
-        debug_capabilities: vec![],
-        stop_timeout_ms: None,
-    });
+    push_box(
+        &mut realm_decl.environments,
+        cm_rust::EnvironmentDecl {
+            name: ENVIRONMENT_NAME.parse().unwrap(),
+            extends: fcdecl::EnvironmentExtends::Realm,
+            resolvers: Box::from([cm_rust::ResolverRegistration {
+                resolver: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
+                source: cm_rust::RegistrationSource::Child(String::from(RESOLVER_NAME)),
+                scheme: String::from(RESOLVER_SCHEME),
+            }]),
+            runners: Box::from([]),
+            debug_capabilities: Box::from([]),
+            stop_timeout_ms: None,
+        },
+    );
     builder.replace_realm_decl(realm_decl).await?;
 
     for (index, test_url) in test_urls.iter().enumerate() {

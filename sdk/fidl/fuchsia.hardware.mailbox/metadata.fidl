@@ -10,7 +10,7 @@ type ChannelInfo = table {
 };
 
 /// `ControllerInfo` is passed to mailbox controller drivers via metadata.
-const CONTROLLER_INFO_METADATA_TYPE uint32 = 0x584f424d; /// 'MBOX'
+@serializable
 type ControllerInfo = table {
     /// Board-specific controller ID. Optional.
     1: id uint32;

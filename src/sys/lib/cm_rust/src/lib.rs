@@ -9,8 +9,8 @@ use cm_rust_derive::{
 use cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath, Url};
 use from_enum::FromEnum;
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 use std::hash::Hash;
+use std::{fmt, mem};
 use strum_macros::EnumIter;
 use thiserror::Error;
 use {
@@ -29,12 +29,12 @@ pub trait FidlIntoNative<T> {
     fn fidl_into_native(self) -> T;
 }
 
-impl<Native, Fidl> FidlIntoNative<Vec<Native>> for Vec<Fidl>
+impl<Native, Fidl> FidlIntoNative<Box<[Native]>> for Vec<Fidl>
 where
     Fidl: FidlIntoNative<Native>,
 {
-    fn fidl_into_native(self) -> Vec<Native> {
-        self.into_iter().map(|s| s.fidl_into_native()).collect()
+    fn fidl_into_native(self) -> Box<[Native]> {
+        IntoIterator::into_iter(self).map(|s| s.fidl_into_native()).collect()
     }
 }
 
@@ -42,12 +42,12 @@ pub trait NativeIntoFidl<T> {
     fn native_into_fidl(self) -> T;
 }
 
-impl<Native, Fidl> NativeIntoFidl<Vec<Fidl>> for Vec<Native>
+impl<Native, Fidl> NativeIntoFidl<Vec<Fidl>> for Box<[Native]>
 where
     Native: NativeIntoFidl<Fidl>,
 {
     fn native_into_fidl(self) -> Vec<Fidl> {
-        self.into_iter().map(|s| s.native_into_fidl()).collect()
+        IntoIterator::into_iter(self).map(|s| s.native_into_fidl()).collect()
     }
 }
 
@@ -187,14 +187,14 @@ macro_rules! fidl_translations_symmetrical_enums {
 #[fidl_decl(fidl_table = "fdecl::Component")]
 pub struct ComponentDecl {
     pub program: Option<ProgramDecl>,
-    pub uses: Vec<UseDecl>,
-    pub exposes: Vec<ExposeDecl>,
-    pub offers: Vec<OfferDecl>,
-    pub capabilities: Vec<CapabilityDecl>,
-    pub children: Vec<ChildDecl>,
-    pub collections: Vec<CollectionDecl>,
+    pub uses: Box<[UseDecl]>,
+    pub exposes: Box<[ExposeDecl]>,
+    pub offers: Box<[OfferDecl]>,
+    pub capabilities: Box<[CapabilityDecl]>,
+    pub children: Box<[ChildDecl]>,
+    pub collections: Box<[CollectionDecl]>,
     pub facets: Option<fdata::Dictionary>,
-    pub environments: Vec<EnvironmentDecl>,
+    pub environments: Box<[EnvironmentDecl]>,
     pub config: Option<ConfigDecl>,
 }
 
@@ -426,7 +426,7 @@ impl UseDeclCommon for UseStorageDecl {
 pub struct UseEventStreamDecl {
     pub source_name: Name,
     pub source: UseSource,
-    pub scope: Option<Vec<EventScope>>,
+    pub scope: Option<Box<[EventScope]>>,
     pub target_path: Path,
     pub filter: Option<BTreeMap<String, DictionaryValue>>,
     #[fidl_decl(default)]
@@ -506,7 +506,7 @@ pub enum OfferDecl {
 #[fidl_decl(fidl_table = "fdecl::OfferEventStream", source_path = "name_only")]
 pub struct OfferEventStreamDecl {
     pub source: OfferSource,
-    pub scope: Option<Vec<EventScope>>,
+    pub scope: Option<Box<[EventScope]>>,
     pub source_name: Name,
     pub target: OfferTarget,
     pub target_name: Name,
@@ -550,8 +550,8 @@ pub struct OfferServiceDecl {
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
-    pub source_instance_filter: Option<Vec<Name>>,
-    pub renamed_instances: Option<Vec<NameMapping>>,
+    pub source_instance_filter: Option<Box<[Name]>>,
+    pub renamed_instances: Option<Box<[NameMapping]>>,
     #[fidl_decl(default)]
     pub availability: Availability,
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -1208,7 +1208,7 @@ pub struct ChildDecl {
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
     pub environment: Option<Name>,
-    pub config_overrides: Option<Vec<ConfigOverride>>,
+    pub config_overrides: Option<Box<[ConfigOverride]>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
@@ -1267,9 +1267,9 @@ pub struct CollectionDecl {
 pub struct EnvironmentDecl {
     pub name: Name,
     pub extends: fdecl::EnvironmentExtends,
-    pub runners: Vec<RunnerRegistration>,
-    pub resolvers: Vec<ResolverRegistration>,
-    pub debug_capabilities: Vec<DebugRegistration>,
+    pub runners: Box<[RunnerRegistration]>,
+    pub resolvers: Box<[ResolverRegistration]>,
+    pub debug_capabilities: Box<[DebugRegistration]>,
     pub stop_timeout_ms: Option<u32>,
 }
 
@@ -1285,7 +1285,7 @@ pub struct ConfigOverride {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_table = "fdecl::ConfigSchema")]
 pub struct ConfigDecl {
-    pub fields: Vec<ConfigField>,
+    pub fields: Box<[ConfigField]>,
     pub checksum: ConfigChecksum,
     pub value_source: ConfigValueSource,
 }
@@ -1564,7 +1564,7 @@ impl FidlIntoNative<ConfigMutability> for fdecl::ConfigMutability {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_table = "fdecl::ConfigValuesData")]
 pub struct ConfigValuesData {
-    pub values: Vec<ConfigValueSpec>,
+    pub values: Box<[ConfigValueSpec]>,
     pub checksum: ConfigChecksum,
 }
 
@@ -1614,7 +1614,7 @@ impl From<&str> for ConfigValue {
 
 impl From<Vec<&str>> for ConfigValue {
     fn from(value: Vec<&str>) -> Self {
-        let value: Vec<_> = value.into_iter().map(|s| s.to_string()).collect();
+        let value: Box<[_]> = value.into_iter().map(|s| s.to_string()).collect();
         ConfigValue::Vector(value.into())
     }
 }
@@ -1639,6 +1639,16 @@ generate_configvalue_from!(ConfigValue::Single, i16);
 generate_configvalue_from!(ConfigValue::Single, i32);
 generate_configvalue_from!(ConfigValue::Single, i64);
 generate_configvalue_from!(ConfigValue::Single, String);
+generate_configvalue_from!(ConfigValue::Vector, Box<[bool]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[u8]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[u16]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[u32]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[u64]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[i8]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[i16]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[i32]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[i64]>);
+generate_configvalue_from!(ConfigValue::Vector, Box<[String]>);
 generate_configvalue_from!(ConfigValue::Vector, Vec<bool>);
 generate_configvalue_from!(ConfigValue::Vector, Vec<u8>);
 generate_configvalue_from!(ConfigValue::Vector, Vec<u16>);
@@ -1715,16 +1725,76 @@ impl fmt::Display for ConfigSingleValue {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigVectorValue")]
 pub enum ConfigVectorValue {
-    BoolVector(Vec<bool>),
-    Uint8Vector(Vec<u8>),
-    Uint16Vector(Vec<u16>),
-    Uint32Vector(Vec<u32>),
-    Uint64Vector(Vec<u64>),
-    Int8Vector(Vec<i8>),
-    Int16Vector(Vec<i16>),
-    Int32Vector(Vec<i32>),
-    Int64Vector(Vec<i64>),
-    StringVector(Vec<String>),
+    BoolVector(Box<[bool]>),
+    Uint8Vector(Box<[u8]>),
+    Uint16Vector(Box<[u16]>),
+    Uint32Vector(Box<[u32]>),
+    Uint64Vector(Box<[u64]>),
+    Int8Vector(Box<[i8]>),
+    Int16Vector(Box<[i16]>),
+    Int32Vector(Box<[i32]>),
+    Int64Vector(Box<[i64]>),
+    StringVector(Box<[String]>),
+}
+
+impl From<Vec<bool>> for ConfigVectorValue {
+    fn from(v: Vec<bool>) -> Self {
+        Self::BoolVector(v.into())
+    }
+}
+
+impl From<Vec<u8>> for ConfigVectorValue {
+    fn from(v: Vec<u8>) -> Self {
+        Self::Uint8Vector(v.into())
+    }
+}
+
+impl From<Vec<u16>> for ConfigVectorValue {
+    fn from(v: Vec<u16>) -> Self {
+        Self::Uint16Vector(v.into())
+    }
+}
+
+impl From<Vec<u32>> for ConfigVectorValue {
+    fn from(v: Vec<u32>) -> Self {
+        Self::Uint32Vector(v.into())
+    }
+}
+
+impl From<Vec<u64>> for ConfigVectorValue {
+    fn from(v: Vec<u64>) -> Self {
+        Self::Uint64Vector(v.into())
+    }
+}
+
+impl From<Vec<i8>> for ConfigVectorValue {
+    fn from(v: Vec<i8>) -> Self {
+        Self::Int8Vector(v.into())
+    }
+}
+
+impl From<Vec<i16>> for ConfigVectorValue {
+    fn from(v: Vec<i16>) -> Self {
+        Self::Int16Vector(v.into())
+    }
+}
+
+impl From<Vec<i32>> for ConfigVectorValue {
+    fn from(v: Vec<i32>) -> Self {
+        Self::Int32Vector(v.into())
+    }
+}
+
+impl From<Vec<i64>> for ConfigVectorValue {
+    fn from(v: Vec<i64>) -> Self {
+        Self::Int64Vector(v.into())
+    }
+}
+
+impl From<Vec<String>> for ConfigVectorValue {
+    fn from(v: Vec<String>) -> Self {
+        Self::StringVector(v.into())
+    }
 }
 
 impl ConfigVectorValue {
@@ -2223,10 +2293,6 @@ pub enum DictionaryValue {
 
 impl FidlIntoNative<DictionaryValue> for Option<Box<fdata::DictionaryValue>> {
     fn fidl_into_native(self) -> DictionaryValue {
-        // Temporarily allow unreachable patterns while fuchsia.data.DictionaryValue
-        // is migrated from `strict` to `flexible`.
-        // TODO(https://fxbug.dev/42173900): Remove this.
-        #[allow(unreachable_patterns)]
         match self {
             Some(v) => match *v {
                 fdata::DictionaryValue::Str(s) => DictionaryValue::Str(s),
@@ -2729,6 +2795,24 @@ pub enum Error {
     ParseCapabilityTypeName { raw: String },
 }
 
+/// Push `value` onto the end of `Box<[T]>`. Convenience function for clients that work with
+/// cm_rust, which uses `Box<[T]>` instead of `Vec<T>` for its list type.
+pub fn push_box<T>(container: &mut Box<[T]>, value: T) {
+    let boxed = mem::replace(container, Box::from([]));
+    let mut new_container: Vec<_> = boxed.into();
+    new_container.push(value);
+    *container = new_container.into();
+}
+
+/// Append `other` to the end of `Box<[T]>`. Convenience function for clients that work with
+/// cm_rust, which uses `Box<[T]>` instead of `Vec<T>` for its list type.
+pub fn append_box<T>(container: &mut Box<[T]>, other: &mut Vec<T>) {
+    let boxed = mem::replace(container, Box::from([]));
+    let mut new_container: Vec<_> = boxed.into();
+    new_container.append(other);
+    *container = new_container.into();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2848,14 +2932,14 @@ mod tests {
             },
             result = ComponentDecl {
                 program: None,
-                uses: vec![],
-                exposes: vec![],
-                offers: vec![],
-                capabilities: vec![],
-                children: vec![],
-                collections: vec![],
+                uses: Box::from([]),
+                exposes: Box::from([]),
+                offers: Box::from([]),
+                capabilities: Box::from([]),
+                children: Box::from([]),
+                collections: Box::from([]),
                 facets: None,
-                environments: vec![],
+                environments: Box::from([]),
                 config: None,
             },
         },
@@ -3363,7 +3447,7 @@ mod tests {
                             ..Default::default()
                         },
                     }),
-                    uses: vec![
+                    uses: Box::from([
                         UseDecl::Service(UseServiceDecl {
                             dependency_type: DependencyType::Strong,
                             source: UseSource::Parent,
@@ -3410,7 +3494,7 @@ mod tests {
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Child("netstack".parse().unwrap()),
-                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".parse().unwrap(), collection: None}), EventScope::Collection("b".parse().unwrap())]),
+                            scope: Some(Box::from([EventScope::Child(ChildRef{ name: "a".parse().unwrap(), collection: None}), EventScope::Collection("b".parse().unwrap())])),
                             source_name: "stopped".parse().unwrap(),
                             target_path: "/svc/test".parse().unwrap(),
                             filter: None,
@@ -3430,8 +3514,8 @@ mod tests {
                             default: None,
                             source_dictionary: ".".parse().unwrap(),
                         }),
-                    ],
-                    exposes: vec![
+                    ]),
+                    exposes: Box::from([
                         ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "legacy_netstack".parse().unwrap(),
@@ -3488,8 +3572,8 @@ mod tests {
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
                         }),
-                    ],
-                    offers: vec![
+                    ]),
+                    offers: Box::from([
                         OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::Parent,
                             source_name: "legacy_netstack".parse().unwrap(),
@@ -3557,8 +3641,8 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "netstack3".parse().unwrap(),
                             source_dictionary: ".".parse().unwrap(),
-                            source_instance_filter: Some(vec!["allowedinstance".parse().unwrap()]),
-                            renamed_instances: Some(vec![NameMapping{source_name: "default".parse().unwrap(), target_name: "allowedinstance".parse().unwrap()}]),
+                            source_instance_filter: Some(Box::from(["allowedinstance".parse().unwrap()])),
+                            renamed_instances: Some(Box::from([NameMapping{source_name: "default".parse().unwrap(), target_name: "allowedinstance".parse().unwrap()}])),
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
@@ -3573,8 +3657,8 @@ mod tests {
                             dependency_type: DependencyType::Weak,
                             availability: Availability::Required,
                         }),
-                    ],
-                    capabilities: vec![
+                    ]),
+                    capabilities: Box::from([
                         CapabilityDecl::Service(ServiceDecl {
                             name: "netstack".parse().unwrap(),
                             source_path: Some("/netstack".parse().unwrap()),
@@ -3612,8 +3696,8 @@ mod tests {
                             name: "dict2".parse().unwrap(),
                             source_path: Some("/in/other".parse().unwrap()),
                         }),
-                    ],
-                    children: vec![
+                    ]),
+                    children: Box::from([
                         ChildDecl {
                             name: "netstack".parse().unwrap(),
                             url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".parse().unwrap(),
@@ -3638,8 +3722,8 @@ mod tests {
                             environment: Some("test_env".parse().unwrap()),
                             config_overrides: None,
                         },
-                    ],
-                    collections: vec![
+                    ]),
+                    collections: Box::from([
                         CollectionDecl {
                             name: "modular".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
@@ -3656,7 +3740,7 @@ mod tests {
                             allow_long_names: true,
                             persistent_storage: Some(true),
                         },
-                    ],
+                    ]),
                     facets: Some(fdata::Dictionary {
                         entries: Some(vec![
                             fdata::DictionaryEntry {
@@ -3666,42 +3750,42 @@ mod tests {
                         ]),
                         ..Default::default()
                     }),
-                    environments: vec![
+                    environments: Box::from([
                         EnvironmentDecl {
                             name: "test_env".parse().unwrap(),
                             extends: fdecl::EnvironmentExtends::Realm,
-                            runners: vec![
+                            runners: Box::from([
                                 RunnerRegistration {
                                     source_name: "runner".parse().unwrap(),
                                     source: RegistrationSource::Child("gtest".to_string()),
                                     target_name: "gtest-runner".parse().unwrap(),
                                 }
-                            ],
-                            resolvers: vec![
+                            ]),
+                            resolvers: Box::from([
                                 ResolverRegistration {
                                     resolver: "pkg_resolver".parse().unwrap(),
                                     source: RegistrationSource::Parent,
                                     scheme: "fuchsia-pkg".to_string(),
                                 }
-                            ],
-                            debug_capabilities: vec![
+                            ]),
+                            debug_capabilities: Box::from([
                                 DebugRegistration::Protocol(DebugProtocolRegistration {
                                     source_name: "some_protocol".parse().unwrap(),
                                     source: RegistrationSource::Child("gtest".to_string()),
                                     target_name: "some_protocol".parse().unwrap(),
                                 })
-                            ],
+                            ]),
                             stop_timeout_ms: Some(4567),
                         }
-                    ],
+                    ]),
                     config: Some(ConfigDecl {
-                        fields: vec![
+                        fields: Box::from([
                             ConfigField {
                                 key: "enable_logging".to_string(),
                                 type_: ConfigValueType::Bool,
                                 mutability: ConfigMutability::default(),
                             }
-                        ],
+                        ]),
                         checksum: ConfigChecksum::Sha256([
                             0x64, 0x49, 0x9E, 0x75, 0xF3, 0x37, 0x69, 0x88, 0x74, 0x3B, 0x38, 0x16,
                             0xCD, 0x14, 0x70, 0x9F, 0x3D, 0x4A, 0xD3, 0xE2, 0x24, 0x9A, 0x1A, 0x34,
@@ -3944,12 +4028,12 @@ mod tests {
                             ..Default::default()
                         },
                     }),
-                    uses: vec![],
-                    exposes: vec![],
-                    offers: vec![],
-                    capabilities: vec![],
-                    children: vec![],
-                    collections: vec![
+                    uses: Box::from([]),
+                    exposes: Box::from([]),
+                    offers: Box::from([]),
+                    capabilities: Box::from([]),
+                    children: Box::from([]),
+                    collections: Box::from([
                         CollectionDecl {
                             name: "modular".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
@@ -3982,12 +4066,12 @@ mod tests {
                             allow_long_names: true,
                             persistent_storage: None,
                         },
-                    ],
+                    ]),
                     facets: Some(fdata::Dictionary{
                         entries: Some(vec![]),
                         ..Default::default()
                     }),
-                    environments: vec![],
+                    environments: Box::from([]),
                     config: None,
                 }
             },
@@ -4110,8 +4194,8 @@ mod tests {
         let bool_true = ConfigValue::Single(ConfigSingleValue::Bool(true));
         let bool_false = ConfigValue::Single(ConfigSingleValue::Bool(false));
         let uint8_zero = ConfigValue::Single(ConfigSingleValue::Uint8(0));
-        let vec_bool_true = ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![true]));
-        let vec_bool_false = ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![false]));
+        let vec_bool_true = ConfigValue::Vector(ConfigVectorValue::BoolVector(Box::from([true])));
+        let vec_bool_false = ConfigValue::Vector(ConfigVectorValue::BoolVector(Box::from([false])));
 
         assert!(bool_true.matches_type(&bool_false));
         assert!(vec_bool_true.matches_type(&vec_bool_false));

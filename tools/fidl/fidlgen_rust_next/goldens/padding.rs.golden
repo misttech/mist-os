@@ -2928,4 +2928,413 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::Padding1ByteEnd> for ::fidl_test_padding::Padding1ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding1ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding1ByteEnd> for crate::Padding1ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding1ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding1ByteMiddle>
+        for ::fidl_test_padding::Padding1ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding1ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding1ByteMiddle>
+        for crate::Padding1ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding1ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding2ByteAlignmentLength6>
+        for ::fidl_test_padding::Padding2ByteAlignmentLength6
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding2ByteAlignmentLength6) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding2ByteAlignmentLength6>
+        for crate::Padding2ByteAlignmentLength6
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding2ByteAlignmentLength6) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding2ByteEnd> for ::fidl_test_padding::Padding2ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding2ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding2ByteEnd> for crate::Padding2ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding2ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding2ByteMiddle>
+        for ::fidl_test_padding::Padding2ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding2ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding2ByteMiddle>
+        for crate::Padding2ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding2ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding3ByteEnd> for ::fidl_test_padding::Padding3ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding3ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding3ByteEnd> for crate::Padding3ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding3ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding3ByteMiddle>
+        for ::fidl_test_padding::Padding3ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding3ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding3ByteMiddle>
+        for crate::Padding3ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding3ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding4ByteAlignmentLength12>
+        for ::fidl_test_padding::Padding4ByteAlignmentLength12
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding4ByteAlignmentLength12) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+
+                d: ::fidl_next::CompatFrom::compat_from(value.d),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding4ByteAlignmentLength12>
+        for crate::Padding4ByteAlignmentLength12
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding4ByteAlignmentLength12) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+
+                d: ::fidl_next::CompatFrom::compat_from(value.d),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding4ByteEnd> for ::fidl_test_padding::Padding4ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding4ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding4ByteEnd> for crate::Padding4ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding4ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding4ByteMiddle>
+        for ::fidl_test_padding::Padding4ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding4ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding4ByteMiddle>
+        for crate::Padding4ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding4ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding5ByteEnd> for ::fidl_test_padding::Padding5ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding5ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding5ByteEnd> for crate::Padding5ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding5ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding5ByteMiddle>
+        for ::fidl_test_padding::Padding5ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding5ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding5ByteMiddle>
+        for crate::Padding5ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding5ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+
+                c: ::fidl_next::CompatFrom::compat_from(value.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding6ByteEnd> for ::fidl_test_padding::Padding6ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding6ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding6ByteEnd> for crate::Padding6ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding6ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding6ByteMiddle>
+        for ::fidl_test_padding::Padding6ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding6ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding6ByteMiddle>
+        for crate::Padding6ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding6ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding7ByteEnd> for ::fidl_test_padding::Padding7ByteEnd {
+        #[inline]
+        fn compat_from(value: crate::Padding7ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding7ByteEnd> for crate::Padding7ByteEnd {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding7ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Padding7ByteMiddle>
+        for ::fidl_test_padding::Padding7ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: crate::Padding7ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_padding::Padding7ByteMiddle>
+        for crate::Padding7ByteMiddle
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_padding::Padding7ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+}

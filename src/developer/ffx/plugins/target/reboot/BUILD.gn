@@ -17,7 +17,7 @@ ffx_plugin("ffx_reboot") {
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   args_sources = [ "src/args.rs" ]
   args_deps = [

@@ -78,7 +78,7 @@ rust_library(
     }),
     version = "0.14.19",
     deps = [
-        "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
+        "//third_party/rust_crates/vendor/bytes-1.10.1:bytes",
         "//third_party/rust_crates/vendor/futures-channel-0.3.30:futures_channel",
         "//third_party/rust_crates/vendor/futures-core-0.3.30:futures_core",
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
@@ -86,7 +86,7 @@ rust_library(
         "//third_party/rust_crates/vendor/http-body-0.4.4:http_body",
         "//third_party/rust_crates/vendor/httparse-1.9.4:httparse",
         "//third_party/rust_crates/vendor/httpdate-1.0.3:httpdate",
-        "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+        "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
         "//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite",
         "//third_party/rust_crates/vendor/tokio-1.38.1:tokio",
         "//third_party/rust_crates/vendor/tower-service-0.3.0:tower_service",

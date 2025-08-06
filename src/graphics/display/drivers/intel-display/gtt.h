@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_GTT_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_GTT_H_
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/bti.h>
@@ -16,6 +15,9 @@
 #include <fbl/vector.h>
 #include <hwreg/mmio.h>
 #include <region-alloc/region-alloc.h>
+
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace intel_display {
 
@@ -43,7 +45,8 @@ class GttRegionImpl : public GttRegion {
   GttRegionImpl(Gtt* gtt, RegionAllocator::Region::UPtr region);
   ~GttRegionImpl() override;
 
-  void SetRotation(uint32_t rotation, const image_metadata_t& image_metadata);
+  void SetRotation(display::CoordinateTransformation coordinate_transformation,
+                   const display::ImageMetadata& image_metadata);
 
   zx_status_t PopulateRegion(zx_handle_t vmo, uint64_t page_offset, uint64_t length,
                              bool writable = false);

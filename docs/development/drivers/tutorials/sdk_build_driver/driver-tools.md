@@ -1,8 +1,9 @@
 # Interact with the driver
 
-Software on Fuchsia interacts with driver components through their exposed entries
-in [devfs][concepts-devfs]. Once a client connects to the driver's devfs entry,
-it receives an instance of the FIDL service representing that driver.
+Software on Fuchsia interacts with driver components through their exposed
+service capabilities. Once a client connects to the driver's service, it
+receives an instance of the FIDL protocol representing that driver. For more
+details, see the [Driver Communication][driver-communication] guide.
 
 In this section, you'll create a new `eductl` executable that discovers and
 interacts with the capabilities exposed by the `qemu_edu` driver.
@@ -71,9 +72,9 @@ to build this new tool into a Fuchsia package:
 
 ## Implement the client tool
 
-When clients open a connection to an entry in devfs, they receive an instance of
-the FIDL protocol being served by the driver. Add the following code to `eductl`
-to open a connection to the `edu` device using its devfs path:
+Clients connect to the driver's exposed service to receive an instance of the
+FIDL protocol. Add the following code to `eductl` to connect to the `edu`
+device service:
 
 `qemu_edu/tools/eductl.cc`:
 
@@ -82,15 +83,13 @@ to open a connection to the `edu` device using its devfs path:
 
 {{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/tools/eductl.cc" region_tag="fidl_imports" adjust_indentation="auto" %}{{ '</strong>' }}
 
-{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/tools/eductl.cc" region_tag="device_path" adjust_indentation="auto" %}{{ '</strong>' }}
-
-{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/tools/eductl.cc" region_tag="device_client" adjust_indentation="auto" %}{{ '</strong>' }}
+{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/tools/eductl.cc" region_tag="service_client" adjust_indentation="auto" %}{{ '</strong>' }}
 
 // ...
 ```
 
 Add `liveness_check()` and `compute_factorial()` functions to call methods using
-the `examples.qemuedu/Device` FIDL protocol returned from `OpenDevice()`.
+the `examples.qemuedu/Device` FIDL protocol returned from `ConnectToDevice()`.
 Finally, update the tool's `main()` function to call the appropriate device
 function based on the argument passed on the command line:
 
@@ -158,4 +157,4 @@ from a separate client.
 
 <!-- Reference links -->
 
-[concepts-devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
+[driver-communication]: /docs/concepts/drivers/driver_communication.md

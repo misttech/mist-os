@@ -26,6 +26,7 @@ ffx_plugin("ffx_target_screenshot") {
   test_deps = [
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",

@@ -156,26 +156,6 @@ impl StorageAdmin {
 
         while let Some(request) = stream.try_next().await? {
             match request {
-                fsys::StorageAdminRequest::OpenComponentStorage {
-                    relative_moniker,
-                    flags,
-                    mode,
-                    object,
-                    control_handle: _,
-                } => {
-                    let moniker = Moniker::try_from(relative_moniker.as_str())?;
-                    let absolute_moniker = component.moniker().concat(&moniker);
-                    let instance_id =
-                        component.component_id_index().id_for_moniker(&absolute_moniker).cloned();
-
-                    let dir_proxy = storage::open_isolated_storage(
-                        &backing_dir_source_info,
-                        moniker,
-                        instance_id.as_ref(),
-                    )
-                    .await?;
-                    dir_proxy.deprecated_open(flags, mode, ".", object)?;
-                }
                 fsys::StorageAdminRequest::OpenStorage { relative_moniker, object, responder } => {
                     let fut = async {
                         let moniker = Moniker::parse_str(&relative_moniker)

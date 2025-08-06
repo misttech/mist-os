@@ -4,20 +4,29 @@
 
 #include "src/graphics/display/drivers/intel-display/gtt.h"
 
+#include <lib/device-protocol/pci.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/vmo.h>
+#include <limits.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
-#include <climits>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <memory>
 #include <utility>
 
-#include <fbl/algorithm.h>
+#include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 #define PAGE_PRESENT (1 << 0)
 
@@ -238,9 +247,10 @@ void GttRegionImpl::ClearRegion() {
   vmo_ = ZX_HANDLE_INVALID;
 }
 
-void GttRegionImpl::SetRotation(uint32_t rotation, const image_metadata_t& image_metadata) {
-  bool rotated = (rotation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
-                  rotation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270);
+void GttRegionImpl::SetRotation(display::CoordinateTransformation coordinate_transformation,
+                                const display::ImageMetadata& image_metadata) {
+  bool rotated = (coordinate_transformation == display::CoordinateTransformation::kRotateCcw90 ||
+                  coordinate_transformation == display::CoordinateTransformation::kRotateCcw270);
   if (rotated == is_rotated_) {
     return;
   }
@@ -254,12 +264,13 @@ void GttRegionImpl::SetRotation(uint32_t rotation, const image_metadata_t& image
 
   uint64_t mask = is_rotated_ ? kRotatedFlag : 0;
   uint32_t width = [&]() {
-    uint64_t width = bytes_per_row() / get_tile_byte_width(image_metadata.tiling_type);
+    uint64_t width = bytes_per_row() / get_tile_byte_width(image_metadata.tiling_type());
     ZX_DEBUG_ASSERT_MSG(width <= std::numeric_limits<uint32_t>::max(), "%lu overflows uint32_t",
                         width);
     return static_cast<uint32_t>(width);
   }();
-  uint32_t height = height_in_tiles(image_metadata.tiling_type, image_metadata.dimensions.height);
+  uint32_t height =
+      height_in_tiles(image_metadata.tiling_type(), image_metadata.dimensions().height());
 
   auto mmio_space = &gtt_->buffer_.value();
   uint32_t pte_offset = static_cast<uint32_t>(base() / PAGE_SIZE);

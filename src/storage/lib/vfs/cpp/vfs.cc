@@ -4,15 +4,30 @@
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/zx/result.h>
+#include <limits.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <zircon/assert.h>
+#include <zircon/availability.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <mutex>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
+#include <fbl/ref_ptr.h>
+
 #include "src/storage/lib/vfs/cpp/debug.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;

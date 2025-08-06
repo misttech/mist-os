@@ -18,8 +18,8 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/gpu-control-server.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace virtio_display {
 
@@ -54,13 +54,13 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
   // Must be called after `InitResources()`.
   zx::result<> InitGpuControlNode();
 
-  // Must outlive `display_engine_` and `engine_banjo_adapter_`.
-  std::unique_ptr<display::DisplayEngineEventsBanjo> engine_events_;
+  // Must outlive `display_engine_` and `engine_fidl_adapter_`.
+  std::unique_ptr<display::DisplayEngineEventsFidl> engine_events_;
 
-  // Must outlive `engine_banjo_adapter_`.
+  // Must outlive `engine_fidl_adapter_`.
   std::unique_ptr<DisplayEngine> display_engine_;
 
-  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
+  std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
 
   std::unique_ptr<GpuControlServer> gpu_control_server_;
 
@@ -69,7 +69,6 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
   // Not started (and therefore not joinable) until Start() is called.
   std::thread start_thread_;
 
-  compat::SyncInitializedDeviceServer display_compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> display_node_controller_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_control_node_controller_;

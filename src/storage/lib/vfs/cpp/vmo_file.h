@@ -5,11 +5,21 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VMO_FILE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VMO_FILE_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
-#include <mutex>
+#include <cstddef>
+#include <cstdint>
 
-#include "vnode.h"
+#include <fbl/macros.h>
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

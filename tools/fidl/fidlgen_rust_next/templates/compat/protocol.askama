@@ -1,15 +1,33 @@
 #[cfg(target_os = "fuchsia")]
 /// An alias for a client sender over `zx::Channel` for the `{{ name }}`
 /// protocol.
-pub type {{ proxy_name }} = ::fidl_next::ClientSender<
-    ::fidl_next::fuchsia::zx::Channel,
-    crate::{{ name }},
->;
+pub type {{ proxy_name }} = ::fidl_next::ClientSender<crate::{{ name }}>;
 
 {{ denylist }}
-impl ::core::convert::From<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
-    #[inline]
-    fn from(_: crate::{{ name }}) -> Self {
+impl ::fidl_next::CompatFrom<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    fn compat_from(_: crate::{{ name }}) -> Self {
         Self
     }
 }
+
+{{ denylist }}
+impl ::fidl_next::CompatFrom<::{{ compat.crate_name }}::{{ compat_name }}> for crate::{{ name }} {
+    fn compat_from(_: ::{{ compat.crate_name }}::{{ compat_name }}) -> Self {
+        Self
+    }
+}
+
+{# Drivers do not generate proxies #}
+{% if !matches!(self.denylist, Denylist::CfgDriver) %}
+
+#[cfg(target_os = "fuchsia")]
+{{ denylist }}
+impl ::fidl_next::ClientCompatFrom<::{{ compat.crate_name }}::{{ compat_proxy_name }}> for crate::{{ name }} {
+    fn client_compat_from(proxy: ::{{ compat.crate_name }}::{{ compat_proxy_name }}) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+        let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+        let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+        ::fidl_next::Client::new(client_end)
+    }
+}
+
+{% endif %}

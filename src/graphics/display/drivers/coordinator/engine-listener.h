@@ -17,9 +17,8 @@ namespace display_coordinator {
 //
 // All functions must run on the same dispatcher.
 //
-// Designed to work with both [`fuchsia.hardware.display.engine/EngineListener`]
-// FIDL adapter and [`fuchsia.hardware.display.controller/
-// DisplayEngineListener`] banjo adapter.
+// Designed to work with the [`fuchsia.hardware.display.engine/EngineListener`]
+// FIDL adapter.
 class EngineListener {
  public:
   virtual void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info) = 0;

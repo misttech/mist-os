@@ -138,7 +138,7 @@ RegistersValue GetTestRegisters() {
 // FP/SIMD registers should be initialized to 0 for new processes.
 TEST(ExtendedPstate, InitialState) {
   // When running in Starnix the child binary is mounted at this path in the test's namespace.
-  std::string child_path = "data/tests/extended_pstate_initial_state_child";
+  std::string child_path = "data/tests/deps/extended_pstate_initial_state_child";
   if (!files::IsFile(child_path)) {
     // When running on host the child binary is next to the test binary.
     char self_path[PATH_MAX];

@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_F2FS_DIR_ENTRY_CACHE_H_
 #define SRC_STORAGE_F2FS_DIR_ENTRY_CACHE_H_
 
+#include <fbl/ref_counted.h>
+
 #include "src/storage/f2fs/common.h"
 
 namespace f2fs {

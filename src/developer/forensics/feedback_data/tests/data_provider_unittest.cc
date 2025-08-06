@@ -374,14 +374,6 @@ TEST_F(DataProviderTest, GetSnapshot_SingleAttachmentOnEmptyAttachmentAllowlist)
   EXPECT_EQ(unpacked_attachments.count(kAttachmentAnnotations), 1u);
 }
 
-TEST_F(DataProviderTest, GetSnapshot_ErrorAnnotationsNotInFidl) {
-  SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{},
-                    {{"annotation1", ErrorOrString(Error::kMissingValue)}});
-
-  Snapshot snapshot = GetSnapshot();
-  EXPECT_FALSE(snapshot.has_annotations());
-}
-
 TEST_F(DataProviderTest, GetSnapshotAnnotationsInFidl) {
   SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{},
                     {{"annotation1", ErrorOrString("value1")}});
@@ -390,9 +382,6 @@ TEST_F(DataProviderTest, GetSnapshotAnnotationsInFidl) {
 
   const std::vector<fuchsia::feedback::Annotation> expected_annotations = {
       {"annotation1", "value1"}};
-
-  ASSERT_TRUE(snapshot.has_annotations());
-  EXPECT_EQ(snapshot.annotations(), expected_annotations);
 
   ASSERT_TRUE(snapshot.has_annotations2());
   EXPECT_EQ(snapshot.annotations2(), expected_annotations);

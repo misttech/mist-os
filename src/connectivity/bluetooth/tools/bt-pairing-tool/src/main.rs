@@ -31,7 +31,7 @@ struct Opt {
 }
 
 fn run(opt: Opt) -> Result<(), Error> {
-    let mut exec = fasync::LocalExecutor::new();
+    let mut exec = fasync::LocalExecutorBuilder::new().build();
 
     let pairing = connect_to_protocol::<PairingMarker>()
         .context("Failed to connect to bluetooth pairing interface")?;

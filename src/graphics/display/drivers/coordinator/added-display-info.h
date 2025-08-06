@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ADDED_DISPLAY_INFO_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ADDED_DISPLAY_INFO_H_
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -14,6 +14,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace display_coordinator {
@@ -26,16 +27,14 @@ namespace display_coordinator {
 struct AddedDisplayInfo {
   // Returns a valid instance.
   //
-  // Fails with ZX_ERR_INVALID_ARGS if `banjo_display_info` cannot be used to
+  // Fails with ZX_ERR_INVALID_ARGS if `fidl_display_info` cannot be used to
   // produce a valid instance. Fails with ZX_ERR_NO_MEMORY on OOM. All failures
   // result in logging.
   //
   // Instances are always created on the heap so they can be conveniently passed
   // between dispatchers.
   static zx::result<std::unique_ptr<AddedDisplayInfo>> Create(
-      const raw_display_info_t& banjo_display_info);
-
-  // TODO(https://fxbug.dev/314126494): Add Create() overload for FIDL clients.
+      const fuchsia_hardware_display_engine::wire::RawDisplayInfo& fidl_display_info);
 
   // Guaranteed to be valid in valid instances.
   //
@@ -50,12 +49,7 @@ struct AddedDisplayInfo {
   fbl::Vector<display::PixelFormat> pixel_formats;
 
   // Empty if no preferred modes are provided.
-  //
-  // This data member uses a Banjo-generated type because the display::Mode
-  // equivalent does not convey detailed timing information. We will be able to
-  // remove this Banjo dependency once we move detailed timing information
-  // management to engine / panel drivers.
-  fbl::Vector<display_mode_t> banjo_preferred_modes;
+  fbl::Vector<display::Mode> preferred_modes;
 };
 
 }  // namespace display_coordinator

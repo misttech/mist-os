@@ -88,7 +88,7 @@ pub fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     info!("starting package resolver");
 
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     executor.run_singlethreaded(main_inner_async(startup_time)).map_err(|err| {
         // Use anyhow to print the error chain.
         let err = anyhow!(err);

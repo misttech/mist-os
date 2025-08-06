@@ -6,6 +6,7 @@ use core::cell::RefCell;
 use core::convert::Into;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use futures::future::BoxFuture;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use summary::MemorySummary;
 
@@ -17,7 +18,7 @@ pub mod fplugin_serde;
 pub use name::ZXName;
 pub mod summary;
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize)]
 pub struct PrincipalIdentifier(pub u64);
 
 impl From<fplugin::PrincipalIdentifier> for PrincipalIdentifier {
@@ -33,7 +34,7 @@ impl Into<fplugin::PrincipalIdentifier> for PrincipalIdentifier {
 }
 
 /// User-understandable description of a Principal
-#[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash, Serialize)]
 pub enum PrincipalDescription {
     Component(String),
     Part(String),
@@ -59,7 +60,7 @@ impl Into<fplugin::Description> for PrincipalDescription {
 }
 
 /// Type of a principal.
-#[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash, Serialize)]
 pub enum PrincipalType {
     Runnable,
     Part,
@@ -84,7 +85,7 @@ impl Into<fplugin::PrincipalType> for PrincipalType {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 /// A Principal, that can use and claim memory.
 pub struct Principal {
     // These fields are initialized from [fplugin::Principal].
@@ -124,6 +125,7 @@ impl Into<fplugin::Principal> for Principal {
 }
 
 /// A Principal, with its attribution claims and resources.
+#[derive(Serialize)]
 pub struct InflatedPrincipal {
     /// The principal definition.
     principal: Principal,
@@ -157,7 +159,7 @@ impl InflatedPrincipal {
 }
 
 /// Type of the claim, that changes depending on how the claim was created.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, Serialize)]
 pub enum ClaimType {
     /// A principal claimed this resource directly.
     Direct,
@@ -182,7 +184,7 @@ impl From<u64> for Koid {
 /// Note that this object is slightly different from the [fplugin::Attribution] object: it goes from
 /// a Resource to a Principal, and covers also indirect attribution claims of sub- and parent
 /// resources.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, Serialize)]
 pub struct Claim {
     /// Principal to which the resources are attributed.
     subject: PrincipalIdentifier,
@@ -191,10 +193,11 @@ pub struct Claim {
     claim_type: ClaimType,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Resource {
     pub koid: u64,
     pub name_index: usize,
+    #[serde(with = "fplugin_serde::ResourceTypeDef")]
     pub resource_type: fplugin::ResourceType,
 }
 
@@ -222,7 +225,7 @@ impl Into<fplugin::Resource> for Resource {
 // Claim with a boolean tag, to help find leaves in the claim assignment graph.
 pub struct TaggedClaim(Claim, bool);
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct InflatedResource {
     resource: Resource,
     claims: HashSet<Claim>,
@@ -327,7 +330,7 @@ impl InflatedResource {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 /// Holds the list of resources attributed to a Principal (subject) by another Principal (source).
 pub struct Attribution {
     /// Principal making the attribution claim.
@@ -359,7 +362,7 @@ impl Into<fplugin::Attribution> for Attribution {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 /// References a kernel [`Resource`], or some subset of a [`Resource`] (such as a part of a process
 /// address space).
 pub enum ResourceReference {
@@ -454,9 +457,9 @@ pub trait AttributionDataProvider: Send + Sync {
 /// Processed snapshot of the memory usage of a device, with attribution of memory resources to
 /// Principals resolved.
 pub struct ProcessedAttributionData {
-    principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
-    resources: HashMap<u64, RefCell<InflatedResource>>,
-    resource_names: Vec<ZXName>,
+    pub principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
+    pub resources: HashMap<u64, RefCell<InflatedResource>>,
+    pub resource_names: Vec<ZXName>,
 }
 
 impl ProcessedAttributionData {

@@ -6,10 +6,10 @@
 #![cfg(test)]
 
 use crate::highlevel::Command;
+use crate::lowlevel;
 use crate::serde::{
     DeserializeBytes, DeserializeError, DeserializeErrorCause, DeserializeResult, SerDe,
 };
-use assert_matches::assert_matches;
 use std::io::Cursor;
 
 #[test]
@@ -129,19 +129,24 @@ fn multiple_and_multipart_command_deserialize() {
 fn deserialize_error() {
     let bytes = b"ATNOTACOMMAND\r";
     let result = Command::deserialize(&mut Cursor::new(bytes), DeserializeBytes::new());
-    assert_matches!(
+    assert_eq!(
         result,
         DeserializeResult {
-            values,
-            error: Some(DeserializeError {
-                cause: DeserializeErrorCause::UnknownCommand(_),
-                bytes: error_bytes
-            }),
-            remaining_bytes: DeserializeBytes { bytes }
-        } if
-              error_bytes == b"ATNOTACOMMAND".to_vec() &&
-              values == Vec::new() &&
-              bytes == b"\r".to_vec()
+            values: Vec::new(),
+            error: Some(Box::new(DeserializeError {
+                cause: DeserializeErrorCause::UnknownCommand(lowlevel::Command::Execute {
+                    name: String::from("NOTACOMMAND"),
+                    is_extension: false,
+                    arguments: lowlevel::DelimitedArguments {
+                        delimiter: None,
+                        arguments: lowlevel::Arguments::ArgumentList(Vec::new()),
+                        terminator: None,
+                    }
+                }),
+                bytes: b"ATNOTACOMMAND".to_vec(),
+            })),
+            remaining_bytes: DeserializeBytes { bytes: b"\r".to_vec() }
+        }
     )
 }
 
@@ -149,19 +154,24 @@ fn deserialize_error() {
 fn deserialize_error_and_continue() {
     let bytes = b"ATNOTACOMMAND\rATTESTEX\r";
     let result1 = Command::deserialize(&mut Cursor::new(bytes), DeserializeBytes::new());
-    assert_matches!(
+    assert_eq!(
         result1,
         DeserializeResult {
-            values,
-            error: Some(DeserializeError {
-                cause: DeserializeErrorCause::UnknownCommand(_),
-                bytes: error_bytes
-            }),
-            remaining_bytes: DeserializeBytes { ref bytes }
-        } if
-              error_bytes == b"ATNOTACOMMAND".to_vec() &&
-              values == Vec::new() &&
-              bytes == &b"\rATTESTEX\r".to_vec()
+            values: Vec::new(),
+            error: Some(Box::new(DeserializeError {
+                cause: DeserializeErrorCause::UnknownCommand(lowlevel::Command::Execute {
+                    name: String::from("NOTACOMMAND"),
+                    is_extension: false,
+                    arguments: lowlevel::DelimitedArguments {
+                        delimiter: None,
+                        arguments: lowlevel::Arguments::ArgumentList(Vec::new()),
+                        terminator: None,
+                    },
+                }),
+                bytes: b"ATNOTACOMMAND".to_vec(),
+            })),
+            remaining_bytes: DeserializeBytes { bytes: b"\rATTESTEX\r".to_vec() },
+        },
     );
     let result2 = Command::deserialize(&mut Cursor::new([]), result1.remaining_bytes);
     assert_eq!(
@@ -179,19 +189,24 @@ fn deserialize_error_and_continue_with_more_bytes() {
     let bytes1 = b"ATNOTACOMMAND\rATTES";
     let bytes2 = b"TEX\rATTESTEX\rATTEST";
     let result1 = Command::deserialize(&mut Cursor::new(bytes1), DeserializeBytes::new());
-    assert_matches!(
+    assert_eq!(
         result1,
         DeserializeResult {
-            values,
-            error: Some(DeserializeError {
-                cause: DeserializeErrorCause::UnknownCommand(_),
-                bytes: error_bytes
-            }),
-            remaining_bytes: DeserializeBytes { ref bytes }
-        } if
-              error_bytes == b"ATNOTACOMMAND".to_vec() &&
-              values == Vec::new() &&
-              bytes == &b"\rATTES".to_vec()
+            values: Vec::new(),
+            error: Some(Box::new(DeserializeError {
+                cause: DeserializeErrorCause::UnknownCommand(lowlevel::Command::Execute {
+                    name: String::from("NOTACOMMAND"),
+                    is_extension: false,
+                    arguments: lowlevel::DelimitedArguments {
+                        delimiter: None,
+                        arguments: lowlevel::Arguments::ArgumentList(Vec::new()),
+                        terminator: None,
+                    },
+                }),
+                bytes: b"ATNOTACOMMAND".to_vec(),
+            })),
+            remaining_bytes: DeserializeBytes { bytes: b"\rATTES".to_vec() },
+        },
     );
     let result2 = Command::deserialize(&mut Cursor::new(bytes2), result1.remaining_bytes);
     assert_eq!(

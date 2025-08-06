@@ -50,7 +50,7 @@ class HdmiDisplay final : public DisplayDevice {
 
   bool CheckPixelRate(int64_t pixel_rate_hz) final;
 
-  raw_display_info_t CreateRawDisplayInfo() override;
+  AddedDisplayInfo CreateAddedDisplayInfo() override;
 
  private:
   GMBusI2c& gmbus_i2c_;

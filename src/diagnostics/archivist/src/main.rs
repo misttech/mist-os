@@ -29,6 +29,7 @@ use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
 use zx::AsHandleRef;
 
+use fuchsia_async::SendExecutorBuilder;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
@@ -41,12 +42,21 @@ fn main() -> Result<(), Error> {
     } else {
         // The executor will spin up an extra thread which is only for monitoring, so we ignore
         // that.
-        let mut executor = fasync::SendExecutor::new(config.num_threads);
+        let mut executor = SendExecutorBuilder::new().num_threads(config.num_threads).build();
         executor.run(async_main(config))
     }
     .context("async main")?;
     debug!("Exiting.");
     Ok(())
+}
+
+fn write_to_serial(msg: &str) {
+    let msg = msg.as_bytes();
+    for chunk in msg.chunks(MAX_SERIAL_WRITE_SIZE) {
+        unsafe {
+            zx::sys::zx_debug_write(chunk.as_ptr(), chunk.len());
+        }
+    }
 }
 
 async fn async_main(config: Config) -> Result<(), Error> {
@@ -56,13 +66,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
     let is_embedded = !config.enable_klog;
 
     if let Err(e) = init_diagnostics(&ring_buffer, is_embedded).await {
-        let msg = format!("archivist: init_diagnostics failed: {e:?}\n");
-        let msg = msg.as_bytes();
-        for chunk in msg.chunks(MAX_SERIAL_WRITE_SIZE) {
-            unsafe {
-                zx::sys::zx_debug_write(chunk.as_ptr(), chunk.len());
-            }
-        }
+        write_to_serial(&format!("archivist: init_diagnostics failed: {e:?}\n"));
         return Err(e).context("init_diagnostics");
     }
 
@@ -91,6 +95,12 @@ async fn init_diagnostics(
     ring_buffer: &ring_buffer::Reader,
     is_embedded: bool,
 ) -> Result<(), Error> {
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        write_to_serial(&format!("[archivist] FATAL: {info}\n"));
+        previous_hook(info);
+    }));
+
     struct Logger {
         iob: zx::Iob,
         dropped: AtomicU64,

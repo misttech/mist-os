@@ -20,7 +20,6 @@
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <fuchsia/web/cpp/fidl.h>
@@ -138,8 +137,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
             {.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
              .source = ChildRef{kNetstack},
              .targets = {target}},
-            {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_},
-                              Protocol{fuchsia::ui::scenic::Scenic::Name_}},
+            {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_}},
              .source = kTestUIStackRef,
              .targets = {target}},
             {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},

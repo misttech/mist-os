@@ -26,6 +26,11 @@
                 // TODO(https://fxbug.dev/430852485): Flaky due to not decommitting the pages
                 // consistently on mremap. Fix and re-enable.
                 "MMapProcTest.MremapDontUnmapKeepsFlags",
+
+                // TODO(https://fxbug.dev/391599171): Some features of userfaultfd that Starnix
+                // can't support with its current implementation. Enable as support is extended.
+                "UffdTest.PopulateFromAnotherUffd",
+                "UffdTest.NoSigBusOnAccessedPage",
             ],
         },
         {
@@ -33,6 +38,9 @@
             matchers: [
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
+
+                // TODO(https://fxbug.dev/433932261)
+                "CloneAndExecTest.ExecUnsharesCloneFiles",
 
                 // TODO(https://fxbug.dev/297438799)
                 "MmapTest.CanMprotectNonExecMmapToExecutable",
@@ -107,6 +115,9 @@
                 // TODO(https://fxbug.dev/419882465): Need a more granular API to report these values correctly
                 "MMapProcTest.SmapsRssSplitMappingsStrict",
                 "MlockProcTest.MlockOnePageIncreasesVmLck",
+
+                // TODO(https://fxbug.dev/423010702)
+                "Task.KillZombieEPERM",
             ],
         },
         {

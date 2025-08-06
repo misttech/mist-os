@@ -5,9 +5,11 @@
 use super::*;
 use crate::{merkle_str, pinned_pkg_url};
 use fidl_fuchsia_update_installer_ext::{
-    FetchFailureReason, PrepareFailureReason, Progress, State, UpdateInfo, UpdateInfoAndProgress,
+    FetchFailureReason, PrepareFailureReason, Progress, StageFailureReason, State, UpdateInfo,
+    UpdateInfoAndProgress,
 };
 use pretty_assertions::assert_eq;
+use test_case::test_case;
 
 #[fasync::run_singlethreaded(test)]
 async fn fails_on_package_resolver_connect_error() {
@@ -23,7 +25,46 @@ async fn fails_on_package_resolver_connect_error() {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn fails_on_update_package_fetch_error() {
+async fn package_resolver_not_needed_for_packageless_update() {
+    let env = TestEnvBuilder::new()
+        .unregister_protocol(Protocol::PackageResolver)
+        .ota_manifest(make_manifest([]))
+        .build()
+        .await;
+
+    env.run_packageless_update().await.unwrap();
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_on_ota_downloader_connect_error_packageless() {
+    let env = TestEnvBuilder::new()
+        .unregister_protocol(Protocol::OtaDownloader)
+        .ota_manifest(make_manifest([manifest::Blob {
+            uncompressed_size: 1,
+            delivery_blob_type: 1,
+            fuchsia_merkle_root: hash(0),
+        }]))
+        .build()
+        .await;
+
+    let result = env.run_packageless_update().await;
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into(), hash(0).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![hash(0).into()]),
+        Gc,
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_on_system_image_package_fetch_error() {
     let env = TestEnv::builder().build().await;
 
     env.resolver
@@ -60,6 +101,45 @@ async fn fails_on_update_package_fetch_error() {
         ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap()]),
         Gc,
         PackageResolve(system_image_url.to_string()),
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_on_blob_fetch_error_packageless() {
+    let env = TestEnvBuilder::new()
+        .ota_manifest(make_manifest([manifest::Blob {
+            uncompressed_size: 1,
+            delivery_blob_type: 1,
+            fuchsia_merkle_root: hash(0),
+        }]))
+        .build()
+        .await;
+
+    let result = env.run_packageless_update().await;
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::PackageDownload as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Error as u32,
+        }
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into(), hash(0).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![hash(0).into()]),
+        Gc,
+        OtaDownloader(OtaDownloaderEvent::FetchBlob(hash(0).into())),
     ]));
 }
 
@@ -202,9 +282,40 @@ async fn fails_when_package_cache_sync_fails() {
     ]));
 }
 
+#[fasync::run_singlethreaded(test)]
+async fn fails_when_package_cache_sync_fails_packageless() {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
+    env.cache_service.set_sync_response(Err(Status::INTERNAL));
+
+    let result = env.run_packageless_update().await;
+
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![]),
+        Gc,
+        BlobfsSync,
+    ]));
+}
+
 /// Verifies that when we fail to resolve the update package, we get a Prepare failure with the
 /// expected `PrepareFailureReason`.
-async fn assert_prepare_failure_reason(
+#[test_case(fidl_fuchsia_pkg::ResolveError::NoSpace, PrepareFailureReason::OutOfSpace)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::AccessDenied, PrepareFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::RepoNotFound, PrepareFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::Internal, PrepareFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::Io, PrepareFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::PackageNotFound, PrepareFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::UnavailableBlob, PrepareFailureReason::Internal)]
+#[fasync::run_singlethreaded(test)]
+async fn test_prepare_failure_reason(
     resolve_error: fidl_fuchsia_pkg::ResolveError,
     expected_reason: PrepareFailureReason,
 ) {
@@ -217,56 +328,107 @@ async fn assert_prepare_failure_reason(
     assert_eq!(attempt.next().await.unwrap().unwrap(), State::FailPrepare(expected_reason));
 }
 
+/// Verifies that when we fail to fetch an image blob, we get a Stage failure with the
+/// expected `StageFailureReason`.
+#[test_case(fidl_fuchsia_pkg::ResolveError::NoSpace, StageFailureReason::OutOfSpace)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::AccessDenied, StageFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::Internal, StageFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::Io, StageFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::BlobNotFound, StageFailureReason::Internal)]
+#[test_case(fidl_fuchsia_pkg::ResolveError::UnavailableBlob, StageFailureReason::Internal)]
 #[fasync::run_singlethreaded(test)]
-async fn prepare_failure_reason_out_of_space() {
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::NoSpace,
-        PrepareFailureReason::OutOfSpace,
-    )
-    .await;
-}
+async fn test_stage_failure_reason_packageless(
+    resolve_error: fidl_fuchsia_pkg::ResolveError,
+    expected_reason: StageFailureReason,
+) {
+    let mut manifest = make_manifest([]);
+    manifest.images[0].sha256 = [0; 32].into();
+    let env = TestEnv::builder().ota_manifest(manifest).build().await;
+    env.ota_downloader_service.set_fetch_blob_response(Err(resolve_error));
 
-#[fasync::run_singlethreaded(test)]
-async fn prepare_failure_reason_internal() {
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::AccessDenied,
-        PrepareFailureReason::Internal,
-    )
-    .await;
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::RepoNotFound,
-        PrepareFailureReason::Internal,
-    )
-    .await;
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::Internal,
-        PrepareFailureReason::Internal,
-    )
-    .await;
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::Io,
-        PrepareFailureReason::Internal,
-    )
-    .await;
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::PackageNotFound,
-        PrepareFailureReason::Internal,
-    )
-    .await;
-    assert_prepare_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::UnavailableBlob,
-        PrepareFailureReason::Internal,
-    )
-    .await;
+    let mut attempt = env.start_packageless_update().await.unwrap();
+
+    assert_eq!(attempt.next().await.unwrap().unwrap(), State::Prepare);
+    let info = UpdateInfo::builder().download_size(0).build();
+    let progress = Progress::builder().fraction_completed(0.0).bytes_downloaded(0).build();
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Stage(UpdateInfoAndProgress::builder().info(info).progress(progress).build())
+    );
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::FailStage(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(progress)
+                .build()
+                .with_stage_reason(expected_reason)
+        )
+    );
 }
 
 /// Verifies that when we fail to resolve a non-update package, we get a Fetch failure with the
 /// expected `FetchFailureReason`.
-async fn assert_fetch_failure_reason(
+#[test_case(
+    UPDATE_PKG_URL,
+    fidl_fuchsia_pkg::ResolveError::NoSpace,
+    FetchFailureReason::OutOfSpace
+)]
+#[test_case(
+    UPDATE_PKG_URL,
+    fidl_fuchsia_pkg::ResolveError::AccessDenied,
+    FetchFailureReason::Internal
+)]
+#[test_case(
+    UPDATE_PKG_URL,
+    fidl_fuchsia_pkg::ResolveError::RepoNotFound,
+    FetchFailureReason::Internal
+)]
+#[test_case(UPDATE_PKG_URL, fidl_fuchsia_pkg::ResolveError::Internal, FetchFailureReason::Internal)]
+#[test_case(UPDATE_PKG_URL, fidl_fuchsia_pkg::ResolveError::Io, FetchFailureReason::Internal)]
+#[test_case(
+    UPDATE_PKG_URL,
+    fidl_fuchsia_pkg::ResolveError::PackageNotFound,
+    FetchFailureReason::Internal
+)]
+#[test_case(
+    UPDATE_PKG_URL,
+    fidl_fuchsia_pkg::ResolveError::UnavailableBlob,
+    FetchFailureReason::Internal
+)]
+#[test_case(MANIFEST_URL, fidl_fuchsia_pkg::ResolveError::NoSpace, FetchFailureReason::OutOfSpace)]
+#[test_case(
+    MANIFEST_URL,
+    fidl_fuchsia_pkg::ResolveError::AccessDenied,
+    FetchFailureReason::Internal
+)]
+#[test_case(MANIFEST_URL, fidl_fuchsia_pkg::ResolveError::Internal, FetchFailureReason::Internal)]
+#[test_case(MANIFEST_URL, fidl_fuchsia_pkg::ResolveError::Io, FetchFailureReason::Internal)]
+#[test_case(
+    MANIFEST_URL,
+    fidl_fuchsia_pkg::ResolveError::BlobNotFound,
+    FetchFailureReason::Internal
+)]
+#[test_case(
+    MANIFEST_URL,
+    fidl_fuchsia_pkg::ResolveError::UnavailableBlob,
+    FetchFailureReason::Internal
+)]
+#[fasync::run_singlethreaded(test)]
+async fn test_fetch_failure_reason(
+    update_url: &str,
     resolve_error: fidl_fuchsia_pkg::ResolveError,
     expected_reason: FetchFailureReason,
 ) {
-    let env = TestEnv::builder().build().await;
+    let env = TestEnv::builder()
+        .ota_manifest(make_manifest([manifest::Blob {
+            uncompressed_size: 1,
+            delivery_blob_type: 1,
+            fuchsia_merkle_root: hash(0),
+        }]))
+        .build()
+        .await;
+    env.ota_downloader_service.set_fetch_blob_response(Err(resolve_error));
     env.resolver
         .register_package("update", "upd4t3")
         .add_file("packages.json", make_packages_json([SYSTEM_IMAGE_URL]))
@@ -274,7 +436,7 @@ async fn assert_fetch_failure_reason(
         .add_file("images.json", make_images_json_zbi());
     env.resolver.mock_resolve_failure(SYSTEM_IMAGE_URL, resolve_error);
 
-    let mut attempt = env.start_update().await.unwrap();
+    let mut attempt = env.start_update_with_options(update_url, default_options()).await.unwrap();
 
     let info = UpdateInfo::builder().download_size(0).build();
     let progress = Progress::builder().fraction_completed(0.5).bytes_downloaded(0).build();
@@ -306,44 +468,4 @@ async fn assert_fetch_failure_reason(
                 .with_fetch_reason(expected_reason)
         )
     );
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn fetch_failure_reason_out_of_space() {
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::NoSpace,
-        FetchFailureReason::OutOfSpace,
-    )
-    .await;
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn fetch_failure_reason_internal() {
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::AccessDenied,
-        FetchFailureReason::Internal,
-    )
-    .await;
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::RepoNotFound,
-        FetchFailureReason::Internal,
-    )
-    .await;
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::Internal,
-        FetchFailureReason::Internal,
-    )
-    .await;
-    assert_fetch_failure_reason(fidl_fuchsia_pkg::ResolveError::Io, FetchFailureReason::Internal)
-        .await;
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::PackageNotFound,
-        FetchFailureReason::Internal,
-    )
-    .await;
-    assert_fetch_failure_reason(
-        fidl_fuchsia_pkg::ResolveError::UnavailableBlob,
-        FetchFailureReason::Internal,
-    )
-    .await;
 }

@@ -24,7 +24,7 @@ if (is_host) {
   }
   host_test_data("host-test-data") {
     sources = [ "$target_gen_dir/charlie.doc.zip" ]
-    public_deps = [ ":charlie.actual.rustdoc" ]
+    public_deps = [ ":charlie.rustdoc" ]
     outputs = [ "$target_gen_dir/charlie.doc.zip.copy" ]
   }
 }

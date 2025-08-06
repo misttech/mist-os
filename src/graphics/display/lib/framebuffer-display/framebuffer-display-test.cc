@@ -26,7 +26,7 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -242,7 +242,7 @@ class FakeMmio {
 class FramebufferDisplayTest : public ::testing::Test {
  protected:
   fdf_testing::ScopedGlobalLogger logger_;
-  display::DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsFidl engine_events_;
 };
 
 void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
@@ -360,7 +360,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
 
   async::Loop env_loop(&kAsyncLoopConfigNeverAttachToThread);
   FakeSysmem fake_sysmem(env_loop.dispatcher(), framebuffer_vmo.borrow(),
-                         kBufferCollectionId.ToBanjo());
+                         kBufferCollectionId.value());
   FakeMmio fake_mmio;
 
   env_loop.StartThread("env-loop");
@@ -405,11 +405,11 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   // attention to any settings, so this way if that changes, this test will fail intentionally so
   // that this test can be updated to have settings that achieve this test's goals.
   auto settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
-  EXPECT_OK(heap->AllocateVmo(0, settings.Build(), kBufferCollectionId.ToBanjo(), 0).status());
+  EXPECT_OK(heap->AllocateVmo(0, settings.Build(), kBufferCollectionId.value(), 0).status());
 
   bind_ref.Unbind();
 
-  fake_sysmem.SetupFakeVmoInfo(kBufferCollectionId.ToBanjo(), 0);
+  fake_sysmem.SetupFakeVmoInfo(kBufferCollectionId.value(), 0);
 
   // Invalid import: bad collection id
   static constexpr display::ImageMetadata kDisplayImageMetadata(

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_import.bzl", "cc_import")
 load("@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 cc_import(

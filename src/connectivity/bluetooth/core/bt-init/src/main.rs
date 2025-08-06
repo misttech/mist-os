@@ -145,7 +145,7 @@ async fn run_device_watcher() -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     info!("Starting bt-init...");
 
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     let cfg = Config::take_from_startup_handle();
 
     // Start bt-snoop service before anything else and hold onto the connection until bt-init exits.

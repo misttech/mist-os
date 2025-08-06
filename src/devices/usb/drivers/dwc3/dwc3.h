@@ -55,6 +55,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   Dwc3(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase{"dwc3", std::move(start_args), std::move(dispatcher)} {}
+  ~Dwc3() { FDF_LOG(INFO, "~Dwc3()"); }
 
   zx::result<> Start() override;
   void Stop() override;

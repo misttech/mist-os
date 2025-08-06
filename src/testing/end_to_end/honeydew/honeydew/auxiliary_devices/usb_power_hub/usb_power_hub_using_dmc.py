@@ -53,8 +53,11 @@ class UsbPowerHubUsingDmc(usb_power_hub.UsbPowerHub):
             ) from error
 
     # List all the public methods
-    def power_off(self) -> None:
+    def power_off(self, port: int | None = None) -> None:
         """Turns off the usb power to the Fuchsia device.
+
+        Args:
+            port: None. Not being used by this implementation.
 
         Raises:
             UsbPowerError: In case of failure.
@@ -67,8 +70,11 @@ class UsbPowerHubUsingDmc(usb_power_hub.UsbPowerHub):
         )
         _LOGGER.info("Successfully powered off usb for %s...", self._name)
 
-    def power_on(self) -> None:
+    def power_on(self, port: int | None = None) -> None:
         """Turns on the usb power to the Fuchsia device.
+
+        Args:
+            port: None. Not being used by this implementation.
 
         Raises:
             UsbPowerError: In case of failure.

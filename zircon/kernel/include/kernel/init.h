@@ -7,8 +7,6 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_INIT_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_INIT_H_
 
-#include <zircon/compiler.h>
-
 void kernel_init();
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_INIT_H_

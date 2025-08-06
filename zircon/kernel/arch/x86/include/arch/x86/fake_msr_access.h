@@ -7,6 +7,8 @@
 #ifndef ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_X86_FAKE_MSR_ACCESS_H_
 #define ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_X86_FAKE_MSR_ACCESS_H_
 
+#include <assert.h>
+#include <stdint.h>
 #include <zircon/types.h>
 
 #include <arch/x86/platform_access.h>

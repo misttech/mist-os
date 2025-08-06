@@ -504,6 +504,7 @@ mod tests {
         generate_random_fidl_network_config, generate_random_fidl_network_config_with_ssid,
     };
     use anyhow::{format_err, Error};
+    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
     use fuchsia_async as fasync;
@@ -511,7 +512,6 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::assert_variant;
 
     /// Only used to tell us what disconnect request was given to the IfaceManager so that we
     /// don't need to worry about the implementation logic in the FakeIfaceManager.
@@ -743,11 +743,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
         let connect_fut = controller.connect(&fidl_policy::NetworkIdentifier {
@@ -757,9 +757,9 @@ mod tests {
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedNotSupported))
         );
@@ -788,21 +788,21 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_open);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the connect call is acknowledged.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -825,21 +825,21 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_wpa2_w_password);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the connect call is acknowledged.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -862,21 +862,21 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_wpa2_w_psk);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the connect call is acknowledged.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -898,26 +898,26 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should now be waiting for request.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue request to start client connections.
         let start_fut = controller.start_client_connections();
         let mut start_fut = pin!(start_fut);
 
         // Request should be acknowledged.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut start_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
 
         // A message should be sent to telemetry.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::StartClientConnectionsRequest);
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::StartClientConnectionsRequest);
         });
 
         // Perform a connect operation.
@@ -925,32 +925,32 @@ mod tests {
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the connect call is acknowledged.
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
 
         // The client state machine will immediately query for status.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue request to stop client connections.
         let stop_fut = controller.stop_client_connections();
         let mut stop_fut = pin!(stop_fut);
 
         // Run the serve future until it stalls and expect the client to disconnect
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // A message should be sent to telemetry.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::StopClientConnectionsRequest);
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::StopClientConnectionsRequest);
         });
 
         // Request should be acknowledged.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -975,11 +975,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue a scan request.
         let (_iter, server) = fidl::endpoints::create_proxy();
@@ -992,7 +992,7 @@ mod tests {
         exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![])));
 
         // Process scan request and verify scan response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that a scan request was sent to the scan module, including an active scan for the
         // potentially-hidden networks.
@@ -1034,12 +1034,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(_)
         );
@@ -1057,11 +1057,11 @@ mod tests {
         let mut save_fut = controller.save_network(&network_config);
 
         // Run server_provider forward so that it will process the save network request
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the the response says we succeeded.
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
 
         // Check that the value was actually saved in the saved networks manager.
         let target_id = NetworkIdentifier::from(network_id);
@@ -1098,16 +1098,16 @@ mod tests {
             };
             let record_idle_fut = iface_manager.record_idle_client(0);
             let mut record_idle_fut = pin!(record_idle_fut);
-            assert_variant!(exec.run_until_stalled(&mut record_idle_fut), Poll::Ready(Ok(())));
+            assert_matches!(exec.run_until_stalled(&mut record_idle_fut), Poll::Ready(Ok(())));
         }
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(_)
         );
@@ -1124,11 +1124,11 @@ mod tests {
         };
         let mut save_fut = controller.save_network(&network_config);
 
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the the response says we succeeded.
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(result) => {
             let save_result = result.expect("Failed to get save network response");
             assert_eq!(save_result, Ok(()));
         });
@@ -1158,12 +1158,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(_)
         );
@@ -1173,7 +1173,7 @@ mod tests {
         let credential = Credential::Password(b"password".to_vec());
         let save_fut = saved_networks.store(network_id.clone(), credential.clone());
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Save a network with the same identifier but a different password
         let network_config = fidl_policy::NetworkConfig {
@@ -1184,16 +1184,16 @@ mod tests {
         let mut save_fut = controller.save_network(&network_config);
 
         // Process the remove request on the server side and handle requests to stash on the way.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the iface manager was asked to disconnect from some network
-        assert_variant!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
+        assert_matches!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
             assert_eq!(net_id, network_id.clone());
             assert_eq!(reason, client_types::DisconnectReason::NetworkConfigUpdated);
         });
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
     }
 
     #[fuchsia::test]
@@ -1216,12 +1216,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(_)
         );
@@ -1242,10 +1242,10 @@ mod tests {
         let mut save_fut = controller.save_network(&network_config);
 
         // Run server_provider forward so that it will process the save network request
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the the response says we failed to save the network.
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(result) => {
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(result) => {
             let error = result.expect("Failed to get save network response");
             assert_eq!(error, Err(fidl_policy::NetworkConfigChangeError::NetworkConfigWriteError));
         });
@@ -1272,12 +1272,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(_)
         );
@@ -1291,18 +1291,18 @@ mod tests {
         let mut remove_fut = controller.remove_network(&network_config);
 
         // Process the remove request on the server side and handle requests to stash on the way.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Successfully removing a network should always request a disconnect from IfaceManager,
         // which will know whether we are connected to the network to disconnect from. This checks
         // that the IfaceManager is told to disconnect (if connected).
-        assert_variant!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
+        assert_matches!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
             assert_eq!(net_id, test_values.net_id_open.clone().into());
             assert_eq!(reason, client_types::DisconnectReason::NetworkUnsaved);
         });
-        assert_variant!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert!(exec
             .run_singlethreaded(
                 test_values.saved_networks.lookup(&test_values.net_id_open.clone().into())
@@ -1312,12 +1312,12 @@ mod tests {
         // Removing a network that is not saved should not trigger a disconnect.
         let mut remove_fut = controller.remove_network(&network_config);
         // Process the remove request on the server side and handle requests to stash on the way.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()),
             Poll::Pending
         );
-        assert_variant!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
     }
 
     #[fuchsia::test]
@@ -1370,11 +1370,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue request to get the list of saved networks.
         let (iter, server) =
@@ -1386,7 +1386,7 @@ mod tests {
         let mut saved_networks_results = vec![];
         for i in 0..expected_num_sends {
             let get_saved_fut = iter.get_next();
-            assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
             let results = exec
                 .run_singlethreaded(get_saved_fut)
                 .expect("Failed to get next chunk of saved networks results");
@@ -1400,7 +1400,7 @@ mod tests {
             saved_networks_results.extend(results);
         }
         let get_saved_end_fut = iter.get_next();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         let results = exec
             .run_singlethreaded(get_saved_end_fut)
             .expect("Failed to get next chunk of saved networks results");
@@ -1429,12 +1429,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
         let (_controller, _update_stream) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
             Poll::Ready(Some(listener::Message::NewListener(_)))
         );
@@ -1451,15 +1451,15 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Register listener.
         let (update_sink, _update_stream) =
             create_request_stream::<fidl_policy::ClientStateUpdatesMarker>();
         listener.get_listener(update_sink).expect("error getting listener");
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut listener_updates.next()),
             Poll::Ready(Some(listener::Message::NewListener(_)))
         );
@@ -1481,24 +1481,24 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (controller1, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request another controller.
         let (controller2, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure first controller is operable. Issue connect request.
         let connect_fut = controller1.connect(&test_values.net_id_open);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -1508,8 +1508,8 @@ mod tests {
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from second controller. Verify failure.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::ALREADY_BOUND,
@@ -1519,20 +1519,20 @@ mod tests {
 
         // Drop first controller. A new controller can now take control.
         drop(controller1);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request another controller.
         let (controller3, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure third controller is operable. Issue connect request.
         let connect_fut = controller3.connect(&test_values.net_id_open);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from third controller. Verify success.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -1554,21 +1554,21 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (_controller1, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request another controller.
         let (controller2, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
         let mut controller2_event_fut = pin!(controller2_event_fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::ALREADY_BOUND,
@@ -1667,19 +1667,19 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (controller, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_open);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedIncompatibleMode))
         );
@@ -1757,11 +1757,11 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
         let (controller1, _) = request_controller(&test_values.provider);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Create another client provider request stream and start serving it.  This is equivalent
         // to the behavior that occurs when a second client connects to the ClientProvider service.
@@ -1781,13 +1781,13 @@ mod tests {
 
         // Request a client controller from the second instance of the service.
         let (controller2, _) = request_controller(&provider);
-        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
         let mut controller2_event_fut = pin!(controller2_event_fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::ALREADY_BOUND,
@@ -1799,19 +1799,19 @@ mod tests {
         // Drop the first controller and verify that the second provider client can get a
         // functional client controller.
         drop(controller1);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         let (controller2, _) = request_controller(&provider);
-        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Ensure the new controller works by issuing a connect request.
         let connect_fut = controller2.connect(&test_values.net_id_open);
         let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
-        assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut connect_fut),
             Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
@@ -1835,7 +1835,7 @@ mod tests {
         // simply ack the caller.
         let fut = handle_client_request_start_client_connections(iface_manager);
         let mut fut = pin!(fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(fidl_policy::RequestStatus::Acknowledged)
         );
@@ -1859,7 +1859,7 @@ mod tests {
         // simply ack the caller.
         let fut = handle_client_request_stop_client_connections(iface_manager);
         let mut fut = pin!(fut);
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(fidl_policy::RequestStatus::Acknowledged)
         );

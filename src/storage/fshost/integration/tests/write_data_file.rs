@@ -5,7 +5,7 @@
 //! Test cases which simulate fshost running in the configuration used in recovery builds (which,
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
-use fshost::{AdminProxy, AdminWriteDataFileResult};
+use fshost::{RecoveryProxy, RecoveryWriteDataFileResult};
 use fshost_test_fixture::disk_builder::VolumesSpec;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
@@ -18,11 +18,11 @@ const PAYLOAD: &[u8] = b"top secret stuff";
 const SECRET_FILE_NAME: &'static str = "inconspicuous/secret.txt";
 const SMALL_DISK_SIZE: u64 = 25165824;
 
-async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
+async fn call_write_data_file(recovery: &RecoveryProxy) -> RecoveryWriteDataFileResult {
     let vmo = zx::Vmo::create(1024).unwrap();
     vmo.write(PAYLOAD, 0).unwrap();
     vmo.set_content_size(&(PAYLOAD.len() as u64)).unwrap();
-    admin
+    recovery
         .write_data_file(SECRET_FILE_NAME, vmo)
         .await
         .expect("write_data_file failed: transport error")
@@ -39,9 +39,9 @@ async fn unformatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
+    call_write_data_file(&recovery).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
     let fixture = new_builder().with_disk_from(disk).build().await;
@@ -72,9 +72,9 @@ async fn no_existing_data_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
+    call_write_data_file(&recovery).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
     let fixture = new_builder().with_disk_from(disk).build().await;
@@ -115,9 +115,9 @@ async fn unformatted_small_disk() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
+    call_write_data_file(&recovery).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
     let fixture = new_builder().with_disk_from(disk).build().await;
@@ -151,9 +151,9 @@ async fn formatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
-    call_write_data_file(&admin).await.expect("write_data_file failed");
+    call_write_data_file(&recovery).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
     let fixture = new_builder().with_disk_from(disk).build().await;
@@ -190,13 +190,13 @@ async fn formatted_file_in_root() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let vmo = zx::Vmo::create(1024).unwrap();
     vmo.write(PAYLOAD, 0).unwrap();
     vmo.set_content_size(&(PAYLOAD.len() as u64)).unwrap();
-    admin
+    recovery
         .write_data_file("test.txt", vmo)
         .await
         .expect("write_data_file failed: transport error")

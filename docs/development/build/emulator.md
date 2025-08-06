@@ -119,10 +119,11 @@ To verify that your `fx` tool is using the correct port, run the
 following command:
 
 ```posix-terminal
-ffx target get-ssh-address
+ffx target list
 ```
 
-You should see the SSH address printed next to `Device name`.
+The device's SSH address is listed under `ADDRS/IP`. If a port is not
+specified as part of the address, the default SSH port (22) is used.
 
 To SSH into the emulator, run the following command:
 

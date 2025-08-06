@@ -1028,7 +1028,7 @@ mod test {
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_serve_impl_validate_args() {
         let env = get_test_env().await;
 
@@ -1218,7 +1218,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_serve_impl_validate_args_in_tree() {
         let build_dir = tempfile::tempdir().expect("temp dir");
         let env = ffx_config::test_env()
@@ -1275,7 +1275,7 @@ mod test {
         };
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_serve_impl_validate_args_running_servers() {
         let env = get_test_env().await;
 
@@ -1672,7 +1672,7 @@ mod test {
 
     #[test_case(true; "direct")]
     #[test_case(false; "tunnelled")]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_auto_reconnect(direct_target_connection: bool) {
         let test_env = get_test_env().await;
 
@@ -1857,7 +1857,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_no_device() {
         let test_env = get_test_env().await;
         test_env
@@ -2189,7 +2189,7 @@ mod test {
         Ed25519PrivateKey::from_pkcs8(&Ed25519PrivateKey::pkcs8().unwrap()).unwrap()
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trusted_root_file() {
         let test_env = get_test_env().await;
         test_env

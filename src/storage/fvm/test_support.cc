@@ -125,7 +125,7 @@ std::unique_ptr<RamdiskRef> RamdiskRef::Create(const fbl::unique_fd& devfs_root,
     return nullptr;
   }
 
-  RamdiskClient* client;
+  ramdisk_client_t* client;
   if (!vmo) {
     zx::vmo created_vmo;
     if (zx_status_t status = zx::vmo::create(block_size * block_count, 0, &created_vmo);

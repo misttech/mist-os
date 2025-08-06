@@ -41,7 +41,7 @@ class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   fdf::Arena arena_{'CLOC'};
-  fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_;
+  fdf::WireClient<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_;
   const uint32_t id_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_node_;
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;

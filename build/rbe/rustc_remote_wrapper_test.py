@@ -127,6 +127,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler_shlibs: Sequence[Path] | None = None,
         clang_rt_libdir: Path | None = None,
         libcxx_static: Path | None = None,
+        source_files_path_contents: Sequence[Path] | None = None,
+        compilation_deps_path_contents: Sequence[Path] | None = None,
     ) -> Iterable[Any]:
         """common mocks needed for RustRemoteAction.prepare()"""
         # depfile only command
@@ -167,6 +169,20 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 fuchsia, "clang_libcxx_static", return_value=libcxx_static or ""
             )
 
+        if source_files_path_contents:
+            yield mock.patch.object(
+                rustc_remote_wrapper.RustRemoteAction,
+                "_rust_source_file_inputs",
+                return_value=source_files_path_contents,
+            )
+
+        if compilation_deps_path_contents:
+            yield mock.patch.object(
+                rustc_remote_wrapper.RustRemoteAction,
+                "_rust_compilation_deps_inputs",
+                return_value=compilation_deps_path_contents,
+            )
+
         # expected to be called through _rust_stdlib_libunwind_inputs()
         # when --sysroot is unspecified.
         yield mock.patch.object(
@@ -184,8 +200,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         command = _strs([compiler, source, "-o", rlib])
         r = rustc_remote_wrapper.RustRemoteAction(
             ["--", *command],
@@ -205,7 +220,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(aux_rspfiles, [])
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -217,9 +232,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         self.assertEqual(remote_output_files, {rlib})
 
     def test_cxx_stdlibdir(self) -> None:
@@ -255,7 +268,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = Path("obj/foo.rlib")
         rmeta_dep = Path("obj/bar.rmeta")
         implied_rlib_dep = Path("obj/bar.rlib")
-        deps = [rmeta_dep]
+        deps = [source, rmeta_dep]
         depfile_contents = [str(d) + ":" for d in deps]
 
         with tempfile.TemporaryDirectory() as td:
@@ -268,6 +281,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             )
 
         mocks = self.generate_prepare_mocks(
+            source_files_path_contents=[Path("__SKIP_ENFORCEMENT__.rs")],
             depfile_contents=depfile_contents,
             compiler_shlibs=[shlib_rel],
         )
@@ -294,6 +308,50 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
+    def test_prepare_with_rmeta_file_in_provided_deps(self) -> None:
+        exec_root = Path("/home/project")
+        working_dir = exec_root / "build-here"
+        compiler = Path("../tools/bin/rustc")
+        shlib = Path("tools/lib/librusteze.so")
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        source = Path("../foo/src/lib.rs")
+        sources = [source]
+        rlib = Path("obj/foo.rlib")
+        rmeta_dep = Path("obj/bar.rmeta")
+        implied_rlib_dep = Path("obj/bar.rlib")
+        compilation_deps = [rlib, rmeta_dep, implied_rlib_dep]
+
+        with tempfile.TemporaryDirectory() as td:
+            command = _strs([compiler, source, "-o", rlib])
+            r = rustc_remote_wrapper.RustRemoteAction(
+                ["--", *command],
+                exec_root=exec_root,
+                working_dir=working_dir,
+                auto_reproxy=False,
+            )
+
+        mocks = self.generate_prepare_mocks(
+            source_files_path_contents=[source],
+            compilation_deps_path_contents=compilation_deps,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        # The corresponding .rlib from the .rmeta dep is considered a remote input.
+        self.assertEqual(
+            remote_inputs,
+            set([compiler, shlib_rel] + sources + compilation_deps),
+        )
+        self.assertEqual(remote_output_files, {rlib})
+
     def test_prepare_with_response_file(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
@@ -303,8 +361,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
 
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
@@ -324,34 +381,21 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             )
 
             mocks = self.generate_prepare_mocks(
-                depfile_contents=depfile_contents,
+                source_files_path_contents=sources,
                 compiler_shlibs=[shlib_rel],
             )
             with contextlib.ExitStack() as stack:
                 for m in mocks:
                     stack.enter_context(m)
-                with mock.patch.object(
-                    rustc_remote_wrapper, "_remove_files"
-                ) as mock_remove:
-                    prepare_status = r.prepare()
+                prepare_status = r.prepare()
 
             self.assertEqual(prepare_status, 0)  # success
-
-            # Expect there was a temporary response file written next to the
-            # original one, also inside the temporary dir.
-            # It should be marked for cleanup.
-            mock_remove.assert_called_once()
-            args, _ = mock_remove.call_args_list[0]
-            self.assertEqual(len(args), 1)
-            # args[0] is the list of files to cleanup
-            self.assertGreater(len(args[0]), 0)
-            self.assertTrue(any(str(f).startswith(str(rsp)) for f in args[0]))
 
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source, rsp] + deps)
+            remote_inputs, set([compiler, shlib_rel, rsp] + sources)
         )
         self.assertEqual(remote_output_files, {rlib})
 
@@ -396,9 +440,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
+        sources = [source, Path("../foo/src/other.rs")]
         depfile_path = Path("obj/foo.rlib.d")
-        depfile_contents = [str(d) + ":" for d in deps]
         command = _strs(
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
@@ -410,7 +453,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -422,9 +465,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         self.assertEqual(remote_output_files, {rlib, depfile_path})
         self.assertFalse(a.skipping_some_download)
         # Even if download_outputs=false, the depfile is required locally.
@@ -439,9 +480,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
+        sources = [source, Path("../foo/src/other.rs")]
         depfile_path = Path("obj/foo.rlib.d")
-        depfile_contents = [str(d) + ":" for d in deps]
         # skip downloading the main output
         command = _strs(
             [
@@ -461,7 +501,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -473,9 +513,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         self.assertEqual(remote_output_files, {rlib, depfile_path})
         self.assertTrue(a.skipping_some_download)
         # Even if download_outputs=false, the depfile is required locally.
@@ -517,8 +555,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
         llvm_ir = Path("obj/foo.ll")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         command = _strs([compiler, source, "-o", rlib, f"--emit=llvm-ir"])
         r = rustc_remote_wrapper.RustRemoteAction(
             ["--", *command],
@@ -528,7 +565,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -540,9 +577,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         # Even if download_outputs=false, we want the non-primary outputs.
         self.assertEqual(remote_output_files, {rlib, llvm_ir})
         self.assertFalse(a.skipping_some_download)
@@ -558,8 +593,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
         llvm_ir = Path("obj/foo.ll")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         command = _strs(
             [
                 compiler,
@@ -578,7 +612,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -590,9 +624,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         # Even if download_outputs=false, we want the non-primary outputs.
         self.assertEqual(remote_output_files, {rlib, llvm_ir})
         self.assertTrue(a.skipping_some_download)
@@ -607,8 +639,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         externs = list(
             _paths(
                 [
@@ -635,7 +666,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -648,7 +679,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps + externs)
+            remote_inputs, set([compiler, shlib_rel] + sources + externs)
         )
         self.assertEqual(remote_output_files, {rlib})
 
@@ -661,8 +692,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         link_arg = Path("obj/some/random.a")
         command = _strs(
             [compiler, source, "-o", rlib, f"-Clink-arg={link_arg}"]
@@ -675,7 +705,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -689,7 +719,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
             remote_inputs,
-            set([compiler, shlib_rel, source] + deps + [link_arg]),
+            set([compiler, shlib_rel] + sources + [link_arg]),
         )
         self.assertEqual(remote_output_files, {rlib})
 
@@ -708,8 +738,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         source = Path("../foo/src/lib.rs")
         target = "x86_64-unknown-linux-gnu"
         exe = Path("obj/foo.exe")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         command = _strs(
             [
                 compiler,
@@ -733,7 +762,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(r.remote_ld_path, lld)
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
             clang_rt_libdir=clang_rt_libdir,
             libcxx_static=exec_root_rel / libcxx,
@@ -751,8 +780,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             remote_inputs,
             set(
                 _paths(
-                    [compiler, shlib_rel, source]
-                    + deps
+                    [compiler, shlib_rel]
+                    + sources
                     + [linker, lld, clang_rt_libdir, exec_root_rel / libcxx]
                 )
             ),
@@ -768,8 +797,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         remote_flag = "--some_forwarded_rewrapper_flag=value"  # not real
         command = _strs(
             [compiler, source, "-o", rlib, f"--remote-flag={remote_flag}"]
@@ -782,7 +810,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -794,9 +822,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         self.assertEqual(remote_output_files, {rlib})
         # Position matters, not just presence.
         # Could override the set of standard options.
@@ -811,8 +837,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         env_file = Path("../path/to/config.json")
         command = _strs(
             [
@@ -832,7 +857,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -853,7 +878,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
             remote_inputs,
-            set(_paths([compiler, shlib_rel, source, env_file] + deps)),
+            set(_paths([compiler, shlib_rel, env_file] + sources)),
         )
         self.assertEqual(remote_output_files, {rlib})
 
@@ -987,20 +1012,16 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             working_dir=working_dir,
             auto_reproxy=False,
         )
-        mocks = self.generate_prepare_mocks()
+        mocks = self.generate_prepare_mocks(source_files_path_contents=[source])
         with contextlib.ExitStack() as stack:
             for m in mocks:
                 stack.enter_context(m)
             with mock.patch.object(
-                rustc_remote_wrapper.RustRemoteAction, "_local_depfile_inputs"
-            ) as mock_deps:
-                with mock.patch.object(
-                    rustc_remote_wrapper.RustRemoteAction,
-                    "_remote_rustc_shlibs",
-                ) as mock_shlibs:
-                    r.prepare()
+                rustc_remote_wrapper.RustRemoteAction,
+                "_remote_rustc_shlibs",
+            ) as mock_shlibs:
+                r.prepare()
 
-        mock_deps.assert_called_once()
         mock_shlibs.assert_called_once()
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
@@ -1025,8 +1046,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         target = "powerpc-unknown-freebsd"
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
-        depfile_contents = [str(d) + ":" for d in deps]
+        sources = [source, Path("../foo/src/other.rs")]
         command = _strs(
             [
                 compiler,
@@ -1054,7 +1074,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(r.remote_ld_path, remote_ld_path)
 
         mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -1087,7 +1107,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
             remote_inputs,
-            set([remote_compiler, shlib_rel, libcxx, source] + deps),
+            set([remote_compiler, shlib_rel, libcxx] + sources),
         )
         self.assertEqual(remote_output_files, {rlib})
 
@@ -1101,9 +1121,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
         input_rlib = Path("libintermediate.rlib")
-        deps = [Path("../foo/src/other.rs")]
+        sources = [source, Path("../foo/src/other.rs")]
         depfile_path = Path("obj/foo.rlib.d")
-        depfile_contents = [str(d) + ":" for d in deps]
         command = _strs(
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
@@ -1115,7 +1134,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         prepare_mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
+            source_files_path_contents=sources,
             compiler_shlibs=[shlib_rel],
         )
         with contextlib.ExitStack() as stack:
@@ -1128,7 +1147,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source, input_rlib] + deps)
+            remote_inputs, set([compiler, shlib_rel, input_rlib] + sources)
         )
         self.assertEqual(remote_output_files, {rlib, depfile_path})
 
@@ -1203,9 +1222,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
-        deps = [Path("../foo/src/other.rs")]
+        sources = [source, Path("../foo/src/other.rs")]
         depfile_path = Path("obj/foo.rlib.d")
-        depfile_contents = [str(d) + ":" for d in deps]
         command = _strs(
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
@@ -1217,8 +1235,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         prepare_mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
             compiler_shlibs=[shlib_rel],
+            source_files_path_contents=sources,
         )
         with contextlib.ExitStack() as stack:
             for m in prepare_mocks:
@@ -1230,9 +1248,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertIsNotNone(a._post_remote_run_success_action)
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
-        self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source] + deps)
-        )
+        self.assertEqual(remote_inputs, set([compiler, shlib_rel] + sources))
         self.assertEqual(remote_output_files, {rlib, depfile_path})
 
         run_mocks = [

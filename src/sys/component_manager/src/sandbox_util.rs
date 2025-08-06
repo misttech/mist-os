@@ -549,7 +549,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_with_request_ok() {
         let bar = Dict::new();
-        let data = Data::String("hello".to_owned());
+        let data = Data::String("hello".into());
         assert!(bar.insert_capability(&RelativePath::new("data").unwrap(), data.into()).is_ok());
         let bar_router = Router::<Dict>::new_ok(bar);
 
@@ -580,7 +580,7 @@ pub mod tests {
         assert_matches!(
             cap,
             Ok(Some(GenericRouterResponse::Capability(Capability::Data(Data::String(str)))))
-                if str == "hello"
+                if &*str == "hello"
         );
     }
 
@@ -844,13 +844,13 @@ pub mod tests {
             .unwrap();
         assert_matches!(
             resp,
-            RouterResponse::<Connector>::Debug(Data::String(s)) if &s == "debug"
+            RouterResponse::<Connector>::Debug(Data::String(s)) if &*s == "debug"
         );
     }
 
     #[fuchsia::test]
     async fn lazy_get() {
-        let source = Capability::Data(Data::String("hello".to_string()));
+        let source = Capability::Data(Data::String("hello".into()));
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
@@ -876,12 +876,12 @@ pub mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 
     #[fuchsia::test]
     async fn lazy_get_deep() {
-        let source = Capability::Data(Data::String("hello".to_string()));
+        let source = Capability::Data(Data::String("hello".into()));
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
         let dict2 = Dict::new();
@@ -919,12 +919,12 @@ pub mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 
     #[fuchsia::test]
     async fn get_router_or_not_found() {
-        let source = Router::<Data>::new_ok(Data::String("hello".to_string()));
+        let source = Router::<Data>::new_ok(Data::String("hello".into()));
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
 
@@ -940,12 +940,12 @@ pub mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 
     #[fuchsia::test]
     async fn get_router_or_not_found_deep() {
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
         let dict2 = Dict::new();
@@ -973,6 +973,6 @@ pub mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 }

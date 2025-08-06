@@ -165,7 +165,7 @@ template("dart_test") {
     testonly = true
 
     # snapshot file contains output dir name
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 
   if (is_host) {

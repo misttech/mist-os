@@ -7,17 +7,21 @@ use anyhow::{format_err, Context, Error};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use futures::future::{join_all, LocalBoxFuture};
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use log::*;
 use std::collections::HashMap;
 use std::rc::Rc;
-use {fuchsia_async as fasync, serde_json as json};
+use {fidl_fuchsia_power_cpu_manager as fcpumanager, fuchsia_async as fasync, serde_json as json};
 
 // nodes
 use crate::{
     cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler, rppm_handler,
     syscall_handler, thermal_watcher,
 };
+
+enum Services {
+    Boost(fcpumanager::BoostRequestStream),
+}
 
 pub struct CpuManager {
     nodes: HashMap<String, Rc<dyn Node>>,
@@ -47,13 +51,28 @@ impl CpuManager {
             .await
             .context("Failed to create nodes from config")?;
 
+        fs.dir("svc").add_fidl_service(Services::Boost);
+
         // Begin serving FIDL requests. It's important to do this after creating nodes but before
         // initializing them, since some nodes depend on incoming FIDL requests for their `init()`
         // process.
         fs.take_and_serve_directory_handle()?;
 
         let node_futures_task = fasync::Task::local(node_futures.collect::<()>());
-        let service_fs_task = fasync::Task::local(fs.collect::<()>());
+        let handler = self.nodes.get("cpu_manager_main").map(|n| n.clone());
+        let service_fs_task =
+            fasync::Task::local(fs.for_each_concurrent(None, move |request: Services| {
+                let handler = handler.clone();
+                async move {
+                    match request {
+                        Services::Boost(stream) => {
+                            if let Err(e) = Self::handle_boost_requests(stream, handler).await {
+                                log::error!("Error handling Manager requests: {}", e);
+                            }
+                        }
+                    }
+                }
+            }));
 
         self.init_nodes().await?;
 
@@ -166,6 +185,66 @@ impl CpuManager {
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
         .map(|_| ())
+    }
+
+    #[cfg(feature = "enable_android_power_hints")]
+    async fn handle_boost_requests(
+        mut stream: fcpumanager::BoostRequestStream,
+        handler: Option<Rc<dyn Node>>,
+    ) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                fcpumanager::BoostRequest::SetBoost { enable, responder } => {
+                    use crate::message::{Message, MessageReturn};
+                    let msg = Message::SetBoost(enable);
+                    if let Some(handler) = &handler {
+                        match handler.handle_message(&msg).await {
+                            Ok(MessageReturn::SetBoost) => {
+                                // success
+                                responder.send(Ok(()))?;
+                            }
+                            res => {
+                                log::error!("Failed to set boost: {:?}", res);
+                                responder.send(Err(fcpumanager::SetBoostError::Internal))?;
+                            }
+                        }
+                    } else {
+                        log::error!("No handler for the manger fidl");
+                        responder.send(Err(fcpumanager::SetBoostError::Internal))?;
+                    }
+                }
+                fcpumanager::BoostRequest::IsBoostSupported { responder } => {
+                    responder.send(true)?;
+                }
+                fcpumanager::BoostRequest::_UnknownMethod { .. } => {
+                    log::info!("Received an unknown method");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "enable_android_power_hints"))]
+    async fn handle_boost_requests(
+        mut stream: fcpumanager::BoostRequestStream,
+        _handler: Option<Rc<dyn Node>>,
+    ) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                fcpumanager::BoostRequest::SetBoost { enable, responder } => {
+                    log::error!("SetBoost is not supported, enable: {}", enable);
+                    responder.send(Err(fcpumanager::SetBoostError::NotSupported))?;
+                }
+                fcpumanager::BoostRequest::IsBoostSupported { responder } => {
+                    log::error!("Boost is not supported");
+                    responder.send(false)?;
+                }
+                fcpumanager::BoostRequest::_UnknownMethod { .. } => {
+                    log::info!("Received an unknown method");
+                }
+            }
+        }
+        Ok(())
     }
 }
 

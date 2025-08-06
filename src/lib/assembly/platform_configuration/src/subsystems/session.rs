@@ -5,9 +5,9 @@
 use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
-use assembly_config_schema::platform_config::swd_config::SwdConfig;
-use assembly_config_schema::product_config::ProductSessionConfig;
+use assembly_config_schema::platform_settings::session_config::PlatformSessionConfig;
+use assembly_config_schema::platform_settings::swd_config::SwdConfig;
+use assembly_config_schema::product_settings::ProductSessionConfig;
 use fuchsia_url::AbsoluteComponentUrl;
 
 pub(crate) struct SessionConfig;

@@ -55,7 +55,7 @@ mod tests {
 
     use super::*;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_debugcmd() {
         let command_request = PowerManagerDebugCommand {
             node_name: "test_node_name".to_string(),

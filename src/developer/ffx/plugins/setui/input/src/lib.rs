@@ -116,7 +116,7 @@ mod test {
         DeviceState { toggle_flags: ToggleStateFlags::from_bits(num), ..Default::default() }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
@@ -161,7 +161,7 @@ mod test {
         };
         "Test input set() output with a different input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_input_set_output(mut expected_input: Input) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
@@ -191,7 +191,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_input_watch_output() -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { .. } => {

@@ -11,7 +11,6 @@ use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
 use cm_types::{Name, Url};
-use errors::OpenExposedDirError;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use futures::StreamExt;
@@ -97,28 +96,6 @@ impl RealmQuery {
                 }
                 fsys::RealmQueryRequest::ConstructNamespace { moniker, responder } => {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
-                    responder.send(result)
-                }
-                fsys::RealmQueryRequest::Open {
-                    moniker,
-                    dir_type,
-                    flags,
-                    mode,
-                    path,
-                    object,
-                    responder,
-                } => {
-                    let result = open_deprecated(
-                        &model,
-                        &scope_moniker,
-                        &moniker,
-                        dir_type,
-                        flags,
-                        mode,
-                        &path,
-                        object,
-                    )
-                    .await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
@@ -415,123 +392,6 @@ async fn construct_namespace(
     Ok(ns.into())
 }
 
-#[cfg(any(fuchsia_api_level_less_than = "25", fuchsia_api_level_at_least = "PLATFORM"))]
-async fn open_deprecated(
-    model: &Arc<Model>,
-    scope_moniker: &Moniker,
-    moniker_str: &str,
-    dir_type: fsys::OpenDirType,
-    flags: fio::OpenFlags,
-    mode: fio::ModeType,
-    path: &str,
-    object: ServerEnd<fio::NodeMarker>,
-) -> Result<(), fsys::OpenError> {
-    // Construct the complete moniker using the scope moniker and the moniker string.
-    let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
-    let moniker = scope_moniker.concat(&moniker);
-
-    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance = model.root().find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
-
-    match dir_type {
-        fsys::OpenDirType::OutgoingDir => {
-            let mut object_request = flags.to_object_request(object);
-            if let Err(e) = instance
-                .open_outgoing(OpenRequest::new(
-                    instance.execution_scope.clone(),
-                    flags,
-                    path.try_into().map_err(|_| fsys::OpenError::BadPath)?,
-                    &mut object_request,
-                ))
-                .await
-            {
-                object_request.shutdown(e.as_zx_status());
-                Err(fsys::OpenError::FidlError)
-            } else {
-                Ok(())
-            }
-        }
-        fsys::OpenDirType::RuntimeDir => {
-            let state = instance.lock_state().await;
-            let dir = state
-                .get_started_state()
-                .ok_or(fsys::OpenError::InstanceNotRunning)?
-                .runtime_dir()
-                .ok_or(fsys::OpenError::NoSuchDir)?;
-            #[cfg(fuchsia_api_level_at_least = "27")]
-            let result = dir
-                .deprecated_open(flags, mode, path, object)
-                .map_err(|_| fsys::OpenError::FidlError);
-            #[cfg(not(fuchsia_api_level_at_least = "27"))]
-            let result =
-                dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError);
-
-            result
-        }
-        fsys::OpenDirType::PackageDir => {
-            let mut state = instance.lock_state().await;
-            match state.get_resolved_state_mut() {
-                Some(r) => {
-                    let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
-                    #[cfg(fuchsia_api_level_at_least = "27")]
-                    let result = pkg
-                        .package_dir
-                        .deprecated_open(flags, mode, path, object)
-                        .map_err(|_| fsys::OpenError::FidlError);
-                    #[cfg(not(fuchsia_api_level_at_least = "27"))]
-                    let result = pkg
-                        .package_dir
-                        .open(flags, mode, path, object)
-                        .map_err(|_| fsys::OpenError::FidlError);
-
-                    result
-                }
-                None => Err(fsys::OpenError::InstanceNotResolved),
-            }
-        }
-        fsys::OpenDirType::ExposedDir => {
-            let mut object_request = flags.to_object_request(object);
-            if let Err(e) = instance
-                .open_exposed(OpenRequest::new(
-                    instance.execution_scope.clone(),
-                    flags,
-                    path.try_into().map_err(|_| fsys::OpenError::BadPath)?,
-                    &mut object_request,
-                ))
-                .await
-            {
-                object_request.shutdown(e.as_zx_status());
-                Err(match e {
-                    OpenExposedDirError::InstanceNotResolved => {
-                        fsys::OpenError::InstanceNotResolved
-                    }
-                    _ => fsys::OpenError::FidlError,
-                })
-            } else {
-                Ok(())
-            }
-        }
-        fsys::OpenDirType::NamespaceDir => {
-            let path =
-                vfs::path::Path::validate_and_split(path).map_err(|_| fsys::OpenError::BadPath)?;
-
-            let state = instance.lock_state().await;
-            let resolved_state =
-                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
-
-            resolved_state
-                .namespace_dir()
-                .await
-                .map_err(|_| fsys::OpenError::NoSuchDir)?
-                .deprecated_open(instance.execution_scope.clone(), flags, path, object);
-
-            Ok(())
-        }
-        _ => Err(fsys::OpenError::BadDirType),
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "25")]
 async fn open_directory(
     model: &Arc<Model>,
     scope_moniker: &Moniker,

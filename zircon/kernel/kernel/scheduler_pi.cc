@@ -129,7 +129,6 @@ class Scheduler::PiOperation {
   inline void HandlePiInteractionCommon() TA_REQ(chainlock_transaction_token, target_.get_lock());
 
   TargetType& target_;
-  const SchedTime mono_now_{CurrentTime()};
 };
 
 namespace {
@@ -270,7 +269,8 @@ class ThreadBaseProfileChangedOp
 
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep)
+                           const SchedulerState::EffectiveProfile& target_new_ep,
+                           SchedTime mono_now)
       TA_REQ(chainlock_transaction_token, target_.get_lock()) {
     // Make sure the start and finish times are consistent with the bandwidth
     // parameters of the deadline profile. Consistency in fair profiles is
@@ -282,7 +282,7 @@ class ThreadBaseProfileChangedOp
 #else
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
                            const SchedulerState::EffectiveProfile& target_new_ep,
-                           SchedTime virt_now)
+                           SchedTime mono_now, SchedTime virt_now)
       TA_REQ(chainlock_transaction_token, target_.get_lock()) {
     // When the base profile of a thread was changed by a user, we treat it like
     // a yield in order to avoid any attempts by a user to game the system to
@@ -301,7 +301,7 @@ class ThreadBaseProfileChangedOp
     } else {
       DEBUG_ASSERT(target_new_ep.IsDeadline());
       // TODO(johngro): use the `now` time latched at the start of ThreadBaseProfileChanged instead?
-      GetStartTime(target_) = SchedTime{current_mono_time()} + target_new_ep.deadline().deadline_ns;
+      GetStartTime(target_) = mono_now + target_new_ep.deadline().deadline_ns;
       GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline().deadline_ns;
     }
     GetTimeSliceNs(target_) = SchedDuration{0};
@@ -342,8 +342,8 @@ class UpstreamThreadBaseProfileChangedOp
 
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep)
-      TA_REQ(target_.get_lock()) {
+                           const SchedulerState::EffectiveProfile& target_new_ep,
+                           SchedTime mono_now) TA_REQ(target_.get_lock()) {
     // Make sure the start and finish times are consistent with the bandwidth
     // parameters of the deadline profile. Consistency in fair profiles is
     // handled by Scheduler::AdjustFairBandwidth.
@@ -354,7 +354,7 @@ class UpstreamThreadBaseProfileChangedOp
 #else
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
                            const SchedulerState::EffectiveProfile& target_new_ep,
-                           SchedTime virt_now) TA_REQ(target_.get_lock()) {
+                           SchedTime mono_now, SchedTime virt_now) TA_REQ(target_.get_lock()) {
     // TODO(johngro): What is the proper fair policy here?  Typically, we
     // penalize threads which are changing profiles to make sure there is no way
     // for them to game the system and gain any bandwidth via artificial
@@ -372,7 +372,7 @@ class UpstreamThreadBaseProfileChangedOp
       GetTimeSliceNs(target_) = SchedDuration{0};
     } else {
       DEBUG_ASSERT(target_new_ep.IsDeadline());
-      GetStartTime(target_) = Base::mono_now_ + target_new_ep.deadline().deadline_ns;
+      GetStartTime(target_) = mono_now + target_new_ep.deadline().deadline_ns;
       GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline().deadline_ns;
       GetTimeSliceNs(target_) = SchedDuration{0};
     }
@@ -428,7 +428,7 @@ class JoinNodeToPiGraphOp
       : Base{target}, upstream_{upstream} {}
 
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep
+                           const SchedulerState::EffectiveProfile& target_new_ep, SchedTime mono_now
 #if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
                            ,
                            SchedTime virt_now
@@ -468,9 +468,9 @@ class JoinNodeToPiGraphOp
       // target_'s dynamic deadline parameters using the lag equation.
       // Compute the remaining periods of the target and upstream threads.
       const SchedDuration target_remaining_period =
-          ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now_, SchedDuration{0});
+          ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now, SchedDuration{0});
       const SchedDuration upstream_remaining_period =
-          ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now_, SchedDuration{0});
+          ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now, SchedDuration{0});
       const SchedDuration min_remaining_period =
           ktl::min(target_remaining_period, upstream_remaining_period);
 
@@ -504,11 +504,11 @@ class JoinNodeToPiGraphOp
       // target_'s dynamic deadline parameters using the lag equation.
       // Compute the time till absolute deadline (ttad) of the target_ and
       // upstream threads.
-      const SchedDuration target_ttad = (GetFinishTime(target_) > mono_now_)
-                                            ? (GetFinishTime(target_) - mono_now_)
+      const SchedDuration target_ttad = (GetFinishTime(target_) > mono_now)
+                                            ? (GetFinishTime(target_) - mono_now)
                                             : SchedDuration{0};
-      const SchedDuration upstream_ttad = (GetFinishTime(upstream_) > mono_now_)
-                                              ? (GetFinishTime(upstream_) - mono_now_)
+      const SchedDuration upstream_ttad = (GetFinishTime(upstream_) > mono_now)
+                                              ? (GetFinishTime(upstream_) - mono_now)
                                               : SchedDuration{0};
       const SchedDuration combined_ttad = ktl::min(target_ttad, upstream_ttad);
 
@@ -556,7 +556,6 @@ class JoinNodeToPiGraphOp
   using Base::GetStartTime;
   using Base::GetTimeSliceNs;
   using Base::GetTimeSliceUsedNs;
-  using Base::mono_now_;
   using Base::target_;
 
   const UpstreamType& upstream_;
@@ -575,7 +574,7 @@ class SplitNodeFromPiGraphOp
       : Base{target}, upstream_{upstream} {}
 
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep
+                           const SchedulerState::EffectiveProfile& target_new_ep, SchedTime mono_now
 #if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
                            ,
                            SchedTime virt_now
@@ -620,7 +619,7 @@ class SplitNodeFromPiGraphOp
       GetTimeSliceUsedNs(target_) = GetTimeSliceNs(target_);
 #else
       // Make sure that our fair parameters have been reset.  If we are
-      // an active thread, we will mono_now_ re-arrive with our new parameters.
+      // an active thread, we will now re-arrive with our new parameters.
       GetStartTime(target_) = SchedTime{0};
       GetFinishTime(target_) = SchedTime{1};
       GetTimeSliceNs(target_) = SchedDuration{0};
@@ -640,13 +639,13 @@ class SplitNodeFromPiGraphOp
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
         // Compute the time until absolute deadline of the target and upstream.
         const SchedDuration target_remaining_period =
-            ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now_, SchedDuration{0});
+            ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now, SchedDuration{0});
         const SchedDuration upstream_remaining_period =
-            ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now_, SchedDuration{0});
+            ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now, SchedDuration{0});
 #else
         // Compute the time till absolute deadline (ttad) of the target_.
-        const SchedDuration target_ttad = (GetFinishTime(target_) > mono_now_)
-                                              ? (GetFinishTime(target_) - mono_now_)
+        const SchedDuration target_ttad = (GetFinishTime(target_) > mono_now)
+                                              ? (GetFinishTime(target_) - mono_now)
                                               : SchedDuration{0};
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
@@ -673,16 +672,16 @@ class SplitNodeFromPiGraphOp
             upstream_ep().deadline().capacity_ns -
             ktl::max(new_upstream_remaining_time_slice, SchedDuration{0});
 #else
-        // If the upstream_ node's time till absolute deadline is zero, there
-        // is no need to compute its time slice remaining right mono_now_; we
-        // would just end up capping it to zero anyway.
+        // If the upstream_ node's time till absolute deadline is zero, there is
+        // no need to compute its time slice remaining right now; we would just
+        // end up capping it to zero anyway.
         //
         // TODO(johngro): this changes when carried lag comes into the picture.
-        if (GetFinishTime(upstream_) <= mono_now_) {
+        if (GetFinishTime(upstream_) <= mono_now) {
           GetTimeSliceNs(upstream_) = SchedDuration{0};
         } else {
           // Looks like we need to compute this value after all.
-          const SchedDuration upstream_ttad = GetFinishTime(upstream_) - mono_now_;
+          const SchedDuration upstream_ttad = GetFinishTime(upstream_) - mono_now;
           const SchedDuration new_upstream_tsr =
               upstream_ep().deadline().utilization *
               ((GetTimeSliceNs(target_) / combined_uncapped_utilization) + upstream_ttad -
@@ -760,7 +759,6 @@ class SplitNodeFromPiGraphOp
   using Base::GetStartTime;
   using Base::GetTimeSliceNs;
   using Base::GetTimeSliceUsedNs;
-  using Base::mono_now_;
   using Base::target_;
 
   const UpstreamType& upstream_;
@@ -792,6 +790,8 @@ class SplitNodeFromPiGraphOp
 // 2.2) Recompute the target's dynamic scheduler parameters.
 template <typename Op, typename TargetType>
 inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "HandlePiInteractionCommon");
+
   if constexpr (ktl::is_same_v<TargetType, Thread>) {
     SchedulerState& state = target_.scheduler_state();
 
@@ -804,6 +804,10 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler.queue_lock_, SOURCE_TAG};
       scheduler.ValidateInvariants();
       scheduler.AssertInScheduler(target_);
+
+      // Sample the current time after acquiring the queue lock to avoid large skews under
+      // contention.
+      const SchedMonoTimeAndBootTicks now = CurrentMonoTimeAndBootTicks();
 
       // Keep track of the original disposition. See SchedulerQueueState for
       // more details on how the disposition and thread state indicate which
@@ -823,9 +827,12 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
         }
       } else {
         DEBUG_ASSERT(disposition == Disposition::Associated);
+        ktrace::Scope trace_update = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "Update Timeslice",
+                                                              ("target cpu", scheduler.this_cpu()));
 
         // Update the time slice before updating other bookkeeping.
-        const SchedDuration actual_runtime_ns = mono_now_ - state.last_started_running_;
+        const SchedDuration actual_runtime_ns =
+            ktl::max<SchedDuration>(now.mono_time - state.last_started_running_, SchedDuration{0});
         const SchedDuration scaled_actual_runtime_ns = state.effective_profile().IsDeadline()
                                                            ? scheduler.ScaleDown(actual_runtime_ns)
                                                            : actual_runtime_ns;
@@ -844,8 +851,12 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
         };
 #endif
 
-        state.last_started_running_ = mono_now_;
-        scheduler.start_of_current_time_slice_ns_ = mono_now_;
+        state.last_started_running_ = now.mono_time;
+        scheduler.start_of_current_time_slice_ns_ = now.mono_time;
+        scheduler.UpdateEstimatedEnergyConsumption(&target_, now, actual_runtime_ns);
+
+        trace_update = KTRACE_END_SCOPE(("mono_now", now.mono_time), ("boot_ticks", now.boot_ticks),
+                                        ("actual_runtime_ns", actual_runtime_ns));
       }
 
       // Copy the original effective profile before updating it to compute the
@@ -873,7 +884,7 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
 
         if (weight_delta != 0) {
           scheduler.weight_total_ += weight_delta;
-          scheduler.UpdateFairBandwidthPeriod(mono_now_);
+          scheduler.UpdateFairBandwidthPeriod(now.mono_time);
         }
         if (utilization_delta != 0) {
           scheduler.UpdateTotalDeadlineUtilization(utilization_delta);
@@ -898,12 +909,13 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       }
 
       DEBUG_ASSERT(scheduler.weight_total_ >= SchedWeight{0});
-      DEBUG_ASSERT(scheduler.total_deadline_utilization_ >= SchedUtilization{0});
+      DEBUG_ASSERT(scheduler.power_level_control_.normalized_utilization() >= SchedUtilization{0});
 
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
-      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep);
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, now.mono_time);
 #else
-      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, scheduler.virtual_time_);
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, now.mono_time,
+                                                  scheduler.virtual_time_);
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
       if (target_.state() == THREAD_READY) {
@@ -965,9 +977,10 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
         target_.RecomputeEffectiveProfile();
       }
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
-      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_);
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_, CurrentTime());
 #else
-      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_, SchedTime{0});
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_, CurrentTime(),
+                                                  SchedTime{0});
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     }
   } else {
@@ -975,9 +988,9 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
                   "Targets of PI operations must either be Threads or OwnedWaitQueues");
     SchedulerState::EffectiveProfile old_ep{ComputeEffectiveProfile(target_)};
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
-    static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep);
+    static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep, CurrentTime());
 #else
-    static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep, SchedTime{0});
+    static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep, CurrentTime(), SchedTime{0});
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   }
 

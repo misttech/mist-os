@@ -1479,6 +1479,7 @@ async fn run_tcp_socket_test(
 trait TestIpExt: packet_formats::ip::IpExt {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
+    const CLIENT_ADDR: Self::Addr;
     const SERVER_SUBNET: fnet::Subnet;
     const SERVER_ADDR: Self::Addr;
 }
@@ -1486,6 +1487,7 @@ trait TestIpExt: packet_formats::ip::IpExt {
 impl TestIpExt for Ipv4 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
+    const CLIENT_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.2");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     const SERVER_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.1");
 }
@@ -1493,6 +1495,7 @@ impl TestIpExt for Ipv4 {
 impl TestIpExt for Ipv6 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64");
+    const CLIENT_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7334");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64");
     const SERVER_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7335");
 }
@@ -4068,7 +4071,9 @@ impl TestPmtuIpExt for Ipv6 {
 #[netstack_test]
 #[variant(N, Netstack)]
 #[variant(I, Ip)]
-async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
+#[test_case(true; "start by priming cache")]
+#[test_case(false; "start with empty cache")]
+async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str, prime_cache: bool) {
     use packet_formats::ip::IpPacket as _;
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4086,6 +4091,30 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
         .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
         .await
         .expect("add_neighbor_entry");
+
+    if prime_cache {
+        // First, prime the PMTU cache with the value we will send later, as a
+        // regression test for https://fxbug.dev/435260334.
+        let (message, code) = I::packet_too_big();
+        let icmp_error = packet::Buf::new([], ..)
+            .wrap_in(IcmpPacketBuilder::<I, _>::new(I::SERVER_ADDR, I::CLIENT_ADDR, code, message))
+            .wrap_in(I::PacketBuilder::new(
+                I::SERVER_ADDR,
+                I::CLIENT_ADDR,
+                u8::MAX,
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
+            ))
+            .wrap_in(EthernetFrameBuilder::new(
+                SERVER_MAC.into_ext(),
+                client_interface.mac().await.into_ext(),
+                EtherType::from_ip_version(I::VERSION),
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
+            ))
+            .serialize_vec_outer()
+            .expect("serialize ICMP error")
+            .unwrap_b();
+        fake_ep.write(icmp_error.as_ref()).await.expect("write ICMP error");
+    }
 
     // Filter frames observed on the fake endpoint to just those containing a TCP
     // segment in an IP packet.

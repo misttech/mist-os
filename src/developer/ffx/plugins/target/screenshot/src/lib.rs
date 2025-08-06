@@ -310,7 +310,7 @@ mod test {
         serde_json::from_str(&stdout).unwrap()
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_bgra() -> Result<()> {
         let ScreenshotOutput { output_file } =
             run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::BGRA })
@@ -323,7 +323,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_output_dir_bgra() -> Result<()> {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");
@@ -337,7 +337,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_png() -> Result<()> {
         let ScreenshotOutput { output_file } =
             run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::PNG })
@@ -350,7 +350,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_output_dir_png() -> Result<()> {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");
@@ -364,7 +364,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_rgba() -> Result<()> {
         let ScreenshotOutput { output_file } =
             run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::RGBA })
@@ -377,7 +377,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_output_dir_rgba() -> Result<()> {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");

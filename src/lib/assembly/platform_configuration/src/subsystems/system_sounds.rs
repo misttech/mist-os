@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::Context;
-use assembly_config_schema::platform_config::system_sounds_config::SystemSoundsConfig;
+use assembly_config_schema::platform_settings::system_sounds_config::SystemSoundsConfig;
 use assembly_constants::FileEntry;
 
 pub(crate) struct SystemSoundsSubsystem;

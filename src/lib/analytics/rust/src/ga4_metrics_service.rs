@@ -282,7 +282,7 @@ impl GA4MetricsService {
     }
 
     fn uuid_as_str(&self) -> String {
-        self.state.uuid.map_or("No uuid".to_string(), |u| u.to_string())
+        self.state.uuid.map_or_else(|| "No uuid".to_string(), |u| u.to_string())
     }
 
     /// Create the GA4 Post object that will be sent to Google Analytics.

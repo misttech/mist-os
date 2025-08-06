@@ -250,8 +250,8 @@ impl CapabilityFactory {
                 router_proxy.as_channel().basic_info().ok()?.related_koid
             }
             fruntime::Capability::Data(data) => match data {
-                fruntime::Data::Bytes(bytes) => return Some(Data::Bytes(bytes).into()),
-                fruntime::Data::String(string) => return Some(Data::String(string).into()),
+                fruntime::Data::Bytes(bytes) => return Some(Data::Bytes(bytes.into()).into()),
+                fruntime::Data::String(string) => return Some(Data::String(string.into()).into()),
                 fruntime::Data::Int64(num) => return Some(Data::Int64(num).into()),
                 fruntime::Data::Uint64(num) => return Some(Data::Uint64(num).into()),
                 _ => return None,
@@ -446,8 +446,12 @@ impl CapabilityFactory {
                 fruntime::Capability::DataRouter(client_end)
             }
             Capability::Data(data) => match data {
-                Data::Bytes(bytes) => fruntime::Capability::Data(fruntime::Data::Bytes(bytes)),
-                Data::String(string) => fruntime::Capability::Data(fruntime::Data::String(string)),
+                Data::Bytes(bytes) => {
+                    fruntime::Capability::Data(fruntime::Data::Bytes(bytes.into()))
+                }
+                Data::String(string) => {
+                    fruntime::Capability::Data(fruntime::Data::String(string.into()))
+                }
                 Data::Int64(num) => fruntime::Capability::Data(fruntime::Data::Int64(num)),
                 Data::Uint64(num) => fruntime::Capability::Data(fruntime::Data::Uint64(num)),
             },
@@ -700,8 +704,10 @@ impl CapabilityFactory {
                         match router.route(maybe_route_request, false).await {
                             Ok(RouterResponse::Capability(data)) => {
                                 let data = match data {
-                                    Data::Bytes(bytes) => fruntime::Data::Bytes(bytes),
-                                    Data::String(string) => fruntime::Data::String(string),
+                                    Data::Bytes(bytes) => fruntime::Data::Bytes(bytes.to_vec()),
+                                    Data::String(string) => {
+                                        fruntime::Data::String(string.to_string())
+                                    }
                                     Data::Int64(num) => fruntime::Data::Int64(num),
                                     Data::Uint64(num) => fruntime::Data::Uint64(num),
                                 };
@@ -930,8 +936,8 @@ impl Remotable for Data {
 
     async fn to_remote(self, _factory: &CapabilityFactory) -> Self::RemotedType {
         match self {
-            Data::Bytes(bytes) => fruntime::Data::Bytes(bytes),
-            Data::String(string) => fruntime::Data::String(string),
+            Data::Bytes(bytes) => fruntime::Data::Bytes(bytes.to_vec()),
+            Data::String(string) => fruntime::Data::String(string.to_string()),
             Data::Int64(num) => fruntime::Data::Int64(num),
             Data::Uint64(num) => fruntime::Data::Uint64(num),
         }
@@ -939,8 +945,8 @@ impl Remotable for Data {
 
     async fn from_remote(data: Self::RemotedType, _factory: &CapabilityFactory) -> Option<Self> {
         match data {
-            fruntime::Data::Bytes(bytes) => Some(Data::Bytes(bytes)),
-            fruntime::Data::String(string) => Some(Data::String(string)),
+            fruntime::Data::Bytes(bytes) => Some(Data::Bytes(bytes.into())),
+            fruntime::Data::String(string) => Some(Data::String(string.into())),
             fruntime::Data::Int64(num) => Some(Data::Int64(num)),
             fruntime::Data::Uint64(num) => Some(Data::Uint64(num)),
             _ => None,

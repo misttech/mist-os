@@ -66,9 +66,10 @@ TEST(SystemSuspend, ResourceValidation) {
 
   // The suspend call validates the resource before proceeding, errors associated with other
   // conditions means validation succeeded.
-  EXPECT_EQ(ZX_ERR_TIMED_OUT,
-            zx_system_suspend_enter(resource_result->get(), ZX_TIME_INFINITE_PAST));
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, zx_system_suspend_enter(event.get(), ZX_TIME_INFINITE_PAST));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), ZX_TIME_INFINITE_PAST,
+                                                      0, nullptr, nullptr, 0, nullptr));
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, zx_system_suspend_enter(event.get(), ZX_TIME_INFINITE_PAST, 0,
+                                                       nullptr, nullptr, 0, nullptr));
 
   // TODO(eieio): This syscall uses standard resource validation. Do we need to cover all cases in
   // this test?
@@ -81,10 +82,12 @@ TEST(SystemSuspend, TimeoutIsPast) {
   ASSERT_OK(resource_result.status_value());
 
   const zx::time_boot almost_now = zx::clock::get_boot() - zx::nsec(1);
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), almost_now.get()));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), almost_now.get(), 0,
+                                                      nullptr, nullptr, 0, nullptr));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), ZX_TIME_INFINITE_PAST,
+                                                      0, nullptr, nullptr, 0, nullptr));
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
-            zx_system_suspend_enter(resource_result->get(), ZX_TIME_INFINITE_PAST));
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), 0));
+            zx_system_suspend_enter(resource_result->get(), 0, 0, nullptr, nullptr, 0, nullptr));
 }
 
 TEST(SystemSuspend, SuspendAndResumeByTimer) {
@@ -99,7 +102,8 @@ TEST(SystemSuspend, SuspendAndResumeByTimer) {
   zx::duration suspend_duration = zx::sec(1);
   do {
     resume_at = zx::clock::get_boot() + suspend_duration;
-    suspend_status = zx_system_suspend_enter(resource_result->get(), resume_at.get());
+    suspend_status = zx_system_suspend_enter(resource_result->get(), resume_at.get(), 0, nullptr,
+                                             nullptr, 0, nullptr);
     suspend_duration *= 2;
   } while (suspend_status == ZX_ERR_TIMED_OUT);
 
@@ -140,8 +144,8 @@ TEST(SystemSuspend, ConcurrentSuspend) {
 
       std::cout << "Suspend tester " << id << " attempt " << i << "...\n";
       const zx::time_boot resume_at = zx::clock::get_boot() + suspend_duration;
-      const zx_status_t suspend_status =
-          zx_system_suspend_enter(resource_result->get(), resume_at.get());
+      const zx_status_t suspend_status = zx_system_suspend_enter(
+          resource_result->get(), resume_at.get(), 0, nullptr, nullptr, 0, nullptr);
       EXPECT_TRUE(suspend_status == ZX_OK || suspend_status == ZX_ERR_TIMED_OUT);
       std::cout << "Suspend tester " << id << " attempt " << i
                 << ": status=" << zx_status_get_string(suspend_status) << "\n";

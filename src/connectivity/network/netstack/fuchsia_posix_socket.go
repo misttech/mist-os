@@ -28,6 +28,7 @@ import (
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
 	fnet "fidl/fuchsia/net"
+	fnettcp "fidl/fuchsia/net/tcp"
 	"fidl/fuchsia/posix"
 	"fidl/fuchsia/posix/socket"
 	packetsocket "fidl/fuchsia/posix/socket/packet"
@@ -3932,30 +3933,30 @@ func (s *streamSocketImpl) GetTcpInfo(fidl.Context) (socket.StreamSocketGetTcpIn
 	info.SetState(func() socket.TcpState {
 		switch state := tcp.EndpointState(value.State); state {
 		case tcp.StateEstablished:
-			return socket.TcpStateEstablished
+			return fnettcp.StateEstablished
 		case tcp.StateSynSent:
-			return socket.TcpStateSynSent
+			return fnettcp.StateSynSent
 		case tcp.StateSynRecv:
-			return socket.TcpStateSynRecv
+			return fnettcp.StateSynRecv
 		case tcp.StateFinWait1:
-			return socket.TcpStateFinWait1
+			return fnettcp.StateFinWait1
 		case tcp.StateFinWait2:
-			return socket.TcpStateFinWait2
+			return fnettcp.StateFinWait2
 		case tcp.StateTimeWait:
-			return socket.TcpStateTimeWait
+			return fnettcp.StateTimeWait
 		case tcp.StateClose:
-			return socket.TcpStateClose
+			return fnettcp.StateClose
 		case tcp.StateCloseWait:
-			return socket.TcpStateCloseWait
+			return fnettcp.StateCloseWait
 		case tcp.StateLastAck:
-			return socket.TcpStateLastAck
+			return fnettcp.StateLastAck
 		case tcp.StateListen:
-			return socket.TcpStateListen
+			return fnettcp.StateListen
 		case tcp.StateClosing:
-			return socket.TcpStateClosing
+			return fnettcp.StateClosing
 		// Endpoint states internal to netstack.
 		case tcp.StateInitial, tcp.StateBound, tcp.StateConnecting, tcp.StateError:
-			return socket.TcpStateClose
+			return fnettcp.StateClose
 		default:
 			panic(fmt.Sprintf("unknown state: %d", state))
 		}

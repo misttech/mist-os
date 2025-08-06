@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -23,6 +22,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/display-timing-mode-conversion.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/logging.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
@@ -57,7 +57,10 @@ Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
           .dsi_host = std::move(dsi_host),
           .clock = std::move(dsi_clock),
           .panel_config = *panel_config,
-          .banjo_display_mode = display::ToBanjoDisplayMode(panel_config->display_timing),
+          .mode_and_id = display::ModeAndId({
+              .id = display::ModeId(1),
+              .mode = ToDisplayMode(panel_config->display_timing),
+          }),
       } {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   node_.RecordInt("vout_type", static_cast<int>(type()));
@@ -158,32 +161,29 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
   return zx::ok(std::move(vout));
 }
 
-raw_display_info_t Vout::CreateRawDisplayInfo(
-    display::DisplayId display_id,
-    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
+AddedDisplayInfo Vout::CreateAddedDisplayInfo(display::DisplayId display_id) {
   switch (type_) {
     case VoutType::kDsi: {
-      return raw_display_info_t{
-          .display_id = display_id.ToBanjo(),
-          .preferred_modes_list = &dsi_.banjo_display_mode,
-          .preferred_modes_count = 1,
-          .edid_bytes_list = nullptr,
-          .edid_bytes_count = 0,
-          .pixel_formats_list = pixel_formats.data(),
-          .pixel_formats_count = pixel_formats.size(),
+      ZX_DEBUG_ASSERT(dsi_.mode_and_id.has_value());
+      return {
+          .display_id = display_id,
+          .preferred_modes = {dsi_.mode_and_id.value()},
+          .edid = {},
       };
     }
-    case VoutType::kHdmi:
+    case VoutType::kHdmi: {
       ZX_DEBUG_ASSERT(!hdmi_.current_display_edid.is_empty());
-      return raw_display_info_t{
-          .display_id = display_id.ToBanjo(),
-          .preferred_modes_list = nullptr,
-          .preferred_modes_count = 0,
-          .edid_bytes_list = hdmi_.current_display_edid.data(),
-          .edid_bytes_count = hdmi_.current_display_edid.size(),
-          .pixel_formats_list = pixel_formats.data(),
-          .pixel_formats_count = pixel_formats.size(),
+      fbl::Vector<uint8_t> out_edid;
+      fbl::AllocChecker alloc_checker;
+      out_edid.resize(hdmi_.current_display_edid.size(), &alloc_checker);
+      ZX_ASSERT(alloc_checker.check());
+      std::ranges::copy(hdmi_.current_display_edid, out_edid.begin());
+      return {
+          .display_id = display_id,
+          .preferred_modes = {},
+          .edid = std::move(out_edid),
       };
+    }
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
@@ -299,6 +299,16 @@ zx::result<> Vout::SetFrameVisibility(bool frame_visible) {
       }
       return zx::ok();
   }
+}
+
+display::Mode Vout::CurrentDisplayMode() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return ToDisplayMode(dsi_.panel_config.display_timing);
+    case VoutType::kHdmi:
+      return ToDisplayMode(hdmi_.current_display_timing_);
+  }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %" PRIu8, static_cast<uint8_t>(type_));
 }
 
 bool Vout::IsDisplayTimingSupported(const display::DisplayTiming& timing) {

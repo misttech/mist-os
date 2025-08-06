@@ -17,7 +17,6 @@ source_set("iommu-x86") {
     "//src/lib/ddk",
     "//third_party/acpica",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/syslog:syslog-headers",
     "//zircon/system/ulib/zx",
   ]
 }

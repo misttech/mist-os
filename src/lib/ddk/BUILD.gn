@@ -47,7 +47,6 @@ static_library("ddk") {
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/zbi-format",
     "//zircon/system/ulib/ddk-platform-defs",
-    "//zircon/system/ulib/syslog:syslog-headers",
   ]
   if (is_fuchsia) {
     public_deps += [
@@ -62,7 +61,6 @@ static_library("ddk") {
     public_deps -= [
       "//sdk/lib/async:async",
       "//sdk/lib/driver/runtime:driver_runtime",
-      "//zircon/system/ulib/syslog:syslog-headers",
     ]
     deps -= [ "//zircon/system/ulib/sync" ]
   }

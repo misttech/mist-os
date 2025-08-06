@@ -107,16 +107,26 @@ pub struct ConfirmationFlags {
 
 /// The type of message with a dynamic neighbor update.
 #[derive(Debug, Copy, Clone)]
-pub enum DynamicNeighborUpdateSource {
+pub enum DynamicNeighborUpdateSource<A> {
     /// Indicates an update from a neighbor probe message.
     ///
     /// E.g. NDP Neighbor Solicitation.
-    Probe,
+    Probe {
+        /// The source link-layer address option.
+        // TODO(https://fxbug.dev/42083958): Wrap in `UnicastAddr`.
+        link_address: A,
+    },
 
     /// Indicates an update from a neighbor confirmation message.
     ///
     /// E.g. NDP Neighbor Advertisement.
-    Confirmation(ConfirmationFlags),
+    Confirmation {
+        /// The target link-layer address option.
+        // TODO(https://fxbug.dev/42083958): Wrap in `UnicastAddr`.
+        link_address: Option<A>,
+        /// The flags set on the neighbor confirmation.
+        flags: ConfirmationFlags,
+    },
 }
 
 /// A neighbor's state.
@@ -1302,7 +1312,7 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
         timers: &mut TimerHeap<I, BC>,
         device_id: &CC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        link_address: D::Address,
+        link_address: Option<D::Address>,
         flags: ConfirmationFlags,
         num_entries: usize,
         last_gc: &mut Option<BC::Instant>,
@@ -1331,11 +1341,17 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
                 //
                 //   Note that the Override flag is ignored if the entry is in the
                 //   INCOMPLETE state.
-                if solicited_flag {
-                    Some(NewState::Reachable { link_address })
-                } else {
-                    Some(NewState::Stale { link_address })
-                }
+                //
+                // Also note that if the target link-layer address was not specified in this
+                // neighbor confirmation, we ignore the confirmation: there is nothing we can do
+                // since we don't have a cached link-layer address.
+                link_address.map(|link_address| {
+                    if solicited_flag {
+                        NewState::Reachable { link_address }
+                    } else {
+                        NewState::Stale { link_address }
+                    }
+                })
             }
             DynamicNeighborState::Reachable(Reachable {
                 link_address: current,
@@ -1345,7 +1361,26 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
             | DynamicNeighborState::Delay(Delay { link_address: current })
             | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ })
             | DynamicNeighborState::Unreachable(Unreachable { link_address: current, mode: _ }) => {
-                let updated_link_address = current != &link_address;
+                // Per RFC 4861 section 4.4:
+                //
+                //    The link-layer address for the target, i.e., the
+                //    sender of the advertisement ... MUST be
+                //    included on link layers that have addresses when
+                //    responding to multicast solicitations.  When
+                //    responding to a unicast Neighbor Solicitation this
+                //    option SHOULD be included.
+                //
+                //    ... When responding to unicast
+                //    solicitations, the option can be omitted since the
+                //    sender of the solicitation has the correct link-
+                //    layer address; otherwise, it would not be able to
+                //    send the unicast solicitation in the first place.
+                //
+                // Because neighbors may choose to omit the target link-layer address option
+                // from neighbor confirmations, we must be tolerant of its absence. In the case
+                // of absence, we use the cached link-layer address if one is available.
+                let updated_link_address = link_address
+                    .and_then(|link_address| (current != &link_address).then_some(link_address));
 
                 match (solicited_flag, updated_link_address, override_flag) {
                     // Per RFC 4861 section 7.2.5:
@@ -1353,8 +1388,8 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
                     //   If [either] the Override flag is set, or the supplied link-layer address is
                     //   the same as that in the cache, [and] ... the Solicited flag is set, the
                     //   entry MUST be set to REACHABLE.
-                    (true, _, true) | (true, false, _) => {
-                        Some(NewState::Reachable { link_address })
+                    (true, _, true) | (true, None, _) => {
+                        Some(NewState::Reachable { link_address: link_address.unwrap_or(*current) })
                     }
                     // Per RFC 4861 section 7.2.5:
                     //
@@ -1365,7 +1400,7 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
                     //       update the entry in any other way.
                     //    b. Otherwise, the received advertisement should be ignored and MUST NOT
                     //       update the cache.
-                    (_, true, false) => match self {
+                    (_, Some(_), false) => match self {
                         // NB: do not update the link address.
                         DynamicNeighborState::Reachable(Reachable {
                             link_address,
@@ -1384,12 +1419,12 @@ impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
                     //   If the Override flag is set [and] ... the Solicited flag is zero and the
                     //   link-layer address was updated with a different address, the state MUST be
                     //   set to STALE.
-                    (false, true, true) => Some(NewState::Stale { link_address }),
+                    (false, Some(link_address), true) => Some(NewState::Stale { link_address }),
                     // Per RFC 4861 section 7.2.5:
                     //
                     //   There is no need to update the state for unsolicited advertisements that do
                     //   not change the contents of the cache.
-                    (false, false, _) => None,
+                    (false, None, _) => None,
                 }
             }
         };
@@ -2058,7 +2093,7 @@ pub trait NudIpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        link_addr: &[u8],
+        link_addr: Option<&[u8]>,
         flags: ConfirmationFlags,
     );
 
@@ -2088,9 +2123,7 @@ pub trait NudHandler<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D>>: DeviceIdCon
         // subnet broadcast addresses with all host bits equal to 1.
         // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         neighbor: SpecifiedAddr<I::Addr>,
-        // TODO(https://fxbug.dev/42083958): Wrap in `UnicastAddr`.
-        link_addr: D::Address,
-        source: DynamicNeighborUpdateSource,
+        source: DynamicNeighborUpdateSource<D::Address>,
     );
 
     /// Clears the neighbor table.
@@ -2394,8 +2427,7 @@ impl<
         bindings_ctx: &mut BC,
         device_id: &CC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        link_address: D::Address,
-        source: DynamicNeighborUpdateSource,
+        source: DynamicNeighborUpdateSource<D::Address>,
     ) {
         debug!("received neighbor {:?} from {}", source, neighbor);
         self.with_nud_state_mut_and_sender_ctx(
@@ -2404,7 +2436,7 @@ impl<
                 let num_entries = neighbors.len();
                 match neighbors.entry(neighbor) {
                     Entry::Vacant(e) => match source {
-                        DynamicNeighborUpdateSource::Probe => {
+                        DynamicNeighborUpdateSource::Probe { link_address } => {
                             // Per [RFC 4861 section 7.2.3] ("Receipt of Neighbor Solicitations"):
                             //
                             //   If an entry does not already exist, the node SHOULD create a new
@@ -2433,11 +2465,11 @@ impl<
                         //   target.
                         //
                         // [RFC 4861 section 7.2.5]: https://tools.ietf.org/html/rfc4861#section-7.2.5
-                        DynamicNeighborUpdateSource::Confirmation(_) => {}
+                        DynamicNeighborUpdateSource::Confirmation { .. } => {}
                     },
                     Entry::Occupied(e) => match e.into_mut() {
                         NeighborState::Dynamic(e) => match source {
-                            DynamicNeighborUpdateSource::Probe => e.handle_probe(
+                            DynamicNeighborUpdateSource::Probe { link_address } => e.handle_probe(
                                 core_ctx,
                                 bindings_ctx,
                                 timer_heap,
@@ -2447,7 +2479,7 @@ impl<
                                 num_entries,
                                 last_gc,
                             ),
-                            DynamicNeighborUpdateSource::Confirmation(flags) => e
+                            DynamicNeighborUpdateSource::Confirmation { link_address, flags } => e
                                 .handle_confirmation(
                                     core_ctx,
                                     bindings_ctx,
@@ -3220,8 +3252,7 @@ mod tests {
             bindings_ctx,
             &FakeLinkDeviceId,
             ip_address,
-            link_address,
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe { link_address },
         );
         assert_neighbor_state_with_ip(
             core_ctx,
@@ -3253,11 +3284,10 @@ mod tests {
             bindings_ctx,
             &FakeLinkDeviceId,
             ip_address,
-            link_address,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: true,
-                override_flag: false,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(link_address),
+                flags: ConfirmationFlags { solicited_flag: true, override_flag: false },
+            },
         );
         assert_neighbor_state_with_ip(
             core_ctx,
@@ -3641,8 +3671,7 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe { link_address: LINK_ADDR1 },
         );
 
         // Neighbor should now be in STALE, per RFC 4861 section 7.2.3.
@@ -3672,11 +3701,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag,
-                override_flag,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR1),
+                flags: ConfirmationFlags { solicited_flag, override_flag },
+            },
         );
 
         let expected_state = if solicited_flag {
@@ -3743,8 +3771,9 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            if update_link_address { LINK_ADDR2 } else { LINK_ADDR1 },
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe {
+                link_address: if update_link_address { LINK_ADDR2 } else { LINK_ADDR1 },
+            },
         );
 
         // If the link address was updated, the neighbor should now be in STALE with the
@@ -3791,11 +3820,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: true,
-                override_flag,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR1),
+                flags: ConfirmationFlags { solicited_flag: true, override_flag },
+            },
         );
 
         // Neighbor should now be in REACHABLE, per RFC 4861 section 7.2.5.
@@ -3833,11 +3861,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: false,
-                override_flag: true,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR2),
+                flags: ConfirmationFlags { solicited_flag: false, override_flag: true },
+            },
         );
 
         // Neighbor should now be in STALE, per RFC 4861 section 7.2.5.
@@ -3876,11 +3903,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: false,
-                override_flag,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR1),
+                flags: ConfirmationFlags { solicited_flag: false, override_flag },
+            },
         );
 
         // Neighbor should not have been updated.
@@ -3909,11 +3935,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: true,
-                override_flag: true,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR2),
+                flags: ConfirmationFlags { solicited_flag: true, override_flag: true },
+            },
         );
 
         // Neighbor should now be in REACHABLE, per RFC 4861 section 7.2.5.
@@ -3942,8 +3967,7 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe { link_address: LINK_ADDR1 },
         );
 
         // Neighbor should still be in REACHABLE with the same link address.
@@ -3976,11 +4000,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                override_flag: false,
-                solicited_flag,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR2),
+                flags: ConfirmationFlags { override_flag: false, solicited_flag },
+            },
         );
 
         // Neighbor should now be in STALE, with the *same* link address as was
@@ -4017,11 +4040,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                override_flag: false,
-                solicited_flag,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR2),
+                flags: ConfirmationFlags { override_flag: false, solicited_flag },
+            },
         );
 
         // Neighbor should still be in the original state; the link address should *not*
@@ -4259,17 +4281,16 @@ mod tests {
     fn confirmation_should_not_create_entry<I: TestIpExt>(solicited_flag: bool) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
-        let link_addr = FakeLinkAddress([1]);
+        let link_address = Some(FakeLinkAddress([1]));
         NudHandler::handle_neighbor_update(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            link_addr,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag,
-                override_flag: false,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address,
+                flags: ConfirmationFlags { solicited_flag, override_flag: false },
+            },
         );
         assert_eq!(core_ctx.nud.state.neighbors, HashMap::new());
     }
@@ -4349,11 +4370,10 @@ mod tests {
                 &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
-                LINK_ADDR1,
-                DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                    solicited_flag: true,
-                    override_flag: false,
-                }),
+                DynamicNeighborUpdateSource::Confirmation {
+                    link_address: Some(LINK_ADDR1),
+                    flags: ConfirmationFlags { solicited_flag: true, override_flag: false },
+                },
             );
             core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
                 &mut bindings_ctx,
@@ -4409,8 +4429,7 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe { link_address: LINK_ADDR2 },
         );
         check_lookup_has(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
 
@@ -4435,8 +4454,7 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR2,
-            DynamicNeighborUpdateSource::Probe,
+            DynamicNeighborUpdateSource::Probe { link_address: LINK_ADDR2 },
         );
         check_lookup_has(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR2);
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4493,11 +4511,10 @@ mod tests {
             &mut bindings_ctx,
             &FakeLinkDeviceId,
             I::LOOKUP_ADDR1,
-            LINK_ADDR1,
-            DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                solicited_flag: true,
-                override_flag: false,
-            }),
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: Some(LINK_ADDR1),
+                flags: ConfirmationFlags { solicited_flag: true, override_flag: false },
+            },
         );
         check_lookup_has(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
 
@@ -4775,11 +4792,10 @@ mod tests {
                     bindings_ctx,
                     &FakeLinkDeviceId,
                     I::LOOKUP_ADDR1,
-                    LINK_ADDR1,
-                    DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                        solicited_flag: true,
-                        override_flag: false,
-                    }),
+                    DynamicNeighborUpdateSource::Confirmation {
+                        link_address: Some(LINK_ADDR1),
+                        flags: ConfirmationFlags { solicited_flag: true, override_flag: false },
+                    },
                 );
                 let now = bindings_ctx.now();
                 assert_neighbor_state(
@@ -5191,6 +5207,38 @@ mod tests {
         assert_eq!(
             bindings_ctx.timers.scheduled_instant(&mut core_ctx.nud.state.timer_heap.gc),
             None
+        );
+    }
+
+    #[ip_test(I)]
+    fn confirmation_processed_even_if_no_target_link_layer_addr<I: TestIpExt>() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+
+        // Initialize a neighbor in STALE.
+        init_stale_neighbor_with_ip(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
+
+        // Receive a neighbor confirmation that omits the target link-layer address
+        // option. Because we have a cached link-layer address, we should still process
+        // the confirmation (updating the neighbor to REACHABLE).
+        NudHandler::handle_neighbor_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeLinkDeviceId,
+            I::LOOKUP_ADDR1,
+            DynamicNeighborUpdateSource::Confirmation {
+                link_address: None,
+                flags: ConfirmationFlags { solicited_flag: true, override_flag: false },
+            },
+        );
+        let now = bindings_ctx.now();
+        assert_neighbor_state(
+            &core_ctx,
+            &mut bindings_ctx,
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: now,
+            }),
+            Some(ExpectedEvent::Changed),
         );
     }
 }

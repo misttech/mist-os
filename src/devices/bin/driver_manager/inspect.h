@@ -16,6 +16,7 @@
 #include <atomic>
 
 #include <fbl/array.h>
+#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"

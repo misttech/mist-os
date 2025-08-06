@@ -44,7 +44,7 @@ void DisplayEngineEventsFidl::OnDisplayAdded(
   ZX_DEBUG_ASSERT(pixel_formats.size() <= kMaxPixelFormats);
 
   if (!fidl_client_.is_valid()) {
-    fdf::warn("OnDisplayAdded() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
     return;
   }
 
@@ -60,7 +60,7 @@ void DisplayEngineEventsFidl::OnDisplayAdded(
   }
 
   ZX_DEBUG_ASSERT(edid_bytes.size() <= edid_buffer_.max_size());
-  std::ranges::copy(edid_bytes, edid_buffer_.begin());
+  std::copy(edid_bytes.begin(), edid_bytes.end(), edid_buffer_.begin());
 
   fuchsia_hardware_display_engine::wire::RawDisplayInfo fidl_display_info = {
       .display_id = display_id.ToFidl(),
@@ -74,26 +74,28 @@ void DisplayEngineEventsFidl::OnDisplayAdded(
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       fidl_client_.buffer(arena)->OnDisplayAdded(std::move(fidl_display_info));
-  if (!fidl_status.ok()) {
-    fdf::error("OnDisplayAdded() FIDL failure: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    FDF_LOG(ERROR, "OnDisplayAdded() FIDL failure: %s",
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
 void DisplayEngineEventsFidl::OnDisplayRemoved(display::DisplayId display_id) {
   if (!fidl_client_.is_valid()) {
-    fdf::warn("OnDisplayRemoved() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayRemoved() emitted with invalid event listener; event dropped");
     return;
   }
 
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       fidl_client_.buffer(arena)->OnDisplayRemoved(display_id.ToFidl());
-  if (!fidl_status.ok()) {
-    fdf::error("OnDisplayRemoved() FIDL failure: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    FDF_LOG(ERROR, "OnDisplayRemoved() FIDL failure: %s",
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
@@ -101,32 +103,34 @@ void DisplayEngineEventsFidl::OnDisplayVsync(display::DisplayId display_id,
                                              zx::time_monotonic timestamp,
                                              display::DriverConfigStamp config_stamp) {
   if (!fidl_client_.is_valid()) {
-    fdf::warn("OnDisplayVsync() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayVsync() emitted with invalid event listener; event dropped");
     return;
   }
 
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status = fidl_client_.buffer(arena)->OnDisplayVsync(
+  fidl::OneWayStatus fidl_transport_status = fidl_client_.buffer(arena)->OnDisplayVsync(
       display_id.ToFidl(), timestamp, config_stamp.ToFidl());
-  if (!fidl_status.ok()) {
-    fdf::error("OnDisplayVsync() FIDL failure: {}", fidl_status.error());
+  if (!fidl_transport_status.ok()) {
+    FDF_LOG(ERROR, "OnDisplayVsync() FIDL failure: %s",
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
 void DisplayEngineEventsFidl::OnCaptureComplete() {
   if (!fidl_client_.is_valid()) {
-    fdf::warn("OnCaptureComplete() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnCaptureComplete() emitted with invalid event listener; event dropped");
     return;
   }
 
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status = fidl_client_.buffer(arena)->OnCaptureComplete();
-  if (!fidl_status.ok()) {
-    fdf::error("OnCaptureComplete() FIDL failure: {}", fidl_status.error());
+  fidl::OneWayStatus fidl_transport_status = fidl_client_.buffer(arena)->OnCaptureComplete();
+  if (!fidl_transport_status.ok()) {
+    FDF_LOG(ERROR, "OnCaptureComplete() FIDL failure: %s",
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 

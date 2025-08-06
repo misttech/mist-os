@@ -3731,7 +3731,7 @@ mod tests {
     fn realm_builder_works_with_send() {
         // This test exercises realm builder on a multi-threaded executor, so that we can guarantee
         // that the library works in this situation.
-        let mut executor = fasync::SendExecutor::new(2);
+        let mut executor = fasync::SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async {
             let (builder, _server_task, _receive_server_requests) =
                 new_realm_builder_and_server_task();
@@ -3811,13 +3811,13 @@ mod tests {
             .add_environment(cm_rust::EnvironmentDecl {
                 name: "driver-host-env".parse().unwrap(),
                 extends: fdecl::EnvironmentExtends::Realm,
-                runners: vec![],
-                resolvers: vec![cm_rust::ResolverRegistration {
+                runners: Box::from([]),
+                resolvers: Box::from([cm_rust::ResolverRegistration {
                     resolver: "boot-resolver".parse().unwrap(),
                     source: cm_rust::RegistrationSource::Child("fake-resolver".to_string()),
                     scheme: "fuchsia-boot".to_string(),
-                }],
-                debug_capabilities: vec![],
+                }]),
+                debug_capabilities: Box::from([]),
                 stop_timeout_ms: Some(20000),
             })
             .await

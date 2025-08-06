@@ -23,7 +23,7 @@ use starnix_types::ownership::WeakRef;
 use starnix_types::time::timeval_from_duration;
 use starnix_uapi::auth::{
     Capabilities, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
-    CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
+    CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG, PTRACE_MODE_READ_REALCREDS,
 };
 use starnix_uapi::errors::{Errno, ENAMETOOLONG};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -375,25 +375,10 @@ pub fn sys_getppid(
     Ok(current_task.thread_group().read().get_ppid())
 }
 
-fn get_task_if_owner_or_has_capabilities(
-    current_task: &CurrentTask,
-    pid: pid_t,
-    capabilities: Capabilities,
-) -> Result<WeakRef<Task>, Errno> {
-    let weak = current_task.get_task(pid);
-    let task_creds = Task::from_weak(&weak)?.real_creds();
-    let current_creds = current_task.current_creds();
-    if task_creds.euid != current_creds.euid {
-        security::check_task_capable(current_task, capabilities)?;
-    }
-    Ok(weak)
-}
-
 fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
     if pid == 0 {
         current_task.weak_task()
     } else {
-        // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
         current_task.get_task(pid)
     }
 }
@@ -1516,8 +1501,6 @@ pub fn sys_capset(
     if header.pid != 0 && header.pid != current_task.tid {
         return error!(EPERM);
     }
-    let weak = get_task_or_current(current_task, header.pid);
-    let target_task = Task::from_weak(&weak)?;
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_1 => {
@@ -1545,7 +1528,7 @@ pub fn sys_capset(
     };
 
     // Permission checks. Copied out of TLPI section 39.7.
-    let mut creds = target_task.real_creds();
+    let mut creds = current_task.current_creds();
     {
         log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
         if !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable) {
@@ -1913,7 +1896,7 @@ fn obfuscate_arc<T>(arc: &Arc<T>) -> usize {
 }
 
 pub fn sys_kcmp(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid1: pid_t,
     pid2: pid_t,
@@ -1921,10 +1904,14 @@ pub fn sys_kcmp(
     index1: u64,
     index2: u64,
 ) -> Result<u32, Errno> {
-    let weak1 = get_task_if_owner_or_has_capabilities(current_task, pid1, CAP_SYS_PTRACE)?;
+    let weak1 = current_task.get_task(pid1);
+    let weak2 = current_task.get_task(pid2);
     let task1 = Task::from_weak(&weak1)?;
-    let weak2 = get_task_if_owner_or_has_capabilities(current_task, pid2, CAP_SYS_PTRACE)?;
     let task2 = Task::from_weak(&weak2)?;
+
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_READ_REALCREDS, &task1)?;
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_READ_REALCREDS, &task2)?;
+
     let resource_type = KcmpResource::from_raw(resource_type)?;
 
     // Output encoding (see <https://man7.org/linux/man-pages/man2/kcmp.2.html>):

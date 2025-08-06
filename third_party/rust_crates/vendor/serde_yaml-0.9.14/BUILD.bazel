@@ -75,7 +75,7 @@ rust_library(
     version = "0.9.14",
     deps = [
         "//third_party/rust_crates/vendor/indexmap-1.9.2:indexmap",
-        "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+        "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
         "//third_party/rust_crates/vendor/ryu-1.0.3:ryu",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/unsafe-libyaml-0.2.4:unsafe_libyaml",

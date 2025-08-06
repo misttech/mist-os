@@ -10,6 +10,11 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <string_view>
+
+#if __cplusplus >= 202002L
+#include <format>
+#endif
 
 namespace display {
 
@@ -54,6 +59,9 @@ class PixelFormat {
   // and Inspect. The values have the same stability guarantees as the
   // equivalent FIDL type.
   constexpr uint32_t ValueForLogging() const;
+
+  // Returns a developer-facing string representation.
+  std::string_view ToString() const;
 
   // The number of planes used by this format.
   constexpr int PlaneCount() const;
@@ -230,5 +238,14 @@ inline constexpr const PixelFormat PixelFormat::kR8G8B8(
     fuchsia_images2::wire::PixelFormat::kR8G8B8);
 
 }  // namespace display
+
+#if __cplusplus >= 202002L
+template <>
+struct std::formatter<display::PixelFormat> : std::formatter<std::string_view> {
+  auto format(const display::PixelFormat& format, std::format_context& ctx) const {
+    return std::formatter<std::string_view>::format(format.ToString(), ctx);
+  }
+};
+#endif
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_PIXEL_FORMAT_H_

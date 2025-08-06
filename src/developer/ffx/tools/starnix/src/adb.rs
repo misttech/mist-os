@@ -359,7 +359,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_adb_relay() {
         let any_local_address = "127.0.0.1:0";
         let listener = TcpListener::bind(any_local_address).await.unwrap();

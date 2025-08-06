@@ -267,7 +267,7 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
       SAFE_SYSCALL(syscall(SYS_set_robust_list, head, sizeof(robust_list_head)));
       entry->futex = static_cast<int>(syscall(SYS_gettid));
 
-      std::string test_binary = "/data/tests/syscall_test_exec_child";
+      std::string test_binary = "data/tests/deps/syscall_test_exec_child";
       if (!files::IsFile(test_binary)) {
         // We're running on host
         char self_path[PATH_MAX];

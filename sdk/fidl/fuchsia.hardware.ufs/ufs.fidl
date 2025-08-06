@@ -28,7 +28,7 @@ closed protocol Ufs {
 
     /// Reads a flag. A flag is a fixed size single byte value that represents a Boolean value.
     strict ReadFlag(struct {
-        type Flag;
+        flag Flag;
     }) -> (struct {
         value uint8;
     }) error QueryErrorCode;
@@ -70,7 +70,7 @@ closed protocol Ufs {
     /// Sends a UIC command to the UFS device.
     strict SendUicCommand(UicCommand) -> (struct {
         result uint32;
-    });
+    }) error zx.Status;
 
     /// UFS transactions use UPIU packets with a fixed 12-byte header, transaction-specific fields,
     /// possibly one or more extended header segments and zero or more data segments.

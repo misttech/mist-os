@@ -491,7 +491,7 @@ mod tests {
         setup_inner(target).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_product() -> Result<()> {
         let (_, proxy) = setup().await;
         proxy
@@ -500,7 +500,7 @@ mod tests {
             .map_err(|e| anyhow!("error rebooting: {:?}", e))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_recovery() -> Result<()> {
         let (_, proxy) = setup().await;
         proxy
@@ -509,7 +509,7 @@ mod tests {
             .map_err(|e| anyhow!("error rebooting: {:?}", e))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_bootloader() -> Result<()> {
         let (_, proxy) = setup().await;
         proxy
@@ -518,7 +518,7 @@ mod tests {
             .map_err(|e| anyhow!("error rebooting: {:?}", e))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_fastboot_reboot_product() -> Result<()> {
         let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
@@ -528,7 +528,7 @@ mod tests {
             .map_err(|e| anyhow!("error rebooting: {:?}", e))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_fastboot_reboot_recovery() -> Result<()> {
         let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
@@ -536,7 +536,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_fastboot_reboot_bootloader() -> Result<()> {
         let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
@@ -546,7 +546,7 @@ mod tests {
             .map_err(|e| anyhow!("error rebooting: {:?}", e))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_zedboot_reboot_bootloader() -> Result<()> {
         let (target, proxy) = setup().await;
         target.set_state(TargetConnectionState::Zedboot(Instant::now()));
@@ -554,7 +554,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_zedboot_reboot_recovery() -> Result<()> {
         let (target, proxy) = setup().await;
         target.set_state(TargetConnectionState::Zedboot(Instant::now()));

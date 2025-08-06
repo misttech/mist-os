@@ -5,14 +5,14 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::{anyhow, bail, Context as _};
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::platform_settings::session_config::PlatformSessionConfig;
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
-use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
-use assembly_config_schema::product_config::{
+use assembly_config_schema::product_settings::{
     GlobalPlatformTee, GlobalPlatformTeeClient, ProprietaryTee, Tee,
 };
-use assembly_config_schema::BoardInformation;
+use assembly_config_schema::BoardConfig;
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
 use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write as _;
@@ -27,7 +27,7 @@ impl DefineSubsystemConfiguration<(&Tee, &Vec<GlobalPlatformTeeClient>, &Platfor
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         let global_platform_trusted_app_guids =
-            get_global_platform_tee_trusted_app_guids(context.board_info)?;
+            get_global_platform_tee_trusted_app_guids(context.board_config)?;
         let (tee, transitional_tee_clients, session) = *product_config;
         if tee != &Tee::Undefined && !transitional_tee_clients.is_empty() {
             bail!("Conflicting TEE configuration: product configuration may contain `tee` or `tee_clients`, but not both");
@@ -358,18 +358,18 @@ fn create_tee_clients(
 }
 
 fn get_global_platform_tee_trusted_app_guids(
-    board_info: &BoardInformation,
+    board_config: &BoardConfig,
 ) -> anyhow::Result<&Vec<uuid::Uuid>> {
-    if !board_info.global_platform_tee_trusted_app_guids.is_empty()
-        && !board_info.tee_trusted_app_guids.is_empty()
+    if !board_config.global_platform_tee_trusted_app_guids.is_empty()
+        && !board_config.tee_trusted_app_guids.is_empty()
     {
         bail!("Cannot set both `global_platform_tee_trusted_app_guids` and deprecated `tee_trusted_app_guids`");
     }
 
-    Ok(if board_info.tee_trusted_app_guids.is_empty() {
-        &board_info.global_platform_tee_trusted_app_guids
+    Ok(if board_config.tee_trusted_app_guids.is_empty() {
+        &board_config.global_platform_tee_trusted_app_guids
     } else {
-        &board_info.tee_trusted_app_guids
+        &board_config.tee_trusted_app_guids
     })
 }
 
@@ -397,16 +397,16 @@ mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
     use crate::CompletedConfiguration;
-    use assembly_config_schema::product_config::{TeeClientConfigData, TeeClientFeatures};
-    use assembly_config_schema::BoardInformation;
+    use assembly_config_schema::product_settings::{TeeClientConfigData, TeeClientFeatures};
+    use assembly_config_schema::BoardConfig;
     use assembly_images_config::BoardFilesystemConfig;
     use camino::{Utf8Path, Utf8PathBuf};
     use std::collections::BTreeMap;
     use std::path::Path;
     use std::sync::LazyLock;
 
-    static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardInformation> =
-        LazyLock::new(|| BoardInformation {
+    static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardConfig> =
+        LazyLock::new(|| BoardConfig {
             name: "Test Board".into(),
             provided_features: vec![],
             input_bundles: Default::default(),
@@ -418,8 +418,8 @@ mod tests {
             ..Default::default()
         });
 
-    static BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardInformation> =
-        LazyLock::new(|| BoardInformation {
+    static BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardConfig> =
+        LazyLock::new(|| BoardConfig {
             name: "Test Board".into(),
             provided_features: vec![],
             input_bundles: Default::default(),
@@ -432,7 +432,7 @@ mod tests {
         });
 
     static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS_AND_TEE_TRUSTED_APP_GUIDS:
-        LazyLock<BoardInformation> = LazyLock::new(|| BoardInformation {
+        LazyLock<BoardConfig> = LazyLock::new(|| BoardConfig {
         name: "Test Board".into(),
         provided_features: vec![],
         input_bundles: Default::default(),
@@ -889,7 +889,7 @@ mod tests {
         populate_resource_dir(resource_dir);
 
         let mut context = ConfigurationContext::default_for_tests();
-        context.board_info = &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS;
+        context.board_config = &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS;
         context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context
     }
@@ -898,7 +898,7 @@ mod tests {
         populate_resource_dir(resource_dir);
 
         let mut context = ConfigurationContext::default_for_tests();
-        context.board_info = &*BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS;
+        context.board_config = &*BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS;
         context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context
     }
@@ -909,7 +909,7 @@ mod tests {
         populate_resource_dir(resource_dir);
 
         let mut context = ConfigurationContext::default_for_tests();
-        context.board_info =
+        context.board_config =
             &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS_AND_TEE_TRUSTED_APP_GUIDS;
         context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context

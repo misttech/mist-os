@@ -75,8 +75,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                     DiscoverySources::USB | DiscoverySources::FASTBOOT_FILE,
                 )
                 .await?;
-                while let Some(s) = device_stream.next().await {
-                    if let Ok(event) = s {
+                while let Some(event) = device_stream.next().await {
                         match event {
                             TargetEvent::Added(e) => match e.state {
                                 TargetState::Fastboot(fts) => match fts.connection_state {
@@ -132,7 +131,6 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                                 log::debug!("Skipping removed event");
                             }
                         }
-                    }
                 }
             }
         }));

@@ -39,6 +39,8 @@ struct TestOptions {
   MkfsOptions mkfs_options{};
   std::vector<std::pair<MountOption, size_t>> mount_options;
   bool run_fsck = true;
+  // The file given by |image_file| is a zstd compressed image of f2fs, located at "pkg/data"
+  std::optional<std::string> image_file;
 };
 
 class F2fsFakeDevTestFixture : public testing::Test {
@@ -62,6 +64,10 @@ class F2fsFakeDevTestFixture : public testing::Test {
   std::unique_ptr<F2fs> fs_;
   fbl::RefPtr<Dir> root_dir_;
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigAttachToCurrentThread);
+  std::optional<std::string> image_file_;
+
+ private:
+  void LoadImage();
 };
 
 class SingleFileTest : public F2fsFakeDevTestFixture {

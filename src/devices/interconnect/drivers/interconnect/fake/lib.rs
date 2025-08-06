@@ -60,9 +60,12 @@ impl Driver for FakeInterconnectDriver {
 struct Connection;
 
 impl Connection {
-    fn set_nodes_bandwidth(&self, _nodes: Vec<icc::NodeBandwidth>) -> Result<(), Status> {
+    fn set_nodes_bandwidth(
+        &self,
+        _nodes: Vec<icc::NodeBandwidth>,
+    ) -> Result<&[icc::AggregatedBandwidth], Status> {
         info!("set_nodes_bandwidth called");
-        Ok(())
+        Ok(&[])
     }
 
     fn get_node_graph(&self) -> (Vec<icc::Node>, Vec<icc::Edge>) {

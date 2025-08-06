@@ -137,8 +137,8 @@ fuchsia_sdk_ext.local(
     visibility_templates = {
         "hlcpp": [
             # Limit the scope of hlcpp to the sdk itself
-            "@@internal_sdk//:__subpackages__",
-            "@@fuchsia_sdk//:__subpackages__",
+            "@@+_repo_rules+internal_sdk//:__subpackages__",
+            "@@rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk//:__subpackages__",
             "@@//vendor/*/build:hlcpp_allowlist",
         ],
     },
@@ -169,8 +169,8 @@ fuchsia_sdk_repository(
     visibility_templates = {
         "hlcpp": [
             # Limit the scope of hlcpp to the sdk itself
-            "@@internal_sdk//:__subpackages__",
-            "@@fuchsia_sdk//:__subpackages__",
+            "@@+_repo_rules+internal_sdk//:__subpackages__",
+            "@@rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk//:__subpackages__",
             "@@//vendor/*/build:hlcpp_allowlist",
         ],
     },

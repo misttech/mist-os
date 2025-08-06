@@ -29,8 +29,6 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace fhdt = fuchsia_hardware_display_types;
-
 namespace display_coordinator {
 
 class LayerTest : public TestBase {
@@ -137,14 +135,15 @@ TEST_F(LayerTest, PrimaryBasic) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   RunOnDriverDispatcher<void>([&] {
-    fhdt::wire::ImageMetadata image_metadata = {
-        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    const display::ImageMetadata image_metadata({.width = kDisplayWidth,
+                                                 .height = kDisplayHeight,
+                                                 .tiling_type = display::ImageTilingType::kLinear});
+    const display::Rectangle display_area(
+        {.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight});
     layer->SetPrimaryConfig(image_metadata);
-    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+    layer->SetPrimaryPosition(display::CoordinateTransformation::kIdentity, display_area,
                               display_area);
-    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    layer->SetPrimaryAlpha(display::AlphaMode::kDisable, 0);
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
@@ -155,14 +154,15 @@ TEST_F(LayerTest, CleanUpImage) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   RunOnDriverDispatcher<void>([&] {
-    fhdt::wire::ImageMetadata image_metadata = {
-        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    const display::ImageMetadata image_metadata({.width = kDisplayWidth,
+                                                 .height = kDisplayHeight,
+                                                 .tiling_type = display::ImageTilingType::kLinear});
+    const display::Rectangle display_area(
+        {.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight});
     layer->SetPrimaryConfig(image_metadata);
-    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+    layer->SetPrimaryPosition(display::CoordinateTransformation::kIdentity, display_area,
                               display_area);
-    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    layer->SetPrimaryAlpha(display::AlphaMode::kDisable, 0);
   });
 
   auto displayed_image = CreateReadyImage();
@@ -223,14 +223,15 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   RunOnDriverDispatcher<void>([&] {
-    fhdt::wire::ImageMetadata image_metadata = {
-        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    const display::ImageMetadata image_metadata({.width = kDisplayWidth,
+                                                 .height = kDisplayHeight,
+                                                 .tiling_type = display::ImageTilingType::kLinear});
+    const display::Rectangle display_area(
+        {.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight});
     layer->SetPrimaryConfig(image_metadata);
-    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+    layer->SetPrimaryPosition(display::CoordinateTransformation::kIdentity, display_area,
                               display_area);
-    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    layer->SetPrimaryAlpha(display::AlphaMode::kDisable, 0);
   });
 
   // Clean up images, which doesn't change the applied config.
@@ -279,14 +280,15 @@ TEST_F(LayerTest, CleanUpAllImages) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   RunOnDriverDispatcher<void>([&] {
-    fhdt::wire::ImageMetadata image_metadata = {
-        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    const display::ImageMetadata image_metadata({.width = kDisplayWidth,
+                                                 .height = kDisplayHeight,
+                                                 .tiling_type = display::ImageTilingType::kLinear});
+    const display::Rectangle display_area(
+        {.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight});
     layer->SetPrimaryConfig(image_metadata);
-    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+    layer->SetPrimaryPosition(display::CoordinateTransformation::kIdentity, display_area,
                               display_area);
-    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    layer->SetPrimaryAlpha(display::AlphaMode::kDisable, 0);
   });
 
   auto displayed_image = CreateReadyImage();
@@ -327,14 +329,15 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   RunOnDriverDispatcher<void>([&] {
-    fhdt::wire::ImageMetadata image_config = {
-        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-    layer->SetPrimaryConfig(image_config);
-    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+    const display::ImageMetadata image_metadata({.width = kDisplayWidth,
+                                                 .height = kDisplayHeight,
+                                                 .tiling_type = display::ImageTilingType::kLinear});
+    const display::Rectangle display_area(
+        {.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight});
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(display::CoordinateTransformation::kIdentity, display_area,
                               display_area);
-    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    layer->SetPrimaryAlpha(display::AlphaMode::kDisable, 0);
   });
 
   // Clean up all images, which doesn't change the applied config.

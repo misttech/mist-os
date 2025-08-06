@@ -5,10 +5,10 @@
 #ifndef SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_BUFFER_H_
 #define SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_BUFFER_H_
 
-#include <cstdint>
+#include <concepts>
+#include <cstddef>
 #include <memory>
 #include <span>
-#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -68,10 +68,10 @@ class Buffer {
       : data_(std::exchange(other.data_, {})), impl_(std::move(other.impl_)) {}
 
   // Converting move construction is allowed if the pointers are convertible.
-  template <typename OtherT, class OtherView,
-            typename = std::enable_if_t<std::is_convertible_v<const OtherT*, const T*>>>
-  Buffer(Buffer<OtherT, OtherView>&& other) noexcept
-      : data_{reinterpret_cast<const T*>(other->data()), other->size_bytes() / sizeof(T)},
+  template <typename OtherT, class OtherView>
+    requires std::convertible_to<const OtherT*, const T*>
+  explicit(false) Buffer(Buffer<OtherT, OtherView>&& other) noexcept
+      : data_{static_cast<const T*>(other->data()), other->size_bytes() / sizeof(T)},
         impl_{std::move(other.impl_)} {
     other.data_ = {};
   }
@@ -82,16 +82,16 @@ class Buffer {
     return *this;
   }
 
-  template <typename OtherT, class OtherView,
-            typename = std::enable_if_t<std::is_convertible_v<const OtherT*, const T*>>>
+  template <typename OtherT, class OtherView>
+    requires std::convertible_to<const OtherT*, const T*>
   Buffer& operator=(Buffer<OtherT, OtherView>&& other) noexcept {
     *this = Buffer(std::move(other));
     return *this;
   }
 
-  // An explicit static_cast to another Buffer type is allowed.
+  // This is like a reinterpret_cast, but applied to the rvalue reference.
   template <typename OtherT, class OtherView>
-  explicit operator Buffer<OtherT, OtherView>() {
+  Buffer<OtherT, OtherView> Reinterpret() && {
     Buffer<OtherT, OtherView> other;
     other.data_ = {
         reinterpret_cast<const OtherT*>(data_.data()),

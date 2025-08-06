@@ -29,7 +29,7 @@ use packet_formats::udp::UdpPacketBuilder;
 use test_case::test_case;
 
 use netstack3_base::testutil::{
-    FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext,
+    set_logger_for_test, FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext,
 };
 use netstack3_base::{DeviceIdContext, FrameDestination, InstantContext as _};
 use netstack3_core::device::{
@@ -138,6 +138,120 @@ fn router_advertisement_with_source_link_layer_option_should_add_neighbor() {
             },
             NeighborState::Dynamic(DynamicNeighborState::Stale(Stale {
                 link_address: remote_mac.get(),
+            })),
+        )]),
+    );
+}
+
+#[test_case(true; "override set")]
+#[test_case(false; "override unset")]
+fn neighbor_advertisement_without_target_link_layer_address_option_should_be_processed(
+    override_flag: bool,
+) {
+    set_logger_for_test();
+
+    let TestAddrs { local_mac, remote_mac, .. } = Ipv6::TEST_ADDRS;
+
+    let mut ctx = FakeCtx::default();
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    // Configure the device to generate a link-local address.
+    let _: Ipv6DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv6>()
+        .update_configuration(
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: SlaacConfigurationUpdate {
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+
+    // First receive a Neighbor Solicitation; this should result in a neighbor being
+    // added in the STALE state (which then immediately transitions to DELAY due to
+    // https://fxbug.dev/42081683).
+    let src_ip = remote_mac.to_ipv6_link_local().addr();
+    let target_addr = local_mac.to_ipv6_link_local().addr();
+    let dst_ip = target_addr.to_solicited_node_address().get();
+    ctx.test_api().receive_ip_packet::<Ipv6, _>(
+        &device_id,
+        Some(FrameDestination::Multicast),
+        icmp::testutil::neighbor_solicitation_ip_packet(
+            **src_ip,
+            dst_ip,
+            **target_addr,
+            *remote_mac,
+        ),
+    );
+    let link_device_id = device_id.clone().try_into().unwrap();
+    let neighbor_ip: UnicastAddr<_> = src_ip.into_addr();
+    let neighbor_ip = neighbor_ip.into_specified();
+    assert_neighbors::<Ipv6>(
+        &mut ctx,
+        &link_device_id,
+        HashMap::from([(
+            neighbor_ip,
+            NeighborState::Dynamic(DynamicNeighborState::Delay(Delay {
+                link_address: remote_mac.get(),
+            })),
+        )]),
+    );
+
+    // Now, receive a solicited Neighbor Advertisement that *omits* the target link-
+    // layer address option. Because we have a cached link-layer address, we should
+    // still process the advertisement (updating the neighbor to REACHABLE).
+    let src_ip = remote_mac.to_ipv6_link_local().addr();
+    let dst_ip = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get();
+    ctx.test_api().receive_ip_packet::<Ipv6, _>(
+        &device_id,
+        Some(FrameDestination::Multicast),
+        Buf::new([], ..)
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip,
+                dst_ip,
+                IcmpZeroCode,
+                NeighborAdvertisement::new(
+                    false, /* router_flag */
+                    true,  /* solicited_flag */
+                    override_flag,
+                    **src_ip,
+                ),
+            ))
+            .wrap_in(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b(),
+    );
+    let now = ctx.bindings_ctx.now();
+    assert_neighbors::<Ipv6>(
+        &mut ctx,
+        &link_device_id,
+        HashMap::from([(
+            neighbor_ip,
+            NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
+                link_address: remote_mac.get(),
+                last_confirmed_at: now,
             })),
         )]),
     );
@@ -528,8 +642,7 @@ where
                 bindings_ctx,
                 &device,
                 neighbor,
-                link_addr.get(),
-                DynamicNeighborUpdateSource::Probe,
+                DynamicNeighborUpdateSource::Probe { link_address: link_addr.get() },
             );
             nud::testutil::assert_dynamic_neighbor_state(
                 &mut core_ctx.context(),

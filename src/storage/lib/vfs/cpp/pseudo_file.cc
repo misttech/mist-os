@@ -4,14 +4,23 @@
 
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
 #include <string_view>
 #include <utility>
 
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include <fbl/ref_ptr.h>
+#include <fbl/string.h>
 
-namespace fio = fuchsia_io;
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fs {
 

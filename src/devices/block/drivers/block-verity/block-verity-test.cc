@@ -18,11 +18,11 @@
 #include <cstdint>
 #include <utility>
 
+#include <fbl/array.h>
 #include <ramdevice-client/ramdisk.h>
 #include <zxtest/zxtest.h>
 
 #include "constants.h"
-#include "src/storage/fvm/test_support.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "verified-volume-client.h"
 
@@ -63,21 +63,30 @@ class BlockVerityTest : public zxtest::Test {
     IsolatedDevmgr::Args args;
     ASSERT_OK(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr_));
     // Create ramdisk.
-    ramdisk_ =
-        fvm::RamdiskRef::Create(devmgr_.devfs_root(), kPhysicalBlockSize, kPhysicalBlockCount);
-    ASSERT_TRUE(ramdisk_);
+    ASSERT_OK(ramdisk_create_at(devfs_root_fd().get(), kPhysicalBlockSize, kPhysicalBlockCount,
+                                &ramdisk_));
   }
 
+  void TearDown() override { ASSERT_OK(ramdisk_destroy(ramdisk_)); }
+
  protected:
+  const fbl::unique_fd& devfs_root_fd() const { return devmgr_.devfs_root(); }
+
+  fidl::UnownedClientEnd<fuchsia_device::Controller> ramdisk_controller_interface() const {
+    return fidl::UnownedClientEnd<fuchsia_device::Controller>(
+        ramdisk_get_block_controller_interface(ramdisk_));
+  }
+
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> ramdisk_block_interface() const {
+    return fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(
+        ramdisk_get_block_interface(ramdisk_));
+  }
+
   void BindAndOpenVerityDeviceManager() {
-    fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-    std::string controller_path = std::string(ramdisk_->path()) + "/device_controller";
-    zx::result channel =
-        component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
-    ASSERT_OK(channel.status_value());
-    fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));
+    fidl::UnownedClientEnd<fuchsia_device::Controller> device = ramdisk_controller_interface();
+    fbl::unique_fd devfs_root(dup(devfs_root_fd().get()));
     zx::result verity = block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
-        channel.value(), std::move(devfs_root),
+        device, std::move(devfs_root),
         block_verity::VerifiedVolumeClient::Disposition::kDriverNeedsBinding,
         zx::duration::infinite());
     ASSERT_OK(verity);
@@ -106,32 +115,25 @@ class BlockVerityTest : public zxtest::Test {
   void ZeroUnderlyingRamdisk() {
     fbl::Array<uint8_t> write_buf(new uint8_t[kBlockSize], kBlockSize);
     memset(write_buf.get(), 0, write_buf.size());
-    fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-    zx::result channel =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
-    ASSERT_OK(channel);
+    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device = ramdisk_block_interface();
     for (uint64_t block = 0; block < kBlockCount; block++) {
-      ASSERT_OK(BWrite(channel.value(), write_buf.get(), write_buf.size(), block * kBlockSize));
+      ASSERT_OK(BWrite(device, write_buf.get(), write_buf.size(), block * kBlockSize));
     }
   }
 
   IsolatedDevmgr devmgr_;
-  std::unique_ptr<fvm::RamdiskRef> ramdisk_;
+  ramdisk_client_t* ramdisk_ = nullptr;
   fidl::Arena<> seal_arena_;
 
   std::unique_ptr<block_verity::VerifiedVolumeClient> vvc_;
 };
 
 TEST_F(BlockVerityTest, Bind) {
-  fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-  std::string controller_path = std::string(ramdisk_->path()) + "/device_controller";
-  zx::result channel =
-      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
-  ASSERT_OK(channel.status_value());
-  ASSERT_OK(BindVerityDriver(channel.value()));
-  fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));
+  fidl::UnownedClientEnd<fuchsia_device::Controller> device = ramdisk_controller_interface();
+  ASSERT_OK(BindVerityDriver(device));
+  fbl::unique_fd devfs_root(dup(devfs_root_fd().get()));
   ASSERT_OK(block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
-      channel.value(), std::move(devfs_root),
+      device, std::move(devfs_root),
       block_verity::VerifiedVolumeClient::Disposition::kDriverAlreadyBound,
       zx::duration::infinite()));
 }
@@ -185,16 +187,13 @@ TEST_F(BlockVerityTest, BasicWrites) {
 
   // Find a block that matches from the underlying device.
   {
-    fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-    zx::result channel =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
-    ASSERT_OK(channel.status_value());
+    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device = ramdisk_block_interface();
 
     bool found = false;
     for (uint64_t block = 0; block < kBlockCount; block++) {
       // Seek to start of block
       off_t offset = block * kBlockSize;
-      ASSERT_OK(BRead(channel.value(), read_buf.get(), read_buf.size(), offset));
+      ASSERT_OK(BRead(device, read_buf.get(), read_buf.size(), offset));
       if (memcmp(read_buf.get(), write_buf.get(), read_buf.size()) == 0) {
         found = true;
         // Expect to find the block at block 66 (after one superblock & 65 integrity blocks)
@@ -289,16 +288,13 @@ TEST_F(BlockVerityTest, BasicSeal) {
   memcpy(expected_root_integrity_block.get() + (32 * 63), final_tier_0_integrity_block_hash, 32);
   memset(expected_root_integrity_block.get() + (32 * 64), 0, kBlockSize - (32 * 64));
 
-  fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-  zx::result channel =
-      component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
-  ASSERT_OK(channel.status_value());
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device = ramdisk_block_interface();
 
   fbl::Array<uint8_t> read_buf(new uint8_t[kBlockSize], kBlockSize);
   for (size_t integrity_block_index = 0; integrity_block_index < 65; integrity_block_index++) {
     size_t absolute_block_index = integrity_block_index + 1;
     off_t offset = absolute_block_index * kBlockSize;
-    ASSERT_OK(BRead(channel.value(), read_buf.get(), read_buf.size(), offset));
+    ASSERT_OK(BRead(device, read_buf.get(), read_buf.size(), offset));
     uint8_t* expected_block;
     if (integrity_block_index < 63) {
       expected_block = expected_early_tier_0_integrity_block.get();
@@ -347,7 +343,7 @@ TEST_F(BlockVerityTest, BasicSeal) {
       // * 4032 zero bytes padding the rest of the block, autofilled by compiler.
   };
 
-  ASSERT_OK(BRead(channel.value(), read_buf.get(), read_buf.size(), 0));
+  ASSERT_OK(BRead(device, read_buf.get(), read_buf.size(), 0));
   EXPECT_EQ(memcmp(expected_superblock, read_buf.get(), kBlockSize), 0,
             "superblock did not contain expected contents");
 
@@ -417,17 +413,14 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
 
   Close();
 
-  fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-  zx::result channel =
-      component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
-  ASSERT_OK(channel.status_value());
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device = ramdisk_block_interface();
 
   // Corrupt a data block (the 0th data block) on the underlying ramdisk, then attempt to read it in
   // verified read mode.
   fbl::Array<uint8_t> one_block(new uint8_t[kBlockSize], kBlockSize);
   memset(one_block.get(), 0xff, kBlockSize);
   off_t data_start = kDataStartBlock * kBlockSize;
-  ASSERT_OK(BWrite(channel.value(), one_block.get(), one_block.size(), data_start));
+  ASSERT_OK(BWrite(device, one_block.get(), one_block.size(), data_start));
   verified_block = OpenForVerifiedRead(seal);
   ASSERT_OK(verified_block);
 
@@ -440,7 +433,7 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
 
   // Corrupt an integrity block, and attempt to perform reads guarded by it.
   off_t integrity_start = kIntegrityStartBlock * kBlockSize;
-  ASSERT_OK(BWrite(channel.value(), one_block.get(), one_block.size(), integrity_start));
+  ASSERT_OK(BWrite(device, one_block.get(), one_block.size(), integrity_start));
   verified_block = OpenForVerifiedRead(seal);
   ASSERT_OK(verified_block);
 
@@ -471,10 +464,10 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   // Expect OpenForVerifiedRead to fail.
   fbl::Array<uint8_t> superblock_buf(new uint8_t[kBlockSize], kBlockSize);
   // Load up the superblock.
-  ASSERT_OK(BRead(channel.value(), superblock_buf.get(), superblock_buf.size(), 0));
+  ASSERT_OK(BRead(device, superblock_buf.get(), superblock_buf.size(), 0));
   // Corrupt the root integrity hash.
   memset(superblock_buf.data() + 32, 0, 32);
-  ASSERT_OK(BWrite(channel.value(), superblock_buf.get(), superblock_buf.size(), 0));
+  ASSERT_OK(BWrite(device, superblock_buf.get(), superblock_buf.size(), 0));
   verified_block = OpenForVerifiedRead(seal);
   ASSERT_EQ(verified_block.error_value(), ZX_ERR_IO_DATA_INTEGRITY);
 }

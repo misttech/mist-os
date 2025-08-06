@@ -5,10 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PIPE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PIPE_H_
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/vmo.h>
 
@@ -24,9 +24,13 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace intel_display {
 
@@ -49,10 +53,13 @@ class Pipe {
 
   void ApplyModeConfig(const display::DisplayTiming& mode);
 
-  using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(uint64_t image_id)>;
+  using GetImagePixelFormatFunc =
+      fit::function<PixelFormatAndModifier(display::DriverImageId image_id)>;
   using SetupGttImageFunc = fit::function<const GttRegion&(
-      const image_metadata_t& image_metadata, uint64_t image_handle, uint32_t rotation)>;
-  void ApplyConfiguration(const display_config_t* banjo_display_config,
+      const display::ImageMetadata& image_metadata, display::DriverImageId image_id,
+      display::CoordinateTransformation coordinate_transformation)>;
+  void ApplyConfiguration(const display::ColorConversion& color_conversion,
+                          cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp,
                           const SetupGttImageFunc& setup_gtt_image,
                           const GetImagePixelFormatFunc& get_pixel_format);
@@ -101,21 +108,23 @@ class Pipe {
   // Display device registers only store image handles / addresses. We should
   // convert the handles to corresponding config stamps using the existing
   // mapping updated in |ApplyConfig()|.
-  display::DriverConfigStamp GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles);
+  display::DriverConfigStamp GetVsyncConfigStamp(
+      const std::vector<display::DriverImageId>& image_ids);
 
  protected:
   bool attached_edp() const { return attached_edp_; }
   registers::Platform platform() const { return platform_; }
 
  private:
-  void ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
-                             bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
+  void ConfigurePrimaryPlane(uint32_t plane_num, const display::DriverLayer* primary,
+                             bool enable_csc, bool* scaler_1_claimed,
+                             registers::pipe_arming_regs* regs,
                              display::DriverConfigStamp config_stamp,
                              const SetupGttImageFunc& setup_gtt_image,
                              const GetImagePixelFormatFunc& get_pixel_format);
   void DisableCursorPlane(registers::pipe_arming_regs* regs,
                           display::DriverConfigStamp config_stamp);
-  void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
+  void SetColorConversionOffsets(bool preoffsets, std::span<const float, 3> vals);
   void ResetActiveTranscoder();
   void ResetScaler();
 
@@ -146,7 +155,8 @@ class Pipe {
   // being displayed. We need to keep a mapping from *image handle* to the
   // latest *config stamp* where this image is used so that we can know which
   // layer has the oldest configuration.
-  std::unordered_map<uintptr_t, display::DriverConfigStamp> latest_config_stamp_with_image_;
+  std::unordered_map<display::DriverImageId, display::DriverConfigStamp>
+      latest_config_stamp_with_image_;
 
   // If the (there can be at most one) background color layer is enabled on the
   // pipe, we need to keep the config stamp of the configuration that enables

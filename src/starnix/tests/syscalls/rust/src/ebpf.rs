@@ -57,7 +57,7 @@ mod tests {
         create_map_attr.key_size = map_def.schema.key_size;
         create_map_attr.value_size = map_def.schema.value_size;
         create_map_attr.max_entries = map_def.schema.max_entries;
-        create_map_attr.map_flags = map_def.flags;
+        create_map_attr.map_flags = map_def.schema.flags.bits();
 
         // SAFETY: `bpf()` syscall with valid arguments.
         let result = unsafe { bpf(linux_uapi::bpf_cmd_BPF_MAP_CREATE, &attr) };
@@ -305,6 +305,7 @@ mod tests {
     const TEST_SOCK_OPT: libc::c_int = 12345;
     // LINT.ThenChange(//src/starnix/tests/syscalls/rust/data/ebpf/ebpf_test_progs.c)
 
+    #[derive(Debug)]
     struct MapSet {
         maps: Vec<(MapDefinition, OwnedFd)>,
     }
@@ -516,7 +517,12 @@ mod tests {
         );
     }
 
+    // This test assumes that `close()` will destroy the corresponding object
+    // before returning. This assumption may be violated if another threads
+    // forks the current process (as in that case the socket FD gets duped to
+    // the new process). The test is marked `serial` to workaround this issue.
     #[test]
+    #[serial]
     fn sock_release_prog() {
         root_required!();
 

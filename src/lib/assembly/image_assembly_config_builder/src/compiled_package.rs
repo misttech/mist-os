@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::PackageSet;

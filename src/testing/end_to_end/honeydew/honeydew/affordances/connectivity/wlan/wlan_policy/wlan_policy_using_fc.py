@@ -9,7 +9,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
-import fidl_fuchsia_wlan_common as f_wlan_common
 import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
@@ -227,7 +226,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     # pylint: disable-next=invalid-overridden-method
     async def connect(
         self, target_ssid: str, security_type: SecurityType
-    ) -> f_wlan_common.RequestStatus:
+    ) -> f_wlan_policy.RequestStatus:
         """Triggers connection to a network.
 
         Args:
@@ -260,7 +259,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             resp = await self._client_controller.proxy.connect(
                 id_=NetworkIdentifier(target_ssid, security_type).to_fidl(),
             )
-            return f_wlan_common.RequestStatus(resp.status)
+            return f_wlan_policy.RequestStatus(resp.status)
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"ClientController.Connect() error {status}"
@@ -654,8 +653,8 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             resp = (
                 await self._client_controller.proxy.start_client_connections()
             )
-            status = f_wlan_common.RequestStatus(resp.status)
-            if status != f_wlan_common.RequestStatus.ACKNOWLEDGED:
+            status = f_wlan_policy.RequestStatus(resp.status)
+            if status != f_wlan_policy.RequestStatus.ACKNOWLEDGED:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.StartClientConnections() returned "
                     f"request status {status.name}"
@@ -691,8 +690,8 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             resp = await self._client_controller.proxy.stop_client_connections()
-            status = f_wlan_common.RequestStatus(resp.status)
-            if status != f_wlan_common.RequestStatus.ACKNOWLEDGED:
+            status = f_wlan_policy.RequestStatus(resp.status)
+            if status != f_wlan_policy.RequestStatus.ACKNOWLEDGED:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.StopClientConnections() returned "
                     f"request status {status.name}"

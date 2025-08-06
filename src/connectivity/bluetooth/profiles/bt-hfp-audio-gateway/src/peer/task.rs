@@ -889,7 +889,7 @@ impl PeerTask {
     }
 
     fn get_codecs(&self) -> Vec<CodecId> {
-        self.connection.selected_codec().map_or(DEFAULT_CODECS.to_vec(), |c| vec![c])
+        self.connection.selected_codec().map_or_else(|| DEFAULT_CODECS.to_vec(), |c| vec![c])
     }
 }
 

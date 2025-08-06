@@ -175,7 +175,7 @@ type SessionInfo = resource table {
     6: options SessionFlags;
 };
 
-/// An aqcuired lease that is propagated up to applications.
+/// An acquired lease that is propagated up to applications.
 @available(added=HEAD)
 type DelegatedRxLease = resource table {
     /// The frame after which the lease in `handle` can be released.

@@ -2,535 +2,383 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::BTreeMap;
-
+use crate::platform_settings::PlatformSettings;
+use crate::PackageDetails;
 use anyhow::Result;
-use assembly_container::{FileType, WalkPaths, WalkPathsFn};
-use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
-use camino::{Utf8Path, Utf8PathBuf};
+use assembly_constants::{CompiledPackageDestination, FileEntry};
+use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use assembly_package_utils::PackageInternalPathBuf;
+use camino::Utf8PathBuf;
+use fuchsia_pkg::PackageManifest;
+use image_assembly_config::PartialKernelConfig;
+use product_input_bundle::ProductInputBundle;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::common::{path_schema, vec_path_schema, DriverDetails};
-use assembly_release_info::ProductReleaseInfo;
+use crate::common::{DriverDetails, PackageName};
+use crate::product_settings::{ProductPackageDetails, ProductSettings};
 
-/// The Product-provided configuration details.
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
+/// Configuration for a Product Assembly operation.
+///
+/// This is a high-level operation that takes a more abstract description of
+/// what is desired in the assembled product images, and then generates the
+/// complete Image Assembly configuration (`ImageProductConfig`) from that.
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
+#[assembly_container(product_configuration.json)]
 pub struct ProductConfig {
     #[walk_paths]
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub packages: ProductPackagesConfig,
-
-    /// List of base drivers to include in the product.
+    pub platform: PlatformSettings,
     #[walk_paths]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub product: ProductSettings,
+    #[walk_paths]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(skip)]
+    pub product_input_bundles: BTreeMap<String, ProductInputBundle>,
+}
+
+impl ProductConfig {
+    pub fn add_package_names(mut self) -> Result<Self> {
+        self.product.packages.base = Self::add_package_names_to_set(self.product.packages.base)?;
+        self.product.packages.cache = Self::add_package_names_to_set(self.product.packages.cache)?;
+        Ok(self)
+    }
+
+    fn add_package_names_to_set(
+        set: BTreeMap<String, ProductPackageDetails>,
+    ) -> Result<BTreeMap<String, ProductPackageDetails>> {
+        set.into_values()
+            .map(|pkg| {
+                let manifest = PackageManifest::try_load_from(&pkg.manifest)?;
+                let name = manifest.name().to_string();
+                Ok((name, pkg))
+            })
+            .collect()
+    }
+}
+
+/// A typename to represent a package that contains shell command binaries,
+/// and the paths to those binaries
+pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
+
+/// A bundle of inputs to be used in the assembly of a product.
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
+#[serde(default, deny_unknown_fields)]
+pub struct AssemblyInputBundle {
+    /// The parameters that specify which kernel to put into the ZBI.
+    pub kernel: Option<PartialKernelConfig>,
+
+    /// The qemu kernel to use when starting the emulator.
+    pub qemu_kernel: Option<Utf8PathBuf>,
+
+    /// The list of additional boot args to add.
+    pub boot_args: Vec<String>,
+
+    /// The packages that are in the bootfs package list, which are
+    /// added to the BOOTFS in the ZBI.
+    pub bootfs_packages: Vec<Utf8PathBuf>,
+
+    /// The set of files to be placed in BOOTFS in the ZBI.
+    pub bootfs_files: Vec<FileEntry<String>>,
+
+    /// Package entries that internally specify their package set, instead of being grouped
+    /// separately.
+    pub packages: Vec<PackageDetails>,
+
+    /// Entries for the `config_data` package.
+    pub config_data: BTreeMap<String, Vec<FileEntry<String>>>,
+
+    /// The blobs index of the AIB.  This currently isn't used by product
+    /// assembly, as the package manifests contain the same information.
+    pub blobs: Vec<Utf8PathBuf>,
+
+    /// Configuration of base driver packages. Driver packages should not be
+    /// listed in the base package list and will be included automatically.
     pub base_drivers: Vec<DriverDetails>,
 
-    /// Product-specific session information.
-    ///
-    /// Default to None which creates a "paused" config that launches nothing to start.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session: Option<ProductSessionConfig>,
+    /// Configuration of boot driver packages. Driver packages should not be
+    /// listed in the bootfs package list and will be included automatically.
+    pub boot_drivers: Vec<DriverDetails>,
 
-    /// Generic product information.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub info: Option<ProductInfoConfig>,
+    /// Map of the names of packages that contain shell commands to the list of
+    /// commands within each.
+    pub bootfs_shell_commands: ShellCommands,
 
-    /// The file paths to various build information.
+    /// Map of the names of packages that contain shell commands to the list of
+    /// commands within each.
+    pub shell_commands: ShellCommands,
+
+    /// Packages to create dynamically as part of the Assembly process.
+    #[file_relative_paths]
     #[walk_paths]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub build_info: Option<BuildInfoConfig>,
-
-    /// The policy given to component_manager that restricts where sensitive capabilities can be
-    /// routed.
-    #[walk_paths]
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub component_policy: ComponentPolicyConfig,
-
-    /// Configuration strategy for TEE.
-    #[walk_paths]
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub tee: Tee,
-
-    /// Components which depend on trusted applications running in the TEE.
-    ///
-    /// *NOTE*: This configuration parameter is deprecated. Use
-    /// `tee = Tee::GlobalPlatform(tee_clients)` instead.
-    #[walk_paths]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tee_clients: Vec<GlobalPlatformTeeClient>,
-
-    /// Components which should run as trusted applications in Fuchsia.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub trusted_apps: Vec<TrustedApp>,
+    pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// A package that includes files to include in bootfs.
-    ///
-    /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
-    #[walk_paths]
-    #[schemars(schema_with = "crate::option_path_schema")]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub bootfs_files_package: Option<Utf8PathBuf>,
 
-    /// Release information about this assembly container artifact.
-    pub release_info: ProductReleaseInfo,
-}
-
-/// Packages provided by the product, to add to the assembled images.
-///
-/// This also includes configuration for those packages:
-///
-/// ```json5
-///   packages: {
-///     base: {
-///       package_a: {
-///         manifest: "path/to/package_a/package_manifest.json",
-///       },
-///       package_b: {
-///         manifest: "path/to/package_b/package_manifest.json",
-///         config_data: {
-///           "foo.cfg": "path/to/some/source/file/foo.cfg",
-///           "bar/more/data.json": "path/to/some.json",
-///         },
-///       },
-///     ],
-///     cache: []
-///   }
-/// ```
-///
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, PartialEq)]
-#[serde(default, deny_unknown_fields, from = "ProductPackagesConfigDeserializeHelper")]
-pub struct ProductPackagesConfig {
-    /// Paths to package manifests, or more detailed json entries for packages
-    /// to add to the 'base' package set, which are keyed by package name.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub base: BTreeMap<String, ProductPackageDetails>,
-
-    /// Paths to package manifests, or more detailed json entries for packages
-    /// to add to the 'cache' package set, which are keyed by package name.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub cache: BTreeMap<String, ProductPackageDetails>,
-
-    /// Paths to package manifests, or more detailed json entries for packages
-    /// to add to the 'bootfs' package set, which are keyed by package name.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub bootfs: BTreeMap<String, ProductPackageDetails>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-struct ProductPackagesConfigDeserializeHelper {
-    pub base: MapOrVecOfPackages,
-    pub cache: MapOrVecOfPackages,
-    pub bootfs: MapOrVecOfPackages,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum MapOrVecOfPackages {
-    Map(BTreeMap<String, ProductPackageDetails>),
-    Vec(Vec<ProductPackageDetails>),
-}
-
-impl Default for MapOrVecOfPackages {
-    fn default() -> Self {
-        Self::Map(BTreeMap::default())
-    }
-}
-
-fn convert_to_map(map_or_vec: MapOrVecOfPackages) -> BTreeMap<String, ProductPackageDetails> {
-    match map_or_vec {
-        MapOrVecOfPackages::Map(map) => map,
-        // The key in the map defaults to the index in the vector.
-        MapOrVecOfPackages::Vec(vec) => {
-            vec.into_iter().enumerate().map(|(i, s)| (i.to_string(), s)).collect()
-        }
-    }
-}
-
-impl From<ProductPackagesConfigDeserializeHelper> for ProductPackagesConfig {
-    fn from(helper: ProductPackagesConfigDeserializeHelper) -> Self {
-        Self {
-            base: convert_to_map(helper.base),
-            cache: convert_to_map(helper.cache),
-            bootfs: convert_to_map(helper.bootfs),
-        }
-    }
-}
-
-/// Describes in more detail a package to add to the assembly.
-#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProductPackageDetails {
-    /// Path to the package manifest for this package.
-    #[schemars(schema_with = "path_schema")]
-    pub manifest: Utf8PathBuf,
-
-    /// Map of config_data entries for this package, from the destination path
-    /// within the package, to the path where the source file is to be found.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub config_data: Vec<ProductConfigData>,
-}
-
-fn walk_package_set<F>(
-    set: &mut BTreeMap<String, ProductPackageDetails>,
-    found: &mut F,
-    dest: Utf8PathBuf,
-) -> Result<()>
-where
-    F: WalkPathsFn,
-{
-    for (name, pkg) in set {
-        let pkg_dest = dest.join(name);
-        found(&mut pkg.manifest, pkg_dest.clone(), FileType::PackageManifest)?;
-
-        // Add the config data so that it is identified by package name and destination.
-        // This ensures that we do not have collisions between inputs with the same name.
-        // For example: `{pkg_dest}/config_data/config.txt`
-        for config in &mut pkg.config_data {
-            let config_dest = pkg_dest.join("config_data").join(&config.destination);
-            found(&mut config.source, config_dest, FileType::Unknown)?;
-        }
-    }
-    Ok(())
-}
-
-impl WalkPaths for ProductPackagesConfig {
-    fn walk_paths_with_dest<F: WalkPathsFn>(
-        &mut self,
-        found: &mut F,
-        dest: Utf8PathBuf,
-    ) -> anyhow::Result<()> {
-        walk_package_set(&mut self.base, found, dest.join("base"))?;
-        walk_package_set(&mut self.cache, found, dest.join("cache"))?;
-        walk_package_set(&mut self.bootfs, found, dest.join("bootfs"))?;
-        Ok(())
-    }
-}
-
-impl From<PackageManifestPathBuf> for ProductPackageDetails {
-    fn from(manifest: PackageManifestPathBuf) -> Self {
-        let manifestpath: &Utf8Path = manifest.as_ref();
-        let path: Utf8PathBuf = manifestpath.into();
-        Self { manifest: path, config_data: Vec::default() }
-    }
-}
-
-impl From<&str> for ProductPackageDetails {
-    fn from(s: &str) -> Self {
-        ProductPackageDetails { manifest: s.into(), config_data: Vec::default() }
-    }
-}
-
-#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProductConfigData {
-    /// Path to the config file on the host.
-    #[schemars(schema_with = "path_schema")]
-    pub source: Utf8PathBuf,
-
-    /// Path to find the file in the package on the target.
-    pub destination: PackageInternalPathBuf,
-}
-
-/// Configuration options for product info.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProductInfoConfig {
-    /// Name of the product.
-    pub name: String,
-    /// Model of the product.
-    pub model: String,
-    /// Manufacturer of the product.
-    pub manufacturer: String,
-}
-
-/// Configuration options for build info.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
-#[serde(deny_unknown_fields)]
-pub struct BuildInfoConfig {
-    /// Name of the product build target.
-    pub name: String,
-    /// Path to the version file.
+    /// A list of memory buckets to pass to memory monitor.
+    #[file_relative_paths]
     #[walk_paths]
-    #[schemars(schema_with = "path_schema")]
-    pub version: Utf8PathBuf,
-    /// Path to the jiri snapshot.
-    #[walk_paths]
-    #[schemars(schema_with = "path_schema")]
-    pub jiri_snapshot: Utf8PathBuf,
-    /// Path to the latest commit date.
-    #[walk_paths]
-    #[schemars(schema_with = "path_schema")]
-    pub latest_commit_date: Utf8PathBuf,
+    pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
-/// Configuration options for the component policy.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
-#[serde(default, deny_unknown_fields)]
-pub struct ComponentPolicyConfig {
-    /// The file paths to a product-provided component policies.
-    #[walk_paths]
-    #[schemars(schema_with = "vec_path_schema")]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub product_policies: Vec<Utf8PathBuf>,
-}
+impl AssemblyInputBundle {
+    /// Are all containers in this AIB empty.
+    pub fn is_empty(&self) -> bool {
+        // destructure to ensure that when new fields are added, they require this function
+        // to be touched.
+        let Self {
+            kernel,
+            qemu_kernel,
+            boot_args,
+            bootfs_packages,
+            bootfs_files,
+            packages,
+            config_data,
+            blobs,
+            base_drivers,
+            boot_drivers,
+            bootfs_shell_commands,
+            shell_commands,
+            packages_to_compile,
+            bootfs_files_package,
+            memory_buckets,
+        } = &self;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(default)]
-pub struct TeeClientFeatures {
-    /// Whether this component needs /dev-class/securemem routed to it. If true, the securemem
-    //// directory will be routed as dev-securemem.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub securemem: bool,
-    /// Whether this component requires persistent storage, routed as /data.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub persistent_storage: bool,
-    /// Whether this component requires tmp storage, routed as /tmp.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub tmp_storage: bool,
-}
-
-/// Configuration strategy for TEE.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Tee {
-    /// Transitional value for deprecating `ProductConfig::tee_clients`. When this value is used,
-    /// the `Tee::GlobalPlatform` strategy is deployed using `ProductConfig::tee_clients`.
-    #[default]
-    Undefined,
-    /// Do not instantiate a TEE manager and associated routes.
-    NoTee,
-    /// Instantiate the platform-provided Global Platform (OPTEE) `tee_manager` component, with the
-    /// provided `GlobalPlatformTeeClient` specifications.
-    GlobalPlatform(GlobalPlatformTee),
-    /// Instantiate a product-provided TEE management stack configured by the provided
-    /// `ProprietaryTee`.
-    Proprietary(ProprietaryTee),
-}
-
-/// Configuration of platform-provided TEE stack.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
-pub struct GlobalPlatformTee {
-    /// Components which depend on trusted applications running in the TEE.
-    ///
-    /// *NOTE*: This configuration parameter replaces `ProductConfig::tee_clients`.
-    pub clients: Vec<GlobalPlatformTeeClient>,
-}
-
-/// Configuration of TEE stack with product-provided components that use custom proprietary TEE
-/// protocols.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
-pub struct ProprietaryTee {
-    /// Absolute URL of the product-provided realm of components that consume TEE driver
-    /// capabilities and provides TEE-related capabilities, including key management capabilities
-    /// that are routed to the storage stack and other capabilities that are routed to the session.
-    pub tee_realm_url: String,
-}
-
-/// A configuration for a component which depends on TEE-based protocols.
-/// Examples include components which implement DRM, or authentication services.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
-pub struct GlobalPlatformTeeClient {
-    /// The URL of the component.
-    pub component_url: String,
-    /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
-    /// protocol provided by the TEE.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub guids: Vec<String>,
-    /// Capabilities provided by this component which should be routed to the
-    /// rest of the system.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub capabilities: Vec<String>,
-    /// Additional protocols which are required for this component to work, and
-    /// which will be routed from 'parent'
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub additional_required_protocols: Vec<String>,
-    /// Config data files required for this component to work, and which will be inserted into
-    /// config data for this package (with a package name based on the component URL)
-    #[serde(default)]
-    #[walk_paths]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config_data: Option<TeeClientConfigData>,
-    /// Additional features required for the component to function.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub additional_required_features: TeeClientFeatures,
-}
-
-/// The map of config data files for the TeeClient.
-///
-/// We have to wrap the BTreeMap in order to be able to implement JsonSchema
-/// for a Utf8PathBuf.
-#[derive(Clone, Debug, Deserialize, Serialize, WalkPaths, PartialEq)]
-pub struct TeeClientConfigData {
-    /// The inner map of config data files.
-    #[serde(flatten)]
-    #[walk_paths]
-    pub files: BTreeMap<String, Utf8PathBuf>,
-}
-
-impl JsonSchema for TeeClientConfigData {
-    fn schema_name() -> String {
-        "TeeClientConfigData".into()
-    }
-
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut schema: schemars::schema::SchemaObject =
-            <BTreeMap<String, String>>::json_schema(gen).into();
-        schema.format = Some("BTreeMap<String, Utf8PathBuf>".to_owned());
-        schema.into()
+        qemu_kernel.is_none()
+            && boot_args.is_empty()
+            && bootfs_packages.is_empty()
+            && bootfs_files.is_empty()
+            && packages.is_empty()
+            && config_data.is_empty()
+            && blobs.is_empty()
+            && base_drivers.is_empty()
+            && boot_drivers.is_empty()
+            && bootfs_shell_commands.is_empty()
+            && shell_commands.is_empty()
+            && packages_to_compile.is_empty()
+            && bootfs_files_package.is_none()
+            && memory_buckets.is_empty()
+            && (match &kernel {
+                Some(kernel) => kernel.args.is_empty() && kernel.path.is_none(),
+                None => true,
+            })
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
-pub enum TrustedAppType {
-    GlobalPlatform,
-    BinderRPC,
-}
-
-/// Configuration for how to run a trusted application in Fuchsia.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
-pub struct TrustedApp {
-    /// The URL of the component.
-    pub component_url: String,
-    /// The GUID that identifies this trusted app for clients.
-    pub guid: String,
-    /// Type of trusted application.
-    pub ta_type: TrustedAppType,
-}
-
-/// Product configuration options for the session:
-///
-/// ```json5
-///   session: {
-///     url: "fuchsia-pkg://fuchsia.com/my_session#meta/my_session.cm",
-///     initial_element: {
-///         collection: "elements",
-///         url: "fuchsia-pkg://fuchsia.com/my_component#meta/my_component.cm"
-///         view_id_annotation: "my_component"
-///     }
-///   }
-/// ```
-///
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+/// Contents of a compiled package. The contents provided by all
+/// selected AIBs are merged by `name` into a single package
+/// at assembly time.
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
-pub struct ProductSessionConfig {
-    /// Start URL to pass to `session_manager`.
-    pub url: String,
+pub struct CompiledPackageDefinition {
+    /// Name of the package to compile.
+    pub name: CompiledPackageDestination,
 
-    /// Specifies initial element properties for the window manager.
+    /// Components to compile and add to the package.
+    #[file_relative_paths]
+    #[walk_paths]
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub initial_element: Option<InitialElement>,
+    pub components: Vec<CompiledComponentDefinition>,
+
+    /// Non-component files to add to the package.
+    #[serde(default)]
+    pub contents: Vec<FileEntry<String>>,
+
+    /// CML files included by the component cml.
+    #[serde(default)]
+    pub includes: Vec<Utf8PathBuf>,
+
+    /// Whether the contents of this package should go into bootfs.
+    /// Gated by allowlist -- please use this as a base package if possible.
+    #[serde(default)]
+    pub bootfs_package: bool,
 }
 
-/// Platform configuration options for the window manager.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+/// Contents of a compiled component. The contents provided by all
+/// selected AIBs are merged by `name` into a single package
+/// at assembly time.
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
-pub struct InitialElement {
-    /// Specifies the collection in which the window manager should launch the
-    /// initial element, if one is given by `url`. Defaults to "elements".
-    #[serde(default = "collection_default")]
-    pub collection: String,
+pub struct CompiledComponentDefinition {
+    /// The name of the component to compile.
+    pub component_name: String,
 
-    /// Specifies the Fuchsia package URL of the element the window manager
-    /// should launch on startup, if one is given.
-    pub url: String,
-
-    /// Specifies the annotation value by which the window manager can identify
-    /// a view presented by the element it launched on startup, if one is given
-    /// by `url`.
-    pub view_id_annotation: String,
-}
-
-fn collection_default() -> String {
-    String::from("elements")
+    /// CML file shards to include in the compiled component manifest.
+    #[file_relative_paths]
+    #[walk_paths]
+    pub shards: Vec<FileRelativePathBuf>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::PackageSet;
+    use crate::platform_settings::media_config::{
+        AudioConfig, AudioDeviceRegistryConfig, PlatformMediaConfig,
+    };
+    use crate::platform_settings::{BuildType, FeatureSetLevel};
+    use crate::product_settings::ProductPackageDetails;
     use assembly_util as util;
+    use fuchsia_pkg::{MetaPackage, PackageManifestBuilder, PackageName};
+    use std::str::FromStr;
+    use tempfile::tempdir;
 
     #[test]
-    fn test_default_serialization() {
-        crate::common::tests::default_serialization_helper::<ProductConfig>();
+    fn test_product_assembly_config_from_json5() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+          product: {},
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
     }
 
     #[test]
-    fn test_product_provided_config_data() {
+    fn test_bringup_product_assembly_config_from_json5() {
         let json5 = r#"
-            {
-                base: [
-                    {
-                        manifest: "path/to/base/package_manifest.json"
-                    },
-                    {
-                        manifest: "some/other/manifest.json",
-                        config_data: [
-                            {
-                                destination: "dest/path/cfg.txt",
-                                source: "source/path/cfg.txt",
-                            },
-                            {
-                                destination: "other_data.json",
-                                source: "source_other_data.json",
-                            },
-                        ]
-                    }
-                ],
-                cache: [
-                    {
-                        manifest: "path/to/cache/package_manifest.json"
-                    }
-                ],
-                bootfs: [
-                    {
-                        manifest: "path/to/bootfs/package_manifest.json"
-                    }
-                ]
-            }
-        "#;
+        {
+          platform: {
+            feature_set_level: "bootstrap",
+            build_type: "eng",
+          },
+          product: {},
+        }
+    "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let packages: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Bootstrap);
+    }
+
+    #[test]
+    fn test_minimal_product_assembly_config_from_json5() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+          product: {},
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
+    }
+
+    #[test]
+    fn test_empty_product_assembly_config_from_json5() {
+        let json5 = r#"
+        {
+          platform: {
+            feature_set_level: "test_no_platform",
+            build_type: "eng",
+          },
+          product: {},
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::TestNoPlatform);
+    }
+
+    #[test]
+    fn test_buildtype_deserialization_userdebug() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "userdebug",
+          },
+          product: {},
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::UserDebug);
+    }
+
+    #[test]
+    fn test_buildtype_deserialization_user() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "user",
+          },
+          product: {},
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::User);
+    }
+
+    #[test]
+    fn test_product_assembly_config_with_product_provided_parts() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+          product: {
+              packages: {
+                  base: [
+                      { manifest: "path/to/base/package_manifest.json" }
+                  ],
+                  cache: [
+                      { manifest: "path/to/cache/package_manifest.json" }
+                  ],
+              },
+              base_drivers: [
+                {
+                  package: "path/to/base/driver/package_manifest.json",
+                  components: [ "meta/path/to/component.cml" ]
+                }
+              ]
+          },
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
         assert_eq!(
-            packages.base,
-            [
-                (
-                    "0".to_string(),
-                    ProductPackageDetails {
-                        manifest: "path/to/base/package_manifest.json".into(),
-                        config_data: Vec::default()
-                    }
-                ),
-                (
-                    "1".to_string(),
-                    ProductPackageDetails {
-                        manifest: "some/other/manifest.json".into(),
-                        config_data: vec![
-                            ProductConfigData {
-                                destination: "dest/path/cfg.txt".into(),
-                                source: "source/path/cfg.txt".into(),
-                            },
-                            ProductConfigData {
-                                destination: "other_data.json".into(),
-                                source: "source_other_data.json".into(),
-                            },
-                        ]
-                    }
-                ),
-            ]
+            config.product.packages.base,
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/base/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
             .into()
         );
         assert_eq!(
-            packages.cache,
+            config.product.packages.cache,
             [(
                 "0".to_string(),
                 ProductPackageDetails {
@@ -541,295 +389,237 @@ mod tests {
             .into()
         );
         assert_eq!(
-            packages.bootfs,
-            [(
-                "0".to_string(),
-                ProductPackageDetails {
-                    manifest: "path/to/bootfs/package_manifest.json".into(),
-                    config_data: Vec::default()
-                }
-            )]
-            .into()
-        );
+            config.product.base_drivers,
+            vec![DriverDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    "path/to/base/driver/package_manifest.json".into()
+                ),
+                components: vec!["meta/path/to/component.cml".into()]
+            }]
+        )
     }
 
     #[test]
-    fn product_packages_config_deserialization() {
-        let from_list = r#"
-            {
-                base: [{
-                    manifest: "some/other/manifest.json",
-                    config_data: [
-                        {
-                            destination: "dest/path/cfg.txt",
-                            source: "source/path/cfg.txt",
-                        },
-                        {
-                            destination: "other_data.json",
-                            source: "source_other_data.json",
-                        },
-                    ]
-                }]
-            }
-        "#;
-        let from_map = r#"
-            {
-                base: {
-                    "0": {
-                        manifest: "some/other/manifest.json",
-                        config_data: [
-                            {
-                                destination: "dest/path/cfg.txt",
-                                source: "source/path/cfg.txt",
-                            },
-                            {
-                                destination: "other_data.json",
-                                source: "source_other_data.json",
-                            },
-                        ]
-                    }
-                }
-            }
-        "#;
-        let expected = ProductPackagesConfig {
-            base: [(
-                "0".to_string(),
-                ProductPackageDetails {
-                    manifest: "some/other/manifest.json".into(),
-                    config_data: vec![
-                        ProductConfigData {
-                            destination: "dest/path/cfg.txt".into(),
-                            source: "source/path/cfg.txt".into(),
-                        },
-                        ProductConfigData {
-                            destination: "other_data.json".into(),
-                            source: "source_other_data.json".into(),
-                        },
-                    ],
-                },
-            )]
-            .into(),
-            cache: BTreeMap::default(),
-            bootfs: BTreeMap::default(),
-        };
+    fn test_product_assembly_config_with_relative_paths() {
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
 
-        let mut cursor = std::io::Cursor::new(from_list);
-        let details: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(details, expected);
+        let config_path = dir_path.join("product_configuration.json");
+        let config_file = std::fs::File::create(&config_path).unwrap();
 
-        let mut cursor = std::io::Cursor::new(from_map);
-        let details: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(details, expected);
+        let index_path = dir_path.join("component_id_index.json");
+        std::fs::write(&index_path, "").unwrap();
+
+        let json = serde_json::json!({
+          "platform": {
+            "build_type": "eng",
+            "storage": {
+              "component_id_index": {
+                "product_index": "component_id_index.json",
+              },
+            },
+          },
+        });
+        serde_json::to_writer(config_file, &json).unwrap();
+        let config = ProductConfig::from_dir(&dir_path).unwrap();
+
+        assert_eq!(index_path, config.platform.storage.component_id_index.product_index.unwrap());
     }
 
     #[test]
-    fn product_package_details_deserialization() {
+    fn test_assembly_input_bundle_from_json5() {
         let json5 = r#"
             {
-                manifest: "some/other/manifest.json",
-                config_data: [
-                    {
-                        destination: "dest/path/cfg.txt",
-                        source: "source/path/cfg.txt",
-                    },
-                    {
-                        destination: "other_data.json",
-                        source: "source_other_data.json",
-                    },
+              // json5 files can have comments in them.
+              packages: [
+                {
+                    package: "package5",
+                    set: "base",
+                },
+                {
+                    package: "package6",
+                    set: "cache",
+                },
+              ],
+              kernel: {
+                path: "path/to/kernel",
+                args: ["arg1", "arg2"],
+              },
+              // and lists can have trailing commas
+              boot_args: ["arg1", "arg2", ],
+              bootfs_files: [
+                {
+                  source: "path/to/source",
+                  destination: "path/to/destination",
+                }
+              ],
+              config_data: {
+                "package1": [
+                  {
+                    source: "path/to/source.json",
+                    destination: "config.json"
+                  }
                 ]
+              },
+              base_drivers: [
+                {
+                  package: "path/to/driver",
+                  components: ["path/to/1234", "path/to/5678"]
+                }
+              ],
+              shell_commands: {
+                "package1": ["path/to/binary1", "path/to/binary2"]
+              },
+              packages_to_compile: [
+                  {
+                    name: "core",
+                    components: [
+                      {
+                        component_name: "component1",
+                        shards: ["path/to/component1.cml"],
+                      },
+                      {
+                        component_name: "component2",
+                        shards: ["path/to/component2.cml"],
+                      },
+                    ],
+                    contents: [
+                        {
+                            source: "path/to/source",
+                            destination: "path/to/destination",
+                        }
+                    ],
+                    includes: [ "src/path/to/include.cml" ]
+                },
+              ],
+              memory_buckets: [
+                "path/to/buckets.json",
+              ],
             }
         "#;
-        let expected = ProductPackageDetails {
-            manifest: "some/other/manifest.json".into(),
-            config_data: vec![
-                ProductConfigData {
-                    destination: "dest/path/cfg.txt".into(),
-                    source: "source/path/cfg.txt".into(),
+        let bundle =
+            util::from_reader::<_, AssemblyInputBundle>(&mut std::io::Cursor::new(json5)).unwrap();
+        assert_eq!(
+            bundle.packages,
+            vec!(
+                PackageDetails {
+                    package: FileRelativePathBuf::FileRelative(Utf8PathBuf::from("package5")),
+                    set: PackageSet::Base,
                 },
-                ProductConfigData {
-                    destination: "other_data.json".into(),
-                    source: "source_other_data.json".into(),
+                PackageDetails {
+                    package: FileRelativePathBuf::FileRelative(Utf8PathBuf::from("package6")),
+                    set: PackageSet::Cache,
                 },
-            ],
+            )
+        );
+        let expected_kernel = PartialKernelConfig {
+            path: Some(Utf8PathBuf::from("path/to/kernel")),
+            args: vec!["arg1".to_string(), "arg2".to_string()],
         };
-        let mut cursor = std::io::Cursor::new(json5);
-        let details: ProductPackageDetails = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(details, expected);
+        assert_eq!(bundle.kernel, Some(expected_kernel));
+        assert_eq!(bundle.boot_args, vec!("arg1".to_string(), "arg2".to_string()));
+        assert_eq!(
+            bundle.bootfs_files,
+            vec!(FileEntry {
+                source: Utf8PathBuf::from("path/to/source"),
+                destination: "path/to/destination".to_string()
+            })
+        );
+        assert_eq!(
+            bundle.config_data.get("package1").unwrap(),
+            &vec!(FileEntry {
+                source: Utf8PathBuf::from("path/to/source.json"),
+                destination: "config.json".to_string()
+            })
+        );
+        assert_eq!(
+            bundle.base_drivers[0],
+            DriverDetails {
+                package: FileRelativePathBuf::FileRelative(Utf8PathBuf::from("path/to/driver")),
+                components: vec!(
+                    Utf8PathBuf::from("path/to/1234"),
+                    Utf8PathBuf::from("path/to/5678")
+                )
+            }
+        );
+        assert_eq!(
+            bundle.shell_commands.get("package1").unwrap(),
+            &BTreeSet::from([
+                PackageInternalPathBuf::from("path/to/binary1"),
+                PackageInternalPathBuf::from("path/to/binary2"),
+            ])
+        );
+        assert_eq!(
+            bundle.memory_buckets,
+            vec![FileRelativePathBuf::FileRelative("path/to/buckets.json".into())]
+        );
     }
 
     #[test]
-    fn product_package_details_serialization() {
-        let entries = vec![
-            ProductPackageDetails {
-                manifest: "path/to/manifest.json".into(),
-                config_data: Vec::default(),
+    fn test_assembly_config_wrapper_for_overrides() {
+        let config: ProductConfig = serde_json::from_value(serde_json::json!({
+            "platform": {
+                "build_type": "eng",
             },
-            ProductPackageDetails {
-                manifest: "another/path/to/a/manifest.json".into(),
-                config_data: vec![
-                    ProductConfigData {
-                        destination: "dest/path/A".into(),
-                        source: "source/path/A".into(),
+            "product": {},
+        }))
+        .unwrap();
+
+        let overrides = serde_json::json!({
+            "platform": {
+                "media": {
+                    "audio": {
+                      "device_registry": {},
                     },
-                    ProductConfigData {
-                        destination: "dest/path/B".into(),
-                        source: "source/path/B".into(),
-                    },
-                ],
-            },
-        ];
-        let serialized = serde_json::to_value(entries).unwrap();
-        let expected = serde_json::json!(
-            [
-                {
-                    "manifest": "path/to/manifest.json"
                 },
-                {
-                    "manifest": "another/path/to/a/manifest.json",
-                    "config_data": [
-                        {
-                            "destination": "dest/path/A",
-                            "source": "source/path/A",
-                        },
-                        {
-                            "destination": "dest/path/B",
-                            "source": "source/path/B",
-                        },
-                    ]
-                }
-            ]
+            },
+        });
+
+        let config = config.apply_overrides(overrides).unwrap();
+
+        assert_eq!(
+            config.platform.media,
+            PlatformMediaConfig {
+                audio: Some(AudioConfig::DeviceRegistry(AudioDeviceRegistryConfig {
+                    eager_start: false
+                })),
+                ..Default::default()
+            },
         );
-        assert_eq!(serialized, expected);
     }
 
     #[test]
-    fn product_tee_serialization() {
-        let product_config = ProductConfig { tee: Tee::Undefined, ..Default::default() };
-        let serialized = serde_json::to_value(product_config).unwrap();
-        let expected = serde_json::json!({"release_info": ProductReleaseInfo::new_for_testing()});
-        assert_eq!(serialized, expected);
+    fn test_get_package_names() {
+        // Prepare a directory for temporary files.
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
 
-        let product_config = ProductConfig { tee: Tee::NoTee, ..Default::default() };
-        let serialized = serde_json::to_value(product_config).unwrap();
-        let expected = serde_json::json!(
-            {
-                "tee": "no_tee",
-                "release_info": ProductReleaseInfo::new_for_testing(),
-            }
+        // Generate a fake package manifest.
+        let package_name = PackageName::from_str("my_pkg").unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero(package_name);
+        let package_manifest_builder = PackageManifestBuilder::new(meta_package);
+        let package_manifest = package_manifest_builder.build();
+        let package_manifest_path = dir_path.join("my_pkg_package_manifest.json");
+        package_manifest.write_with_relative_paths(&package_manifest_path).unwrap();
+
+        // Create an assembly config with the package manifest.
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+        }
+        "#;
+        let mut cursor = std::io::Cursor::new(json5);
+        let mut config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        config.product.packages.base.insert(
+            "0".to_string(),
+            ProductPackageDetails { manifest: package_manifest_path.clone(), config_data: vec![] },
         );
-        assert_eq!(serialized, expected);
 
-        let product_config = ProductConfig {
-            tee: Tee::GlobalPlatform(GlobalPlatformTee { clients: vec![] }),
-            ..Default::default()
-        };
-        let serialized = serde_json::to_value(product_config).unwrap();
-        let expected = serde_json::json!(
-            {
-                "tee": {
-                    "global_platform": {
-                        "clients": []
-                    }
-                },
-                "release_info": ProductReleaseInfo::new_for_testing(),
-            }
-        );
-        assert_eq!(serialized, expected);
-
-        let product_config = ProductConfig {
-            tee: Tee::Proprietary(ProprietaryTee {
-                tee_realm_url: String::from(
-                    "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
-                ),
-            }),
-            ..Default::default()
-        };
-        let serialized = serde_json::to_value(product_config).unwrap();
-        let expected = serde_json::json!(
-            {
-                "tee": {
-                    "proprietary": {
-                        "tee_realm_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm"
-                    }
-                },
-                "release_info": ProductReleaseInfo::new_for_testing(),
-            }
-        );
-        assert_eq!(serialized, expected);
-    }
-
-    #[test]
-    fn product_tee_deserialization() {
-        let json5 = r#"{}"#;
-        let expected = ProductConfig { tee: Tee::Undefined, ..Default::default() };
-        let mut cursor = std::io::Cursor::new(json5);
-        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(product_config, expected);
-
-        let json5 = r#"{
-            tee: "no_tee",
-            release_info: {
-                info: {
-                    name: "",
-                    repository: "",
-                    version: ""
-                },
-                pibs: []
-            }
-        }"#;
-        let expected = ProductConfig { tee: Tee::NoTee, ..Default::default() };
-        let mut cursor = std::io::Cursor::new(json5);
-        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(product_config, expected);
-
-        let json5 = r#"{
-            tee: {
-                global_platform: {
-                    clients: [],
-                },
-            },
-            release_info: {
-                info: {
-                    name: "",
-                    repository: "",
-                    version: ""
-                },
-                pibs: []
-            }
-        }"#;
-        let expected = ProductConfig {
-            tee: Tee::GlobalPlatform(GlobalPlatformTee { clients: vec![] }),
-            ..Default::default()
-        };
-        let mut cursor = std::io::Cursor::new(json5);
-        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(product_config, expected);
-
-        let json5 = r#"{
-            tee: {
-                proprietary: {
-                    tee_realm_url: "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
-                },
-            },
-            release_info: {
-                info: {
-                    name: "",
-                    repository: "",
-                    version: ""
-                },
-                pibs: []
-            }
-        }"#;
-        let expected = ProductConfig {
-            tee: Tee::Proprietary(ProprietaryTee {
-                tee_realm_url: String::from(
-                    "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
-                ),
-            }),
-            ..Default::default()
-        };
-        let mut cursor = std::io::Cursor::new(json5);
-        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(product_config, expected);
+        // Test the logic to add proper package names.
+        let config = config.add_package_names().unwrap();
+        let details = config.product.packages.base.get("my_pkg").unwrap();
+        assert_eq!(&details.manifest, &package_manifest_path);
     }
 }

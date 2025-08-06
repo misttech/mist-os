@@ -35,6 +35,7 @@ class PandoraGrpcServer {
   A2dpService a2dp_service_;
   HostService host_service_;
   L2capService l2cap_service_;
+  SecurityService security_service_;
   SecurityStorageService security_storage_service_;
 
   std::unique_ptr<grpc::Server> server_;

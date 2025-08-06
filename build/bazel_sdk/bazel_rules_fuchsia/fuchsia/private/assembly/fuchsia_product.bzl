@@ -78,7 +78,7 @@ def _fuchsia_product_assembly_impl(ctx):
         "product",
         "--product",
         product_config.directory,
-        "--board-info",
+        "--board-config",
         board_config.directory,
         "--input-bundles-dir",
         platform_artifacts.root,

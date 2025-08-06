@@ -30,7 +30,8 @@ use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::ndp::send_ra_with_router_lifetime;
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Manager, ManagerConfig, Netstack, NetstackExt, TestSandboxExt as _,
+    constants, KnownServiceProvider, Manager, ManagerConfig, Netstack, NetstackExt,
+    TestSandboxExt as _,
 };
 use netstack_testing_common::{
     pause_fake_clock, wait_for_component_stopped, Result, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -247,7 +248,7 @@ impl DnsCheckType {
                 // get the servers we want or after too long.
                 let dns_server_watcher = realm
                     .connect_to_protocol_from_child::<net_name::DnsServerWatcherMarker>(
-                        M::MANAGEMENT_AGENT.get_component_name(),
+                        constants::netcfg::COMPONENT_NAME,
                     )
                     .expect("failed to connect to DnsServerWatcher");
                 poll_dns_server_watcher(
@@ -307,7 +308,7 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: Dns
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
-                    M::MANAGEMENT_AGENT.get_component_name(),
+                    constants::netcfg::COMPONENT_NAME,
                     None,
                 )
                 .fuse();
@@ -444,7 +445,7 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str, check_type: 
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
-                    M::MANAGEMENT_AGENT.get_component_name(),
+                    constants::netcfg::COMPONENT_NAME,
                     None,
                 )
                 .fuse();
@@ -618,7 +619,7 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
-                    M::MANAGEMENT_AGENT.get_component_name(),
+                    constants::netcfg::COMPONENT_NAME,
                     None,
                 )
                 .fuse();
@@ -692,7 +693,7 @@ async fn discovered_starnix_networks_dns<M: Manager, N: Netstack>(
         port: DEFAULT_DNS_PORT,
     })]);
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+        wait_for_component_stopped(&realm, constants::netcfg::COMPONENT_NAME, None).fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
     check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect1).await;
 
@@ -809,7 +810,7 @@ async fn discovered_starnix_fuchsia_networks_dns<M: Manager, N: Netstack>(
         port: DEFAULT_DNS_PORT,
     })]);
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+        wait_for_component_stopped(&realm, constants::netcfg::COMPONENT_NAME, None).fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
     check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect1).await;
 

@@ -199,21 +199,7 @@ def _get_visibility_list(values):
     """
     if not values:
         return ["//visibility:public"]
-
-    visibility_list = []
-    for entry in values:
-        repo_name = entry.repo_name
-
-        # If this repo_name is empty we change it to refer to the root
-        # repo to avoid confusing it with the generated repo.
-        if repo_name == "":
-            repo_name = "@"
-        visibility_list.append("@{}//{}:{}".format(
-            repo_name,
-            entry.package,
-            entry.name,
-        ))
-    return visibility_list
+    return [str(v) for v in values]
 
 def _get_target_name(name):
     return name.rpartition("/")[2]
@@ -910,16 +896,6 @@ def _generate_cc_source_library_build_rules(
                         for suffix in suffixes
                     ],
                 )
-    elif "fidl_deps" in meta:
-        for fidl in meta["fidl_deps"]:
-            dep_path = _find_dep_path(
-                fidl,
-                "fidl/",
-                ctx.attr.parent_sdk,
-                parent_sdk_contents,
-            )
-            fidl_deps.append(dep_path + ":" + fidl + "_cc")
-            fidl_llcpp_deps.append(dep_path + ":" + fidl + "_llcpp_cc")
 
     deps = []
     for bind in meta.get("bind_deps", []):

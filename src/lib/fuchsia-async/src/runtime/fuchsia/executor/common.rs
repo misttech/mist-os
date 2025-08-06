@@ -782,14 +782,16 @@ impl TaskHandle {
 #[cfg(test)]
 mod tests {
     use super::{EHandle, ACTIVE_EXECUTORS};
-    use crate::SendExecutor;
+    use crate::SendExecutorBuilder;
     use crossbeam::epoch;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
     #[test]
     fn test_no_leaks() {
-        std::thread::spawn(|| SendExecutor::new(1).run(async {})).join().unwrap();
+        std::thread::spawn(|| SendExecutorBuilder::new().num_threads(1).build().run(async {}))
+            .join()
+            .unwrap();
 
         // This seems like the only way to force crossbeam to do a collection.
         while ACTIVE_EXECUTORS.load(Ordering::Relaxed) != 0 {
@@ -799,7 +801,7 @@ mod tests {
 
     #[test]
     fn poll_tasks() {
-        SendExecutor::new(1).run(async {
+        SendExecutorBuilder::new().num_threads(1).build().run(async {
             let ehandle = EHandle::local();
 
             // This will tie up the executor's only running thread which ensures that the task

@@ -34,7 +34,7 @@ import("//build/rust/rustc_library.gni")
 #   stability (optional)
 #     The stability requirement of this interface.
 #
-#   structured (optional)
+#   structured (optional, defaults to true)
 #     Whether to use structured AIDL.
 #
 #   version (optional, if stability is not defined, mandatory otherwise)

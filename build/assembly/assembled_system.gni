@@ -514,7 +514,7 @@ template("assembled_system") {
 
     if (defined(files.board_config)) {
       args += [
-        "--board-info",
+        "--board-config",
         rebase_path(files.board_config_dir, root_build_dir),
       ]
       inputs += [ files.board_config ]
@@ -597,7 +597,7 @@ template("assembled_system") {
   }
 
   ffx_action(labels.image_assembler) {
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
 
     forward_variables_from(invoker,
                            [

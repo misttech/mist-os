@@ -4,6 +4,7 @@
 """Fuchsia base test class."""
 
 import enum
+import importlib
 import logging
 import os
 
@@ -11,6 +12,10 @@ from honeydew import errors
 from honeydew.auxiliary_devices.power_switch import (
     power_switch,
     power_switch_using_dmc,
+)
+from honeydew.auxiliary_devices.usb_power_hub import (
+    usb_power_hub,
+    usb_power_hub_using_dmc,
 )
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.typing import custom_types
@@ -404,18 +409,14 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
     def _recover_device(self, fx_device: fuchsia_device.FuchsiaDevice) -> None:
         """Try to recover the fuchsia device by power cycling it if the test has
-        access to DMC.
+        access to a power switch.
 
         Args:
             fx_device: FuchsiaDevice object
         """
         try:
-            dmc_power_switch: power_switch_using_dmc.PowerSwitchUsingDmc = (
-                power_switch_using_dmc.PowerSwitchUsingDmc(
-                    device_name=fx_device.device_name
-                )
-            )
-            fx_device.power_cycle(power_switch=dmc_power_switch, outlet=None)
+            switch, outlet = self._lookup_power_switch(fx_device)
+            fx_device.power_cycle(power_switch=switch, outlet=outlet)
         except power_switch_using_dmc.PowerSwitchDmcError as err:
             _LOGGER.warning(
                 "Unable to power cycle %s as test does not have access to DMC. "
@@ -435,6 +436,114 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             raise signals.TestAbortClass(
                 f"{fx_device.device_name} is unhealthy and failed to recover it"
             ) from err
+
+    def _lookup_power_switch(
+        self, fx_device: fuchsia_device.FuchsiaDevice
+    ) -> tuple[power_switch.PowerSwitch, int | None]:
+        """Finds the power switch and outlet that powers the device from the
+        device config.
+
+        If a power switch is not found in the device config, it defaults to
+        using one that is compatible with Fuchsia Infra.
+
+        Args:
+            fx_device: FuchsiaDevice object
+
+        Returns:
+            Tuple of the PowerSwitch and the outlet number.
+        """
+        device_config: dict[str, object] = self._get_device_config(
+            controller_type="FuchsiaDevice",
+            identifier_key="name",
+            identifier_value=fx_device.device_name,
+        )
+        power_switch_hw: dict[str, str] = device_config.get(  # type: ignore[assignment]
+            "power_switch_hw", {}
+        )
+        power_switch_impl: dict[str, str] = device_config.get(  # type: ignore[assignment]
+            "power_switch_impl", {}
+        )
+        power_switch_outlet: int | None = device_config.get(  # type: ignore[assignment]
+            "power_switch_outlet", None
+        )
+        if power_switch_hw and power_switch_impl:
+            _LOGGER.debug(
+                "Importing %s.%s module",
+                power_switch_impl["module"],
+                power_switch_impl["class"],
+            )
+            power_switch_class: type[power_switch.PowerSwitch] = getattr(
+                importlib.import_module(power_switch_impl["module"]),
+                power_switch_impl["class"],
+            )
+            _LOGGER.debug(
+                "Instantiating %s.%s module",
+                power_switch_impl["module"],
+                power_switch_impl["class"],
+            )
+            return power_switch_class(**power_switch_hw), power_switch_outlet
+        else:
+            # Default to using DMC, which interfaces with the Fuchsia infra.
+            return (
+                power_switch_using_dmc.PowerSwitchUsingDmc(
+                    device_name=fx_device.device_name,
+                ),
+                None,  # DMC doesn't use the outlet number
+            )
+
+    def _lookup_usb_power_hub(
+        self, fx_device: fuchsia_device.FuchsiaDevice
+    ) -> tuple[usb_power_hub.UsbPowerHub, int | None]:
+        """Finds the usb power hub and port connected to the device from the
+        device config.
+
+        If a usb power hub is not found in the device config, it defaults to
+        using one that is compatible with Fuchsia Infra.
+
+        Args:
+            fx_device: FuchsiaDevice object
+
+        Returns:
+            Tuple of the UsbPowerHub and the port number.
+        """
+        device_config: dict[str, object] = self._get_device_config(
+            controller_type="FuchsiaDevice",
+            identifier_key="name",
+            identifier_value=fx_device.device_name,
+        )
+        usb_power_hub_hw: dict[str, str] = device_config.get(  # type: ignore[assignment]
+            "usb_power_hub_hw", {}
+        )
+        usb_power_hub_impl: dict[str, str] = device_config.get(  # type: ignore[assignment]
+            "usb_power_hub_impl", {}
+        )
+        usb_power_hub_port: int | None = device_config.get(  # type: ignore[assignment]
+            "usb_power_hub_port", None
+        )
+        if usb_power_hub_hw and usb_power_hub_impl:
+            _LOGGER.debug(
+                "Importing %s.%s module",
+                usb_power_hub_impl["module"],
+                usb_power_hub_impl["class"],
+            )
+            usb_power_hub_class: type[usb_power_hub.UsbPowerHub] = getattr(
+                importlib.import_module(usb_power_hub_impl["module"]),
+                usb_power_hub_impl["class"],
+            )
+            _LOGGER.debug(
+                "Instantiating %s.%s module",
+                usb_power_hub_impl["module"],
+                usb_power_hub_impl["class"],
+            )
+            return usb_power_hub_class(**usb_power_hub_hw), usb_power_hub_port
+        else:
+            # Default to using DMC, which interfaces with the Fuchsia infra.
+            return (
+                usb_power_hub_using_dmc.UsbPowerHubUsingDmc(
+                    device_name=fx_device.device_name,
+                ),
+                None,  # DMC doesn't use the port number
+            )
 
     def _log_message_to_devices(
         self, message: str, level: custom_types.LEVEL

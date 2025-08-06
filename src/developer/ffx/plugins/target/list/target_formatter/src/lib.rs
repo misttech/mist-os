@@ -164,7 +164,7 @@ impl TryFrom<Vec<ffx::TargetInfo>> for AddressesTargetFormatter {
 
 impl TargetFormatter for AddressesTargetFormatter {
     fn lines(&self, _default_nodename: Option<&str>) -> Vec<String> {
-        self.targets.iter().map(|t| t.0.to_string()).collect()
+        self.targets.iter().map(|t| t.0.optional_port_str()).collect()
     }
 }
 
@@ -616,8 +616,41 @@ mod test {
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
     use std::sync::LazyLock;
 
+    fn make_target(
+        addr: fidl_fuchsia_developer_ffx::TargetAddrInfo,
+    ) -> fidl_fuchsia_developer_ffx::TargetInfo {
+        ffx::TargetInfo {
+            nodename: Some("lorberding".to_string()),
+            addresses: Some(vec![addr]),
+            rcs_state: Some(ffx::RemoteControlState::Unknown),
+            target_state: Some(ffx::TargetState::Unknown),
+            ..Default::default()
+        }
+    }
+
+    fn make_ip_v4_port_info(port: u16) -> fidl_fuchsia_developer_ffx::TargetAddrInfo {
+        ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+            port,
+        })
+    }
+
+    fn make_ip_v6_port_info(
+        scope_id: u32,
+        port: u16,
+    ) -> fidl_fuchsia_developer_ffx::TargetAddrInfo {
+        ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+            ip: IpAddress::Ipv6(Ipv6Address {
+                addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+            }),
+            scope_id: scope_id,
+            port: port,
+        })
+    }
+
     static EMPTY_FORMATTER_GOLDEN: LazyLock<String> = LazyLock::new(|| {
-        include_str!("../test_data/target_formatter_empty_formatter_golden").trim().to_owned();
+        include_str!("../test_data/target_formatter_empty_formatter_golden").trim().to_owned()
     });
     static ONE_TARGET_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
         include_str!("../test_data/target_formatter_one_target_with_default_golden")
@@ -753,7 +786,7 @@ mod test {
         let formatter = TabularTargetFormatter::try_from(Vec::<ffx::TargetInfo>::new()).unwrap();
         let lines = formatter.lines(None);
         assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].len(), 50); // Just some manual math.
+        assert_eq!(lines[0].len(), 60); // Just some manual math.
         assert_eq!(lines.join("\n"), EMPTY_FORMATTER_GOLDEN.to_string());
     }
 
@@ -1292,51 +1325,52 @@ mod test {
 
     #[fuchsia::test]
     async fn test_nonstandard_port_ipv4() {
-        let target = ffx::TargetInfo {
-            nodename: Some("lorberding".to_string()),
-            addresses: Some(vec![ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
-                ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
-                scope_id: 0,
-                port: 1234,
-            })]),
-            rcs_state: Some(ffx::RemoteControlState::Unknown),
-            target_state: Some(ffx::TargetState::Unknown),
-            ..Default::default()
-        };
+        let target = make_target(make_ip_v4_port_info(1234));
         let formatter = JsonTargetFormatter::try_from(vec![target.clone()]).unwrap();
         let json = formatter.lines(None)[0].clone();
-        let (first_ip, first_port) = get_first_address(dbg!(&json));
+        let (first_ip, first_port) = get_first_address(&json);
         assert_eq!(first_ip, "127.0.0.1".to_string());
         assert_eq!(first_port, 1234);
 
-        let formatter = TabularTargetFormatter::try_from(vec![target]).unwrap();
+        let formatter = TabularTargetFormatter::try_from(vec![target.clone()]).unwrap();
         let out = formatter.lines(None)[1].clone();
         assert!(out.contains("127.0.0.1:1234"));
+
+        let formatter = AddressesTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let out = formatter.lines(None)[0].clone();
+        assert_eq!(out, "127.0.0.1:1234".to_string());
     }
 
     #[fuchsia::test]
     async fn test_nonstandard_port_ipv6() {
-        let target = ffx::TargetInfo {
-            nodename: Some("lorberding".to_string()),
-            addresses: Some(vec![ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
-                ip: IpAddress::Ipv6(Ipv6Address {
-                    addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
-                }),
-                scope_id: 42,
-                port: 1234,
-            })]),
-            rcs_state: Some(ffx::RemoteControlState::Unknown),
-            target_state: Some(ffx::TargetState::Unknown),
-            ..Default::default()
-        };
+        let addr = make_ip_v6_port_info(42, 1234);
+        let target = make_target(addr);
         let formatter = JsonTargetFormatter::try_from(vec![target.clone()]).unwrap();
         let json = formatter.lines(None)[0].clone();
-        let (first_ip, first_port) = get_first_address(dbg!(&json));
+        let (first_ip, first_port) = get_first_address(&json);
         assert_eq!(first_ip, "fe80::1:101:101:101%42".to_string());
         assert_eq!(first_port, 1234);
 
-        let formatter = TabularTargetFormatter::try_from(vec![target]).unwrap();
+        let formatter = TabularTargetFormatter::try_from(vec![target.clone()]).unwrap();
         let out = formatter.lines(None)[1].clone();
         assert!(out.contains("[fe80::1:101:101:101%42]:1234"));
+
+        let formatter = AddressesTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let out = formatter.lines(None)[0].clone();
+        assert_eq!(out, "[fe80::1:101:101:101%42]:1234".to_string());
+    }
+
+    #[fuchsia::test]
+    async fn test_addresses_std_ports() {
+        let target = make_target(make_ip_v4_port_info(0));
+
+        let formatter = AddressesTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let out = formatter.lines(None)[0].clone();
+        assert_eq!(out, "127.0.0.1".to_string());
+
+        let target = make_target(make_ip_v6_port_info(0, 0));
+        let formatter = AddressesTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let out = formatter.lines(None)[0].clone();
+        assert_eq!(out, "fe80::1:101:101:101".to_string());
     }
 }

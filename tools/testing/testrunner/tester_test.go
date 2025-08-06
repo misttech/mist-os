@@ -237,6 +237,8 @@ func TestSubprocessTester(t *testing.T) {
 				"--env",
 				"TEMPDIR=/tmp",
 				"--env",
+				fmt.Sprintf("TEST_OUTPUT_SUMMARY_PATH=%s/test_output_summary/host_x64/passing/test_output_summary_path.json", tmpDir),
+				"--env",
 				"TMP=/tmp",
 				"--env",
 				"TMPDIR=/tmp",

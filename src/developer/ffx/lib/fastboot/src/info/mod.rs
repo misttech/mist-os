@@ -39,7 +39,7 @@ mod test {
     use ffx_fastboot_interface::test::setup;
     use tokio::sync::mpsc;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_showing_variables() -> Result<()> {
         let (_, mut proxy) = setup();
         let (client, mut server) = mpsc::channel(1);

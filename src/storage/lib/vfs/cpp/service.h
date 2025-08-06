@@ -5,16 +5,21 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_SERVICE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_SERVICE_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/fit/traits.h>
 #include <lib/zx/channel.h>
+#include <zircon/types.h>
 
 #include <type_traits>
+#include <utility>
 
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
 
-#include "vnode.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 
@@ -35,20 +40,19 @@ class Service : public Vnode {
   template <typename T>
   struct has_protocol_type<T, std::void_t<typename T::ProtocolType>> : public std::true_type {};
   template <typename T>
-  static constexpr inline auto has_protocol_type_v = has_protocol_type<T>::value;
+  static constexpr auto has_protocol_type_v = has_protocol_type<T>::value;
 
   // Returns if |T| could potentially be a protocol connector:
   // - It is not |Service|.
   // - It cannot be converted to the untyped connector.
   template <typename T>
-  static constexpr inline auto maybe_protocol_connector =
+  static constexpr auto maybe_protocol_connector =
       std::conjunction_v<std::negation<std::is_same<std::remove_cvref_t<T>, Service>>,
                          std::negation<std::is_convertible<T, Connector>>>;
 
  public:
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t ConnectService(zx::channel channel) final;
 
  protected:

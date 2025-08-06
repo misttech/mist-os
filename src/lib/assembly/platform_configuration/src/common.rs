@@ -4,15 +4,15 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
-use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
+use assembly_config_schema::product_config::CompiledPackageDefinition;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 
-use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
-use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
+use assembly_config_schema::platform_settings::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
+use assembly_config_schema::{BoardConfig, BuildType, ICUConfig};
 use assembly_constants::{
     BootfsDestination, CompiledPackageDestination, FileEntry, KernelArg, PackageSetDestination,
 };
@@ -77,7 +77,7 @@ impl FeatureSetLevel {
     /// Convert a deserialized assembly_config_schema:: FeatureSetLevel into an
     /// `Option<FeatureSetLevel>`, where the `Empty` case becomes `None`.
     pub fn from_deserialized(
-        value: &assembly_config_schema::platform_config::FeatureSetLevel,
+        value: &assembly_config_schema::platform_settings::FeatureSetLevel,
     ) -> Option<Self> {
         match value {
             assembly_config_schema::FeatureSetLevel::TestKernelOnly => None,
@@ -117,13 +117,13 @@ pub(crate) trait DefineSubsystemConfiguration<T> {
 
 /// This provides the context that's passed to each subsystem's configuration
 /// module.  These are the fields from the
-/// `assembly_config_schema::platform_config::PlatformConfig` struct that are
+/// `assembly_config_schema::platform_settings::PlatformSettings` struct that are
 /// available to all subsystems to use to derive their configuration from.
 #[derive(Debug)]
 pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSetLevel,
     pub build_type: &'a BuildType,
-    pub board_info: &'a BoardInformation,
+    pub board_config: &'a BoardConfig,
     pub gendir: Utf8PathBuf,
     pub resource_dir: Utf8PathBuf,
     pub developer_only_options: Option<&'a DeveloperOnlyOptions>,
@@ -781,12 +781,12 @@ impl BootfsConfigBuilder for BootfsConfig {
     }
 }
 
-pub(crate) trait BoardInformationExt {
+pub(crate) trait BoardConfigExt {
     /// Returns whether or not this board provides the named feature.
     fn provides_feature(&self, name: impl AsRef<str>) -> bool;
 }
 
-impl BoardInformationExt for BoardInformation {
+impl BoardConfigExt for BoardConfig {
     /// Returns whether or not this board provides the named feature.
     fn provides_feature(&self, name: impl AsRef<str>) -> bool {
         // .contains(&str) doesn't work for Vec<String>, so it's neccessary
@@ -796,10 +796,10 @@ impl BoardInformationExt for BoardInformation {
     }
 }
 
-impl BoardInformationExt for Option<&BoardInformation> {
+impl BoardConfigExt for Option<&BoardConfig> {
     fn provides_feature(&self, name: impl AsRef<str>) -> bool {
         match self {
-            Some(board_info) => board_info.provides_feature(name),
+            Some(board_config) => board_config.provides_feature(name),
             _ => false,
         }
     }
@@ -896,7 +896,7 @@ impl ConfigurationContext<'_> {
 
 /// This is the basis for the the context that's passed to each subsystem's configuration
 /// module.  These are the fields from the
-/// `assembly_config_schema::platform_config::PlatformConfig` struct that are
+/// `assembly_config_schema::platform_settings::PlatformSettings` struct that are
 /// available to all subsystems to use to derive their configuration from.  This is used to create
 /// the specific ConfigurationContext object that's used for each individual subsystem.
 #[derive(Debug)]
@@ -932,7 +932,7 @@ impl ConfigurationContext<'_> {
         Self {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
-            board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
+            board_config: &tests::BOARD_INFORMATION_FOR_TESTS,
             gendir: Utf8PathBuf::from_path_buf(
                 tempfile::TempDir::new().unwrap().path().to_path_buf(),
             )
@@ -954,7 +954,7 @@ mod tests {
     use utf8_path::path_relative_from_current_dir;
 
     lazy_static! {
-        pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
+        pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardConfig = BoardConfig {
             name: "Test Board".into(),
             provided_features: vec![],
             input_bundles: Default::default(),
@@ -1186,15 +1186,15 @@ mod tests {
 
     #[test]
     fn test_provides_feature() {
-        let board_info = BoardInformation {
+        let board_config = BoardConfig {
             name: "sample".to_owned(),
             provided_features: vec!["feature_a".into(), "feature_b".into()],
             ..Default::default()
         };
 
-        assert!(board_info.provides_feature("feature_a"));
-        assert!(board_info.provides_feature("feature_b"));
-        assert!(!board_info.provides_feature("feature_c"));
+        assert!(board_config.provides_feature("feature_a"));
+        assert!(board_config.provides_feature("feature_b"));
+        assert!(!board_config.provides_feature("feature_c"));
     }
 
     #[test]
@@ -1208,7 +1208,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
+            board_config: &BoardConfig {
                 name: "sample".to_owned(),
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()
@@ -1230,7 +1230,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
+            board_config: &BoardConfig {
                 name: "sample".to_owned(),
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()
@@ -1256,7 +1256,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
-            board_info: &BoardInformation {
+            board_config: &BoardConfig {
                 name: "sample".to_owned(),
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()

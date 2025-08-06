@@ -13,6 +13,7 @@
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/node.h"
 #include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 
@@ -72,7 +73,15 @@ uint64_t DirBlockIndex(uint32_t level, uint8_t dir_level, uint32_t idx) {
   return bidx;
 }
 
-Dir::Dir(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
+Dir::Dir(F2fs *fs, ino_t ino, umode_t mode, std::optional<gid_t> gid) : VnodeF2fs(fs, ino, mode) {
+  if (gid) {
+    SetGid(*gid);
+    SetMode(mode | S_ISGID);
+  }
+}
+
+Dir::Dir(F2fs *fs, ino_t ino, umode_t mode, LockedPage node_page)
+    : VnodeF2fs(fs, ino, mode, std::move(node_page)) {}
 
 fuchsia_io::NodeProtocolKinds Dir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
@@ -282,7 +291,7 @@ void Dir::UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) {
   if (vnode->TestFlag(InodeInfoFlag::kNewInode)) {
     vnode->ClearFlag(InodeInfoFlag::kNewInode);
     if (vnode->IsDir()) {
-      IncNlink();
+      IncrementLinkUnsafe();
       SetFlag(InodeInfoFlag::kUpdateDir);
     }
   }
@@ -428,18 +437,18 @@ void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
 
   if (vnode) {
     if (vnode->IsDir()) {
-      DropNlink();
+      DecrementLinkUnsafe();
       SetDirty();
     }
 
     vnode->SetDirty();
     vnode->SetTime<Timestamps::ChangeTime>();
-    vnode->DropNlink();
+    vnode->DecrementLink();
     if (vnode->IsDir()) {
-      vnode->DropNlink();
+      vnode->DecrementLink();
       vnode->SetSize(0);
     }
-    if (vnode->GetNlink() == 0) {
+    if (vnode->GetLinkCount() == 0) {
       vnode->SetOrphan();
     }
   }

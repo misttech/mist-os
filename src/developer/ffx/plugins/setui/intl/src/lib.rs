@@ -59,7 +59,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         let proxy = fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
@@ -101,7 +101,7 @@ mod test {
         };
         "Test intl set() output with a different non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_intl_set_output(expected_intl: Intl) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
@@ -137,7 +137,7 @@ mod test {
         };
         "Test intl watch() output with non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_intl_watch_output(expected_intl: Intl) -> Result<()> {
         let expected_intl_clone = expected_intl.clone();
         let proxy = fake_proxy(move |req| match req {

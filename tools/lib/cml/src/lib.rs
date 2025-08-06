@@ -1083,13 +1083,14 @@ pub struct Document {
     ///     {
     ///         protocol: [
     ///             "fuchsia.posix.socket.Provider",
+    ///             "fuchsia.logger.LogSink",
     ///         ],
     ///     },
     /// ],
     ///
     /// // syslog.client.shard.cml
     /// use: [
-    ///     { protocol: "fuchsia.logger.LogSink", from: "parent/diagnostics" },
+    ///     { protocol: "fuchsia.logger.LogSink" },
     /// ],
     /// ```
     ///
@@ -1126,10 +1127,9 @@ pub struct Document {
     /// use: [
     ///     {
     ///         protocol: [
-    ///             "fuchsia.logger.LogSink",
     ///             "fuchsia.posix.socket.Provider",
+    ///             "fuchsia.logger.LogSink",
     ///         ],
-    ///         from: "parent/diagnostics",
     ///         availability: "optional",
     ///     },
     /// ],
@@ -1137,9 +1137,8 @@ pub struct Document {
     /// // syslog.client.shard.cml
     /// use: [
     ///     {
-    ///         protocol: "fuchsia.logger.LogSink"
+    ///         protocol: "fuchsia.logger.LogSink
     ///         availability: "required",  // This is the default
-    ///         from: "parent/diagnostics",
     ///     },
     /// ],
     /// ```
@@ -1155,7 +1154,6 @@ pub struct Document {
     ///     {
     ///         protocol: "fuchsia.logger.LogSink",
     ///         availability: "required",
-    ///         from: "parent/diagnostics",
     ///     },
     /// ],
     /// ```

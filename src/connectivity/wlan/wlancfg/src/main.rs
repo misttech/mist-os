@@ -433,7 +433,7 @@ async fn main() {
     ftrace_provider::trace_provider_create_with_fdio();
     wtrace::instant_wlancfg_start();
 
-    run_all_futures().await.unwrap_or_else(|e| {
+    Box::pin(run_all_futures()).await.unwrap_or_else(|e| {
         error!("{e:?}");
         // The wlancfg component is `on_terminate: "reboot"`, so this will reboot the device.
         panic!("wlancfg unclean exit")

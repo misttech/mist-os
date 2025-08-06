@@ -6,18 +6,28 @@
 
 #include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/mmio-ptr/fake.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/sysmem-version/sysmem-version.h>
 
-#include <memory>
+#include <array>
+#include <cstdint>
+#include <map>
+#include <optional>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/intel-display/gtt.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
-#include "src/graphics/display/drivers/intel-display/registers-pipe.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace intel_display {
 
@@ -49,36 +59,43 @@ class TestGttRegionImpl : public GttRegion {
   uint64_t handle_ = 0;
 };
 
-std::map<uint64_t, TestGttRegionImpl> region_map;
+std::map<display::DriverImageId, TestGttRegionImpl> region_map;
 
-PixelFormatAndModifier GetPixelFormat(uint64_t image_handle) {
+PixelFormatAndModifier GetPixelFormat(display::DriverImageId image_id) {
   return PixelFormatAndModifier(
       fuchsia_images2::PixelFormat::kB8G8R8A8,
       /*pixel_format_modifier_param=*/fuchsia_images2::PixelFormatModifier::kLinear);
 }
 
-const GttRegion& GetGttImageHandle(const image_metadata_t& image_metadata, uint64_t image_handle,
-                                   uint32_t rotation) {
+const GttRegion& GetGttImageHandle(const display::ImageMetadata& image_metadata,
+                                   display::DriverImageId image_handle,
+                                   display::CoordinateTransformation coordinate_transformation) {
   auto it = region_map.find(image_handle);
   if (it != region_map.end()) {
     return it->second;
   }
-  return region_map.try_emplace(image_handle, image_handle).first->second;
+  return region_map.try_emplace(image_handle, image_handle.value()).first->second;
 }
 
-layer_t CreatePrimaryLayerConfig(uint64_t handle) {
-  static constexpr uint32_t kWidth = 1024;
-  static constexpr uint32_t kHeight = 768;
+display::DriverLayer CreatePrimaryLayerConfig(display::DriverImageId image_id) {
+  static constexpr int32_t kWidth = 1024;
+  static constexpr int32_t kHeight = 768;
 
-  return layer_t{
-      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
-      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
-      .image_handle = handle,
-      .image_metadata = {.dimensions = {.width = kWidth, .height = kHeight},
-                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
-      .alpha_mode = ALPHA_DISABLE,
-      .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
-  };
+  return display::DriverLayer({
+      .display_destination = {{.x = 0, .y = 0, .width = kWidth, .height = kHeight}},
+      .image_source = {{.x = 0, .y = 0, .width = kWidth, .height = kHeight}},
+      .image_id = image_id,
+      .image_metadata = {{.width = kWidth,
+                          .height = kHeight,
+                          .tiling_type = display::ImageTilingType::kLinear}},
+      .fallback_color = {{
+          .format = display::PixelFormat::kB8G8R8A8,
+          .bytes = {{0xaa, 0xbb, 0xcc, 0xdd, 0, 0, 0, 0}},
+      }},
+      .alpha_mode = display::AlphaMode::kDisable,
+      .alpha_coefficient = 0.0f,
+      .image_source_transformation = display::CoordinateTransformation::kIdentity,
+  });
 }
 
 }  // namespace
@@ -101,24 +118,18 @@ TEST_F(PipeTest, TiedTranscoderId) {
 TEST_F(PipeTest, GetVsyncConfigStamp) {
   PipeSkylake pipe(&*mmio_buffer_, PipeId::PIPE_A, {});
 
-  uint64_t kImageHandle1 = 0x1111u;
-  uint64_t kImageHandle2 = 0x2222u;
-  uint64_t kImageHandle3 = 0x3333u;
-  layer_t layer_1 = CreatePrimaryLayerConfig(kImageHandle1);
-  layer_t layer_2 = CreatePrimaryLayerConfig(kImageHandle2);
-  layer_t layer_3 = CreatePrimaryLayerConfig(kImageHandle3);
+  display::DriverImageId kImageHandle1(0x1111u);
+  display::DriverImageId kImageHandle2(0x2222u);
+  display::DriverImageId kImageHandle3(0x3333u);
+  display::DriverLayer layer_1 = CreatePrimaryLayerConfig(kImageHandle1);
+  display::DriverLayer layer_2 = CreatePrimaryLayerConfig(kImageHandle2);
+  display::DriverLayer layer_3 = CreatePrimaryLayerConfig(kImageHandle3);
 
   // Applies configuration with only one layer (layer_1).
-  const layer_t test_layers_1[] = {layer_1};
-  display_config_t config = {
-      .display_id = 1u,
-      .mode = {},
-      .cc_flags = 0u,
-      .layers_list = test_layers_1,
-      .layers_count = 1,
-  };
+  const std::array<display::DriverLayer, 1> test_layers1 = {layer_1};
   display::DriverConfigStamp stamp_1{1};
-  pipe.ApplyConfiguration(&config, stamp_1, GetGttImageHandle, GetPixelFormat);
+  pipe.ApplyConfiguration(display::ColorConversion::kIdentity, test_layers1, stamp_1,
+                          GetGttImageHandle, GetPixelFormat);
 
   // For images that are not registered with Pipe yet, GetVsyncConfigStamp()
   // should return nullopt.
@@ -134,16 +145,10 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
 
   // Applies another configuration with two layers (layer_2 replacing layer_1,
   // and a new layer layer_3).
-  const layer_t test_layers_2[] = {layer_2, layer_3};
-  display_config_t config_2 = {
-      .display_id = 1u,
-      .mode = {},
-      .cc_flags = 0u,
-      .layers_list = test_layers_2,
-      .layers_count = 1,
-  };
+  const std::array<display::DriverLayer, 2> test_layers2 = {layer_2, layer_3};
   display::DriverConfigStamp stamp_2{2};
-  pipe.ApplyConfiguration(&config_2, stamp_2, GetGttImageHandle, GetPixelFormat);
+  pipe.ApplyConfiguration(display::ColorConversion::kIdentity, test_layers2, stamp_2,
+                          GetGttImageHandle, GetPixelFormat);
 
   // It is possible that a layer update is slower than other layers, so on
   // Vsync time the device may have layers from different configurations. In

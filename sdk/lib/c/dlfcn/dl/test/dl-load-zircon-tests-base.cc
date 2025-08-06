@@ -4,7 +4,7 @@
 #include "dl-load-zircon-tests-base.h"
 
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
-#include <lib/ld/testing/test-vmo.h>
+#include <lib/ld/testing/vdso.h>
 
 namespace dl::testing {
 

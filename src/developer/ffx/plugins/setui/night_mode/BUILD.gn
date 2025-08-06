@@ -22,7 +22,7 @@ ffx_plugin("ffx_setui_night_mode") {
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:test-case",
   ]
 

@@ -208,6 +208,15 @@ open protocol SupplicantStaNetwork {
     flexible SetPskPassphrase(table {
         1: passphrase vector<uint8>:MAX;
     });
+    flexible SetWepKey(table {
+        1: key vector<uint8>:MAX;
+        2: key_idx int32;
+    });
+    /// Designate the key to use for the WEP connection based on its index. The key should have
+    /// been previously set with SetWepKey.
+    flexible SetWepTxKeyIdx(table {
+        1: key_idx int32;
+    });
     flexible Select() -> () error zx.Status;
 };
 

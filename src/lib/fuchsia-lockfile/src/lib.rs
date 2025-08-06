@@ -215,9 +215,10 @@ impl Lockfile {
         context: LockContext,
     ) -> Result<Self, Box<LockfileCreateError>> {
         let mut lock_path = filename.to_owned();
-        let filename = lock_path.file_name().map_or(".lock".to_string(), |name| {
-            format!("{filename}.lock", filename = name.to_string_lossy())
-        });
+        let filename = lock_path.file_name().map_or_else(
+            || ".lock".to_string(),
+            |name| format!("{filename}.lock", filename = name.to_string_lossy()),
+        );
 
         lock_path.set_file_name(&filename);
         Self::new(&lock_path, context)
@@ -274,9 +275,10 @@ impl Lockfile {
         timeout: Duration,
     ) -> Result<Self, Box<LockfileCreateError>> {
         let mut lock_path = filename.to_owned();
-        let filename = lock_path.file_name().map_or(".lock".to_string(), |name| {
-            format!("{filename}.lock", filename = name.to_string_lossy())
-        });
+        let filename = lock_path.file_name().map_or_else(
+            || ".lock".to_string(),
+            |name| format!("{filename}.lock", filename = name.to_string_lossy()),
+        );
 
         lock_path.set_file_name(&filename);
         Self::lock(&lock_path, timeout).await

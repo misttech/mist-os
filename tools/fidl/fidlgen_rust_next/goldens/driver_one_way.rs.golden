@@ -535,16 +535,55 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::Payload> for ::fidl_test_driveroneway::Payload {
+        #[inline]
+        fn compat_from(value: crate::Payload) -> Self {
+            Self { value: ::fidl_next::CompatFrom::compat_from(value.value) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_driveroneway::Payload> for crate::Payload {
+        #[inline]
+        fn compat_from(value: ::fidl_test_driveroneway::Payload) -> Self {
+            Self { value: ::fidl_next::CompatFrom::compat_from(value.value) }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::OneWaySendRequest>
+        for ::fidl_test_driveroneway::OneWaySendRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::OneWaySendRequest) -> Self {
+            Self { payload: ::fidl_next::CompatFrom::compat_from(value.payload) }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_driveroneway::OneWaySendRequest>
+        for crate::OneWaySendRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_driveroneway::OneWaySendRequest) -> Self {
+            Self { payload: ::fidl_next::CompatFrom::compat_from(value.payload) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OneWay`
     /// protocol.
-    pub type OneWayProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OneWay>;
+    pub type OneWayProxy = ::fidl_next::ClientSender<crate::OneWay>;
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::OneWay> for ::fidl_test_driveroneway::OneWayMarker {
-        #[inline]
-        fn from(_: crate::OneWay) -> Self {
+    impl ::fidl_next::CompatFrom<crate::OneWay> for ::fidl_test_driveroneway::OneWayMarker {
+        fn compat_from(_: crate::OneWay) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_driveroneway::OneWayMarker> for crate::OneWay {
+        fn compat_from(_: ::fidl_test_driveroneway::OneWayMarker) -> Self {
             Self
         }
     }

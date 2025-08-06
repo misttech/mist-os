@@ -5,7 +5,7 @@
 
 import itertools
 import logging
-from typing import Iterator, Optional, Sequence, Tuple
+from typing import Iterator, MutableSequence, Optional, Tuple
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
@@ -40,7 +40,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         """Calculate suspend/resume metrics.
 
         Args:

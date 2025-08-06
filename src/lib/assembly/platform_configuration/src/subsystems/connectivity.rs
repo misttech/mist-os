@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::{bail, ensure};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::connectivity_config::{
+use assembly_config_schema::platform_settings::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
     WlanRecoveryProfile, WlanRoamingMode, WlanRoamingPolicy, WlanRoamingProfile,
 };
@@ -146,7 +146,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             // The use of netstack3 can be forcibly required by the board,
             // otherwise it's selectable by the product.
             match (
-                context.board_info.provides_feature("fuchsia::network_require_netstack3"),
+                context.board_config.provides_feature("fuchsia::network_require_netstack3"),
                 connectivity_config.network.netstack_version,
             ) {
                 (true, _) | (false, NetstackVersion::Netstack3) => {
@@ -192,8 +192,8 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     .field("suspend_enabled", false)?;
             }
 
-            let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
-            let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
+            let has_fullmac = context.board_config.provides_feature("fuchsia::wlan_fullmac");
+            let has_softmac = context.board_config.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {
                 // Select the policy layer
                 match connectivity_config.wlan.policy_layer {
@@ -345,7 +345,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         }
 
         if let Some(netsvc_interface) =
-            &context.board_info.platform.connectivity.network.netsvc_interface
+            &context.board_config.platform.connectivity.network.netsvc_interface
         {
             builder.set_config_capability(
                 "fuchsia.network.PrimaryInterface",
@@ -368,13 +368,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         }
 
         // Include realtek-8211f driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::realtek_8211f") {
+        if context.board_config.provides_feature("fuchsia::realtek_8211f") {
             // We only need this driver feature in the utility / standard feature set levels.
             builder.platform_bundle("realtek_8211f_driver");
         }
 
         // Include GNSS service through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::gnss") {
+        if context.board_config.provides_feature("fuchsia::gnss") {
             builder.platform_bundle("gnss");
         }
 

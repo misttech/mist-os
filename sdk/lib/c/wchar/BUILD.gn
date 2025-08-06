@@ -13,6 +13,7 @@ llvm_libc_source_set("wchar") {
     "wcscmp",
     "wcscpy",
     "wcscspn",
+    "wcsdup",
     "wcslen",
     "wcsncat",
     "wcsncmp",

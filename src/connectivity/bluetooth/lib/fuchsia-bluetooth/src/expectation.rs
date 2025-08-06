@@ -131,7 +131,7 @@ fn fmt_falsifications<'d>(
     doc: &'d BoxAllocator,
 ) -> Option<DocBuilder<'d>> {
     i.take(MAX_ITER_FALSIFICATIONS).fold(None, |acc: Option<DocBuilder<'d>>, falsification| {
-        Some(acc.map_or(doc.nil(), |d| d.append(doc.space())).append(falsification))
+        Some(acc.map_or_else(|| doc.nil(), |d| d.append(doc.space())).append(falsification))
     })
 }
 

@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::power_config::PowerConfig;
+use assembly_config_schema::platform_settings::power_config::PowerConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 
 pub(crate) struct PowerManagementSubsystem;
@@ -23,7 +23,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Setting metrics-logger config data path")?;
         }
 
-        if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
+        if let Some(energy_model_config) = &context.board_config.configuration.energy_model {
             builder
                 .bootfs()
                 .file(FileEntry {
@@ -33,7 +33,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding energy model config file for processor power management")?;
         }
 
-        if let Some(power_manager_config) = &context.board_info.configuration.power_manager {
+        if let Some(power_manager_config) = &context.board_config.configuration.power_manager {
             builder
                 .bootfs()
                 .file(FileEntry {
@@ -43,7 +43,8 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding power_manager config file")?;
         }
 
-        if let Some(system_power_mode_config) = &context.board_info.configuration.system_power_mode
+        if let Some(system_power_mode_config) =
+            &context.board_config.configuration.system_power_mode
         {
             builder
                 .bootfs()
@@ -54,7 +55,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding system power mode configuration file")?;
         }
 
-        if let Some(thermal_config) = &context.board_info.configuration.thermal {
+        if let Some(thermal_config) = &context.board_config.configuration.thermal {
             builder
                 .bootfs()
                 .file(FileEntry {
@@ -93,7 +94,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 "fuchsia.power.WaitForSuspendingToken",
                 Config::new(
                     ConfigValueType::Bool,
-                    context.board_info.provides_feature("fuchsia::suspending_token").into(),
+                    context.board_config.provides_feature("fuchsia::suspending_token").into(),
                 ),
             )?;
 
@@ -101,7 +102,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 "fuchsia.power.UseSuspender",
                 Config::new(
                     ConfigValueType::Bool,
-                    context.board_info.provides_feature("fuchsia::suspender").into(),
+                    context.board_config.provides_feature("fuchsia::suspender").into(),
                 ),
             )?;
 
@@ -128,7 +129,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             }
         }
 
-        if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
+        if let Some(cpu_manager_config) = &context.board_config.configuration.cpu_manager {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug, BuildType::User],
                 &[FeatureSetLevel::Bootstrap, FeatureSetLevel::Utility, FeatureSetLevel::Standard],
@@ -156,13 +157,13 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 ConfigValueType::Bool,
                 serde_json::Value::Bool(
                     config.storage_power_management_enabled
-                        && context.board_info.provides_feature("fuchsia::suspending_token"),
+                        && context.board_config.provides_feature("fuchsia::suspending_token"),
                 ),
             ),
         )?;
 
         if let (Some(config), FeatureSetLevel::Standard) =
-            (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
+            (&context.board_config.configuration.power_metrics_recorder, &context.feature_set_level)
         {
             builder.platform_bundle("power_metrics_recorder");
             builder.package("metrics-logger-standalone").config_data(FileEntry {
@@ -172,7 +173,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         }
 
         // Include fake-battery driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::fake_battery") {
+        if context.board_config.provides_feature("fuchsia::fake_battery") {
             // We only need this driver feature in the utility / standard feature set levels.
             if *context.feature_set_level == FeatureSetLevel::Standard
                 || *context.feature_set_level == FeatureSetLevel::Utility
@@ -182,7 +183,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         }
 
         // Include fake-power-sensor through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::fake_power_sensor")
+        if context.board_config.provides_feature("fuchsia::fake_power_sensor")
             && *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {

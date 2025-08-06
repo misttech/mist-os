@@ -23,6 +23,7 @@ rustc_library("fshost_test_fixture") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -44,6 +45,7 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/crypt/policy",
     "//src/storage/crypt/zxcrypt",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
+    "//src/storage/fshost:fuchsia.fshost.fxfsprovisioner_rust",
     "//src/storage/fshost/config",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/gpt/component:lib",
@@ -179,6 +181,9 @@ template("fshost_integration_test_component") {
 #   enable_corruption_tests (default: true)
 #     [bool] Include corruption tests in the integration test package.
 #
+#   enable_provision_fxfs_tests (default: false)
+#     [bool] Include provision fxfs tests in the integration test package.
+#
 #   data_filesystem_variant (optional)
 #     [string] A variant string passed to the integration test harness. Defaults to the
 #              data_filesystem_format.
@@ -270,6 +275,7 @@ template("fshost_integration_test_package") {
       deps += [
         "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
         "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+        "//src/storage/lib/blob_writer:blob-writer",
       ]
     }
     if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
@@ -390,6 +396,34 @@ template("fshost_integration_test_package") {
     }
   }
 
+  #
+  # Provision Fxfs Tests
+  #
+  if (defined(invoker.enable_provision_fxfs_tests) &&
+      invoker.enable_provision_fxfs_tests) {
+    _provision_fxfs_component_target = "${target_name}_provision_fxfs"
+    _test_components += [ ":$_provision_fxfs_component_target" ]
+    fshost_integration_test_component(_provision_fxfs_component_target) {
+      fshost_target = _fshost_target
+      data_filesystem_format = fshost_options.data_filesystem_format
+      data_filesystem_variant = invoker.data_filesystem_variant
+      extra_features = _extra_features
+      source_root = "tests/provision_fxfs.rs"
+      deps = [
+        "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+        "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
+        "//sdk/rust/zx",
+        "//src/lib/fidl/rust/fidl",
+        "//src/lib/fuchsia-component",
+        "//src/lib/fuchsia-fs",
+        "//src/storage/gpt/rust",
+        "//src/storage/lib/block_client/rust",
+        "//src/storage/lib/block_server:vmo_backed_block_server",
+      ]
+    }
+  }
+
   _main_test_package = "${target_name}_test_package"
   _main_test_package_name = "$target_name"
   _test_packages += [ ":$_main_test_package" ]
@@ -427,22 +461,20 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
   data_filesystem_variant = "fxblob"
   options = {
   }
-  extra_deps = [
-    "//src/storage/lib/blob_writer:blob-writer",
-    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
-  ]
+  extra_deps =
+      [ "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust" ]
 }
 
 fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
+  enable_provision_fxfs_tests = true
   options = {
     use_disk_migration = false
     storage_host = true
   }
   extra_deps = [
     "//src/storage/gpt/component",
-    "//src/storage/lib/blob_writer:blob-writer",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
   ]
 }

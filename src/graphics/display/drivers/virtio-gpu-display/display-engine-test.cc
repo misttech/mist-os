@@ -25,7 +25,7 @@
 #include <virtio/virtio.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -265,7 +265,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
 
-  display::DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsFidl engine_events_;
   std::unique_ptr<DisplayEngine> engine_;
 };
 

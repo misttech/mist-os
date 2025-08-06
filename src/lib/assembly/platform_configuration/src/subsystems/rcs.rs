@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::{
-    BoardInformationExt, BuildType, ConfigurationBuilder, ConfigurationContext,
+    BoardConfigExt, BuildType, ConfigurationBuilder, ConfigurationContext,
     DefineSubsystemConfiguration, FeatureSetLevel,
 };
 
@@ -20,7 +20,7 @@ impl DefineSubsystemConfiguration<()> for RcsSubsystemConfig {
                 FeatureSetLevel::Utility | FeatureSetLevel::Standard,
                 BuildType::UserDebug | BuildType::Eng
             )
-        ) && context.board_info.provides_feature("fuchsia::usb_peripheral_support")
+        ) && context.board_config.provides_feature("fuchsia::usb_peripheral_support")
         {
             builder.platform_bundle("core_realm_development_access_rcs_usb");
         }

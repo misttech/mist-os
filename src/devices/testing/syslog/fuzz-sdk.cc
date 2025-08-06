@@ -33,7 +33,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     kMaxValue = kDoubleField,
     kBooleanField,
   };
-  fuchsia_syslog::LogBuffer buffer;
+  fuchsia_logging::LogBuffer buffer;
   auto severity = provider.ConsumeIntegral<FuchsiaLogSeverity>();
   // Fatal crashes...
   if (severity == FUCHSIA_LOG_FATAL) {

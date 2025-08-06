@@ -32,7 +32,7 @@ mod test {
     use crate::common::vars::LOCKED_VAR;
     use ffx_fastboot_interface::test::setup;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_locked_device_throws_err() -> Result<()> {
         let (state, mut proxy) = setup();
         {
@@ -45,7 +45,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ephemeral_locked_throws_err() -> Result<()> {
         let (state, mut proxy) = setup();
         {
@@ -59,7 +59,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_lock_succeeds() -> Result<()> {
         let (state, mut proxy) = setup();
         {

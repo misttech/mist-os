@@ -107,13 +107,6 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(26) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
-    fprintf(stderr, "Unexpected Connect\n");
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
-
   void ConnectStructured(ConnectStructuredRequestView request,
                          ConnectStructuredCompleter::Sync& _completer) override {
     loop_.Quit();
@@ -1040,9 +1033,9 @@ class TestConnection {
     zx::channel local_endpoint, server_endpoint;
     EXPECT_EQ(ZX_OK, zx::channel::create(0u, &local_endpoint, &server_endpoint));
     EXPECT_EQ(ZX_OK,
-              fdio_service_connect("/svc/fuchsia.sysmem.Allocator", server_endpoint.release()));
+              fdio_service_connect("/svc/fuchsia.sysmem2.Allocator", server_endpoint.release()));
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_sysmem_connection_import(local_endpoint.release(), &connection));
+              magma_sysmem2_connection_import(local_endpoint.release(), &connection));
 
     magma_buffer_collection_t collection;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_sysmem_connection_import_buffer_collection(

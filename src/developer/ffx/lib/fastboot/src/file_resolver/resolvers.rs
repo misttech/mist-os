@@ -192,7 +192,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn zip_archive_resolver_get_file() -> Result<()> {
         // Make a temporary zip file
         let tmpdir = tempdir()?;

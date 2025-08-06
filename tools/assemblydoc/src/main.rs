@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use assembly_config_schema::AssemblyConfig;
+use assembly_config_schema::ProductConfig;
 use camino::Utf8PathBuf;
 use serdedoc::DocWriter;
 use std::path::PathBuf;
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
 
     // Write the docs.
     let writer = DocWriter::new("/reference/assembly/".to_string());
-    writer.write::<AssemblyConfig>(output_dir.clone()).context("Writing assembly docs")?;
+    writer.write::<ProductConfig>(output_dir.clone()).context("Writing assembly docs")?;
 
     // Archive the docs if necessary.
     if let Some(archive_output) = &args.archive_output {

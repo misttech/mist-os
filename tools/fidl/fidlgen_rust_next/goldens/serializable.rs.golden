@@ -626,4 +626,63 @@ impl ::core::fmt::Debug for WireOptionalSerializableUnion {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::SerializableStruct>
+        for ::fidl_test_serializable::SerializableStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::SerializableStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_serializable::SerializableStruct>
+        for crate::SerializableStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_serializable::SerializableStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SerializableTable>
+        for ::fidl_test_serializable::SerializableTable
+    {
+        fn compat_from(value: crate::SerializableTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_serializable::SerializableTable>
+        for crate::SerializableTable
+    {
+        fn compat_from(value: ::fidl_test_serializable::SerializableTable) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SerializableUnion>
+        for ::fidl_test_serializable::SerializableUnion
+    {
+        fn compat_from(value: crate::SerializableUnion) -> Self {
+            match value {
+                crate::SerializableUnion::Unused(value) => {
+                    Self::Unused(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_serializable::SerializableUnion>
+        for crate::SerializableUnion
+    {
+        fn compat_from(value: ::fidl_test_serializable::SerializableUnion) -> Self {
+            match value {
+                ::fidl_test_serializable::SerializableUnion::Unused(value) => {
+                    Self::Unused(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+}

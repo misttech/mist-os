@@ -9,6 +9,10 @@
 
 #include <gtest/gtest.h>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace display {
 
 namespace {
@@ -77,6 +81,25 @@ TEST(CoordinateTransformationTest, FidlConversionRoundtrip) {
   EXPECT_EQ(CoordinateTransformation::kReflectX,
             CoordinateTransformation(CoordinateTransformation::kReflectX.ToFidl()));
 }
+
+TEST(CoordinateTransformation, ToString) {
+  EXPECT_EQ(CoordinateTransformation::kIdentity.ToString(), "Identity");
+  EXPECT_EQ(CoordinateTransformation::kReflectX.ToString(), "ReflectX");
+  EXPECT_EQ(CoordinateTransformation::kReflectY.ToString(), "ReflectY");
+  EXPECT_EQ(CoordinateTransformation::kRotateCcw90.ToString(), "RotateCcw90");
+  EXPECT_EQ(CoordinateTransformation::kRotateCcw180.ToString(), "RotateCcw180");
+  EXPECT_EQ(CoordinateTransformation::kRotateCcw270.ToString(), "RotateCcw270");
+  EXPECT_EQ(CoordinateTransformation::kRotateCcw90ReflectX.ToString(), "RotateCcw90ReflectX");
+  EXPECT_EQ(CoordinateTransformation::kRotateCcw90ReflectY.ToString(), "RotateCcw90ReflectY");
+}
+
+#if __cplusplus >= 202002L
+TEST(CoordinateTransformation, Format) {
+  EXPECT_EQ(std::format("{}", CoordinateTransformation::kIdentity), "Identity");
+  EXPECT_EQ(std::format("{}", CoordinateTransformation::kReflectX), "ReflectX");
+  EXPECT_EQ(std::format("{:>10}", CoordinateTransformation::kIdentity), "  Identity");
+}
+#endif  // __cplusplus >= 202002L
 
 }  // namespace
 

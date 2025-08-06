@@ -67,7 +67,8 @@ fn main() {
     let args = startup::Arguments::from_args()
         .unwrap_or_else(|err| panic!("{}\n{}", err, startup::Arguments::usage()));
     let (runtime_config, bootfs_svc) = build_runtime_config(&args);
-    let mut executor = fasync::SendExecutor::new(runtime_config.num_threads);
+    let mut executor =
+        fasync::SendExecutorBuilder::new().num_threads(runtime_config.num_threads).build();
 
     match runtime_config.log_destination {
         finternal::LogDestination::Syslog => {

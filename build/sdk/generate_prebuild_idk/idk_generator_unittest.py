@@ -93,6 +93,26 @@ class IdkGeneratorTest(unittest.TestCase):
         path.write_text(content)
         return path
 
+    # Use an atom and alias to ensure the check covers both lists.
+    def test_init_duplicate_label_error(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_DATA_INFO,
+            {
+                "atom_label": "//sdk/data/invalid:some_data_sdk",
+                "atom_type": "alias",
+                "atom_actual": "//sdk/data/invalid:other_data_sdk",
+            },
+        ]
+
+        with self.assertRaisesRegex(
+            AssertionError,
+            "Multiple atoms have the same label '//sdk/data/invalid:some_data_sdk'.",
+        ):
+            _ = IdkGenerator(manifest, self.build_dir, self.source_dir)
+
     def test_generate_meta_file_contents_simple_collection(self) -> None:
         manifest: list[AtomInfo] = [
             self._COLLECTION_INFO,

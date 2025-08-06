@@ -78,6 +78,7 @@ static_library("fvm") {
 }
 
 static_library("test_support") {
+  visibility = [ "//src/storage/fvm/*" ]
   testonly = true
 
   sources = [
@@ -155,14 +156,16 @@ test("fvm-integration") {
   deps = [
     ":test_support",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fdio",
-    "//src/devices/testing/driver-integration-test-shim",
-    "//src/lib/fxl",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/storage/blobfs",
     "//src/storage/fvm",
     "//src/storage/lib/block_client/cpp",
@@ -198,7 +201,10 @@ fuchsia_test_package("fvm-integration-test") {
       max_severity = "ERROR"
     }
   }
-  deps = [ "//src/storage/minfs/bin:minfs-component" ]
+  deps = [
+    "//src/storage/blobfs/bin:blobfs-component",
+    "//src/storage/minfs/bin:minfs-component",
+  ]
 }
 
 fvm_sources = [

@@ -50,6 +50,20 @@ if (is_host) {
     ]
   }
 
+  python_mobly_test("direct_daemon_e2e_test") {
+    main_source = "direct_daemon.py"
+    libraries = [
+      ":ffx_test_case",
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    environments = [
+      emu_env,
+      nuc7_env,
+      nuc11_env,
+    ]
+  }
+
   python_library("ffx_test_case") {
     visibility = [ ":*" ]
 
@@ -67,6 +81,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       ":direct_conn_e2e_test($host_toolchain)",
+      ":direct_daemon_e2e_test($host_toolchain)",
       ":ffx_host_tool_e2e_test($host_toolchain)",
       ":ffx_strict_host_tool_e2e_test($host_toolchain)",
     ]

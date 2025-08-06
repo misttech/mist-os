@@ -152,3 +152,11 @@ protocol QrtrTransportConnector {
         proxy client_end:QrtrTransportChannel;
     }) -> () error Error;
 };
+
+service ClientService {
+    qrtr_connector client_end:QrtrConnector;
+};
+
+service TransportService {
+    qrtr_transport_connector client_end:QrtrTransportConnector;
+};

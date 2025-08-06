@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/syslog/logger.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 
 namespace no_ddk {
 
-fx_log_severity_t kMinLogSeverity = FX_LOG_INFO;
+fx_log_severity_t kMinLogSeverity = DDK_LOG_INFO;
 size_t kFakeFWSize = 0x1000;
 
 }  // namespace no_ddk

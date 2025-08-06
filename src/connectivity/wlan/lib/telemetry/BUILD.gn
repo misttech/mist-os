@@ -68,6 +68,7 @@ rustc_library("wlan-telemetry") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
   ]

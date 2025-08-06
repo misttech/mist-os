@@ -87,10 +87,12 @@ void Recorder::RecordAllocation(void* address, size_t size) {
   const size_t count = __sanitizer_fast_backtrace(pc_buffer, kMaxStackFramesLength);
   {
     fbl::AutoLock lock(&lock_);
-    auto result = client_->RecordAllocation(
-        {{.address = reinterpret_cast<uint64_t>(address),
-          .stack_trace = {{.stack_frames = std::vector<uint64_t>(pc_buffer, pc_buffer + count)}},
-          .size = size}});
+    auto result = client_->RecordAllocation({{
+        .address = std::optional{reinterpret_cast<uint64_t>(address)},
+        .stack_trace = std::optional<fuchsia_memory_sampler::StackTrace>(
+            {{.stack_frames = std::optional{std::vector<uint64_t>(pc_buffer, pc_buffer + count)}}}),
+        .size = std::optional<uint64_t>{size},
+    }});
 
     ZX_ASSERT(result.is_ok());
   }
@@ -118,8 +120,10 @@ void Recorder::ForgetAllocation(void* address) {
     fbl::AutoLock lock(&lock_);
 
     auto result = client_->RecordDeallocation(
-        {{.address = reinterpret_cast<uint64_t>(address),
-          .stack_trace = {{.stack_frames = std::vector<uint64_t>(pc_buffer, pc_buffer + count)}}}});
+        {{.address = std::optional{reinterpret_cast<uint64_t>(address)},
+          .stack_trace = std::optional<fuchsia_memory_sampler::StackTrace>{
+              {{.stack_frames =
+                    std::optional{std::vector<uint64_t>(pc_buffer, pc_buffer + count)}}}}}});
     ZX_ASSERT(result.is_ok());
   }
 }

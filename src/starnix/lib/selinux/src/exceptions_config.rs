@@ -213,7 +213,7 @@ mod tests {
         }
     }
     fn test_data() -> TestData {
-        let (parsed, _) = parse_policy_by_value(TEST_POLICY.to_vec()).unwrap();
+        let parsed = parse_policy_by_value(TEST_POLICY.to_vec()).unwrap();
         let policy = Arc::new(parsed.validate().unwrap());
         let defined_source = policy.type_id_by_name(EXCEPTION_SOURCE_TYPE).unwrap();
         let defined_target = policy.type_id_by_name(EXCEPTION_TARGET_TYPE).unwrap();

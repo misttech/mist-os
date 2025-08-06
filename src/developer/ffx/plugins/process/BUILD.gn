@@ -49,6 +49,7 @@ rustc_library("ffx_process") {
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pretty_assertions",

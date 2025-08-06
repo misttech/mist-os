@@ -5,7 +5,7 @@
 use crate::{common, ExtractProductPackageArgs, HybridProductArgs, ProductArgs};
 
 use anyhow::{Context, Result};
-use assembly_config_schema::AssemblyConfig;
+use assembly_config_schema::ProductConfig;
 use assembly_container::AssemblyContainer;
 use assembly_release_info::{ProductReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
@@ -13,7 +13,7 @@ use fuchsia_pkg::{PackageBuilder, PackageManifest};
 use product_input_bundle::ProductInputBundle;
 
 pub fn new(args: &ProductArgs) -> Result<()> {
-    let mut config = AssemblyConfig::from_config_path(&args.config)?;
+    let mut config = ProductConfig::from_config_path(&args.config)?;
 
     for path in &args.product_input_bundles {
         let pib = ProductInputBundle::from_dir(path)?;
@@ -47,7 +47,7 @@ pub fn new(args: &ProductArgs) -> Result<()> {
 }
 
 pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
-    let config = AssemblyConfig::from_dir(&args.input)?;
+    let config = ProductConfig::from_dir(&args.input)?;
 
     // Normally this would not be necessary, because all generated configs come
     // from this tool, which adds the package names above, but we still need to
@@ -73,7 +73,7 @@ pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
 }
 
 pub fn extract_package(args: &ExtractProductPackageArgs) -> Result<()> {
-    let mut config = AssemblyConfig::from_dir(&args.config)?;
+    let mut config = ProductConfig::from_dir(&args.config)?;
 
     if let Some(package_manifest_path) = find_package_in_product(&mut config, &args.package_name) {
         let manifest =
@@ -97,7 +97,7 @@ pub fn extract_package(args: &ExtractProductPackageArgs) -> Result<()> {
 }
 
 fn find_package_in_product<'a>(
-    config: &'a mut AssemblyConfig,
+    config: &'a mut ProductConfig,
     package_name: impl AsRef<str>,
 ) -> Option<&'a mut Utf8PathBuf> {
     config.product.packages.base.iter_mut().chain(&mut config.product.packages.cache).find_map(
@@ -168,7 +168,7 @@ mod tests {
             product_input_bundles: vec![],
         };
         let _ = new(&args);
-        let config = AssemblyConfig::from_dir(product_path).unwrap();
+        let config = ProductConfig::from_dir(product_path).unwrap();
         let expected = "fake_version".to_string();
         assert_eq!(expected, config.product.release_info.info.version);
     }
@@ -200,7 +200,7 @@ mod tests {
             product_input_bundles: vec![],
         };
         let _ = new(&args);
-        let config = AssemblyConfig::from_dir(product_path).unwrap();
+        let config = ProductConfig::from_dir(product_path).unwrap();
         let expected = "unversioned".to_string();
         assert_eq!(expected, config.product.release_info.info.version);
     }

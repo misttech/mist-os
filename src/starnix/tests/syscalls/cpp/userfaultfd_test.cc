@@ -90,6 +90,19 @@ class UffdWrapper {
     ASSERT_EQ(ioctl(uffd_, UFFDIO_COPY, &uffdio_copy), 0);
   }
 
+  int zero_one_page(uintptr_t dst) const {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    uffdio_range uffdio_range;
+    uffdio_range.start = dst;
+    uffdio_range.len = page_size;
+    uffdio_zeropage uffdio_zeropage;
+    uffdio_zeropage.range = uffdio_range;
+    uffdio_zeropage.mode = 0;
+
+    int res = ioctl(uffd_, UFFDIO_ZEROPAGE, &uffdio_zeropage);
+    return res;
+  }
+
   int fd() const { return uffd_; }
 
  private:
@@ -266,6 +279,7 @@ TEST_F(UffdProcTest, Unregister) {
   uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
   reinterpret_cast<char *>(full_range.mapping())[0] = 'a';
 
+  // Unregistering without prior registration is a noop
   EXPECT_EQ(uffd_a.unregister_range(start, len), 0);
   uffd_a.register_range(start, page_size, UFFDIO_REGISTER_MODE_MISSING);
   EXPECT_EQ(uffd_a.unregister_range(start, len), 0);
@@ -305,3 +319,480 @@ TEST_F(UffdProcTest, Close) {
   ASSERT_TRUE(registered_mapping_a->ContainsFlag("um"));
   ASSERT_FALSE(registered_mapping_b->ContainsFlag("um"));
 }
+
+// This test intentionally triggers a deadly signal (SIGBUS) which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
+TEST(UffdTest, Sigbus) {
+  test_helper::ForkHelper helper;
+  helper.ExpectSignal(SIGBUS);
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    // Register the mapping with uffd_a
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+
+    reinterpret_cast<char *>(full_range.mapping())[0] = 'a';
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+#endif
+
+TEST(UffdTest, NoSigbusAfterUnregister) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    // Register the mapping with uffd_a
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+    uffd.unregister_range(start, len);
+
+    reinterpret_cast<char *>(full_range.mapping())[0] = 'a';
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(UffdTest, NoSigbusAfterClose) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    {
+      UffdWrapper uffd;
+      uffd.api(UFFD_FEATURE_SIGBUS);
+
+      uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+    }
+
+    reinterpret_cast<char *>(full_range.mapping())[0] = 'a';
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(UffdTest, NoSigbusFromSyscall) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+  auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
+
+  UffdWrapper uffd;
+  uffd.api(UFFD_FEATURE_SIGBUS);
+
+  // Register 2nd page only.
+  uffd.register_range(start + page_size, page_size, UFFDIO_REGISTER_MODE_MISSING);
+
+  test_helper::ScopedTempFD temp_file;
+  ASSERT_TRUE(temp_file);
+
+  // Complete bad write.
+  errno = 0;
+  ssize_t sresult = write(temp_file.fd(), reinterpret_cast<void *>(start + page_size), page_size);
+  EXPECT_EQ(-1, sresult);
+  EXPECT_EQ(EFAULT, errno);
+}
+
+// This test intentionally triggers a deadly signal (SIGBUS) which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
+TEST(UffdTest, RegisterThenFork) {
+  test_helper::ForkHelper helper;
+  helper.ExpectSignal(SIGBUS);
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+
+    test_helper::ForkHelper helper2;
+    helper2.OnlyWaitForForkedChildren();
+    helper2.RunInForkedProcess([&] {
+      char c_from_fork = reinterpret_cast<char *>(full_range.mapping())[0];
+      // Accessing the registered range from child doesn't trigger uffd
+      EXPECT_EQ(c_from_fork, 0);
+      exit(EXIT_SUCCESS);
+    });
+    ASSERT_TRUE(helper2.WaitForChildren());
+    // Accessing the registered range from parent triggers uffd
+    char c = reinterpret_cast<char *>(full_range.mapping())[0];
+    EXPECT_EQ(c, 0);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+#endif
+
+// This test intentionally triggers a deadly signal (SIGBUS) which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
+TEST(UffdTest, ForkThenRegister) {
+  test_helper::ForkHelper helper;
+  helper.ExpectSignal(SIGBUS);
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    test_helper::ForkHelper helper2;
+    helper2.OnlyWaitForForkedChildren();
+    helper2.RunInForkedProcess([&] {
+      uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+      // Accessing the registered range from child doesn't trigger uffd
+      char c_from_fork = reinterpret_cast<char *>(full_range.mapping())[0];
+      EXPECT_EQ(c_from_fork, 0);
+      exit(EXIT_SUCCESS);
+    });
+    ASSERT_TRUE(helper2.WaitForChildren());
+    // Accessing the registered range from parent triggers uffd
+    char c = reinterpret_cast<char *>(full_range.mapping())[0];
+    EXPECT_EQ(c, 0);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+#endif
+
+// This test intentionally triggers a deadly signal (SIGBUS) which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
+TEST(UffdTest, ForkThenInit) {
+  test_helper::ForkHelper helper;
+  helper.ExpectSignal(SIGBUS);
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+    UffdWrapper uffd;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    test_helper::ForkHelper helper2;
+    helper2.OnlyWaitForForkedChildren();
+    helper2.RunInForkedProcess([&] {
+      uffd.api(UFFD_FEATURE_SIGBUS);
+      uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+      // Accessing the registered range from child doesn't trigger uffd
+      char c_from_fork = reinterpret_cast<char *>(full_range.mapping())[0];
+      EXPECT_EQ(c_from_fork, 0);
+      exit(EXIT_SUCCESS);
+    });
+    ASSERT_TRUE(helper2.WaitForChildren());
+    // Accessing the registered range from parent triggers uffd
+    char c = reinterpret_cast<char *>(full_range.mapping())[0];
+    EXPECT_EQ(c, 0);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+#endif
+
+TEST(UffdTest, SigbusHandling) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    static UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    // SIGBUS handler
+    struct sigaction act;
+    std::memset(&act, '\0', sizeof(act));
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    act.sa_sigaction = [](int sig, siginfo_t *info, void *context) {
+      const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+      size_t len = page_size;
+      auto src = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+          nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+      auto dst = reinterpret_cast<uintptr_t>(info->si_addr) & ~(page_size - 1);
+      uffd.copy_one_page(reinterpret_cast<uintptr_t>(src.mapping()), dst);
+    };
+    SAFE_SYSCALL(sigaction(SIGBUS, &act, nullptr));
+
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+
+    reinterpret_cast<char *>(full_range.mapping())[5] = 'a';
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(UffdTest, PopulateFromAnotherUffd) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    static UffdWrapper uffd_a;
+    uffd_a.api(UFFD_FEATURE_SIGBUS);
+    static UffdWrapper uffd_b;
+    uffd_b.api(UFFD_FEATURE_SIGBUS);
+
+    uffd_a.register_range(start, page_size, UFFDIO_REGISTER_MODE_MISSING);
+
+    struct sigaction act;
+    std::memset(&act, '\0', sizeof(act));
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    act.sa_sigaction = [](int sig, siginfo_t *info, void *context) {
+      const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+      auto dst = reinterpret_cast<uintptr_t>(info->si_addr) & ~(page_size - 1);
+      auto buffer = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+          nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+      memset(buffer.mapping(), 'a', page_size);
+
+      // Populate from uffd_b a range that is registered with uffd_a
+      uffd_b.copy_one_page(reinterpret_cast<uintptr_t>(buffer.mapping()), dst);
+    };
+    SAFE_SYSCALL(sigaction(SIGBUS, &act, nullptr));
+
+    EXPECT_EQ(reinterpret_cast<char *>(start)[5], 'a');
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(UffdTest, IoctlZeroIncludingUnregistered) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = 2 * page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    static UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+    // Register only the first page
+    uffd.register_range(start, page_size, UFFDIO_REGISTER_MODE_MISSING);
+
+    struct sigaction act;
+    std::memset(&act, '\0', sizeof(act));
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    act.sa_sigaction = [](int sig, siginfo_t *info, void *context) {
+      const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+      auto dst = reinterpret_cast<uintptr_t>(info->si_addr) & ~(page_size - 1);
+      uffdio_range uffdio_range;
+      uffdio_range.start = dst;
+      uffdio_range.len = 2 * page_size;
+      uffdio_zeropage uffdio_zeropage;
+      uffdio_zeropage.range = uffdio_range;
+      uffdio_zeropage.mode = 0;
+
+      // Try to fill both pages with zeroes. This should fail and the first page should remain
+      // unmodified.
+      EXPECT_NE(ioctl(uffd.fd(), UFFDIO_ZEROPAGE, &uffdio_zeropage), 0);
+      EXPECT_EQ(errno, ENOENT);
+      EXPECT_EQ(uffdio_zeropage.zeropage, -1 * ENOENT);
+      // Try filling just first page.
+      uffdio_range.len = page_size;
+      uffdio_zeropage.range = uffdio_range;
+      EXPECT_EQ(ioctl(uffd.fd(), UFFDIO_ZEROPAGE, &uffdio_zeropage), 0);
+      EXPECT_EQ(uffdio_zeropage.zeropage, static_cast<int64_t>(page_size));
+    };
+    SAFE_SYSCALL(sigaction(SIGBUS, &act, nullptr));
+
+    EXPECT_EQ(reinterpret_cast<char *>(start)[5], '\0');
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(UffdTest, CannotPopulateTwice) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = 2 * page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+
+    static intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    static UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+
+    struct sigaction act;
+    std::memset(&act, '\0', sizeof(act));
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    act.sa_sigaction = [](int sig, siginfo_t *info, void *context) {
+      const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+      auto buffer = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+          nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+      memset(buffer.mapping(), 'a', 2 * page_size);
+      uintptr_t src = reinterpret_cast<uintptr_t>(buffer.mapping());
+      uintptr_t first_page = start;
+      uintptr_t second_page = start + page_size;
+
+      // Populate the second page (this should work)
+      uffd.copy_one_page(src, second_page);
+
+      // Filling the same page should fail as it is not empty.
+      uffdio_copy uffdio_copy_second{
+          .dst = second_page,
+          .src = src,
+          .len = page_size,
+          .mode = 0,
+          .copy = 0,
+      };
+
+      EXPECT_NE(ioctl(uffd.fd(), UFFDIO_COPY, &uffdio_copy_second), 0);
+      EXPECT_EQ(errno, EEXIST);
+      // The error is reported
+      EXPECT_EQ(uffdio_copy_second.copy, -1 * EEXIST);
+
+      // Filling both pages should fail as well, but first page should get filled. The error is
+      // EAGAIN in that case.
+      uffdio_copy uffdio_copy_both{
+          .dst = first_page,
+          .src = src,
+          .len = 2 * page_size,
+          .mode = 0,
+          .copy = 0,
+      };
+
+      EXPECT_NE(ioctl(uffd.fd(), UFFDIO_COPY, &uffdio_copy_both), 0);
+      EXPECT_EQ(errno, EAGAIN);
+
+      // The number of bytes copied is reported
+      EXPECT_EQ(uffdio_copy_both.copy, static_cast<int64_t>(page_size));
+    };
+    SAFE_SYSCALL(sigaction(SIGBUS, &act, nullptr));
+
+    // Accessing any page in the registered range will trigger the signal handler.
+    EXPECT_EQ(reinterpret_cast<char *>(start)[5], 'a');
+    // Second page is still populated
+    EXPECT_EQ(reinterpret_cast<char *>(start)[page_size + 5], 'a');
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+// This doesn't work on Starnix as we don't have an easy way to check if a page is present in
+// physical memory or not.
+TEST(UffdTest, NoSigBusOnAccessedPage) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  size_t len = page_size;
+
+  auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  EXPECT_EQ(reinterpret_cast<char *>(start)[5], '\0');
+
+  static UffdWrapper uffd;
+  uffd.api(UFFD_FEATURE_SIGBUS);
+  uffd.register_range(start, page_size, UFFDIO_REGISTER_MODE_MISSING);
+
+  EXPECT_EQ(reinterpret_cast<char *>(start)[5], '\0');
+}
+
+// A weaker version of the previous test: sigbus is not triggered if the page was already populated
+// from uffd.
+TEST(UffdTest, NoSigbusAfterPopulating) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+    uffd.zero_one_page(start);
+
+    ASSERT_EQ(reinterpret_cast<char *>(start)[5], '\0');
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+// This test intentionally triggers a deadly signal (SIGBUS) which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
+TEST_F(UffdProcTest, RegisterThenMove) {
+  test_helper::ForkHelper helper;
+  helper.ExpectSignal(SIGBUS);
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([&] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    size_t len = page_size;
+
+    void *source =
+        mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // Add an extra page to prevent the source being merged with the remapped region
+    void *filler =
+        mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(source, MAP_FAILED);
+    ASSERT_NE(filler, MAP_FAILED);
+    intptr_t start = reinterpret_cast<intptr_t>(source);
+
+    UffdWrapper uffd;
+    uffd.api(UFFD_FEATURE_SIGBUS);
+    uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
+    auto smaps_init = FindMemoryMappingInSmaps(start);
+
+    void *remapped = mremap(source, len, len, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
+    ASSERT_NE(remapped, MAP_FAILED);
+    ASSERT_NE(remapped, source);
+
+    auto smaps_source = FindMemoryMappingInSmaps(start);
+    EXPECT_TRUE(smaps_source->ContainsFlag("um"));
+    auto smaps_remapped = FindMemoryMappingInSmaps(reinterpret_cast<intptr_t>(remapped));
+    EXPECT_FALSE(smaps_remapped->ContainsFlag("um"));
+
+    // No sigbus on remapped
+    EXPECT_EQ(reinterpret_cast<char *>(remapped)[5], '\0');
+    // SIGBUS on original
+    EXPECT_EQ(reinterpret_cast<char *>(start)[5], '\0');
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+#endif

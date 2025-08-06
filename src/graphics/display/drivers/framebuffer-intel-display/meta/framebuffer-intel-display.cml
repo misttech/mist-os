@@ -12,6 +12,9 @@
         binary: "driver/framebuffer-intel-display.so",
         bind: "meta/bind/framebuffer-intel-display-bind.bindbc",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.display.engine.Service" },
+    ],
     use: [
         {
             protocol: [
@@ -21,5 +24,11 @@
             ],
         },
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.display.engine.Service",
+            from: "self",
+        },
     ],
 }

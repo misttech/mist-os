@@ -61,11 +61,10 @@ TEST(WireToNaturalConversion, Handle) {
 
   {
     zx::event ev2 = fidl::ToNatural(std::move(ev));
-    EXPECT_EQ(ZX_OK, ev2.get_info(ZX_INFO_HANDLE_VALID, nullptr, 0, nullptr, nullptr));
+    EXPECT_EQ(ZX_OK, zx_handle_check_valid(ev2.get()));
     EXPECT_EQ(handle, ev2.get());
   }
-  EXPECT_EQ(ZX_ERR_BAD_HANDLE,
-            zx_object_get_info(handle, ZX_INFO_HANDLE_VALID, nullptr, 0, nullptr, nullptr));
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, zx_handle_check_valid(handle));
 }
 
 TEST(NaturalToWireConversion, Handle) {
@@ -76,11 +75,10 @@ TEST(NaturalToWireConversion, Handle) {
 
   {
     zx::event ev2 = fidl::ToWire(arena, std::move(ev));
-    EXPECT_EQ(ZX_OK, ev2.get_info(ZX_INFO_HANDLE_VALID, nullptr, 0, nullptr, nullptr));
+    EXPECT_EQ(ZX_OK, zx_handle_check_valid(ev2.get()));
     EXPECT_EQ(handle, ev2.get());
   }
-  EXPECT_EQ(ZX_ERR_BAD_HANDLE,
-            zx_object_get_info(handle, ZX_INFO_HANDLE_VALID, nullptr, 0, nullptr, nullptr));
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, zx_handle_check_valid(handle));
 }
 
 TEST(WireToNaturalConversion, InvalidHandle) {

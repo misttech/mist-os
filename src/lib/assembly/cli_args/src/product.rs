@@ -17,7 +17,7 @@ pub struct ProductArgs {
 
     /// the board configuration directory.
     #[argh(option)]
-    pub board_info: Utf8PathBuf,
+    pub board_config: Utf8PathBuf,
 
     /// the directory to write assembled outputs to.
     #[argh(option)]
@@ -66,8 +66,8 @@ impl ProductArgs {
             "product".to_string(),
             "--product".to_string(),
             self.product.to_string(),
-            "--board-info".to_string(),
-            self.board_info.to_string(),
+            "--board-config".to_string(),
+            self.board_config.to_string(),
             "--outdir".to_string(),
             self.outdir.to_string(),
             "--input-bundles-dir".to_string(),
@@ -151,7 +151,7 @@ pub struct ProductAssemblyOutputs {
 impl From<ProductArgs> for ProductAssemblyOutputs {
     fn from(args: ProductArgs) -> Self {
         let mut image_assembly_config = args.outdir.clone();
-        image_assembly_config.push("image_assembly_config.json");
+        image_assembly_config.push("image_assembly.json");
 
         ProductAssemblyOutputs {
             platform: args.input_bundles_dir,

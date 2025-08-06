@@ -1489,7 +1489,7 @@ where
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        link_addr: &[u8],
+        link_addr: Option<&[u8]>,
         flags: ConfirmationFlags,
     ) {
         let Self { config: _, core_ctx } = self;

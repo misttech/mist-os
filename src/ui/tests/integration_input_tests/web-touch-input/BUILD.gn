@@ -31,7 +31,6 @@ cc_test_executable("web-touch-input-test-bin") {
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_cpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_cpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
     "//sdk/fidl/fuchsia.web:fuchsia.web_cpp",

@@ -75,7 +75,7 @@ rust_library(
     }),
     version = "0.3.5",
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
         "//third_party/rust_crates/vendor/argh-0.1.12:argh",
         "//third_party/rust_crates/vendor/derive_builder-0.11.1:derive_builder",
         "//third_party/rust_crates/vendor/futures-0.3.30:futures",

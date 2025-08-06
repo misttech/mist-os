@@ -700,7 +700,7 @@ void DoExec(pid_t *out) {
     ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0) << strerror(errno);
     raise(SIGSTOP);
 
-    std::string test_binary = "/data/tests/ptrace_test_exec_child";
+    std::string test_binary = "data/tests/deps/ptrace_test_exec_child";
     if (!files::IsFile(test_binary)) {
       // We're running on host
       char self_path[PATH_MAX];

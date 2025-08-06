@@ -376,7 +376,7 @@ async fn rediscover_target(
             let seen = seen.clone();
             async move {
                 match ev {
-                    Ok(TargetEvent::Added(ref h)) => {
+                    TargetEvent::Added(ref h) => {
                         if seen.borrow().contains(h) {
                             None
                         } else {
@@ -391,18 +391,17 @@ async fn rediscover_target(
                                 _ => {}
                             }
                             seen.borrow_mut().insert(h.clone());
-                            Some(Ok((*h).clone()))
+                            Some((*h).clone())
                         }
                     }
                     // We've only asked for Added events
-                    Ok(_) => unreachable!(),
-                    Err(e) => Some(Err(e)),
+                    _ => unreachable!(),
                 }
             }
         })
         .take_until(futures_lite::future::race(timer, found_it));
 
-    let mut discovered_devices = discovered_devices_stream.collect::<Vec<Result<_, _>>>().await;
+    let mut discovered_devices = discovered_devices_stream.collect::<Vec<_>>().await;
 
     match discovered_devices.len() {
         0 => {
@@ -410,7 +409,7 @@ async fn rediscover_target(
         }
         1 => {
             let device_res = discovered_devices.pop().unwrap();
-            Ok((device_res?).state)
+            Ok((device_res).state)
         }
         num @ _ => {
             return_bug!("Expected to rediscover only one device, but found: {}", num)

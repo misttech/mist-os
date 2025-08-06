@@ -18,6 +18,7 @@ enum class Flags {
   fBackgroundOpsEn,
   fDeviceLifeSpanModeEn,
   fPurgeEnable,
+  fRefreshEnable,
   fPhyResourceRemoval = 0x8,
   fBusyRTC,
   fPermanentlyDisableFwUpdate = 0xb,

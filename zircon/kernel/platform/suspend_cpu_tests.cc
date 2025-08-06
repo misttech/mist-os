@@ -30,7 +30,7 @@ bool pending_ipi() {
     const cpu_num_t curr_cpu = arch_curr_cpu_num();
 
     // Pend an interrupt to ourselves to ensure that platform_suspend_cpu returns quickly.
-    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(curr_cpu));
+    mp_interrupt(mp_ipi_target::MASK, cpu_num_to_mask(curr_cpu));
 
     const zx_status_t status = platform_suspend_cpu(PlatformAllowDomainPowerDown::No);
     ASSERT_OK(status);
@@ -95,7 +95,7 @@ bool one_wakes_another() {
       // Wait a short amount of time, see that the thread is still suspended, then wake it.
       Thread::Current::SleepRelative(ZX_MSEC(1));
       if (arg->target_state.load(ktl::memory_order_acquire) == State::SUSPENDING) {
-        mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(arg->target));
+        mp_interrupt(mp_ipi_target::MASK, cpu_num_to_mask(arg->target));
         return ZX_OK;
       }
     }

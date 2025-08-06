@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -71,12 +70,6 @@ void DisplayManager::BindDefaultDisplayCoordinator(
       std::move(coordinator_listener), fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
       fit::bind_member<&DisplayManager::OnVsync>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
-
-  fidl::OneWayStatus enable_vsync_result =
-      default_display_coordinator_->sync()->SetVsyncEventDelivery(true);
-  if (!enable_vsync_result.ok()) {
-    FX_LOGS(ERROR) << "Failed to enable vsync, status: " << enable_vsync_result.error();
-  }
 }
 
 void DisplayManager::OnDisplaysChanged(

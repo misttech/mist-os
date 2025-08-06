@@ -485,7 +485,7 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
       ASSERT_EQ(vnodes.size(), orphan_inos);
 
       for (auto &vnode_refptr : vnodes) {
-        ASSERT_EQ(vnode_refptr.get()->GetNlink(), (uint32_t)1);
+        ASSERT_EQ(vnode_refptr.get()->GetLinkCount(), (uint32_t)1);
       }
       // Check device peer closed exception
       {
@@ -505,7 +505,7 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
       ASSERT_EQ(fs_->PurgeOrphanInodes(), 0);
 
       for (auto &vnode_refptr : vnodes) {
-        ASSERT_EQ(vnode_refptr.get()->GetNlink(), (uint32_t)0);
+        ASSERT_EQ(vnode_refptr.get()->GetLinkCount(), (uint32_t)0);
         fs_->RemoveFromVnodeSet(VnodeSet::kOrphan, vnode_refptr->GetKey());
         vnode_refptr.reset();
       }
@@ -528,9 +528,7 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
     for (auto ino : inos) {
       fbl::RefPtr<VnodeF2fs> vnode =
           fbl::MakeRefCounted<File>(fs_.get(), ino, static_cast<umode_t>(S_IFREG));
-      vnode->InitFileCache();
-      vnode->ClearNlink();
-      vnode->IncNlink();
+      vnode->ClearFlag(InodeInfoFlag::kNewInode);
       fs_->GetVCache().Add(vnode.get());
       vnodes.push_back(std::move(vnode));
       fs_->AddToVnodeSet(VnodeSet::kOrphan, ino);

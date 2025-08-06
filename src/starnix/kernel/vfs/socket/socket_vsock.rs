@@ -41,7 +41,7 @@ enum VsockSocketState {
     Listening(AcceptQueue),
 
     /// The socket is connected to a ZxioBackedSocket.
-    Connected(FileHandle),
+    Connected { file: FileHandle, peer_addr: SocketAddress },
 
     /// The socket is closed.
     Closed,
@@ -134,7 +134,7 @@ impl SocketOps for VsockSocket {
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
         match socket_address {
-            SocketAddress::Vsock(_) => {}
+            SocketAddress::Vsock { .. } => {}
             _ => return error!(EINVAL),
         }
         let mut inner = self.lock();
@@ -158,7 +158,7 @@ impl SocketOps for VsockSocket {
             let address = inner.address.clone();
 
             match &inner.state {
-                VsockSocketState::Connected(file) => (address, file.clone()),
+                VsockSocketState::Connected { file, .. } => (address, file.clone()),
                 _ => return error!(EBADF),
             }
         };
@@ -183,7 +183,7 @@ impl SocketOps for VsockSocket {
         let file = {
             let inner = self.lock();
             match &inner.state {
-                VsockSocketState::Connected(file) => file.clone(),
+                VsockSocketState::Connected { file, .. } => file.clone(),
                 _ => return error!(EBADF),
             }
         };
@@ -201,7 +201,7 @@ impl SocketOps for VsockSocket {
     ) -> WaitCanceler {
         let inner = self.lock();
         match &inner.state {
-            VsockSocketState::Connected(file) => file
+            VsockSocketState::Connected { file, .. } => file
                 .wait_async(locked, current_task, waiter, events, handler)
                 .expect("vsock socket should be connected to a file that can be waited on"),
             _ => inner.waiters.wait_async_fd_events(waiter, events, handler),
@@ -254,15 +254,11 @@ impl SocketOps for VsockSocket {
     fn getpeername(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        socket: &Socket,
+        _socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         match &inner.state {
-            VsockSocketState::Connected(_) => {
-                // Do not know how to get the peer address at the moment,
-                // so just return the default address.
-                Ok(SocketAddress::default_for_domain(socket.domain))
-            }
+            VsockSocketState::Connected { peer_addr, .. } => Ok(peer_addr.clone()),
             _ => {
                 error!(ENOTCONN)
             }
@@ -306,7 +302,13 @@ impl VsockSocket {
                     /* kernel_private = */ false,
                 )?;
                 downcast_socket_to_vsock(&remote_socket).lock().state =
-                    VsockSocketState::Connected(file);
+                    VsockSocketState::Connected {
+                        file,
+                        peer_addr: SocketAddress::Vsock {
+                            port: u32::MAX,
+                            cid: starnix_uapi::VMADDR_CID_HOST,
+                        },
+                    };
                 queue.sockets.push_back(remote_socket);
                 inner.waiters.notify_fd_events(FdEvents::POLLIN);
                 Ok(())
@@ -327,7 +329,7 @@ impl VsockSocketInner {
     {
         Ok(match &self.state {
             VsockSocketState::Disconnected => FdEvents::empty(),
-            VsockSocketState::Connected(file) => file.query_events(locked, current_task)?,
+            VsockSocketState::Connected { file, .. } => file.query_events(locked, current_task)?,
             VsockSocketState::Listening(queue) => {
                 if !queue.sockets.is_empty() {
                     FdEvents::POLLIN
@@ -430,7 +432,10 @@ mod tests {
         let remote =
             create_fuchsia_pipe(locked, &current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK)
                 .unwrap();
-        downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
+        downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected {
+            file: remote,
+            peer_addr: SocketAddress::Vsock { port: u32::MAX, cid: starnix_uapi::VMADDR_CID_HOST },
+        };
         let socket_file =
             SocketFile::from_socket(locked, &current_task, socket, OpenFlags::RDWR, false)
                 .expect("Failed to create socket file.");
@@ -475,7 +480,10 @@ mod tests {
             /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
-        downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
+        downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected {
+            file: pipe,
+            peer_addr: SocketAddress::Vsock { port: u32::MAX, cid: starnix_uapi::VMADDR_CID_HOST },
+        };
         let socket =
             SocketFile::from_socket(locked, &current_task, socket_object, OpenFlags::RDWR, false)
                 .expect("Failed to create socket file.");

@@ -39,9 +39,6 @@ TEST(EncodeTest, AnnotationsAsFidl) {
       fuchsia::feedback::Annotation{.key = "key2", .value = "value2"},
   });
 
-  ASSERT_TRUE(annotations.has_annotations());
-  EXPECT_EQ(annotations.annotations(), expected);
-
   ASSERT_TRUE(annotations.has_annotations2());
   EXPECT_EQ(annotations.annotations2(), expected);
 }
@@ -49,7 +46,6 @@ TEST(EncodeTest, AnnotationsAsFidl) {
 TEST(EncodeTest, EmptyAnnotationsAsFidl) {
   const auto annotations = Encode<fuchsia::feedback::Annotations>(Annotations({}));
 
-  EXPECT_FALSE(annotations.has_annotations());
   EXPECT_FALSE(annotations.has_annotations2());
 }
 
@@ -64,9 +60,6 @@ TEST(EncodeTest, AnnotationsAsFidlLargeSize) {
   }
 
   const auto fidl_annotations = Encode<fuchsia::feedback::Annotations>(annotations);
-
-  ASSERT_TRUE(fidl_annotations.has_annotations());
-  EXPECT_THAT(fidl_annotations.annotations(), UnorderedElementsAreArray(expected));
 
   ASSERT_TRUE(fidl_annotations.has_annotations2());
   EXPECT_THAT(fidl_annotations.annotations2(), UnorderedElementsAreArray(expected));

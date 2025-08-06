@@ -7,7 +7,7 @@ use {fidl_next_test_benchmark as ftb_next, fidl_test_benchmark as ftb};
 
 impl_generate! {
     for ftb::Vector3, ftb_next::Vector3 => rng {
-        Self { x: rng.gen(), y: rng.gen(), z: rng.gen() }
+        Self { x: rng.random(), y: rng.random(), z: rng.random() }
     }
 }
 

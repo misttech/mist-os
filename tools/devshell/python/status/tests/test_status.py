@@ -33,6 +33,10 @@ class TestStatusCommand(unittest.TestCase):
         with self.args_gn.open("w") as f:
             f.write(data_for_test.ARGS_GN_BASE)
 
+        self.product_bundles_json = self.out_dir / "product_bundles.json"
+        with self.product_bundles_json.open("w") as f:
+            f.write(data_for_test.PRODUCT_BUNDLES_JSON)
+
         self.async_patch = mock.patch(
             "async_utils.command.AsyncCommand.create",
             mock.AsyncMock(side_effect=self.mock_command_result),
@@ -136,6 +140,44 @@ class TestStatusCommand(unittest.TestCase):
 
     @parameterized.expand(
         [
+            ("no arguments defaults to text", []),
+            ("-f text", ["-f", "text"]),
+            ("--format text", ["--format", "text"]),
+        ]
+    )
+    def test_text_output_no_pb(self, _name: str, flags: list[str]) -> None:
+        """Check that text output is as expected when no PB is set"""
+        with self.args_gn.open("w") as f:
+            f.write(
+                data_for_test.ARGS_GN_BASE.replace(
+                    'main_pb_label = "//bundles:main"\n', ""
+                )
+            )
+
+        # Remove the main_pb_label from the mocked gn format output
+        gn_json = json.loads(data_for_test.ARGS_GN_JSON)
+        gn_json["child"] = [
+            c
+            for c in gn_json["child"]
+            if c.get("child")[0].get("value") != "main_pb_label"
+        ]
+        self.stdout_gn_format = json.dumps(gn_json)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main.main(flags)
+
+        self.maxDiff = None
+        self.assertEqual(
+            out.getvalue(),
+            EXPECTED_TEXT_OUTPUT_NO_PB.lstrip().replace(
+                "<<BUILD_DIR>>", str(self.out_dir)
+            ),
+            f"Output to copy/paste:\n{out.getvalue()}",
+        )
+
+    @parameterized.expand(
+        [
             ("-f json", ["-f", "json"]),
             ("--format json", ["--format", "json"]),
         ]
@@ -152,6 +194,45 @@ class TestStatusCommand(unittest.TestCase):
         self.assertEqual(
             formatted_output,
             EXPECTED_JSON_OUTPUT.lstrip().replace(
+                "<<BUILD_DIR>>", str(self.out_dir)
+            ),
+            f"Output to copy/paste:\n{formatted_output}",
+        )
+
+    @parameterized.expand(
+        [
+            ("-f json", ["-f", "json"]),
+            ("--format json", ["--format", "json"]),
+        ]
+    )
+    def test_json_output_no_pb(self, _name: str, flags: list[str]) -> None:
+        """Check that json output is as expected when no PB is set"""
+        with self.args_gn.open("w") as f:
+            f.write(
+                data_for_test.ARGS_GN_BASE.replace(
+                    'main_pb_label = "//bundles:main"\n', ""
+                )
+            )
+
+        # Remove the main_pb_label from the mocked gn format output
+        gn_json = json.loads(data_for_test.ARGS_GN_JSON)
+        gn_json["child"] = [
+            c
+            for c in gn_json["child"]
+            if c.get("child")[0].get("value") != "main_pb_label"
+        ]
+        self.stdout_gn_format = json.dumps(gn_json)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main.main(flags)
+
+        formatted_output = json.dumps(json.loads(out.getvalue()), indent=2)
+
+        self.maxDiff = None
+        self.assertEqual(
+            formatted_output,
+            EXPECTED_JSON_OUTPUT_NO_PB.lstrip().replace(
                 "<<BUILD_DIR>>", str(self.out_dir)
             ),
             f"Output to copy/paste:\n{formatted_output}",
@@ -254,7 +335,7 @@ class TestStatusCommand(unittest.TestCase):
         lines = set(out.getvalue().splitlines())
         self.assertSetContains(set(lines), "  Device name: foo (set by fx -t)")
 
-    def test_device_name_from_build(self) -> None:
+    def test_device_name_from__build(self) -> None:
         """Retrieve device name from build file"""
 
         # Note that this still obtains the nodename from environment,
@@ -281,6 +362,23 @@ Source Info:
 Build Info:
   Board: x64 (//boards/x64.gni)
   Product: core (//products/core.gni)
+  Product bundle: main (set with `fx set-main-pb`)
+  Base packages: [//other:tests] (--with-base argument of `fx set`)
+  Cache packages: [//src/other:tests] (--with-cache argument of `fx set`)
+  Universe packages: [//scripts:tests, //tools/devshell/python:tests] (--with argument of `fx set`)
+  Developer tests: [//src/other:tests] (--with-test argument of `fx set`)
+  Compilation mode: debug
+"""
+
+EXPECTED_TEXT_OUTPUT_NO_PB = """
+Environment Info:
+  Current build directory: <<BUILD_DIR>>
+Source Info:
+  Is fuchsia source project in JIRI_HEAD?: true
+  Has Jiri overrides?: false (output of 'jiri override -list')
+Build Info:
+  Board: x64 (//boards/x64.gni)
+  Product: core (//products/core.gni)
   Base packages: [//other:tests] (--with-base argument of `fx set`)
   Cache packages: [//src/other:tests] (--with-cache argument of `fx set`)
   Universe packages: [//scripts:tests, //tools/devshell/python:tests] (--with argument of `fx set`)
@@ -290,6 +388,89 @@ Build Info:
 
 
 EXPECTED_JSON_OUTPUT = """
+{
+  "environmentInfo": {
+    "name": "Environment Info",
+    "items": {
+      "build_dir": {
+        "title": "Current build directory",
+        "value": "<<BUILD_DIR>>",
+        "notes": null
+      }
+    }
+  },
+  "sourceInfo": {
+    "name": "Source Info",
+    "items": {
+      "is_in_jiri_head": {
+        "title": "Is fuchsia source project in JIRI_HEAD?",
+        "value": true,
+        "notes": null
+      },
+      "has_jiri_overrides": {
+        "title": "Has Jiri overrides?",
+        "value": false,
+        "notes": "output of 'jiri override -list'"
+      }
+    }
+  },
+  "buildInfo": {
+    "name": "Build Info",
+    "items": {
+      "boards": {
+        "title": "Board",
+        "value": "x64",
+        "notes": "//boards/x64.gni"
+      },
+      "products": {
+        "title": "Product",
+        "value": "core",
+        "notes": "//products/core.gni"
+      },
+      "main_pb_label": {
+        "title": "Product bundle",
+        "value": "main",
+        "notes": "set with `fx set-main-pb`"
+      },
+      "base_package_labels": {
+        "title": "Base packages",
+        "value": [
+          "//other:tests"
+        ],
+        "notes": "--with-base argument of `fx set`"
+      },
+      "cache_package_labels": {
+        "title": "Cache packages",
+        "value": [
+          "//src/other:tests"
+        ],
+        "notes": "--with-cache argument of `fx set`"
+      },
+      "universe_package_labels": {
+        "title": "Universe packages",
+        "value": [
+          "//scripts:tests",
+          "//tools/devshell/python:tests"
+        ],
+        "notes": "--with argument of `fx set`"
+      },
+      "developer_test_labels": {
+        "title": "Developer tests",
+        "value": [
+          "//src/other:tests"
+        ],
+        "notes": "--with-test argument of `fx set`"
+      },
+      "compilation_mode": {
+        "title": "Compilation mode",
+        "value": "debug",
+        "notes": null
+      }
+    }
+  }
+}"""
+
+EXPECTED_JSON_OUTPUT_NO_PB = """
 {
   "environmentInfo": {
     "name": "Environment Info",

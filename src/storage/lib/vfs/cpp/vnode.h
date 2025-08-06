@@ -5,37 +5,44 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VNODE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VNODE_H_
 
-#include <lib/fdio/vfs.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <map>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <string>
 #include <string_view>
 #include <utility>
 
-#include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/macros.h>
-#include <fbl/ref_counted_internal.h>
+#include <fbl/recycler.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/ref_counted.h"
-#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/file-lock/file-lock.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/event.h>
 #include <lib/zx/stream.h>
+#include <lib/zx/vmo.h>
 #endif  // __Fuchsia__
 
 namespace fs {
@@ -117,7 +124,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // If the open fails, the file will be deemed to be not opened and Close() will not be called.
   //
   // Vnode implementations should override OpenNode() which this function calls after some
-  // bookeeping.
+  // bookkeeping.
   //
   // Open will never be invoked when a node reference connection is created. This corresponds
   // to Posix open()'s O_PATH flag which will create a thing representing the path to the file
@@ -315,7 +322,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Opens/Closes the vnode. These are the callbacks that the Vnode implementation overrides to do
   // the open and close work. They are called by the public Open() and Close() functions which
-  // handles bookeeping for the base class.
+  // handles bookkeeping for the base class.
   //
   // The open_count() will be updated BEFORE each call. If OpenNode fails, the open count will be
   // rolled back.

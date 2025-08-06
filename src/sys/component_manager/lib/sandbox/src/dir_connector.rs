@@ -7,7 +7,6 @@ use cm_types::RelativePath;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc;
-use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -43,12 +42,6 @@ impl DirConnectable for mpsc::UnboundedSender<ServerEnd<fio::DirectoryMarker>> {
 #[derive(Debug, Clone)]
 pub struct DirConnector {
     inner: Arc<dyn DirConnectable>,
-
-    // This exists to keep the receiver server task alive as long as any clone of this Connector is
-    // alive. This is set when creating a Connector through CapabilityStore. The inner type is
-    // `fuchsia_async::Task` but libsandbox can't depend on fuchsia-async so we type-erase it to
-    // Any.
-    _receiver_task: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl CapabilityBound for DirConnector {
@@ -70,14 +63,7 @@ impl DirConnector {
     }
 
     pub fn new_sendable(connector: impl DirConnectable + 'static) -> Self {
-        Self::new_internal(connector, None)
-    }
-
-    pub(crate) fn new_internal(
-        connector: impl DirConnectable + 'static,
-        receiver_task: Option<Arc<dyn Any + Send + Sync>>,
-    ) -> Self {
-        Self { inner: Arc::new(connector), _receiver_task: receiver_task }
+        Self { inner: Arc::new(connector) }
     }
 
     pub fn send(

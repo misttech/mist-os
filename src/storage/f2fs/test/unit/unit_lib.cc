@@ -4,12 +4,18 @@
 
 #include "unit_lib.h"
 
+#include <fcntl.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <zstd/zstd.h>
 
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+#include "src/storage/volume_image/utils/lz4_decompress_reader.h"
+#include "src/storage/volume_image/utils/lz4_decompressor.h"
 
 namespace f2fs {
 
@@ -19,9 +25,8 @@ using Runner = ComponentRunner;
 F2fsFakeDevTestFixture::F2fsFakeDevTestFixture(const TestOptions &options)
     : block_count_(options.block_count),
       block_size_(options.block_size),
-      run_fsck_(options.run_fsck)
-
-{
+      run_fsck_(options.run_fsck),
+      image_file_(options.image_file) {
   mkfs_options_ = options.mkfs_options;
   for (auto opt : options.mount_options) {
     mount_options_.SetValue(opt.first, opt.second);
@@ -29,6 +34,9 @@ F2fsFakeDevTestFixture::F2fsFakeDevTestFixture(const TestOptions &options)
 }
 
 void F2fsFakeDevTestFixture::SetUp() {
+  if (image_file_ != std::nullopt)
+    return LoadImage();
+
   fbl::RefPtr<VnodeF2fs> root;
   FileTester::MkfsOnFakeDevWithOptions(&bc_, mkfs_options_, block_count_);
   FileTester::MountWithOptions(loop_.dispatcher(), mount_options_, &bc_, &fs_);
@@ -56,6 +64,49 @@ void F2fsFakeDevTestFixture::Remount() {
   FileTester::Unmount(std::move(fs_), &bc_);
   FileTester::MountWithOptions(loop_.dispatcher(), mount_options_, &bc_, &fs_);
   fbl::RefPtr<VnodeF2fs> root;
+  FileTester::CreateRoot(fs_.get(), &root);
+  root_dir_ = fbl::RefPtr<Dir>::Downcast(std::move(root));
+}
+
+void F2fsFakeDevTestFixture::LoadImage() {
+  auto device =
+      std::make_unique<block_client::FakeBlockDevice>(block_client::FakeBlockDevice::Config{
+          .block_count = block_count_, .block_size = kDefaultSectorSize, .supports_trim = false});
+  auto bc_or = CreateBcacheMapper(std::move(device), true);
+  ASSERT_TRUE(bc_or.is_ok());
+  bc_ = std::move(*bc_or);
+
+  std::string file = "pkg/data/" + image_file_.value();
+  auto fd = fbl::unique_fd(open(file.data(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+
+  struct stat s;
+  fstat(fd.get(), &s);
+
+  size_t compressed_size = s.st_size;
+  auto compressed = std::make_unique<char[]>(compressed_size);
+  size_t iter = 0;
+  while (iter < compressed_size) {
+    size_t cur = read(fd.get(), &(compressed[iter]), compressed_size - iter);
+    iter += cur;
+  }
+
+  size_t uncompressed_size = block_count_ * block_size_;
+  auto uncompressed = std::make_unique<char[]>(uncompressed_size);
+  ZSTD_decompress(uncompressed.get(), uncompressed_size, compressed.get(), compressed_size);
+
+  for (uint32_t i = 0; i < uncompressed_size / bc_->BlockSize(); ++i) {
+    ASSERT_EQ(bc_->Writeblk(i, uncompressed.get() + i * bc_->BlockSize()), ZX_OK);
+  }
+
+  if (run_fsck_) {
+    FsckWorker fsck(std::move(bc_), FsckOptions{.repair = false});
+    ASSERT_EQ(fsck.Run(), ZX_OK);
+    bc_ = fsck.Destroy();
+  }
+
+  fbl::RefPtr<VnodeF2fs> root;
+  FileTester::MountWithOptions(loop_.dispatcher(), mount_options_, &bc_, &fs_);
   FileTester::CreateRoot(fs_.get(), &root);
   root_dir_ = fbl::RefPtr<Dir>::Downcast(std::move(root));
 }
@@ -205,11 +256,9 @@ void FileTester::VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2f
   } else {
     vnode = fbl::MakeRefCounted<File>(fs, inode_nid, mode);
   }
-
+  vnode->ClearFlag(InodeInfoFlag::kNewInode);
+  vnode->ClearLinkCount();
   ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
-  vnode->InitTime();
-  vnode->InitFileCache();
-  vnode->InitExtentTree();
   fs->GetVCache().Add(vnode.get());
   vnode->SetDirty();
 }

@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -164,3 +165,62 @@ TEST(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerm
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
+
+namespace {
+
+int pipefd[2];
+
+int pdeath_waiter(void *) {
+  pid_t pid = 0;
+  read(pipefd[0], &pid, sizeof(pid));
+
+  // Wait for the parent to exit so that this task will
+  // have been reparented before exiting.
+  waitpid(pid, nullptr, 0);
+
+  return 0;
+}
+
+int parentSpawningPDeathWaiter(void *) {
+  EXPECT_EQ(pipe(pipefd), 0);
+  nested_clone_helper.runInClonedChild(SIGUSR2, pdeath_waiter);
+
+  pid_t pid = getpid();
+  write(pipefd[1], &pid, sizeof(pid));
+
+  return 0;
+}
+
+TEST(WaitpidExitSignalTest, SubreaperCloneExitSignal) {
+  test_helper::ForkHelper fork_helper;
+  fork_helper.RunInForkedProcess([] {
+    test_helper::CloneHelper helper;
+    ASSERT_EQ(prctl(PR_SET_CHILD_SUBREAPER, 1), 0) << strerror(errno);
+
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGUSR2);
+    sigaddset(&signal_set, SIGCHLD);
+    EXPECT_EQ(sigprocmask(SIG_BLOCK, &signal_set, nullptr), 0);
+
+    helper.runInClonedChild(SIGUSR2, parentSpawningPDeathWaiter);
+
+    // Wait for the parent to exit, which should exit with SIGUSR2.
+    int received_signal;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGUSR2);
+    std::cout << "Waiting for SIGUSR2" << std::endl;
+    EXPECT_EQ(sigwait(&signal_set, &received_signal), 0);
+    EXPECT_EQ(received_signal, SIGUSR2);
+
+    // Wait for the child to exit, which should exit with SIGCHLD since
+    // it has been reparented.
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGCHLD);
+    std::cout << "Waiting for SIGCHLD" << std::endl;
+    EXPECT_EQ(sigwait(&signal_set, &received_signal), 0);
+    EXPECT_EQ(received_signal, SIGCHLD);
+  });
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+}
+}  // namespace

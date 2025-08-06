@@ -398,10 +398,10 @@ mod test {
         keyboard_listener
     }
 
-    async fn init_button_listener(
+    async fn init_button_listeners(
         device_listener_stream: &mut fuipolicy::DeviceListenerRegistryRequestStream,
-    ) -> fuipolicy::MediaButtonsListenerProxy {
-        let buttons_listener = match device_listener_stream.next().await {
+    ) -> (fuipolicy::MediaButtonsListenerProxy, fuipolicy::TouchButtonsListenerProxy) {
+        let media_buttons_listener = match device_listener_stream.next().await {
             Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
                 listener,
                 responder,
@@ -414,7 +414,20 @@ mod test {
             }
         };
 
-        buttons_listener
+        let touch_buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterTouchButtonsListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy()
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        (media_buttons_listener, touch_buttons_listener)
     }
 
     async fn start_touch_input_inspect_and_dimensions(
@@ -443,7 +456,7 @@ mod test {
             fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
             );
 
-        let relay = input_event_relay::InputEventsRelay::new();
+        let (relay, _relay_handle) = input_event_relay::new_input_relay();
         relay.start_relays(
             &current_task.kernel(),
             EventProxyMode::None,
@@ -461,7 +474,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, touch_source_stream)
     }
@@ -489,7 +502,7 @@ mod test {
         let (mouse_source_client_end, _mouse_source_stream) =
             fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
 
-        let relay = input_event_relay::InputEventsRelay::new();
+        let (relay, _relay_handle) = input_event_relay::new_input_relay();
         relay.start_relays(
             current_task.kernel(),
             EventProxyMode::None,
@@ -507,7 +520,7 @@ mod test {
         );
 
         let keyboad_listener = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, keyboad_listener)
     }
@@ -541,7 +554,7 @@ mod test {
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 
-        let relay = input_event_relay::InputEventsRelay::new();
+        let (relay, _relay_handle) = input_event_relay::new_input_relay();
         relay.start_relays(
             current_task.kernel(),
             EventProxyMode::None,
@@ -559,7 +572,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let button_listener = init_button_listener(&mut device_listener_stream).await;
+        let (button_listener, _) = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, button_listener)
     }
@@ -596,7 +609,7 @@ mod test {
             fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
             );
 
-        let relay = input_event_relay::InputEventsRelay::new();
+        let (relay, _relay_handle) = input_event_relay::new_input_relay();
         relay.start_relays(
             &current_task.kernel(),
             EventProxyMode::None,
@@ -614,7 +627,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, mouse_source_stream)
     }
@@ -1956,13 +1969,7 @@ mod test {
             fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
             );
 
-        let relay = input_event_relay::InputEventsRelay::new();
-        relay.add_touch_device(
-            0,
-            input_device.open_files.clone(),
-            Some(input_device.inspect_status.clone()),
-        );
-
+        let (relay, relay_handle) = input_event_relay::new_input_relay();
         relay.start_relays(
             &current_task.kernel(),
             EventProxyMode::None,
@@ -1980,7 +1987,13 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
+
+        relay_handle.add_touch_device(
+            0,
+            input_device.open_files.clone(),
+            Some(input_device.inspect_status.clone()),
+        );
 
         // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
         // A TouchEvent::default() has no pointer sample so these events should be discarded.

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VOUT_H_
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -17,18 +16,32 @@
 #include <cstdint>
 #include <memory>
 
+#include <fbl/static_vector.h>
+
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace amlogic_display {
 
 enum class VoutType : uint8_t {
   kDsi,
   kHdmi,
+};
+
+struct AddedDisplayInfo {
+  // Maximum size of the `preferred_modes`.
+  static constexpr int kMaxPreferredModes = 4;
+
+  display::DisplayId display_id;
+  fbl::static_vector<display::ModeAndId, kMaxPreferredModes> preferred_modes;
+  fbl::Vector<uint8_t> edid;
 };
 
 // Represents the Video Output (VOUT) module and the connected display device.
@@ -64,16 +77,15 @@ class Vout {
   Vout& operator=(Vout&&) = delete;
   Vout& operator=(const Vout&) = delete;
 
-  // `pixel_formats` must outlive the returned added_display_args_t.
-  raw_display_info_t CreateRawDisplayInfo(
-      display::DisplayId display_id,
-      cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
+  AddedDisplayInfo CreateAddedDisplayInfo(display::DisplayId display_id);
 
   VoutType type() { return type_; }
   bool supports_hpd() const { return supports_hpd_; }
 
   zx::result<> UpdateStateOnDisplayConnected();
   void DisplayDisconnected();
+
+  display::Mode CurrentDisplayMode() const;
 
   // Vout must be of `kHdmi` type.
   bool IsDisplayTimingSupported(const display::DisplayTiming& timing);
@@ -125,7 +137,7 @@ class Vout {
     PanelConfig panel_config;
 
     // Matches the timing in `panel_config`.
-    display_mode_t banjo_display_mode;
+    std::optional<display::ModeAndId> mode_and_id;
   } dsi_;
 
   struct hdmi_t {

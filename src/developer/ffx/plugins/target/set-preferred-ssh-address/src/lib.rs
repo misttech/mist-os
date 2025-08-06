@@ -76,7 +76,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn ipv4() {
         set_preferred_ssh_address(
             &setup_fake_target_server(ffx::TargetIp { ip: IPV4_ADDRESS, scope_id: 0 }),
@@ -86,7 +86,7 @@ mod tests {
         .expect("set_preferred_ssh_address error");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn ipv6_with_no_scope() {
         set_preferred_ssh_address(
             &setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 0 }),
@@ -96,7 +96,7 @@ mod tests {
         .expect("set_preferred_ssh_address error");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn ipv6_with_numeric_scope() {
         set_preferred_ssh_address(
             &setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 1 }),

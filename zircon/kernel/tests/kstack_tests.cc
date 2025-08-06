@@ -107,7 +107,7 @@ bool kstack_mp_sync_exec_test() {
     arch::Yield();
   }
   mp_sync_exec(
-      MP_IPI_TARGET_MASK, cpu_num_to_mask(cpu_b),
+      mp_ipi_target::MASK, cpu_num_to_mask(cpu_b),
       [](void* arg) { reinterpret_cast<Context*>(arg)->done.store(true); }, &context);
 
   thread->Join(nullptr, ZX_TIME_INFINITE);

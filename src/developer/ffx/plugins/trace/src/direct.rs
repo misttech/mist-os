@@ -34,6 +34,7 @@ pub(crate) async fn trace(
                     .collect()
             })
             .unwrap_or(vec![]),
+        options.requested_categories,
         proxy,
     )
     .await?;
@@ -47,7 +48,7 @@ pub(crate) async fn trace(
 pub(crate) async fn stop_tracing(task: TraceTask, output_file: String) -> Result<TraceData> {
     Ok(TraceData {
         output_file,
-        categories: task.config().categories.clone().unwrap_or(vec![]),
+        categories: task.requested_categories(),
         stop_result: task.shutdown().await?,
     })
 }

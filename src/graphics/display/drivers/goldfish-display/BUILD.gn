@@ -50,7 +50,7 @@ source_set("common") {
     "render_control.h",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
     "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
@@ -68,6 +68,7 @@ source_set("common") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/goldfish/pipe_headers",
     "//src/devices/lib/goldfish/pipe_io",
+    "//src/graphics/display/lib/api-protocols/cpp",
     "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

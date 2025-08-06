@@ -74,8 +74,11 @@
   .cfi.all_vector \op
 .endm
 
-// Standard prologue sequence for FP setup, with CFI.
-.macro .prologue.fp frame_extra_size=0, rareg=ra
+// Standard prologue sequence for FP setup, with CFI.  This emits .stack_sizes
+// metadata unless the optional third argument prevents it, in which case a
+// separate .llvm.stack_size invocation should be used.
+.macro .prologue.fp frame_extra_size=0, rareg=ra, no_metadata=
+  .llvm.stack_size (\frame_extra_size + 16), \no_metadata
   // The RISC-V psABI defines the frame pointer convention:
   // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc#frame-pointer-convention
   // fp must point to CFA.

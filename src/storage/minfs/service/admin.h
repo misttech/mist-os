@@ -5,8 +5,12 @@
 #ifndef SRC_STORAGE_MINFS_SERVICE_ADMIN_H_
 #define SRC_STORAGE_MINFS_SERVICE_ADMIN_H_
 
+#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fit/function.h>
+
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/service.h"
-#include "src/storage/minfs/runner.h"
 
 namespace minfs {
 

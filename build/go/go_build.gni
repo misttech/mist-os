@@ -509,7 +509,7 @@ template("go_build") {
 
     # The binaries embed absolute paths to the source file,
     # which is copied into a subdir of root_build_dir.
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 
   if (define_sdk_target && is_host) {

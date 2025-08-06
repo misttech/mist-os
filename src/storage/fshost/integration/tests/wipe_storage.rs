@@ -27,7 +27,7 @@ const GPT_PATH: &'static str = "/part-000/block";
 const BLOBFS_FVM_PATH: &'static str = "/part-000/block/fvm/blobfs-p-1/block";
 const DATA_FVM_PATH: &'static str = "/part-000/block/fvm/data-p-2/block";
 
-// Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
+// Ensure fuchsia.fshost.Recovery/WipeStorage fails if we cannot identify a storage device to wipe.
 #[fuchsia::test]
 async fn no_fvm_device() {
     let mut builder = new_builder();
@@ -38,10 +38,10 @@ async fn no_fvm_device() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    let result = admin
+    let result = recovery
         .wipe_storage(Some(blobfs_server), None)
         .await
         .expect("FIDL call to WipeStorage failed")
@@ -50,7 +50,7 @@ async fn no_fvm_device() {
     fixture.tear_down().await;
 }
 
-// Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method.
+// Demonstrate high level usage of the fuchsia.fshost.Recovery/WipeStorage method.
 #[fuchsia::test]
 async fn write_blob() {
     let mut builder = new_builder();
@@ -88,10 +88,10 @@ async fn write_blob() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
+    recovery
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()
@@ -171,10 +171,10 @@ async fn wipe_storage_deletes_starnix_volume() {
     };
 
     // Invoke the WipeStorage API.
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
+    recovery
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await
         .unwrap()
@@ -199,7 +199,7 @@ async fn wipe_storage_deletes_starnix_volume() {
     fixture.tear_down().await;
 }
 
-// Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
+// Demonstrate high level usage of the fuchsia.fshost.Recovery/WipeStorage method when a data
 // data partition does not already exist.
 #[fuchsia::test]
 async fn write_blob_no_existing_data_partition() {
@@ -240,10 +240,10 @@ async fn write_blob_no_existing_data_partition() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
+    recovery
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()
@@ -255,7 +255,7 @@ async fn write_blob_no_existing_data_partition() {
     fixture.tear_down().await;
 }
 
-// Verify that all existing blobs are purged after running fuchsia.fshost.Admin/WipeStorage.
+// Verify that all existing blobs are purged after running fuchsia.fshost.Recovery/WipeStorage.
 #[fuchsia::test]
 async fn blobfs_formatted() {
     let mut builder = new_builder();
@@ -307,10 +307,10 @@ async fn blobfs_formatted() {
     };
 
     // Invoke the WipeStorage API.
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
+    recovery
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await
         .unwrap()
@@ -401,10 +401,10 @@ async fn data_unformatted() {
     }
 
     // Invoke WipeStorage.
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
+    recovery
         .wipe_storage(Some(blobfs_server), None)
         .await
         .unwrap()

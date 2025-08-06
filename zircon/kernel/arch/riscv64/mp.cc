@@ -67,19 +67,19 @@ void riscv64_software_exception() {
   LTRACEF("current_cpu %u (hart %u) reason %#x\n", arch_curr_cpu_num(), riscv64_curr_hart_id(),
           reason);
 
-  if (reason & (1u << MP_IPI_RESCHEDULE)) {
+  if (reason & (1u << static_cast<uint32_t>(mp_ipi::RESCHEDULE))) {
     mp_mbx_reschedule_irq();
-    reason &= ~(1u << MP_IPI_RESCHEDULE);
+    reason &= ~(1u << static_cast<uint32_t>(mp_ipi::RESCHEDULE));
   }
-  if (reason & (1u << MP_IPI_GENERIC)) {
+  if (reason & (1u << static_cast<uint32_t>(mp_ipi::GENERIC))) {
     mp_mbx_generic_irq();
-    reason &= ~(1u << MP_IPI_GENERIC);
+    reason &= ~(1u << static_cast<uint32_t>(mp_ipi::GENERIC));
   }
-  if (reason & (1u << MP_IPI_INTERRUPT)) {
+  if (reason & (1u << static_cast<uint32_t>(mp_ipi::INTERRUPT))) {
     mp_mbx_interrupt_irq();
-    reason &= ~(1u << MP_IPI_INTERRUPT);
+    reason &= ~(1u << static_cast<uint32_t>(mp_ipi::INTERRUPT));
   }
-  if (reason & (1u << MP_IPI_HALT)) {
+  if (reason & (1u << static_cast<uint32_t>(mp_ipi::HALT))) {
     // Park this core in a WFI loop
     arch_disable_ints();
     mb();
@@ -87,7 +87,7 @@ void riscv64_software_exception() {
       __wfi();
     }
 
-    reason &= ~(1u << MP_IPI_HALT);
+    reason &= ~(1u << static_cast<uint32_t>(mp_ipi::HALT));
   }
 
   if (unlikely(reason)) {
@@ -97,7 +97,7 @@ void riscv64_software_exception() {
 }
 
 void arch_mp_reschedule(cpu_mask_t mask) {
-  arch_mp_send_ipi(MP_IPI_TARGET_MASK, mask, MP_IPI_RESCHEDULE);
+  arch_mp_send_ipi(mp_ipi_target::MASK, mask, mp_ipi::RESCHEDULE);
 }
 
 arch::HartMask riscv64_cpu_mask_to_hart_mask(cpu_mask_t cmask) {
@@ -111,21 +111,20 @@ arch::HartMask riscv64_cpu_mask_to_hart_mask(cpu_mask_t cmask) {
   return hmask;
 }
 
-void arch_mp_send_ipi(const mp_ipi_target_t target, cpu_mask_t cpu_mask, const mp_ipi_t ipi) {
-  LTRACEF("target %d mask %#x, ipi %d\n", target, cpu_mask, ipi);
+void arch_mp_send_ipi(const mp_ipi_target target, cpu_mask_t cpu_mask, const mp_ipi ipi) {
+  LTRACEF("target %d mask %#x, ipi %d\n", static_cast<int>(target), cpu_mask,
+          static_cast<int>(ipi));
 
   // translate the high level target + mask mechanism into just a mask
   switch (target) {
-    case MP_IPI_TARGET_ALL:
+    case mp_ipi_target::ALL:
       cpu_mask = mp_get_online_mask();
       break;
-    case MP_IPI_TARGET_ALL_BUT_LOCAL:
+    case mp_ipi_target::ALL_BUT_LOCAL:
       cpu_mask = mp_get_online_mask() & ~cpu_num_to_mask(arch_curr_cpu_num());
       break;
-    case MP_IPI_TARGET_MASK:
+    case mp_ipi_target::MASK:
       break;
-    default:
-      DEBUG_ASSERT(0);
   }
 
   // no need to continue if the computed mask is 0
@@ -147,7 +146,7 @@ void arch_mp_send_ipi(const mp_ipi_target_t target, cpu_mask_t cpu_mask, const m
     hart_mask |= (1UL << hart);
 
     // mark the pending ipi in the cpu
-    riscv64_percpu_array[cpu].ipi_data |= (1U << ipi);
+    riscv64_percpu_array[cpu].ipi_data |= (1U << static_cast<uint32_t>(ipi));
   });
 
   mb();

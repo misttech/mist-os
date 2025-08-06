@@ -49,7 +49,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
     def test_instantiate_usb_power_hub_using_dmc_when_dmc_path_not_set(
         self,
     ) -> None:
-        """Test case to make sure creating UsbPowerUsingDmc when DMC_PATH not set
+        """Test case to make sure creating UsbPowerHubUsingDmc when DMC_PATH not set
         will result in a failure."""
         with self.assertRaisesRegex(
             usb_power_hub_using_dmc.UsbPowerDmcError,
@@ -58,7 +58,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
             usb_power_hub_using_dmc.UsbPowerHubUsingDmc(device_name="fx-emu")
 
     def test_usb_power_hub_using_dmc_is_a_usb_power(self) -> None:
-        """Test case to make sure UsbPowerUsingDmc is UsbPower."""
+        """Test case to make sure UsbPowerHubUsingDmc is UsbPower."""
         self.assertIsInstance(
             self.usb_power_hub_using_dmc_obj, usb_power_hub.UsbPowerHub
         )
@@ -71,7 +71,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
     def test_power_off(
         self, mock_usb_power_hub_using_dmc_run: mock.Mock
     ) -> None:
-        """Test case for UsbPowerUsingDmc.power_off()."""
+        """Test case for UsbPowerHubUsingDmc.power_off()."""
         self.usb_power_hub_using_dmc_obj.power_off()
         mock_usb_power_hub_using_dmc_run.assert_called_once()
 
@@ -83,7 +83,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
     def test_power_on(
         self, mock_usb_power_hub_using_dmc_run: mock.Mock
     ) -> None:
-        """Test case for UsbPowerUsingDmc.power_on()."""
+        """Test case for UsbPowerHubUsingDmc.power_on()."""
         self.usb_power_hub_using_dmc_obj.power_on()
         mock_usb_power_hub_using_dmc_run.assert_called_once()
 
@@ -93,7 +93,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
         autospec=True,
     )
     def test_run(self, mock_host_shell_run: mock.Mock) -> None:
-        """Test case for UsbPowerUsingDmc._run() success case."""
+        """Test case for UsbPowerHubUsingDmc._run() success case."""
         self.usb_power_hub_using_dmc_obj._run(  # pylint: disable=protected-access
             command=["ls"]
         )
@@ -106,7 +106,7 @@ class UsbPowerHubUsingDmcTests(unittest.TestCase):
         autospec=True,
     )
     def test_run_error(self, mock_host_shell_run: mock.Mock) -> None:
-        """Test case for UsbPowerUsingDmc._run() failure case."""
+        """Test case for UsbPowerHubUsingDmc._run() failure case."""
         with self.assertRaises(usb_power_hub.UsbPowerHubError):
             self.usb_power_hub_using_dmc_obj._run(  # pylint: disable=protected-access
                 command=["ls"]

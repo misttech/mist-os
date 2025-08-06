@@ -4,6 +4,8 @@
 
 #include "src/storage/f2fs/extent_cache.h"
 
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+
 namespace f2fs {
 
 namespace {

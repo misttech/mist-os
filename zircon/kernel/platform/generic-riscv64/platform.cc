@@ -95,7 +95,7 @@ static void halt_other_cpus() {
   if (halted.exchange(1) == 0) {
     // stop the other cpus
     printf("stopping other cpus\n");
-    arch_mp_send_ipi(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, MP_IPI_HALT);
+    arch_mp_send_ipi(mp_ipi_target::ALL_BUT_LOCAL, 0, mp_ipi::HALT);
 
     // spin for a while
     // TODO: find a better way to spin at this low level
@@ -542,7 +542,5 @@ zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
 zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug(cpu_id); }
 
 zx_status_t platform_append_mexec_data(ktl::span<ktl::byte> data_zbi) { return ZX_OK; }
-
-void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {}
 
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }

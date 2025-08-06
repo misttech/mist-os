@@ -7980,6 +7980,88 @@ TEST(PagerWriteback, UntrackedBeyondStreamSize) {
   ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
 }
 
+// Tests that single page dirty zero interval slots are correctly absorbed into untracked zero
+// intervals when setting the stream size.
+TEST(PagerWriteback, UntrackedAbsorbsIntervalSlots) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
+  pager_tests::UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  pager_tests::Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(3, ZX_VMO_TRAP_DIRTY, &vmo));
+  // Create a single page untracked zero interval at page 2.
+  ASSERT_OK(vmo->vmo().set_stream_size(2 * zx_system_get_page_size()));
+
+  // Nothing dirty yet.
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  size_t actual, avail;
+  // TODO: Replace with UserPager methods once unbounded VMOs are properly supported in the test
+  // helpers. We can't use pager.VerifyDirtyRanges() for now since it uses the size_ which will be 0
+  // for unbounded VMOs.
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        3 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the stream size should read as zeros.
+  std::vector<uint8_t> expected(2 * zx_system_get_page_size(), 0);
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 1, expected.data(), false));
+
+  // Decrease the stream size by a single page. This should absorb the existing interval slot at
+  // page 2 into the new untracked range [1, 3).
+  ASSERT_OK(vmo->vmo().set_stream_size(zx_system_get_page_size()));
+
+  // Nothing dirty still.
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        3 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the new stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 1, 2, expected.data(), false));
+
+  // Increase the stream size again and commit page 1.
+  ASSERT_OK(vmo->vmo().set_stream_size(2 * zx_system_get_page_size()));
+  ASSERT_TRUE(pager.DirtyPages(vmo, 1, 1));
+
+  // Verify that the committed page is dirty.
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  zx_vmo_dirty_range_t range;
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        3 * zx_system_get_page_size(), &range, sizeof(range),
+                                        &actual, &avail));
+  EXPECT_EQ(1u, actual);
+  EXPECT_EQ(1u, avail);
+  EXPECT_EQ(zx_system_get_page_size(), range.offset);
+  EXPECT_EQ(zx_system_get_page_size(), range.length);
+  EXPECT_EQ(0, range.options);
+
+  // Pages beyond the old stream size should still read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 1, expected.data(), false));
+
+  // Decrease the stream size again, overwriting the page. The single untracked zero slot should get
+  // absorbed back.
+  ASSERT_OK(vmo->vmo().set_stream_size(zx_system_get_page_size()));
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        3 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the new stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 1, 2, expected.data(), false));
+
+  // No page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
 // Tests that pages committed beyond the stream size are absorbed back into untracked (or dirty)
 // zero intervals when setting the stream size.
 TEST(PagerWriteback, UntrackedAbsorbsPages) {

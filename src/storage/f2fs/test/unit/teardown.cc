@@ -33,9 +33,7 @@ using Runner = ComponentRunner;
 class AsyncTearDownVnode : public Dir {
  public:
   AsyncTearDownVnode(F2fs* fs, ino_t ino, sync_completion_t* completions)
-      : Dir(fs, ino, 0), callback_(nullptr), completions_(completions) {
-    InitFileCache();
-  }
+      : Dir(fs, ino, 0), callback_(nullptr), completions_(completions) {}
 
   ~AsyncTearDownVnode() {
     // C) Tear down the Vnode.

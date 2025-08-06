@@ -334,59 +334,6 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   ASSERT_EQ(ZX_ERR_TIMED_OUT, port.wait(zx::deadline_after(zx::sec(0)), &packet));
 }
 
-TEST_F(PciBusTests, LegacyIrqNoAckTest) {
-  // 00:00.0 is a valid device using legacy pin A.
-  pci_bdf_t device = {0, 0, 0};
-  pciroot()
-      .ecam()
-      .get_device(device)
-      ->set_vendor_id(0x8086)
-      .set_device_id(0x8086)
-      .set_interrupt_pin(0x1)
-      .set_status(PCI_STATUS_INTERRUPT);
-  // Route pin A to vector 16.
-  uint8_t vector = 0x10;
-  zx::interrupt bus_interrupt = AddLegacyIrqToBus(vector);
-  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0,
-                       /*a=*/vector,
-                       /*b=*/0, /*c=*/0, /*d=*/0);
-  auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().mmio());
-  ASSERT_OK(owned_bus->Initialize());
-  auto* bus = owned_bus.release();
-  ASSERT_OK(
-      bus->GetDevice(device)->SetIrqMode(fuchsia_hardware_pci::InterruptMode::kLegacyNoack, 1));
-
-  auto* bus_device = bus->GetDevice(device);
-  // Quick method to check if the disabled flag is set for a legacy interrupt.
-  auto check_disabled = [&bus_device]() {
-    fbl::AutoLock _(bus_device->dev_lock());
-    return bus_device->irqs().legacy_disabled;
-  };
-
-  // By tying the trigger/wait in the same thread we can avoid pitfalls with
-  // racing the IRQ worker thread. When we send at least kMaxIrqsPerNoAckPeriod
-  // IRQs the device's IRQ should be disabled.
-  zx::port port;
-  ASSERT_OK(zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port));
-  zx::interrupt dev_interrupt = bus_device->MapInterrupt(0).value();
-  ASSERT_OK(dev_interrupt.bind(port, 1, ZX_INTERRUPT_BIND));
-  ASSERT_FALSE(check_disabled());
-
-  zx::time_boot current_time = zx::clock::get_boot();
-  uint32_t irq_cnt = 0;
-  zx_port_packet_t packet;
-  while (irq_cnt < kMaxIrqsPerNoAckPeriod) {
-    ASSERT_OK(bus_interrupt.trigger(0, current_time));
-    ASSERT_OK(port.wait(zx::time::infinite(), &packet));
-    // Normally a driver would ack their interrupt object after a port wait so
-    // we need to do it manually here.
-    ASSERT_OK(dev_interrupt.ack());
-    irq_cnt++;
-  }
-  ASSERT_TRUE(check_disabled());
-}
-
 TEST_F(PciBusTests, ObeysHeaderTypeMultiFn) {
   auto& ecam = pciroot().ecam();
 

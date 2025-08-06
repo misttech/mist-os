@@ -4,7 +4,9 @@
 
 use attribution_processing::digest::{self};
 use attribution_processing::fplugin_serde::KernelStatistics;
-use attribution_processing::summary::{ComponentProfileResult, PrincipalSummary, VmoSummary};
+use attribution_processing::summary::{
+    ComponentSummaryProfileResult, PrincipalSummary, VmoSummary,
+};
 use attribution_processing::ZXName;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use prettytable::{row, table, Table};
@@ -13,7 +15,7 @@ use std::cmp::Reverse;
 pub fn write_summary(
     f: &mut dyn std::io::Write,
     csv: bool,
-    profile_result: &ComponentProfileResult,
+    profile_result: &ComponentSummaryProfileResult,
 ) -> std::io::Result<()> {
     if csv {
         let mut csv_writer = csv::Writer::from_writer(f);
@@ -332,7 +334,7 @@ mod tests {
             write_summary(
                 &mut buf,
                 true,
-                &ComponentProfileResult {
+                &ComponentSummaryProfileResult {
                     principals: vec![principal],
                     unclaimed: 1,
                     ..Default::default()
@@ -371,7 +373,7 @@ mod tests {
             write_summary(
                 &mut buf,
                 true,
-                &ComponentProfileResult {
+                &ComponentSummaryProfileResult {
                     principals: vec![principal],
                     unclaimed: 1,
                     ..Default::default()

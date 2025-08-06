@@ -6,20 +6,22 @@
 #define LIB_SYSLOG_CPP_LOG_MESSAGE_IMPL_H_
 
 #include <lib/syslog/cpp/log_level.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 #include <cstdint>
 #include <optional>
 #ifdef __Fuchsia__
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
+#include <lib/syslog/structured_backend/cpp/log_buffer.h>
+#else
+#include <lib/syslog/cpp/host/log_buffer.h>
 #endif
 #include <atomic>
 #include <limits>
 #include <sstream>
 
-namespace syslog_runtime {
-
-class LogBuffer;
+namespace fuchsia_logging {
 
 /// Constructs a LogBuffer
 class LogBufferBuilder {
@@ -57,7 +59,7 @@ class LogBufferBuilder {
   }
 #endif
   /// Builds the LogBuffer
-  LogBuffer Build();
+  fuchsia_logging::LogBuffer Build();
 
  private:
   std::optional<std::string_view> file_name_;
@@ -70,164 +72,13 @@ class LogBufferBuilder {
   fuchsia_logging::RawLogSeverity severity_;
 };
 
-template <typename Key, typename Value>
-class KeyValue final {
+class LogMessageVoidify final {
  public:
-  constexpr KeyValue(Key key, Value value) : key_(key), value_(value) {}
-
-  constexpr const Key& key() const { return key_; }
-  constexpr const Value& value() const { return value_; }
-
- private:
-  Key key_;
-  Value value_;
-};
-
-// Opaque structure representing the backend encode state.
-// This structure only has meaning to the backend and application code shouldn't
-// touch these values.
-class LogBuffer final {
- public:
-  void BeginRecord(fuchsia_logging::RawLogSeverity severity,
-                   std::optional<std::string_view> file_name, unsigned int line,
-                   std::optional<std::string_view> message, zx_handle_t socket,
-                   uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
-
-  void WriteKeyValue(std::string_view key, std::string_view value);
-
-  void WriteKeyValue(std::string_view key, int64_t value);
-
-  void WriteKeyValue(std::string_view key, uint64_t value);
-
-  void WriteKeyValue(std::string_view key, double value);
-
-  void WriteKeyValue(std::string_view key, bool value);
-
-  void WriteKeyValue(std::string_view key, const char* value) {
-    WriteKeyValue(key, std::string_view(value));
-  }
-
-  // Encodes an int8
-  void Encode(KeyValue<const char*, int8_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
-  }
-
-  // Encodes an int16
-  void Encode(KeyValue<const char*, int16_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
-  }
-
-  // Encodes an int32
-  void Encode(KeyValue<const char*, int32_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
-  }
-
-  // Encodes an int64
-  void Encode(KeyValue<const char*, int64_t> value) { WriteKeyValue(value.key(), value.value()); }
-
-#ifdef __APPLE__
-  // Encodes a size_t. On Apple Clang, size_t is a special type.
-  void Encode(KeyValue<const char*, size_t> value) {
-    WriteKeyValue(value.key(), static_cast<int64_t>(value.value()));
-  }
-#endif
-
-  // Encodes an uint8_t
-  void Encode(KeyValue<const char*, uint8_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
-  }
-
-  // Encodes an uint16_t
-  void Encode(KeyValue<const char*, uint16_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
-  }
-
-  // Encodes a uint32_t
-  void Encode(KeyValue<const char*, uint32_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
-  }
-
-  // Encodes an uint64
-  void Encode(KeyValue<const char*, uint64_t> value) { WriteKeyValue(value.key(), value.value()); }
-
-  // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, const char*> value) {
-    WriteKeyValue(value.key(), value.value());
-  }
-
-  // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, char*> value) { WriteKeyValue(value.key(), value.value()); }
-
-  // Encodes a C++ std::string.
-  void Encode(KeyValue<const char*, std::string> value) {
-    WriteKeyValue(value.key(), value.value());
-  }
-
-  // Encodes a C++ std::string_view.
-  void Encode(KeyValue<const char*, std::string_view> value) {
-    WriteKeyValue(value.key(), value.value());
-  }
-
-  // Encodes a double floating point value
-  void Encode(KeyValue<const char*, double> value) { WriteKeyValue(value.key(), value.value()); }
-
-  // Encodes a floating point value
-  void Encode(KeyValue<const char*, float> value) { WriteKeyValue(value.key(), value.value()); }
-
-  // Encodes a boolean value
-  void Encode(KeyValue<const char*, bool> value) { WriteKeyValue(value.key(), value.value()); }
-
-  // Writes the log to a socket.
-  bool Flush();
-
-#ifdef __Fuchsia__
-  /// Sets the raw severity
-  void SetRawSeverity(fuchsia_logging::RawLogSeverity severity) { raw_severity_ = severity; }
-
-  /// Sets a fatal error string
-  void SetFatalErrorString(std::string_view fatal_error_string) {
-    maybe_fatal_string_ = fatal_error_string;
-  }
-
-#else
-  uint64_t* data() { return data_; }
-
-  uint64_t* record_state() { return record_state_; }
-
-  static constexpr size_t record_state_size() { return sizeof(record_state_); }
-
-  static constexpr size_t data_size() { return sizeof(data_); }
-#endif
-
- private:
-#ifdef __Fuchsia__
-  // Message string -- valid if severity is FATAL. For FATAL
-  // logs the caller is responsible for ensuring the string
-  // is valid for the duration of the call (which our macros
-  // will ensure for current users).
-  // This will leak on usage, as the process will crash shortly afterwards.
-  std::optional<std::string_view> maybe_fatal_string_;
-
-  // Severity of the log message.
-  fuchsia_logging::RawLogSeverity raw_severity_;
-  // Underlying log buffer.
-  fuchsia_syslog::LogBuffer inner_;
-#else
-  // Max size of log buffer. This number may change as additional fields
-  // are added to the internal encoding state. It is based on trial-and-error
-  // and is adjusted when compilation fails due to it not being large enough.
-  static constexpr auto kBufferSize = (1 << 15) / 8;
-  // Additional storage for internal log state.
-  static constexpr auto kStateSize = 18;
-  // Record state (for keeping track of backend-specific details)
-  uint64_t record_state_[kStateSize];
-  // Log data (used by the backend to encode the log into). The format
-  // for this is backend-specific.
-  uint64_t data_[kBufferSize];
-#endif
+  void operator&(std::ostream&) {}
 };
 
 namespace internal {
+
 // A null-safe wrapper around std::optional<std::string_view>
 //
 // This class is used to represent a string that may be nullptr. It is used
@@ -278,26 +129,20 @@ class NullSafeStringView final {
 template <typename Msg, typename... Args>
 void WriteStructuredLog(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
                         Args... args) {
-  syslog_runtime::LogBufferBuilder builder(severity);
+  LogBufferBuilder builder(severity);
   if (file) {
     builder.WithFile(file, line);
   }
   if (msg != nullptr) {
-    builder.WithMsg(msg);
+    std::string_view message(msg);
+    builder.WithMsg(message);
   }
   auto buffer = builder.Build();
-  (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
+  (buffer.Encode(args), ...);
   buffer.Flush();
 }
+
 }  // namespace internal
-}  // namespace syslog_runtime
-
-namespace fuchsia_logging {
-
-class LogMessageVoidify final {
- public:
-  void operator&(std::ostream&) {}
-};
 
 class LogMessage final {
  public:
@@ -338,5 +183,14 @@ class LogFirstNState final {
 bool IsSeverityEnabled(RawLogSeverity severity);
 
 }  // namespace fuchsia_logging
+
+namespace syslog_runtime {
+
+template <typename K, typename V>
+using KeyValue = ::fuchsia_logging::KeyValue<K, V>;
+using LogBuffer = ::fuchsia_logging::LogBuffer;
+using LogBufferBuilder = ::fuchsia_logging::LogBufferBuilder;
+
+}  // namespace syslog_runtime
 
 #endif  // LIB_SYSLOG_CPP_LOG_MESSAGE_IMPL_H_

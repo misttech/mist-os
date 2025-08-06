@@ -225,7 +225,7 @@ zx_status_t TxQueue::UpdateFifoWatches() {
       if (!waiter.wait_installed) {
         continue;
       }
-      zx_status_t status = port_.cancel(session.tx_fifo(), it.key());
+      zx_status_t status = port_.cancel_key(0u, it.key());
       switch (status) {
         case ZX_OK:
           waiter.wait_installed = false;

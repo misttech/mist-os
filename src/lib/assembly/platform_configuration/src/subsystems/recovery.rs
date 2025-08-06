@@ -9,10 +9,10 @@ use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::platform_settings::recovery_config::{RecoveryConfig, SystemRecovery};
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
-use assembly_config_schema::platform_config::recovery_config::{RecoveryConfig, SystemRecovery};
 use assembly_constants::{
     BootfsCompiledPackageDestination, CompiledPackageDestination, FileEntry, PackageDestination,
     PackageSetDestination,
@@ -172,7 +172,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
         //
         // This needs to always be set, in case recovery is being added by products directly,
         // and not via assembly.
-        if let Some(display_rotation) = &context.board_info.platform.graphics.display.rotation {
+        if let Some(display_rotation) = &context.board_config.platform.graphics.display.rotation {
             builder.set_config_capability(
                 "fuchsia.recovery.DisplayRotation",
                 Config::new(

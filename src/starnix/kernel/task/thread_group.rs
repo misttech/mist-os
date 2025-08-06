@@ -130,6 +130,9 @@ pub struct ThreadGroupMutableState {
     /// parent ends before the child.
     pub parent: Option<ThreadGroupParent>,
 
+    /// The signal this process generates on exit.
+    pub exit_signal: Option<Signal>,
+
     /// The tasks in the thread group.
     ///
     /// The references to Task is weak to prevent cycles as Task have a Arc reference to their
@@ -238,9 +241,6 @@ pub struct ThreadGroup {
     ///
     /// The lead task is typically the initial thread created in the thread group.
     pub leader: pid_t,
-
-    /// The signal this process generates on exit.
-    pub exit_signal: Option<Signal>,
 
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
@@ -582,7 +582,6 @@ impl ThreadGroup {
                 kernel,
                 process,
                 leader,
-                exit_signal,
                 signal_actions,
                 timers: Default::default(),
                 drop_notifier: Default::default(),
@@ -603,6 +602,7 @@ impl ThreadGroup {
                     parent: parent
                         .as_ref()
                         .map(|p| ThreadGroupParent::from(p.base.weak_self.clone())),
+                    exit_signal,
                     tasks: BTreeMap::new(),
                     children: BTreeMap::new(),
                     zombie_children: vec![],
@@ -765,7 +765,7 @@ impl ThreadGroup {
 
             // Replace PID table entry with a zombie.
             let exit_info =
-                ProcessExitInfo { status: exit_status, exit_signal: self.exit_signal.clone() };
+                ProcessExitInfo { status: exit_status, exit_signal: state.exit_signal.clone() };
             let zombie =
                 ZombieProcess::new(state.as_ref(), &persistent_info.real_creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
@@ -798,6 +798,8 @@ impl ThreadGroup {
                         for (_pid, weak_child) in std::mem::take(&mut state.children) {
                             if let Some(child) = weak_child.upgrade() {
                                 let mut child_state = child.write();
+
+                                child_state.exit_signal = Some(SIGCHLD);
                                 child_state.parent = Some(ThreadGroupParent::from(&reaper));
                                 reaper_state.children.insert(child.leader, weak_child.clone());
                             }
@@ -1453,7 +1455,7 @@ impl ThreadGroup {
                 let info = process_state.tasks.values().next().unwrap().info().clone();
                 let uid = info.real_creds().uid;
                 let mut exit_status = None;
-                let exit_signal = process_state.base.exit_signal.clone();
+                let exit_signal = process_state.exit_signal.clone();
                 let time_stats =
                     process_state.base.time_stats() + process_state.children_time_stats;
                 let task_stopped = task_ref.load_stopped();
@@ -1592,6 +1594,29 @@ impl ThreadGroup {
             self.write().send_signal(signal_info);
         }
 
+        Ok(())
+    }
+
+    /// Sends a signal to this thread_group without performing any access checks.
+    ///
+    /// # Safety
+    /// This is unsafe, because it should only be called by tools and tests.
+    pub unsafe fn send_signal_unchecked_debug(
+        &self,
+        current_task: &CurrentTask,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<(), Errno> {
+        let signal = Signal::try_from(unchecked_signal)?;
+        let signal_info = SignalInfo {
+            code: SI_USER as i32,
+            detail: SignalDetail::Kill {
+                pid: current_task.thread_group().leader,
+                uid: current_task.current_creds().uid,
+            },
+            ..SignalInfo::default(signal)
+        };
+
+        self.write().send_signal(signal_info);
         Ok(())
     }
 
@@ -1850,7 +1875,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             if options.wait_for_all {
                 return true;
             }
-            Self::is_correct_exit_signal(options.wait_for_clone, child.exit_signal)
+            Self::is_correct_exit_signal(options.wait_for_clone, child.read().exit_signal)
         };
 
         // If wait_for_exited flag is disabled or no terminated children were found we look for living children.
@@ -1898,7 +1923,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         uid,
                         exit_info: ProcessExitInfo {
                             status: exit_status,
-                            exit_signal: child.base.exit_signal,
+                            exit_signal: child.exit_signal,
                         },
                         time_stats: child.base.time_stats() + child.children_time_stats,
                     }

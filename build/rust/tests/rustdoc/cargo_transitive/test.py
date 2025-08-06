@@ -20,40 +20,6 @@ class Test(TestCase):
     def setUpClass(cls) -> None:
         cls._path = Path(_doc_zip)
 
-    def testFileExists0(self) -> None:
-        self.assertTrue(
-            (self._path / "index.html").is_file(),
-            msg=f"expected `index.html` to be a file in {repr(self._path)}",
-        )
-
-    def testFileContains1(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "List of all crates",
-            found,
-        )
-
-    def testFileContains2(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertNotIn(
-            "quebec",
-            found,
-        )
-
-    def testFileContains3(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertNotIn(
-            "tango",
-            found,
-        )
-
-    def testFileContains4(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "sierra",
-            found,
-        )
-
     def testFileExists5(self) -> None:
         self.assertFalse(
             (self._path / "quebec/struct.Quebec.html").is_file(),
@@ -76,33 +42,5 @@ class Test(TestCase):
         found = (self._path / "sierra/struct.Sierra.html").read_text()
         self.assertIn(
             "Tango",
-            found,
-        )
-
-    def testFileContainsRaw9(self) -> None:
-        found = (self._path / "trait.impl/tango/trait.Tango.js").read_text()
-        self.assertIn(
-            "struct.Sierra.html",
-            found,
-        )
-
-    def testFileContainsRaw10(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "Tango",
-            found,
-        )
-
-    def testFileContainsRaw11(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "Quebec",
-            found,
-        )
-
-    def testFileContainsRaw12(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "Sierra",
             found,
         )

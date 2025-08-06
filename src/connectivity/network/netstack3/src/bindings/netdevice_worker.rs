@@ -619,7 +619,7 @@ impl DeviceHandler {
             ctx.apply_interface_defaults(&core_id);
 
             info!("created interface {:?}", core_id);
-            ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
+            ctx.bindings_ctx().devices.add_device_and_start_publishing(binding_id_alloc, core_id);
 
             (binding_id, tx_task)
         };

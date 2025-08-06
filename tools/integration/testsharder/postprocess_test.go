@@ -32,7 +32,7 @@ func affectedShard(env build.Environment, os string, ids ...int) *Shard {
 	return &Shard{
 		Name:       AffectedShardPrefix + environmentName(env),
 		Tests:      tests,
-		Env:        env,
+		Env:        populateEnvDefaults(env, "x64", false),
 		ExpectsSSH: true,
 		HostCPU:    GetHostCPU(env, false),
 	}
@@ -44,7 +44,7 @@ func isolatedShard(env build.Environment, os string, id int) *Shard {
 	return &Shard{
 		Name:       fmt.Sprintf("%s-%s", environmentName(env), test.Name),
 		Tests:      []Test{test},
-		Env:        env,
+		Env:        populateEnvDefaults(env, "x64", false),
 		ExpectsSSH: true,
 		HostCPU:    GetHostCPU(env, false),
 	}
@@ -90,7 +90,7 @@ func TestSplitOutMultipliers(t *testing.T) {
 		return &Shard{
 			Name:        MultipliedShardPrefix + environmentName(env),
 			Tests:       tests,
-			Env:         env,
+			Env:         populateEnvDefaults(env, "x64", false),
 			ExpectsSSH:  true,
 			TimeoutSecs: int(computeShardTimeout(subshard{time.Duration(timeoutSecs) * time.Second, tests}).Seconds()),
 			HostCPU:     GetHostCPU(env, false),

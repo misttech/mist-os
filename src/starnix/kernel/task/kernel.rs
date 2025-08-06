@@ -9,7 +9,7 @@ use crate::execution::CrashReporter;
 use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
 use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
-use crate::security;
+use crate::security::{self, AuditLogger};
 use crate::task::container_namespace::ContainerNamespace;
 use crate::task::limits::SystemLimits;
 use crate::task::memory_attribution::MemoryAttributionManager;
@@ -50,8 +50,8 @@ use starnix_sync::{
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{from_status_like_fdio, VMADDR_CID_HOST};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
@@ -115,6 +115,9 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
+
+    /// Whether excessive crash reports should be throttled.
+    pub crash_report_throttling: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -377,9 +380,16 @@ impl Kernel {
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
-        let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
+        let vsock_address_maker = Box::new(|x: u32| -> SocketAddress {
+            SocketAddress::Vsock { port: x, cid: VMADDR_CID_HOST }
+        });
 
-        let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
+        let crash_reporter = CrashReporter::new(
+            &inspect_node,
+            crash_reporter_proxy,
+            zx::Duration::from_minutes(8),
+            features.crash_report_throttling,
+        );
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
         let hrtimer_manager = HrTimerManager::new(&inspect_node);
 
@@ -641,6 +651,13 @@ impl Kernel {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.device_registry.open_device(locked, current_task, node, flags, dev, mode)
+    }
+
+    /// Return a reference to the Audit Framework
+    ///
+    /// This function follows the lazy initialization pattern.
+    pub fn audit_logger(&self) -> Arc<AuditLogger> {
+        self.expando.get_or_init(|| AuditLogger::new())
     }
 
     /// Return a reference to the GenericNetlink implementation.

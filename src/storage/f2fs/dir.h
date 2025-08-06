@@ -27,7 +27,10 @@ constexpr size_t kCurrentBitPos = 0;
 
 class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
  public:
-  explicit Dir(F2fs *fs, ino_t ino, umode_t mode);
+  // Constructor for directories loaded from disk
+  explicit Dir(F2fs *fs, ino_t ino, umode_t mode, LockedPage node_page);
+  // Constructor for newly created directories
+  explicit Dir(F2fs *fs, ino_t ino, umode_t mode, std::optional<gid_t> gid = std::nullopt);
 
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }

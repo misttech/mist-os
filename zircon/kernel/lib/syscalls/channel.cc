@@ -36,12 +36,21 @@ KCOUNTER(channel_msg_1k_bytes, "channel.bytes.1k")
 KCOUNTER(channel_msg_4k_bytes, "channel.bytes.4k")
 KCOUNTER(channel_msg_16k_bytes, "channel.bytes.16k")
 KCOUNTER(channel_msg_64k_bytes, "channel.bytes.64k")
+KCOUNTER(channel_msg_0_handles, "channel.handles.00")
+KCOUNTER(channel_msg_1_handles, "channel.handles.01")
+KCOUNTER(channel_msg_2_handles, "channel.handles.02")
+KCOUNTER(channel_msg_4_handles, "channel.handles.04")
+KCOUNTER(channel_msg_8_handles, "channel.handles.08")
+KCOUNTER(channel_msg_16_handles, "channel.handles.16")
+KCOUNTER(channel_msg_32_handles, "channel.handles.32")
+KCOUNTER(channel_msg_64_handles, "channel.handles.64")
+
 KCOUNTER(channel_msg_received, "channel.messages")
 
-void record_recv_msg_sz(uint32_t size) {
+void record_recv_msg_sz(uint32_t num_bytes, uint32_t num_handles) {
   kcounter_add(channel_msg_received, 1);
 
-  switch (size) {
+  switch (num_bytes) {
     case 0:
       kcounter_add(channel_msg_0_bytes, 1);
       break;
@@ -62,6 +71,33 @@ void record_recv_msg_sz(uint32_t size) {
       break;
     case 16385 ... 65536:
       kcounter_add(channel_msg_64k_bytes, 1);
+      break;
+  }
+
+  switch (num_handles) {
+    case 0:
+      kcounter_add(channel_msg_0_handles, 1);
+      break;
+    case 1:
+      kcounter_add(channel_msg_1_handles, 1);
+      break;
+    case 2:
+      kcounter_add(channel_msg_2_handles, 1);
+      break;
+    case 3 ... 4:
+      kcounter_add(channel_msg_4_handles, 1);
+      break;
+    case 5 ... 8:
+      kcounter_add(channel_msg_8_handles, 1);
+      break;
+    case 9 ... 16:
+      kcounter_add(channel_msg_16_handles, 1);
+      break;
+    case 17 ... 32:
+      kcounter_add(channel_msg_32_handles, 1);
+      break;
+    case 33 ... 64:
+      kcounter_add(channel_msg_64_handles, 1);
       break;
   }
 }
@@ -202,7 +238,7 @@ static zx_status_t channel_read(zx_handle_t handle_value, uint32_t options,
     }
   }
 
-  record_recv_msg_sz(num_bytes);
+  record_recv_msg_sz(num_bytes, num_handles);
   return result;
 }
 
@@ -263,10 +299,11 @@ static zx_status_t channel_call_epilogue(ProcessDispatcher* up, MessagePacketPtr
                                          ChannelCallArgs* args, user_out_ptr<uint32_t> actual_bytes,
                                          user_out_ptr<uint32_t> actual_handles) {
   auto bytes = reply ? reply->data_size() : 0u;
+  auto handles = reply ? reply->num_handles() : 0u;
   zx_status_t status = channel_read_out(up, ktl::move(reply), args, actual_bytes, actual_handles);
   if (status != ZX_OK)
     return status;
-  record_recv_msg_sz(bytes);
+  record_recv_msg_sz(bytes, handles);
   return ZX_OK;
 }
 

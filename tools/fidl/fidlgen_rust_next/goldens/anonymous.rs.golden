@@ -2794,50 +2794,292 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::core::convert::From<crate::BitsMember> for ::fidl_test_anonymous::BitsMember {
-        #[inline]
-        fn from(from: crate::BitsMember) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<crate::BitsMember> for ::fidl_test_anonymous::BitsMember {
+        fn compat_from(value: crate::BitsMember) -> Self {
+            Self::from_bits_retain(value.bits())
         }
     }
 
-    impl ::core::convert::From<crate::Op> for ::fidl_test_anonymous::Op {
-        #[inline]
-        fn from(from: crate::Op) -> Self {
-            match crate::Op::from(from) {
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::BitsMember> for crate::BitsMember {
+        fn compat_from(value: ::fidl_test_anonymous::BitsMember) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Op> for ::fidl_test_anonymous::Op {
+        fn compat_from(value: crate::Op) -> Self {
+            match value {
                 crate::Op::Add => Self::Add,
 
                 crate::Op::Mul => Self::Mul,
 
                 crate::Op::Div => Self::Div,
 
-                crate::Op::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::Op::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
             }
         }
     }
 
-    impl ::core::convert::From<crate::Flags> for ::fidl_test_anonymous::Flags {
-        #[inline]
-        fn from(from: crate::Flags) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::Op> for crate::Op {
+        fn compat_from(value: ::fidl_test_anonymous::Op) -> Self {
+            match value {
+                ::fidl_test_anonymous::Op::Add => Self::Add,
+
+                ::fidl_test_anonymous::Op::Mul => Self::Mul,
+
+                ::fidl_test_anonymous::Op::Div => Self::Div,
+
+                ::fidl_test_anonymous::Op::__SourceBreaking { unknown_ordinal: value } => {
+                    Self::UnknownOrdinal_(value)
+                }
+            }
         }
     }
 
-    impl ::core::convert::From<crate::SomeProtocolSomeMethodError>
-        for ::fidl_test_anonymous::SomeProtocolSomeMethodError
+    impl ::fidl_next::CompatFrom<crate::OverrideTest> for ::fidl_test_anonymous::OverrideTest {
+        #[inline]
+        fn compat_from(value: crate::OverrideTest) -> Self {
+            Self {
+                op: ::fidl_next::CompatFrom::compat_from(value.op),
+
+                left: ::fidl_next::CompatFrom::compat_from(value.left),
+
+                right: ::fidl_next::CompatFrom::compat_from(value.right),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::OverrideTest> for crate::OverrideTest {
+        #[inline]
+        fn compat_from(value: ::fidl_test_anonymous::OverrideTest) -> Self {
+            Self {
+                op: ::fidl_next::CompatFrom::compat_from(value.op),
+
+                left: ::fidl_next::CompatFrom::compat_from(value.left),
+
+                right: ::fidl_next::CompatFrom::compat_from(value.right),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Flags> for ::fidl_test_anonymous::Flags {
+        fn compat_from(value: crate::Flags) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::Flags> for crate::Flags {
+        fn compat_from(value: ::fidl_test_anonymous::Flags) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::FunctionApplication>
+        for ::fidl_test_anonymous::FunctionApplication
+    {
+        fn compat_from(value: crate::FunctionApplication) -> Self {
+            Self {
+                func: ::fidl_next::CompatFrom::compat_from(value.func),
+
+                args: ::fidl_next::CompatFrom::compat_from(value.args),
+
+                flags: ::fidl_next::CompatFrom::compat_from(value.flags),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::FunctionApplication>
+        for crate::FunctionApplication
+    {
+        fn compat_from(value: ::fidl_test_anonymous::FunctionApplication) -> Self {
+            Self {
+                func: ::fidl_next::CompatFrom::compat_from(value.func),
+
+                args: ::fidl_next::CompatFrom::compat_from(value.args),
+
+                flags: ::fidl_next::CompatFrom::compat_from(value.flags),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Expression> for ::fidl_test_anonymous::Expression {
+        fn compat_from(value: crate::Expression) -> Self {
+            match value {
+                crate::Expression::Value(value) => {
+                    Self::Value(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::Expression::BinOp(value) => {
+                    Self::BinOp(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::Expression::FunctionApplication(value) => {
+                    Self::FunctionApplication(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::Expression::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::Expression> for crate::Expression {
+        fn compat_from(value: ::fidl_test_anonymous::Expression) -> Self {
+            match value {
+                ::fidl_test_anonymous::Expression::Value(value) => {
+                    Self::Value(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_anonymous::Expression::BinOp(value) => {
+                    Self::BinOp(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_anonymous::Expression::FunctionApplication(value) => {
+                    Self::FunctionApplication(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_anonymous::Expression::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionMember> for ::fidl_test_anonymous::UnionMember {
+        fn compat_from(value: crate::UnionMember) -> Self {
+            match value {
+                crate::UnionMember::UnionData(value) => {
+                    Self::UnionData(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::UnionMember::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::UnionMember> for crate::UnionMember {
+        fn compat_from(value: ::fidl_test_anonymous::UnionMember) -> Self {
+            match value {
+                ::fidl_test_anonymous::UnionMember::UnionData(value) => {
+                    Self::UnionData(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_anonymous::UnionMember::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableData> for ::fidl_test_anonymous::TableData {
+        #[inline]
+        fn compat_from(value: crate::TableData) -> Self {
+            Self { data: ::fidl_next::CompatFrom::compat_from(value.data) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::TableData> for crate::TableData {
+        #[inline]
+        fn compat_from(value: ::fidl_test_anonymous::TableData) -> Self {
+            Self { data: ::fidl_next::CompatFrom::compat_from(value.data) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TableMember> for ::fidl_test_anonymous::TableMember {
+        fn compat_from(value: crate::TableMember) -> Self {
+            Self {
+                table_data: ::fidl_next::CompatFrom::compat_from(value.table_data),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::TableMember> for crate::TableMember {
+        fn compat_from(value: ::fidl_test_anonymous::TableMember) -> Self {
+            Self { table_data: ::fidl_next::CompatFrom::compat_from(value.table_data) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SomeProtocolSomeMethodRequest>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodRequest
     {
         #[inline]
-        fn from(from: crate::SomeProtocolSomeMethodError) -> Self {
-            match crate::SomeProtocolSomeMethodError::from(from) {
+        fn compat_from(value: crate::SomeProtocolSomeMethodRequest) -> Self {
+            Self {
+                union_member: ::fidl_next::CompatFrom::compat_from(value.union_member),
+
+                table_member: ::fidl_next::CompatFrom::compat_from(value.table_member),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::SomeProtocolSomeMethodRequest>
+        for crate::SomeProtocolSomeMethodRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_anonymous::SomeProtocolSomeMethodRequest) -> Self {
+            Self {
+                union_member: ::fidl_next::CompatFrom::compat_from(value.union_member),
+
+                table_member: ::fidl_next::CompatFrom::compat_from(value.table_member),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SomeProtocolSomeMethodResponse>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::SomeProtocolSomeMethodResponse) -> Self {
+            Self { bits_member: ::fidl_next::CompatFrom::compat_from(value.bits_member) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::SomeProtocolSomeMethodResponse>
+        for crate::SomeProtocolSomeMethodResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_anonymous::SomeProtocolSomeMethodResponse) -> Self {
+            Self { bits_member: ::fidl_next::CompatFrom::compat_from(value.bits_member) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::SomeProtocolSomeMethodError>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodError
+    {
+        fn compat_from(value: crate::SomeProtocolSomeMethodError) -> Self {
+            match value {
                 crate::SomeProtocolSomeMethodError::ErrorOne => Self::ErrorOne,
 
                 crate::SomeProtocolSomeMethodError::ErrorTwo => Self::ErrorTwo,
 
-                crate::SomeProtocolSomeMethodError::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::SomeProtocolSomeMethodError::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::SomeProtocolSomeMethodError>
+        for crate::SomeProtocolSomeMethodError
+    {
+        fn compat_from(value: ::fidl_test_anonymous::SomeProtocolSomeMethodError) -> Self {
+            match value {
+                ::fidl_test_anonymous::SomeProtocolSomeMethodError::ErrorOne => Self::ErrorOne,
+
+                ::fidl_test_anonymous::SomeProtocolSomeMethodError::ErrorTwo => Self::ErrorTwo,
+
+                ::fidl_test_anonymous::SomeProtocolSomeMethodError::__SourceBreaking {
+                    unknown_ordinal: value,
+                } => Self::UnknownOrdinal_(value),
             }
         }
     }
@@ -2845,13 +3087,31 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SomeProtocol`
     /// protocol.
-    pub type SomeProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SomeProtocol>;
+    pub type SomeProtocolProxy = ::fidl_next::ClientSender<crate::SomeProtocol>;
 
-    impl ::core::convert::From<crate::SomeProtocol> for ::fidl_test_anonymous::SomeProtocolMarker {
-        #[inline]
-        fn from(_: crate::SomeProtocol) -> Self {
+    impl ::fidl_next::CompatFrom<crate::SomeProtocol> for ::fidl_test_anonymous::SomeProtocolMarker {
+        fn compat_from(_: crate::SomeProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_anonymous::SomeProtocolMarker> for crate::SomeProtocol {
+        fn compat_from(_: ::fidl_test_anonymous::SomeProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_anonymous::SomeProtocolProxy>
+        for crate::SomeProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_anonymous::SomeProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

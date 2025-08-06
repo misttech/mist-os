@@ -37,8 +37,6 @@ class FakeSystemActivityGovernor
 
   bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
 
-  bool OnSuspendStarted() const { return on_suspend_started_; }
-
   LeaseToken AcquireWakeLease() {
     LeaseToken client_token, server_token;
     LeaseToken::create(/*options=*/0u, &client_token, &server_token);
@@ -47,8 +45,8 @@ class FakeSystemActivityGovernor
     zx_handle_t token_handle = server_token.get();
     active_wake_leases_[token_handle] = std::move(server_token);
     if (active_wake_leases_.size() == 1) {
-      on_suspend_started_ = false;
-      listener_client_->OnResume().Then([this, token_handle](auto unused) {
+      suspend_started_ = false;
+      suspend_blocker_client_->AfterResume().Then([this, token_handle](auto unused) {
         auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
         wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                     [this, token_handle](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
@@ -61,9 +59,9 @@ class FakeSystemActivityGovernor
                       ZX_ASSERT(it != active_wake_leases_.end());
                       ZX_ASSERT(token_handle == it->second.get());
                       active_wake_leases_.erase(it);
-                      if (active_wake_leases_.empty() && listener_client_) {
-                        listener_client_->OnSuspendStarted().Then(
-                            [this](auto unused) { on_suspend_started_ = true; });
+                      if (active_wake_leases_.empty() && suspend_blocker_client_) {
+                        suspend_blocker_client_->BeforeSuspend().Then(
+                            [this](auto unused) { suspend_started_ = true; });
                       }
                     });
         wait_once_tasks_.push_back(std::move(wait));
@@ -83,12 +81,19 @@ class FakeSystemActivityGovernor
     completer.Reply(AcquireWakeLease());
   }
 
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {
-    listener_client_.Bind(std::move(request.listener().value()),
-                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    listener_client_->OnSuspendStarted().Then([this](auto unused) { on_suspend_started_ = true; });
-    completer.Reply();
+  void RegisterSuspendBlocker(RegisterSuspendBlockerRequest& request,
+                              RegisterSuspendBlockerCompleter::Sync& completer) override {
+    suspend_blocker_client_.Bind(std::move(request.suspend_blocker().value()),
+                                 fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    suspend_blocker_client_->BeforeSuspend().Then([this](auto unused) { suspend_started_ = true; });
+
+    // Use a fake lease token. There's no need to keep our handle alive.
+    zx::eventpair lease_token, peer;
+    zx::eventpair::create(0, &lease_token, &peer);
+    fuchsia_power_system::ActivityGovernorRegisterSuspendBlockerResponse response;
+    response.token() = std::move(lease_token);
+
+    completer.Reply(fit::ok(std::move(response)));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -100,8 +105,8 @@ class FakeSystemActivityGovernor
 
  private:
   zx::event wake_handling_;
-  bool on_suspend_started_ = false;
-  fidl::Client<fuchsia_power_system::ActivityGovernorListener> listener_client_;
+  bool suspend_started_ = false;
+  fidl::Client<fuchsia_power_system::SuspendBlocker> suspend_blocker_client_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
   std::unordered_map<zx_handle_t, LeaseToken> active_wake_leases_;
   std::vector<std::unique_ptr<async::WaitOnce>> wait_once_tasks_;

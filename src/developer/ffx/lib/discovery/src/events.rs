@@ -5,6 +5,8 @@
 use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{bail, Result};
 use manual_targets::watcher::{ManualTargetEvent, ManualTargetState};
+use netext::IsLocalAddr;
+use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Display;
 use usb_fastboot_discovery::FastbootEvent;
@@ -121,9 +123,7 @@ impl TargetEvent {
     }
 }
 
-pub(crate) fn target_event_from_mdns_event(
-    event: ffx::MdnsEventType,
-) -> Option<Result<TargetEvent>> {
+pub(crate) fn target_event_from_mdns_event(event: ffx::MdnsEventType) -> Option<TargetEvent> {
     match event {
         ffx::MdnsEventType::SocketBound(_) => {
             // Unsupported
@@ -132,7 +132,7 @@ pub(crate) fn target_event_from_mdns_event(
         e @ _ => {
             let converted = TargetEvent::try_from(e);
             match converted {
-                Ok(m) => Some(Ok(m)),
+                Ok(m) => Some(m),
                 Err(_) => None,
             }
         }
@@ -337,6 +337,52 @@ impl From<fastboot_file_discovery::FastbootEvent> for TargetEvent {
                 };
                 TargetEvent::Removed(handle)
             }
+        }
+    }
+}
+
+// For ipv6 addresses, prefer link-local to non-local
+fn prefer_local(a: &TargetAddr, b: &TargetAddr) -> Ordering {
+    let a_is_local = a.ip().map(|x| x.is_link_local_addr()).unwrap_or(false);
+    let b_is_local = b.ip().map(|x| x.is_link_local_addr()).unwrap_or(false);
+    match (a_is_local, b_is_local) {
+        (true, true) | (false, false) => a.cmp(b),
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+    }
+}
+
+impl From<TargetHandle> for ffx::TargetInfo {
+    fn from(handle: TargetHandle) -> Self {
+        let (target_state, addresses, serial_number) = match handle.state {
+            TargetState::Unknown => (ffx::TargetState::Unknown, None, None),
+            TargetState::Product { addrs: target_addrs, serial } => {
+                (ffx::TargetState::Product, Some(target_addrs), serial)
+            }
+            TargetState::Fastboot(fts) => {
+                let addresses = match fts.connection_state {
+                    FastbootConnectionState::Usb => Some(vec![]),
+                    FastbootConnectionState::Tcp(addresses)
+                    | FastbootConnectionState::Udp(addresses) => {
+                        Some(addresses.into_iter().map(Into::into).collect())
+                    }
+                };
+                (ffx::TargetState::Fastboot, addresses, Some(fts.serial_number))
+            }
+            TargetState::Zedboot => (ffx::TargetState::Zedboot, None, None),
+        };
+        let addresses = addresses.map(|mut addrs| {
+            addrs.sort_by(|a, b| prefer_local(a, b));
+            addrs.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>()
+        });
+        ffx::TargetInfo {
+            nodename: handle.node_name,
+            addresses,
+            serial_number,
+            rcs_state: Some(ffx::RemoteControlState::Unknown),
+            target_state: Some(target_state),
+            is_manual: Some(handle.manual),
+            ..Default::default()
         }
     }
 }
@@ -693,5 +739,29 @@ mod test {
             );
         }
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_address_sorting() {
+        let non_link_local_addr: TargetAddr = "[2001:db8::1]:0".parse().unwrap();
+        let link_local_addr: TargetAddr = "[fe80::1]:0".parse().unwrap();
+
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Product {
+                addrs: vec![non_link_local_addr.clone(), link_local_addr.clone()],
+                serial: None,
+            },
+            manual: false,
+        };
+
+        let info: ffx::TargetInfo = handle.into();
+
+        let addrs = info.addresses.unwrap();
+        assert_eq!(addrs.len(), 2);
+        let addrs: Vec<TargetAddr> = addrs.into_iter().map(|a| a.into()).collect();
+        // The link-local address should come first.
+        assert_eq!(addrs[0], link_local_addr);
+        assert_eq!(addrs[1], non_link_local_addr);
     }
 }

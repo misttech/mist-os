@@ -66,14 +66,21 @@ template("go_test") {
 
   if (is_host) {
     _go_build_target_name = "${target_name}_go_build"
+    _test_data_target = "${target_name}_go_test_data"
+    host_test_data(_test_data_target) {
+      sources = [ "$root_out_dir/$_output_name" ]
+      deps = [ ":${_go_build_target_name}" ]
+    }
     host_test(target_name) {
-      binary_path = "$root_out_dir/$_output_name"
+      binary_path = get_label_info("//tools/go_test_parser", "root_out_dir") +
+                    "/go_test_parser"
 
       timeout = "5m"
       if (defined(invoker.timeout)) {
         timeout = invoker.timeout
       }
       args = [
+        rebase_path("$root_out_dir/$_output_name", root_build_dir),
         "-test.timeout",
         timeout,
         "-test.v",  # Emit detailed test case information.
@@ -82,7 +89,11 @@ template("go_test") {
         args += invoker.args
       }
 
-      deps = [ ":${_go_build_target_name}" ]
+      deps = [
+        ":${_go_build_target_name}",
+        ":${_test_data_target}",
+        "//tools/go_test_parser",
+      ]
 
       if (defined(invoker.deps)) {
         deps += invoker.deps

@@ -47,8 +47,6 @@ product_assembly_configuration("zedboot_with_minfs") {
   platform = {
     forward_variables_from(zedboot_platform_base, "*")
     storage = {
-      # TODO(https://fxbug.dev/423673855): Remove to enable
-      storage_host_enabled = false
       filesystems = {
         image_name = "zedboot"
         image_mode = "no_image"

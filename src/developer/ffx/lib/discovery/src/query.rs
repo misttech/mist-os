@@ -187,6 +187,15 @@ where
     }
 }
 
+impl From<TargetInfoQuery> for Option<String> {
+    fn from(t: TargetInfoQuery) -> Self {
+        match t {
+            TargetInfoQuery::First => None,
+            e @ _ => Some(e.into()),
+        }
+    }
+}
+
 impl From<&str> for TargetInfoQuery {
     fn from(s: &str) -> Self {
         String::from(s).into()
@@ -235,6 +244,37 @@ impl From<String> for TargetInfoQuery {
     }
 }
 
+impl From<TargetInfoQuery> for String {
+    fn from(t: TargetInfoQuery) -> Self {
+        String::from(&t)
+    }
+}
+
+impl From<&TargetInfoQuery> for String {
+    fn from(t: &TargetInfoQuery) -> Self {
+        match t {
+            TargetInfoQuery::First => {
+                format!("")
+            }
+            TargetInfoQuery::Serial(s) => {
+                format!("serial:{}", s)
+            }
+            TargetInfoQuery::Usb(cid) => {
+                format!("usb:cid:{}", cid)
+            }
+            TargetInfoQuery::VSock(cid) => {
+                format!("vsock:cid:{}", cid)
+            }
+            TargetInfoQuery::NodenameOrSerial(nnos) => {
+                format!("{}", nnos)
+            }
+            TargetInfoQuery::Addr(addr) => {
+                format!("{}", addr)
+            }
+        }
+    }
+}
+
 impl From<TargetAddr> for TargetInfoQuery {
     fn from(t: TargetAddr) -> Self {
         match t {
@@ -262,6 +302,8 @@ mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::{TargetIp, TargetVSockCtx};
     use fidl_fuchsia_net as net;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use test_case::test_case;
 
     #[test]
     fn test_discovery_sources() {
@@ -398,5 +440,70 @@ mod test {
         let sa = "[fe80::1%1]:8022".parse::<SocketAddr>().unwrap();
 
         assert_eq!(target_addr_info_to_socketaddr(tai), sa);
+    }
+
+    #[test_case(
+        "serial:123456";
+        "Test Serial Number"
+    )]
+    #[test_case(
+        "";
+        "Test First"
+    )]
+    #[test_case(
+        "usb:cid:16";
+        "Test Usb Cid"
+    )]
+    #[test_case(
+        "vsock:cid:12";
+        "Test Vsock Cid"
+    )]
+    #[test_case(
+        "tressoftheemeraldsea";
+        "Test Nodename or serial"
+    )]
+    #[test_case(
+        "192.168.1.1:8082";
+        "Test Address"
+    )]
+    fn test_from_to_string_isomorphic(str_input: &str) {
+        let tiq = TargetInfoQuery::from(str_input);
+        let tiq_string = String::from(tiq);
+        assert_eq!(tiq_string, str_input);
+    }
+
+    #[test_case(
+        TargetInfoQuery::First,
+        None;
+        "Test First"
+    )]
+    #[test_case(
+        TargetInfoQuery::NodenameOrSerial("tressoftheemeraldsea".to_string()),
+        Some("tressoftheemeraldsea".to_string());
+        "Test Nodename or serial"
+    )]
+    #[test_case(
+        TargetInfoQuery::VSock(16),
+        Some("vsock:cid:16".to_string());
+        "Test Vsock Cid"
+    )]
+    #[test_case(
+        TargetInfoQuery::Usb(12),
+        Some("usb:cid:12".to_string());
+        "Test Usb Cid"
+    )]
+    #[test_case(
+        TargetInfoQuery::Serial("totallynothoid".to_string()),
+        Some("serial:totallynothoid".to_string());
+        "Test Serial"
+    )]
+    #[test_case(
+        TargetInfoQuery::Addr(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),8082)),
+        Some("192.168.1.1:8082".to_string());
+        "Test Addr"
+    )]
+    fn test_into_option(query: TargetInfoQuery, want: Option<String>) {
+        let got: Option<String> = query.into();
+        assert_eq!(got, want);
     }
 }

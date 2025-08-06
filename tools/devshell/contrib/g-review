@@ -1,0 +1,79 @@
+#!/bin/bash
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Code submission and review
+### Perform a Gemini review on the current commit
+
+## usage: fx g-review
+##
+## Performs a Gemini review of the current commit
+## Runs in a new headless instance to preserve any gemini-cli context
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source "$SCRIPT_DIR/../lib/vars.sh" || exit $?
+
+fx-config-read
+
+set -euo pipefail
+echo -e >&2 "Creating a Gemini Code Review of the current commit at HEAD"
+echo -e >&2 "Staged and uncommited changes are ignored."
+if ! commit_hash=$(git rev-parse --short --verify HEAD); then
+    fx-error "No commit found. Cannot review."
+    exit 1
+fi
+PROMPT="${FUCHSIA_DIR}/.gemini/g-review_prompt.md"
+if [[ ! -f "$PROMPT" ]]; then
+    fx-error "Prompt template not found at ${PROMPT}"
+    exit 1
+fi
+
+echo -e >&2 "Reviewing changes in: ${commit_hash}"
+git show --pretty="format:" --name-status HEAD >&2
+
+use_tui=$(fx-get-ui-mode "fx-g-review")
+
+# Call gemini with the prompt from stdin
+json_response=$( (cat "$PROMPT"; echo; git show HEAD) | gemini -p ) || {
+    fx-error "Gemini command failed."
+    exit 1
+}
+
+# So far Gemini always respects the prompt to create a JSON object for return.
+# The response seems to always come in a markdown block: strip the fences.
+# Following https://github.com/google-gemini/gemini-cli/issues/5021#issue-3268410106
+json_data=$(echo "$json_response" | sed -e 's/^[[:space:]]*```\(json\)\?//' -e 's/```[[:space:]]*$//')
+
+if ! echo "$json_data" | jq -e . > /dev/null; then
+    fx-error "Gemini response was not valid JSON"
+    echo -e >&2 "RAW RESPONSE:"
+    echo "$json_response"
+    exit 1
+fi
+
+
+text=$(echo "$json_data" | jq -r '.response_text')
+diff=$(echo "$json_data" | jq -r '.diff')
+
+if [[ "$use_tui" == "tui" ]]; then
+    fx gum format "${text}" | fx gum style \
+                    --border=rounded \
+                    --margin="1 4" \
+                    --padding="1 4" \
+                    --align="left" \
+                    --width=$((${COLUMNS:-80} - 10))
+else
+    echo "${text}"
+fi
+if [[ -n "$diff" ]]; then
+    echo -e >&2 "Diff of suggested changes:"
+    echo -e >&2 "$diff"
+    TMP_DIR="${FUCHSIA_DIR}/tmp/g-review"
+    mkdir -p "${TMP_DIR}"
+    diff_file=$(mktemp "${TMP_DIR}/${commit_hash}.XXXXXX.diff")
+    echo "$diff" > "${diff_file}"
+    echo -e >&2 "(diff saved at ${diff_file})"
+fi
+
+

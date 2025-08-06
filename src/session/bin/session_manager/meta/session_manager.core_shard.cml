@@ -137,11 +137,6 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.ssh.AuthorizedKeys",
-            from: "#ssh-key-manager",
-            to: "#session-manager",
-        },
-        {
             protocol: "fuchsia.starnix.runner.Manager",
             from: "#starnix_runner",
             to: "#session-manager",
@@ -273,7 +268,10 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.power.broker.Topology",
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.cpu.manager.Boost",
+            ],
             from: "parent",
             to: "#session-manager",
             availability: "same_as_target",
@@ -783,6 +781,13 @@
             protocol: "fuchsia.sensors.Manager",
             from: "#sensors",
             to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.tracing.controller.Provisioner",
+            from: "#trace_manager",
+            to: "#session-manager",
+            availability: "optional",
             source_availability: "unknown",
         },
     ],

@@ -585,16 +585,69 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::TwoWayAddRequest>
+        for ::fidl_test_drivertwoway::TwoWayAddRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::TwoWayAddRequest) -> Self {
+            Self {
+                addend1: ::fidl_next::CompatFrom::compat_from(value.addend1),
+
+                addend2: ::fidl_next::CompatFrom::compat_from(value.addend2),
+            }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_drivertwoway::TwoWayAddRequest>
+        for crate::TwoWayAddRequest
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_drivertwoway::TwoWayAddRequest) -> Self {
+            Self {
+                addend1: ::fidl_next::CompatFrom::compat_from(value.addend1),
+
+                addend2: ::fidl_next::CompatFrom::compat_from(value.addend2),
+            }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<crate::TwoWayAddResponse>
+        for ::fidl_test_drivertwoway::TwoWayAddResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::TwoWayAddResponse) -> Self {
+            Self { sum: ::fidl_next::CompatFrom::compat_from(value.sum) }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_drivertwoway::TwoWayAddResponse>
+        for crate::TwoWayAddResponse
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_drivertwoway::TwoWayAddResponse) -> Self {
+            Self { sum: ::fidl_next::CompatFrom::compat_from(value.sum) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `TwoWay`
     /// protocol.
-    pub type TwoWayProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::TwoWay>;
+    pub type TwoWayProxy = ::fidl_next::ClientSender<crate::TwoWay>;
 
     #[cfg(feature = "driver")]
-    impl ::core::convert::From<crate::TwoWay> for ::fidl_test_drivertwoway::TwoWayMarker {
-        #[inline]
-        fn from(_: crate::TwoWay) -> Self {
+    impl ::fidl_next::CompatFrom<crate::TwoWay> for ::fidl_test_drivertwoway::TwoWayMarker {
+        fn compat_from(_: crate::TwoWay) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::CompatFrom<::fidl_test_drivertwoway::TwoWayMarker> for crate::TwoWay {
+        fn compat_from(_: ::fidl_test_drivertwoway::TwoWayMarker) -> Self {
             Self
         }
     }

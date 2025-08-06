@@ -28,7 +28,7 @@ aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = "0.8.11"
 ansi_term = "0.12.0"
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 arc-swap = "1.7.1"
 argh = "0.1.12"
@@ -53,7 +53,7 @@ bt-common = "0.0.1"
 bt-gatt = "0.0.1"
 bumpalo = { version = "3.17.0", features = [ "collections" ] }
 byteorder = "1.5.0"
-bytes = "1.10.0"
+bytes = "1.10.1"
 camino = { version = "1.1.9", features = ["proptest1", "serde1"] }
 cbc = "0.1.2"
 cfg-if = "1.0.0"
@@ -98,7 +98,7 @@ downcast-rs = "2.0.1"
 dyn-clone = "1.0.19"
 ecb = "0.1.2"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
-either = "1.14.0"
+either = "1.15.0"
 elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
 enumn = "0.1.14"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
@@ -142,7 +142,7 @@ itertools = "0.14"
 itoa = "1.0"
 json5format = "0.2.6"
 lazy_static = "1.5"
-libc = { version = "0.2.171", features = ["extra_traits"] }
+libc = { version = "0.2.174", features = ["extra_traits"] }
 libm = "0.2.15"
 linked-hash-map = "0.5.6"
 lock_api = "0.4.11"
@@ -207,7 +207,7 @@ rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
-schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
+schemars = { version = "0.8.22", features = ["chrono", "preserve_order"] }
 scopeguard = "1.2.0"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_derive = "1.0.147"
@@ -235,7 +235,7 @@ termion = "1.5.3"
 termtree = "0.5.1"
 test-case = "3.2.1"
 textwrap = { version = "0.16.2", default-features = false }
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 tokio-rustls = "0.24.1"
 toml = "0.5"
 toml_edit = "0.2.1"
@@ -317,7 +317,7 @@ fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.9"
 hyper-rustls = { version = "0.24.2", default-features = false, features = ["rustls-native-certs"] }
-indoc = "1.0.3"
+indoc = "2.0.6"
 loom = "0.7.1"
 # TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
@@ -509,7 +509,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.ahash."0.8.11".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
-[gn.package.anyhow."1.0.97"]
+[gn.package.anyhow."1.0.98"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
 license_files = ["LICENSE-APACHE"]
@@ -614,6 +614,7 @@ visibility = [
   ":loom-v0_7_1.rustdoc",
   ":loom-v0_7_1.aux.deps.deps",
   ":loom-v0_7_1.aux.deps.transdeps",
+  ":loom-v0_7_1.actual.rust_compilation_deps",
 ]
 testonly = true
 deps = [
@@ -662,7 +663,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.lazy_static."1.5.0"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
 
-[gn.package.libc."0.2.171"]
+[gn.package.libc."0.2.174"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -679,7 +680,7 @@ rustflags = [
   "--cfg=libc_const_extern_fn",
  ]
 
-[gn.package.libc."0.2.171".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.174".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.libm."0.2.15"]
@@ -886,18 +887,22 @@ visibility = [
   ":rustls-v0_21_12.rustdoc",
   ":rustls-v0_21_12.aux.deps.deps",
   ":rustls-v0_21_12.aux.deps.transdeps",
+  ":rustls-v0_21_12.actual.rust_compilation_deps",
   ":rustls-webpki-v0_101_7.actual",
   ":rustls-webpki-v0_101_7.rustdoc",
   ":rustls-webpki-v0_101_7.aux.deps.deps",
   ":rustls-webpki-v0_101_7.aux.deps.transdeps",
+  ":rustls-webpki-v0_101_7.actual.rust_compilation_deps",
   ":sct-v0_7_1.actual",
   ":sct-v0_7_1.rustdoc",
   ":sct-v0_7_1.aux.deps.deps",
   ":sct-v0_7_1.aux.deps.transdeps",
+  ":sct-v0_7_1.actual.rust_compilation_deps",
   ":tuf-v0_3_0-beta13.actual",
   ":tuf-v0_3_0-beta13.rustdoc",
   ":tuf-v0_3_0-beta13.aux.deps.deps",
   ":tuf-v0_3_0-beta13.aux.deps.transdeps",
+  ":tuf-v0_3_0-beta13.actual.rust_compilation_deps",
 ]
 deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
 env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
@@ -977,7 +982,7 @@ rustflags = []
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
 
-[gn.package.schemars."0.8.10"]
+[gn.package.schemars."0.8.22"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 
 # scoped-tls has not gone through a thorough safety review yet, and needs to be
@@ -989,6 +994,7 @@ visibility = [
   ":loom-v0_7_1.rustdoc",
   ":loom-v0_7_1.aux.deps.deps",
   ":loom-v0_7_1.aux.deps.transdeps",
+  ":loom-v0_7_1.actual.rust_compilation_deps",
 ]
 testonly = true
 
@@ -1060,7 +1066,7 @@ visibility = [
   "//tools/lib/reference_doc/macro:*",
 ]
 
-[gn.package.thiserror."2.0.11"]
+[gn.package.thiserror."2.0.12"]
 # Has build script but no config needed.
 
 [gn.package.thiserror."1.0.69"]
@@ -1094,8 +1100,8 @@ reviewed_features = [
 
 [gn.package.tokio."1.38.1".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
-  ":bytes-v1_10_0",
-  ":libc-v0_2_171",
+  ":bytes-v1_10_1",
+  ":libc-v0_2_174",
   ":memchr-v2_7_4",
   ":mio-v0_8_9",
   ":num_cpus-v1_16_0",

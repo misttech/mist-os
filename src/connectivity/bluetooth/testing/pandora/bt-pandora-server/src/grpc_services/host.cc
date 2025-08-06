@@ -4,46 +4,15 @@
 
 #include "host.h"
 
-#include <lib/syslog/cpp/macros.h>
-
 #include <algorithm>
 
-#include "fidl/fuchsia.bluetooth.sys/cpp/common_types.h"
-#include "lib/component/incoming/cpp/protocol.h"
-#include "src/connectivity/bluetooth/testing/bt-affordances/ffi_c/bindings.h"
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/message.h>
 
 using grpc::Status;
 using grpc::StatusCode;
 
 using namespace std::chrono_literals;
-
-HostService::HostService(async_dispatcher_t* dispatcher) {
-  // Connect to fuchsia.bluetooth.sys.Pairing
-  zx::result pairing_client_end = component::Connect<fuchsia_bluetooth_sys::Pairing>();
-  if (!pairing_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to Pairing service: " << pairing_client_end.error_value();
-    return;
-  }
-  pairing_client_.Bind(std::move(*pairing_client_end));
-
-  // Connect to fuchsia.bluetooth.sys.PairingDelegate and set PairingDelegate
-  zx::result<fidl::Endpoints<fuchsia_bluetooth_sys::PairingDelegate>> endpoints =
-      fidl::CreateEndpoints<fuchsia_bluetooth_sys::PairingDelegate>();
-  if (!endpoints.is_ok()) {
-    FX_LOGS(ERROR) << "Error creating PairingDelegate endpoints: " << endpoints.status_string();
-    return;
-  }
-  auto [pairing_delegate_client_end, pairing_delegate_server_end] = *std::move(endpoints);
-  auto result = pairing_client_->SetPairingDelegate({fuchsia_bluetooth_sys::InputCapability::kNone,
-                                                     fuchsia_bluetooth_sys::OutputCapability::kNone,
-                                                     std::move(pairing_delegate_client_end)});
-  if (result.is_error()) {
-    FX_LOGS(ERROR) << "Error setting PairingDelegate: " << result.error_value();
-    return;
-  }
-  fidl::BindServer(dispatcher, std::move(pairing_delegate_server_end),
-                   std::make_unique<PairingDelegateImpl>());
-}
 
 // TODO(https://fxbug.dev/316721276): Implement gRPCs necessary to enable GAP/A2DP testing.
 
@@ -95,39 +64,32 @@ Status HostService::WaitConnection(grpc::ServerContext* context,
 Status HostService::ConnectLE(::grpc::ServerContext* context,
                               const ::pandora::ConnectLERequest* request,
                               ::pandora::ConnectLEResponse* response) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  if (!request->has_public_()) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Expected PeerId encoded in public address field");
+  }
+
+  uint64_t peer_id;
+  if (request->public_().size() == 6) {
+    peer_id = get_peer_id(request->public_().c_str());
+  } else {
+    peer_id = std::strtoul(request->public_().c_str(), nullptr, /*base=*/10);
+  }
+
+  if (connect_le(peer_id) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
+  }
+  response->mutable_connection()->mutable_cookie()->set_value(std::to_string(peer_id));
+  return {/*OK*/};
 }
 
 Status HostService::Disconnect(::grpc::ServerContext* context,
                                const ::pandora::DisconnectRequest* request,
                                ::google::protobuf::Empty* response) {
-  auto peer_it =
-      std::find_if(peers_.begin(), peers_.end(),
-                   [id = request->connection()](const fuchsia_bluetooth_sys::Peer& candidate) {
-                     if (candidate.id()) {
-                       return std::to_string(candidate.id()->value()) == id.cookie().value();
-                     }
-                     return false;
-                   });
-
-  // Disconnect from peer if found
-  if (peer_it != peers_.end() && peer_it->connected() && *peer_it->connected()) {
-    access_client_->Disconnect({*peer_it->id()})
-        .Then([this, id = *peer_it->id()](
-                  fidl::Result<fuchsia_bluetooth_sys::Access::Disconnect>& disconnect) {
-          if (disconnect.is_error()) {
-            auto err = disconnect.error_value();
-            FX_LOGS(ERROR) << "Disconnect error: " << err.FormatDescription();
-          } else {
-            FX_LOGS(INFO) << "Disconnected peer: " << std::hex << id.value();
-          }
-          cv_access_.notify_one();
-        });
-
-    std::unique_lock<std::mutex> lock(m_access_);
-    cv_access_.wait(lock);
+  uint64_t peer_id =
+      std::strtoul(request->connection().cookie().value().c_str(), nullptr, /*base=*/10);
+  if (disconnect_peer(peer_id) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }
-
   return {/*OK*/};
 }
 
@@ -140,12 +102,50 @@ Status HostService::WaitDisconnection(::grpc::ServerContext* context,
 Status HostService::Advertise(::grpc::ServerContext* context,
                               const ::pandora::AdvertiseRequest* request,
                               ::grpc::ServerWriter<::pandora::AdvertiseResponse>* writer) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  uint8_t address_type =
+      request->own_address_type() == pandora::OwnAddressType::PUBLIC ||
+              request->own_address_type() == pandora::OwnAddressType::RESOLVABLE_OR_PUBLIC
+          ? 1
+          : 2;
+  uint64_t peer_id = advertise_peripheral(request->connectable(), address_type);
+  if (!peer_id) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
+  }
+  pandora::AdvertiseResponse response;
+  response.mutable_connection()->mutable_cookie()->set_value(std::to_string(peer_id));
+  writer->Write(response);
+  return {/*OK*/};
 }
 
 Status HostService::Scan(::grpc::ServerContext* context, const ::pandora::ScanRequest* request,
                          ::grpc::ServerWriter<::pandora::ScanningResponse>* writer) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  {
+    std::lock_guard lock(m_scan_scp_writer_);
+    scan_rsp_writer = writer;
+  }
+
+  if (start_le_scan(/*context=*/this, LeScanCb) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Failure to start_le_scan (check logs)");
+  }
+
+  // TODO(https://fxbug.dev/396500079): Potentially migrate to gRPC async callback API and remove
+  // this timeout. Since we are using the sync API, `writer` is invalidated when this handler exits,
+  // so we keep it alive for an arbitrary sleep period allowing the scan to proceed, after which we
+  // cancel the scan. In practice, the mmi2gRPC client cancels the scan earlier (when the test peer
+  // is found).
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  std::lock_guard lock(m_scan_scp_writer_);
+  scan_rsp_writer = nullptr;
+  zx_status_t status = stop_le_scan();
+  if (status == ZX_OK) {
+    FX_LOGS(WARNING) << "LE scan stopped after timeout.";
+  } else if (status == ZX_ERR_BAD_STATE) {
+    FX_LOGS(INFO) << "LE scan was already stopped after timeout.";
+  } else {
+    return Status(StatusCode::INTERNAL, "Unexpected error in stop_le_scan");
+  }
+  return {/*OK*/};
 }
 
 Status HostService::Inquiry(::grpc::ServerContext* context,
@@ -168,21 +168,6 @@ Status HostService::SetConnectabilityMode(::grpc::ServerContext* context,
                                           const ::pandora::SetConnectabilityModeRequest* request,
                                           ::google::protobuf::Empty* response) {
   return Status(StatusCode::UNIMPLEMENTED, "");
-}
-
-void HostService::PairingDelegateImpl::OnPairingRequest(
-    OnPairingRequestRequest& request, OnPairingRequestCompleter::Sync& completer) {
-  FX_LOGS(INFO) << "PairingDelegate received pairing request; accepting";
-  completer.Reply({true, {}});
-}
-
-void HostService::PairingDelegateImpl::OnPairingComplete(
-    OnPairingCompleteRequest& request, OnPairingCompleteCompleter::Sync& completer) {
-  if (request.success()) {
-    FX_LOGS(INFO) << "Succesfully paired to peer id: " << request.id().value();
-    return;
-  }
-  FX_LOGS(ERROR) << "Error pairing to peer id: " << request.id().value();
 }
 
 std::vector<fuchsia_bluetooth_sys::Peer>::const_iterator HostService::WaitForPeer(

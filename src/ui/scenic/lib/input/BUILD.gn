@@ -54,7 +54,11 @@ source_set("utils") {
     "//zircon/system/ulib/trace",
   ]
 
-  public_deps = [ "//src/ui/scenic/lib/view_tree:view_tree_snapshot" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
+    "//src/ui/scenic/lib/view_tree:view_tree_snapshot",
+  ]
 }
 
 source_set("gesture_contender_interface") {
@@ -137,6 +141,8 @@ source_set("mouse") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/trace",
   ]
+
+  public_deps = [ "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp" ]
 }
 
 source_set("touch") {

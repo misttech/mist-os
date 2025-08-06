@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fzl/pinned-vmo.h>
@@ -23,22 +22,27 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace goldfish {
 
-class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
+class DisplayEngine final : public display::DisplayEngineInterface {
  public:
   // `control`, `pipe`, `sysmem_allocator` must be valid.
   // `render_control` must not be null.
   // `display_event_dispatcher` must be non-null and outlive `DisplayEngine`.
+  // `engine_events` must not be null and must outlive `DisplayEngine`.
   explicit DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
                          fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
                          fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
                          std::unique_ptr<RenderControl> render_control,
-                         async_dispatcher_t* display_event_dispatcher);
+                         async_dispatcher_t* display_event_dispatcher,
+                         display::DisplayEngineEventsInterface* engine_events);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -50,40 +54,39 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // Performs initialization that cannot be done in the constructor.
   zx::result<> Initialize();
 
-  // ddk::DisplayEngineProtocol
-  void DisplayEngineCompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t* display_engine_listener,
-      engine_info_t* out_banjo_engine_info);
-  void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
-  void DisplayEngineUnsetListener();
-  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
-                                                  zx::channel collection_token);
-  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-                                       uint64_t* out_image_handle);
-  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t index, uint64_t* out_capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  void DisplayEngineReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayEngineCheckConfiguration(const display_config_t* display_config_ptr);
-  void DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
-                                       const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayEngineSetBufferCollectionConstraints(
-      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
+  // display::DisplayEngineInterface
+  display::EngineInfo CompleteCoordinatorConnection() override;
+
+  zx::result<> ImportBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
+  zx::result<> ReleaseBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id) override;
+  zx::result<display::DriverImageId> ImportImage(
+      const display::ImageMetadata& image_metadata,
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  void ReleaseImage(display::DriverImageId image_id) override;
+  display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id,
+      std::variant<display::ModeId, display::DisplayTiming> display_mode,
+      display::ColorConversion color_conversion,
+      cpp20::span<const display::DriverLayer> layers) override;
+  void ApplyConfiguration(display::DisplayId display_id,
+                          std::variant<display::ModeId, display::DisplayTiming> display_mode,
+                          display::ColorConversion color_conversion,
+                          cpp20::span<const display::DriverLayer> layers,
+                          display::DriverConfigStamp config_stamp) override;
+  zx::result<> SetBufferCollectionConstraints(
+      const display::ImageBufferUsage& image_buffer_usage,
+      display::DriverBufferCollectionId buffer_collection_id) override;
+  zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
+  zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
+  zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
+  zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
 
   void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
-
-  const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
-    return &display_engine_protocol_ops_;
-  }
 
  private:
   struct ColorBuffer {
@@ -144,8 +147,8 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   };
 
   zx::result<display::DriverImageId> ImportVmoImage(
-      const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
-      zx::vmo vmo, size_t offset);
+      const display::ImageMetadata& image_metadata,
+      const fuchsia_images2::PixelFormat& pixel_format, zx::vmo vmo, size_t offset);
 
   zx_status_t SetupPrimaryDisplay();
   zx_status_t PresentPrimaryDisplayConfig(const DisplayConfig& display_config);
@@ -166,9 +169,12 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   std::unique_ptr<RenderControl> rc_;
   DisplayState primary_display_device_ = {};
   fbl::Mutex flush_lock_;
-  ddk::DisplayEngineListenerProtocolClient engine_listener_ TA_GUARDED(flush_lock_);
 
   async_dispatcher_t* const display_event_dispatcher_;
+
+  // The display coordinator events are Sink'd through this interface.
+  // This must not be null and must outlive this object.
+  display::DisplayEngineEventsInterface* const engine_events_;
 };
 
 }  // namespace goldfish

@@ -65,6 +65,13 @@ type ConfigStamp = struct {
     value uint64;
 };
 
+/// Equivalent to [`fuchsia.hardware.display.types/Mode`].
+type DisplayMode = struct {
+    active_area SizeU;
+    refresh_rate_millihertz uint32;
+    flags uint32;
+};
+
 // An E-EDID can contain up to 256 data blocks, each of which contains 128
 // bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
 const MAX_COUNT_EDID_BYTES uint32 = 32768;
@@ -201,10 +208,8 @@ type ModeFlag = strict enum : uint32 {
     DOUBLE_CLOCKED = 0x10;
 };
 
-/// The video parameters which specify the display mode.
-///
-/// A superset of the [`fuchsia.hardware.display.types/Mode`] FIDL type.
-type DisplayMode = struct {
+/// The video timing parameters which specify the display mode.
+type DisplayTiming = struct {
     /// The rate at which pixel data gets transferred to the display.
     ///
     /// Valid modes have positive pixel clock rates. This constraint effectively
@@ -235,31 +240,31 @@ type DisplayMode = struct {
     flags uint32;
 };
 
-type ColorConversion = strict enum : uint32 {
-    /// If set, use the 0 vector for the color conversion preoffset
-    PREOFFSET = 0x1;
-    /// If set, use the identity matrix for the color conversion coefficients
-    COEFFICIENTS = 0x2;
-    /// If set, use the 0 vector for the color conversion postoffset
-    POSTOFFSET = 0x4;
+/// Color conversion is applied to each pixel according to the formula:
+///
+/// (coefficients * (pixel + preoffsets)) + postoffsets
+///
+/// where pixel is a column vector consisting of the pixel's 3 components.
+type ColorConversion = struct {
+    preoffsets array<float32, 3>;
+    coefficients array<array<float32, 3>, 3>;
+    postoffsets array<float32, 3>;
 };
 
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
 
-    mode DisplayMode;
+    /// Identifies the display mode provided by the panel.
+    ///
+    /// `timing` is used to set the timing parameters iff `mode_id` is
+    /// `INVALID_MODE_ID`.
+    mode_id uint16;
 
-    /// Bitmask of flags defined in the ColorConversion enum.
-    cc_flags uint32;
-    /// Color conversion is applied to each pixel according to the formula:
-    ///
-    /// (cc_coefficients * (pixel + cc_preoffsets)) + cc_postoffsets
-    ///
-    /// where pixel is a column vector consisting of the pixel's 3 components.
-    cc_preoffsets array<float32, 3>;
-    cc_coefficients array<array<float32, 3>, 3>;
-    cc_postoffsets array<float32, 3>;
+    /// Fallback timing parameters when `mode_id` is invalid.
+    timing DisplayTiming;
+
+    color_conversion ColorConversion;
 
     /// Valid display configurations have at least one layer.
     layers vector<Layer>:MAX;

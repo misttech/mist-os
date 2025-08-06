@@ -20,6 +20,7 @@ use crate::vfs::{
     Anon, DirEntryHandle, DowncastedFile, FileHandle, FileObject, FileSystem, FileSystemHandle,
     FsNode, FsStr, FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
 };
+use ebpf::MapFlags;
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
 use starnix_logging::{log_debug, trace_duration, CATEGORY_STARNIX_SECURITY};
@@ -36,7 +37,7 @@ use starnix_uapi::signals::Signal;
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::{bpf_cmd, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
+use starnix_uapi::{bpf_cmd, error, rlimit};
 use std::ops::Range;
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
@@ -110,11 +111,11 @@ impl From<OpenFlags> for PermissionFlags {
     }
 }
 
-impl PermissionFlags {
-    pub fn from_bpf_flags(bpf_flags: u32) -> Self {
-        if bpf_flags & BPF_F_RDONLY == BPF_F_RDONLY {
+impl From<MapFlags> for PermissionFlags {
+    fn from(bpf_flags: MapFlags) -> Self {
+        if bpf_flags.contains(MapFlags::SyscallReadOnly) {
             PermissionFlags::READ
-        } else if bpf_flags & BPF_F_WRONLY == BPF_F_WRONLY {
+        } else if bpf_flags.contains(MapFlags::SyscallWriteOnly) {
             PermissionFlags::WRITE
         } else {
             PermissionFlags::READ | PermissionFlags::WRITE
@@ -1361,9 +1362,9 @@ pub fn check_syslog_access(source: &CurrentTask, action: SyslogAction) -> Result
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.ptrace_traceme");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::task::ptrace_access_check(
+        selinux_hooks::task::ptrace_traceme(
             &security_server.as_permission_check(),
-            &current_task,
+            current_task,
             &parent_tracer_task,
         )
     })

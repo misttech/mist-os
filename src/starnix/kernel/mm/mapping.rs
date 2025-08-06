@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
+use crate::mm::memory_manager::MemoryManagerState;
 use crate::mm::{
     FaultRegisterMode, MappingOptions, MlockMapping, ProtectionFlags, UserFault,
     GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS, PAGE_SIZE,
@@ -63,39 +64,23 @@ static_assertions::assert_eq_size!(Mapping, [u8; 48]);
 
 impl Mapping {
     pub fn new(
-        base: UserAddress,
-        memory: Arc<MemoryObject>,
-        memory_offset: u64,
+        backing: MappingBacking,
         flags: MappingFlags,
         max_access: Access,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Self::with_name(
-            base,
-            memory,
-            memory_offset,
-            flags,
-            max_access,
-            MappingName::None,
-            file_write_guard,
-        )
+        Self::with_name(backing, flags, max_access, MappingName::None, file_write_guard)
     }
 
     pub fn with_name(
-        base: UserAddress,
-        memory: Arc<MemoryObject>,
-        memory_offset: u64,
+        backing: MappingBacking,
         flags: MappingFlags,
         max_access: Access,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
         MappingUnsplit {
-            backing: MappingBacking::Memory(Box::new(MappingBackingMemory {
-                base,
-                memory,
-                memory_offset,
-            })),
+            backing,
             flags,
             max_access,
             name,
@@ -119,11 +104,11 @@ impl Mapping {
         self.max_access
     }
 
-    pub fn backing(&self) -> &MappingBacking {
+    pub fn get_backing_internal(&self) -> &MappingBacking {
         &self.backing
     }
 
-    pub fn set_backing(&mut self, backing: MappingBacking) {
+    pub fn set_backing_internal(&mut self, backing: MappingBacking) {
         self.backing = backing;
     }
 
@@ -294,27 +279,6 @@ impl Mapping {
         // ui   -   userfaultfd minor fault pages tracking (since Linux 5.13)
         string
     }
-
-    pub fn split_prefix_off(&mut self, start: UserAddress, prefix_len: u64) -> Self {
-        match &mut self.backing {
-            MappingBacking::Memory(backing) => {
-                // Shrink the range of the named mapping to only the named area.
-                backing.memory_offset = prefix_len;
-                Mapping::new(
-                    start,
-                    backing.memory.clone(),
-                    backing.memory_offset,
-                    self.flags,
-                    self.max_access,
-                    self.file_write_guard.clone(),
-                )
-            }
-            #[cfg(feature = "alternate_anon_allocs")]
-            MappingBacking::PrivateAnonymous => {
-                Mapping::new_private_anonymous(self.flags, self.name())
-            }
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -361,43 +325,21 @@ pub enum MappingName {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct MappingBackingMemory {
-    /// The base address of this mapping.
-    ///
-    /// Keep in mind that the mapping might be trimmed in the RangeMap if the
-    /// part of the mapping is unmapped, which means the base might extend
-    /// before the currently valid portion of the mapping.
-    base: UserAddress,
-
     /// The memory object that contains the memory used in this mapping.
     memory: Arc<MemoryObject>,
 
-    /// The offset in the memory object that corresponds to the base address.
-    memory_offset: u64,
+    /// The delta to convert from a user address to an offset in the memory object.
+    address_to_offset_delta: u64,
 }
 
 impl MappingBackingMemory {
-    pub fn base(&self) -> UserAddress {
-        self.base
-    }
-
-    pub fn set_base(&mut self, base: UserAddress) {
-        self.base = base;
+    pub fn new(base: UserAddress, memory: Arc<MemoryObject>, memory_offset: u64) -> Self {
+        let address_to_offset_delta = memory_offset.wrapping_sub(base.ptr() as u64);
+        Self { memory, address_to_offset_delta }
     }
 
     pub fn memory(&self) -> &Arc<MemoryObject> {
         &self.memory
-    }
-
-    pub fn set_memory(&mut self, memory: Arc<MemoryObject>) {
-        self.memory = memory;
-    }
-
-    pub fn memory_offset(&self) -> u64 {
-        self.memory_offset
-    }
-
-    pub fn set_memory_offset(&mut self, memory_offset: u64) {
-        self.memory_offset = memory_offset;
     }
 
     /// Reads exactly `bytes.len()` bytes of memory from `addr`.
@@ -432,7 +374,7 @@ impl MappingBackingMemory {
 
     /// Converts a `UserAddress` to an offset in this mapping's memory object.
     pub fn address_to_offset(&self, addr: UserAddress) -> u64 {
-        (addr.ptr() - self.base.ptr()) as u64 + self.memory_offset
+        (addr.ptr() as u64).wrapping_add(self.address_to_offset_delta)
     }
 }
 
@@ -534,7 +476,7 @@ pub struct MappingSummary {
 }
 
 impl MappingSummary {
-    pub fn add(&mut self, mapping: &Mapping) {
+    pub fn add(&mut self, mm_state: &MemoryManagerState, mapping: &Mapping) {
         let kind_summary = match mapping.name() {
             MappingName::None => &mut self.no_kind,
             MappingName::Stack => &mut self.stack,
@@ -562,12 +504,9 @@ impl MappingSummary {
         if mapping.file_write_guard().0.is_some() {
             kind_summary.num_file_write_guards += 1;
         }
-        match &mapping.backing {
-            MappingBacking::Memory(m) => {
+        match mm_state.get_mapping_backing(mapping) {
+            MappingBacking::Memory(_) => {
                 kind_summary.num_memory_objects += 1;
-                if m.memory_offset != 0 {
-                    kind_summary.num_non_zero_memory_offset += 1;
-                }
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => kind_summary.num_private_anon += 1,
@@ -601,7 +540,6 @@ struct MappingKindSummary {
     count: u64,
     num_private: u64,
     num_shared: u64,
-    num_non_zero_memory_offset: u64,
     num_file_write_guards: u64,
     num_memory_objects: u64,
     #[cfg(feature = "alternate_anon_allocs")]
@@ -613,7 +551,6 @@ impl MappingKindSummary {
         node.record_uint("count", self.count);
         node.record_uint("num_private", self.num_private);
         node.record_uint("num_shared", self.num_shared);
-        node.record_uint("num_non_zero_memory_offset", self.num_non_zero_memory_offset);
         node.record_uint("num_file_write_guards", self.num_file_write_guards);
         node.record_uint("num_memory_objects", self.num_memory_objects);
         #[cfg(feature = "alternate_anon_allocs")]

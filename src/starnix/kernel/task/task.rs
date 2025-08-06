@@ -1092,7 +1092,7 @@ impl Task {
                     ExitStatus::Exit(u8::MAX)
                 });
                 let uid = self.persistent_info.real_creds().uid;
-                let exit_signal = self.thread_group().exit_signal.clone();
+                let exit_signal = self.thread_group().read().exit_signal.clone();
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
                     thread_group_key: self.thread_group_key.clone(),

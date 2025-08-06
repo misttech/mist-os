@@ -91,10 +91,6 @@ group("recovery") {
   ]
 }
 
-# TODO(https://fxbug.dev/42073789) Remove transitional labels
-group("tools") {
-}
-
 group("pkgfs-disable-executability-restrictions") {
   public_deps = [ "bin/pkg-cache:disable-executability-restrictions" ]
   deps = [ "//build/validate:non_production_tag" ]

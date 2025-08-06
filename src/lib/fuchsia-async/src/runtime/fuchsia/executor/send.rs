@@ -42,26 +42,6 @@ impl fmt::Debug for SendExecutor {
 }
 
 impl SendExecutor {
-    /// Create a new multi-threaded executor.
-    #[allow(deprecated)]
-    pub fn new(num_threads: u8) -> Self {
-        Self::new_inner(num_threads, None)
-    }
-
-    /// Set a new worker initialization callback. Will be invoked once at the start of each worker
-    /// thread.
-    pub fn set_worker_init(&mut self, worker_init: impl Fn() + Send + Sync + 'static) {
-        self.worker_init = Some(Arc::new(worker_init) as Arc<dyn Fn() + Send + Sync + 'static>);
-    }
-
-    /// Apply the worker initialization callback to an owned executor, returning the executor.
-    ///
-    /// The initialization callback will be invoked once at the start of each worker thread.
-    pub fn with_worker_init(mut self, worker_init: fn()) -> Self {
-        self.set_worker_init(worker_init);
-        self
-    }
-
     fn new_inner(
         num_threads: u8,
         worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
@@ -197,11 +177,42 @@ impl Drop for SendExecutor {
     }
 }
 
+/// A builder for `SendExecutor`.
+#[derive(Default)]
+pub struct SendExecutorBuilder {
+    num_threads: Option<u8>,
+    worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+}
+
+impl SendExecutorBuilder {
+    /// Creates a new builder used for constructing a `SendExecutor`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the number of threads for the executor.
+    pub fn num_threads(mut self, num_threads: u8) -> Self {
+        self.num_threads = Some(num_threads);
+        self
+    }
+
+    /// Sets the worker initialization function.
+    pub fn worker_init(mut self, worker_init: impl Fn() + Send + Sync + 'static) -> Self {
+        self.worker_init = Some(Arc::new(worker_init));
+        self
+    }
+
+    /// Builds the `SendExecutor`, consuming this `SendExecutorBuilder`.
+    pub fn build(self) -> SendExecutor {
+        SendExecutor::new_inner(self.num_threads.unwrap_or(1), self.worker_init)
+    }
+}
+
 // TODO(https://fxbug.dev/42156503) test SendExecutor with unit tests
 
 #[cfg(test)]
 mod tests {
-    use super::SendExecutor;
+    use super::SendExecutorBuilder;
     use crate::{Task, Timer};
 
     use futures::channel::oneshot;
@@ -210,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_stalled_triggers_wake_up() {
-        SendExecutor::new(2).run(async {
+        SendExecutorBuilder::new().num_threads(2).build().run(async {
             // The timer will only fire on one thread, so use one so we can get to a point where
             // only one thread is running.
             Timer::new(zx::MonotonicDuration::from_millis(10)).await;
@@ -244,7 +255,8 @@ mod tests {
             NUM_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
         }
 
-        let mut exec = SendExecutor::new(2).with_worker_init(initialize_test_worker);
+        let mut exec =
+            SendExecutorBuilder::new().num_threads(2).worker_init(initialize_test_worker).build();
         exec.run(async {});
         assert_eq!(NUM_INIT_CALLS.load(Ordering::SeqCst), 2);
         exec.run(async {});

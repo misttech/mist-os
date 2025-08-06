@@ -4,8 +4,8 @@
 
 //! Fuchsia-specific extensions to the FIDL codec.
 
-mod channel;
 mod handle;
+mod handle_types;
 
 use zx::sys::zx_handle_t;
 use zx::Handle;
@@ -14,8 +14,8 @@ use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{DecodeError, EncodeError};
 
-pub use self::channel::*;
 pub use self::handle::*;
+pub use self::handle_types::*;
 pub use zx;
 
 /// A decoder which support Zircon handles.

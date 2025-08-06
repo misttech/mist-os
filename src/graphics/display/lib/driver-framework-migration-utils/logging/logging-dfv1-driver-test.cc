@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/syslog/logger.h>
 
 #include <gtest/gtest.h>
 
@@ -45,7 +45,7 @@ TEST_F(DriverLoggingTest, MinimumLogLevelTrace) {
   testing::Dfv1DriverWithLogging* driver =
       device_with_logging()->GetDeviceContext<testing::Dfv1DriverWithLogging>();
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_TRACE);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_TRACE);
   EXPECT_TRUE(driver->LogTrace());
   EXPECT_TRUE(driver->LogDebug());
   EXPECT_TRUE(driver->LogInfo());
@@ -57,7 +57,7 @@ TEST_F(DriverLoggingTest, MinimumLogLevelDebug) {
   testing::Dfv1DriverWithLogging* driver =
       device_with_logging()->GetDeviceContext<testing::Dfv1DriverWithLogging>();
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_DEBUG);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_DEBUG);
   EXPECT_FALSE(driver->LogTrace());
   EXPECT_TRUE(driver->LogDebug());
   EXPECT_TRUE(driver->LogInfo());
@@ -69,7 +69,7 @@ TEST_F(DriverLoggingTest, MinimumLogLevelInfo) {
   testing::Dfv1DriverWithLogging* driver =
       device_with_logging()->GetDeviceContext<testing::Dfv1DriverWithLogging>();
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_INFO);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_INFO);
   EXPECT_FALSE(driver->LogTrace());
   EXPECT_FALSE(driver->LogDebug());
   EXPECT_TRUE(driver->LogInfo());
@@ -81,7 +81,7 @@ TEST_F(DriverLoggingTest, MinimumLogLevelWarning) {
   testing::Dfv1DriverWithLogging* driver =
       device_with_logging()->GetDeviceContext<testing::Dfv1DriverWithLogging>();
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_WARNING);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_WARNING);
   EXPECT_FALSE(driver->LogTrace());
   EXPECT_FALSE(driver->LogDebug());
   EXPECT_FALSE(driver->LogInfo());
@@ -93,7 +93,7 @@ TEST_F(DriverLoggingTest, MinimumLogLevelError) {
   testing::Dfv1DriverWithLogging* driver =
       device_with_logging()->GetDeviceContext<testing::Dfv1DriverWithLogging>();
 
-  mock_ddk::SetMinLogSeverity(FX_LOG_ERROR);
+  mock_ddk::SetMinLogSeverity(DDK_LOG_ERROR);
   EXPECT_FALSE(driver->LogTrace());
   EXPECT_FALSE(driver->LogDebug());
   EXPECT_FALSE(driver->LogInfo());

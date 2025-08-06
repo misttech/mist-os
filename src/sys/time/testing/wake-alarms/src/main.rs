@@ -46,7 +46,9 @@ async fn main() -> Result<()> {
     let scope = fuchsia_async::Scope::new();
     let timer_loop = alarms::connect_to_hrtimer_async()
         .await
-        .inspect_err(|e| log::error!("could not connect to hrtimer: {}", &e))
+        .inspect_err(|e| {
+            log::error!("could not connect to the hrtimer driver, wakes will not work: {:?}", &e)
+        })
         .map(|proxy| {
             Rc::new(alarms::Loop::new(
                 scope.to_handle(),

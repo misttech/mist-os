@@ -23,7 +23,6 @@
 #include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
-#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <fidl/fuchsia.web/cpp/fidl.h>
@@ -310,7 +309,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
              {Protocol{fidl::DiscoverableProtocolName<
                   fuchsia_accessibility_semantics::SemanticsManager>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
-              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_scenic::Scenic>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>}},
          .source = kTestUIStackRef,
@@ -321,8 +319,12 @@ class WebEngineTest : public ui_testing::PortableUITest,
             .source = ParentRef(),
             .targets =
                 {
-                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureSignaler},
-                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
+                    target,
+                    ChildRef{kFontsProvider},
+                    ChildRef{kMemoryPressureSignaler},
+                    ChildRef{kBuildInfoProvider},
+                    ChildRef{kWebContextProvider},
+                    ChildRef{kIntl},
                     ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.

@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
@@ -31,20 +30,40 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 
-namespace fhdt = fuchsia_hardware_display_types;
-
 namespace display_coordinator {
+
+namespace {
+
+display::DriverLayer CreatePlaceholderDriverLayer() {
+  return display::DriverLayer({
+      .display_destination = display::Rectangle({.x = 0, .y = 0, .width = 1, .height = 1}),
+      .image_source = display::Rectangle({.x = 0, .y = 0, .width = 0, .height = 0}),
+      .image_id = display::kInvalidDriverImageId,
+      .image_metadata = display::ImageMetadata({
+          .width = 0,
+          .height = 0,
+          .tiling_type = display::ImageTilingType::kLinear,
+      }),
+      .fallback_color = display::Color({
+          .format = display::PixelFormat::kR8G8B8A8,
+          .bytes = {{0, 0, 0, 0, 0, 0, 0, 0}},
+      }),
+  });
+}
+
+}  // namespace
 
 static_assert(WaitingImageList::kMaxSize ==
                   fuchsia_hardware_display::wire::kMaxWaitingImagesPerLayer,
               "Violation of fuchsia.hardware.display.Coordinator API contract.");
 
 Layer::Layer(Controller* controller, display::LayerId id)
-    : IdMappable(id), controller_(*controller) {
+    : IdMappable(id),
+      controller_(*controller),
+      draft_layer_config_(CreatePlaceholderDriverLayer()),
+      applied_layer_config_(CreatePlaceholderDriverLayer()) {
   ZX_DEBUG_ASSERT(controller != nullptr);
 
-  std::memset(&draft_layer_config_, 0, sizeof(layer_t));
-  std::memset(&applied_layer_config_, 0, sizeof(layer_t));
   draft_layer_config_differs_from_applied_ = false;
 
   draft_display_config_list_node_.layer = this;
@@ -106,21 +125,24 @@ void Layer::ApplyChanges() {
     return;
   }
 
-  applied_layer_config_ = draft_layer_config_;
-  draft_layer_config_differs_from_applied_ = false;
-
-  const rect_u& image_source = applied_layer_config_.image_source;
-  const bool is_solid_color_fill = image_source.width == 0 && image_source.height == 0;
+  const display::Rectangle& image_source = draft_layer_config_.image_source();
+  const bool is_solid_color_fill = image_source.width() == 0 && image_source.height() == 0;
   if (is_solid_color_fill) {
     applied_image_ = nullptr;
     waiting_images_.RemoveAllImages();
   }
 
-  if (applied_image_ != nullptr) {
-    applied_layer_config_.image_handle = applied_image_->driver_id().ToBanjo();
-  } else {
-    applied_layer_config_.image_handle = INVALID_DISPLAY_ID;
-  }
+  applied_layer_config_ = display::DriverLayer({
+      .display_destination = draft_layer_config_.display_destination(),
+      .image_source = draft_layer_config_.image_source(),
+      .image_id = applied_image_ ? applied_image_->driver_id() : display::kInvalidDriverImageId,
+      .image_metadata = draft_layer_config_.image_metadata(),
+      .fallback_color = draft_layer_config_.fallback_color(),
+      .alpha_mode = draft_layer_config_.alpha_mode(),
+      .alpha_coefficient = draft_layer_config_.alpha_coefficient(),
+      .image_source_transformation = draft_layer_config_.image_source_transformation(),
+  });
+  draft_layer_config_differs_from_applied_ = false;
 }
 
 void Layer::DiscardChanges() {
@@ -173,7 +195,16 @@ bool Layer::ActivateLatestReadyImage() {
                                                 applied_image_->latest_client_config_stamp()));
 
   applied_image_ = std::move(newest_ready_image);
-  applied_layer_config_.image_handle = applied_image_->driver_id().ToBanjo();
+  applied_layer_config_ = display::DriverLayer({
+      .display_destination = applied_layer_config_.display_destination(),
+      .image_source = applied_layer_config_.image_source(),
+      .image_id = applied_image_->driver_id(),
+      .image_metadata = applied_layer_config_.image_metadata(),
+      .fallback_color = applied_layer_config_.fallback_color(),
+      .alpha_mode = applied_layer_config_.alpha_mode(),
+      .alpha_coefficient = applied_layer_config_.alpha_coefficient(),
+      .image_source_transformation = applied_layer_config_.image_source_transformation(),
+  });
 
   // TODO(costan): `applied_layer_config_` is updated without updating
   // `draft_layer_config_differs_from_applied_`. Is it guaranteed that the
@@ -191,64 +222,77 @@ bool Layer::AppendToConfigLayerList(fbl::DoublyLinkedList<LayerNode*>& config_la
   return true;
 }
 
-void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
-  draft_layer_config_.image_handle = INVALID_DISPLAY_ID;
-  draft_layer_config_.image_metadata = display::ImageMetadata(image_metadata).ToBanjo();
-  const rect_u_t image_area = {.x = 0,
-                               .y = 0,
-                               .width = image_metadata.dimensions.width,
-                               .height = image_metadata.dimensions.height};
-  draft_layer_config_.fallback_color = {
-      .format = static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-      .bytes = {0, 0, 0, 0, 0, 0, 0, 0}};
-  draft_layer_config_.image_source = image_area;
-  draft_layer_config_.display_destination = image_area;
-
+void Layer::SetPrimaryConfig(display::ImageMetadata image_metadata) {
+  const display::Rectangle image_area = {{.x = 0,
+                                          .y = 0,
+                                          .width = image_metadata.dimensions().width(),
+                                          .height = image_metadata.dimensions().height()}};
+  draft_layer_config_ = display::DriverLayer({
+      .display_destination = image_area,
+      .image_source = image_area,
+      .image_id = display::kInvalidDriverImageId,
+      .image_metadata = display::ImageMetadata(image_metadata),
+      .fallback_color = display::Color({
+          .format = display::PixelFormat::kR8G8B8A8,
+          .bytes = {{0, 0, 0, 0, 0, 0, 0, 0}},
+      }),
+      .alpha_mode = draft_layer_config_.alpha_mode(),
+      .alpha_coefficient = draft_layer_config_.alpha_coefficient(),
+      .image_source_transformation = draft_layer_config_.image_source_transformation(),
+  });
   draft_layer_config_differs_from_applied_ = true;
 
   ++draft_image_config_gen_;
   draft_image_ = nullptr;
 }
 
-void Layer::SetPrimaryPosition(fhdt::wire::CoordinateTransformation image_source_transformation,
-                               fuchsia_math::wire::RectU image_source,
-                               fuchsia_math::wire::RectU display_destination) {
-  draft_layer_config_.image_source = display::Rectangle::From(image_source).ToBanjo();
-  draft_layer_config_.display_destination = display::Rectangle::From(display_destination).ToBanjo();
-  draft_layer_config_.image_source_transformation =
-      static_cast<uint8_t>(image_source_transformation);
+void Layer::SetPrimaryPosition(display::CoordinateTransformation image_source_transformation,
+                               display::Rectangle image_source,
+                               display::Rectangle display_destination) {
+  draft_layer_config_ = display::DriverLayer({
+      .display_destination = display_destination,
+      .image_source = image_source,
+      .image_id = draft_layer_config_.image_id(),
+      .image_metadata = draft_layer_config_.image_metadata(),
+      .fallback_color = draft_layer_config_.fallback_color(),
+      .alpha_mode = draft_layer_config_.alpha_mode(),
+      .alpha_coefficient = draft_layer_config_.alpha_coefficient(),
+      .image_source_transformation = image_source_transformation,
+  });
 
   draft_layer_config_differs_from_applied_ = true;
 }
 
-void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
-  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kDisable) == ALPHA_DISABLE,
-                "Bad constant");
-  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kPremultiplied) == ALPHA_PREMULTIPLIED,
-                "Bad constant");
-  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kHwMultiply) == ALPHA_HW_MULTIPLY,
-                "Bad constant");
-
-  draft_layer_config_.alpha_mode = static_cast<alpha_t>(mode);
-  draft_layer_config_.alpha_layer_val = val;
+void Layer::SetPrimaryAlpha(display::AlphaMode alpha_mode, float alpha_coefficient) {
+  draft_layer_config_ = display::DriverLayer({
+      .display_destination = draft_layer_config_.display_destination(),
+      .image_source = draft_layer_config_.image_source(),
+      .image_id = draft_layer_config_.image_id(),
+      .image_metadata = draft_layer_config_.image_metadata(),
+      .fallback_color = draft_layer_config_.fallback_color(),
+      .alpha_mode = alpha_mode,
+      .alpha_coefficient = alpha_coefficient,
+      .image_source_transformation = draft_layer_config_.image_source_transformation(),
+  });
 
   draft_layer_config_differs_from_applied_ = true;
 }
 
-void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
-                           fuchsia_math::wire::RectU display_destination) {
-  // Increase the size of the static array when large color formats are introduced
-  static_assert(decltype(color.bytes)::size() == sizeof(draft_layer_config_.fallback_color.bytes));
-
-  ZX_DEBUG_ASSERT(!color.format.IsUnknown());
-  draft_layer_config_.fallback_color.format =
-      static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
-  std::ranges::copy(color.bytes, draft_layer_config_.fallback_color.bytes);
-
-  draft_layer_config_.image_metadata = {.dimensions = {.width = 0, .height = 0},
-                                        .tiling_type = IMAGE_TILING_TYPE_LINEAR};
-  draft_layer_config_.image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
-  draft_layer_config_.display_destination = display::Rectangle::From(display_destination).ToBanjo();
+void Layer::SetColorConfig(display::Color color, display::Rectangle display_destination) {
+  draft_layer_config_ = display::DriverLayer({
+      .display_destination = display_destination,
+      .image_source = display::Rectangle({.x = 0, .y = 0, .width = 0, .height = 0}),
+      .image_id = display::kInvalidDriverImageId,
+      .image_metadata = display::ImageMetadata({
+          .width = 0,
+          .height = 0,
+          .tiling_type = display::ImageTilingType::kLinear,
+      }),
+      .fallback_color = color,
+      .alpha_mode = draft_layer_config_.alpha_mode(),
+      .alpha_coefficient = draft_layer_config_.alpha_coefficient(),
+      .image_source_transformation = draft_layer_config_.image_source_transformation(),
+  });
 
   draft_layer_config_differs_from_applied_ = true;
 

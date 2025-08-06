@@ -62,7 +62,7 @@ impl TimeMatrixCallLog {
     pub fn drain<T: Any + Send + Clone>(&mut self, name: &str) -> Vec<TimeMatrixCall<T>> {
         self.calls
             .remove(name)
-            .unwrap_or_else(|| panic!("in time matrix \"{}\": call log not found", name))
+            .unwrap_or_default()
             .into_iter()
             .map(|call| call.map(|sample| sample.downcast::<T>().map(|sample| *sample)))
             .map(TimeMatrixCall::transpose)

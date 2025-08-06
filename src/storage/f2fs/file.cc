@@ -10,10 +10,18 @@
 #include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 
-File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
+File::File(F2fs *fs, ino_t ino, umode_t mode, LockedPage node_page)
+    : VnodeF2fs(fs, ino, mode, std::move(node_page)) {}
+
+File::File(F2fs *fs, ino_t ino, umode_t mode, std::optional<gid_t> gid) : VnodeF2fs(fs, ino, mode) {
+  if (gid) {
+    SetGid(*gid);
+  }
+}
 
 #if 0  // porting needed
 // int File::F2fsVmPageMkwrite(vm_area_struct *vma, vm_fault *vmf) {
@@ -368,7 +376,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   // There's no need to touch anything when it is being purged, migrating inline data, or an
   // orphan.
   if (unlikely(TestFlag(InodeInfoFlag::kNoAlloc) || TestFlag(InodeInfoFlag::kInlineData) ||
-               !GetNlink())) {
+               !GetLinkCount())) {
     return VnodeF2fs::VmoDirty(offset, length);
   }
 

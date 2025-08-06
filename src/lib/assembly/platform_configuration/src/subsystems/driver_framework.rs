@@ -5,10 +5,10 @@
 use crate::subsystems::prelude::*;
 use anyhow::anyhow;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::driver_framework_config::{
+use assembly_config_schema::platform_settings::driver_framework_config::{
     DriverFrameworkConfig, TestFuzzingConfig,
 };
-use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::platform_settings::storage_config::StorageConfig;
 use assembly_images_config::FilesystemImageMode;
 
 pub(crate) struct DriverFrameworkSubsystemConfig;
@@ -139,7 +139,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO_LEGACY);
         }
 
-        if context.board_info.provides_feature("fuchsia::fake_battery")
+        if context.board_config.provides_feature("fuchsia::fake_battery")
             && matches!(
                 context.feature_set_level,
                 FeatureSetLevel::Utility | FeatureSetLevel::Standard
@@ -171,8 +171,8 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         )?;
 
         // Include bus-pci or bus-kpci driver through platform AIBs.
-        let bus_pci = context.board_info.provides_feature("fuchsia::bus_pci");
-        let bus_kpci = context.board_info.provides_feature("fuchsia::bus_kpci");
+        let bus_pci = context.board_config.provides_feature("fuchsia::bus_pci");
+        let bus_kpci = context.board_config.provides_feature("fuchsia::bus_kpci");
 
         if bus_pci && bus_kpci {
             return Err(anyhow!(
@@ -191,7 +191,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             builder.platform_bundle("bus_kpci_driver");
         }
 
-        let interconnect = context.board_info.provides_feature("fuchsia::interconnect");
+        let interconnect = context.board_config.provides_feature("fuchsia::interconnect");
         if interconnect {
             builder.platform_bundle("interconnect_driver");
         }

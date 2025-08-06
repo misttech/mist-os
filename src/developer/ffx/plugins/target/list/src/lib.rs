@@ -183,63 +183,26 @@ async fn get_target_info(
     Ok((ffx::RemoteControlState::Down, None, None))
 }
 
-async fn handle_res_to_info(
-    context: &EnvironmentContext,
-    handle: Result<discovery::TargetHandle>,
-    connect_to_target: bool,
-) -> Result<ffx::TargetInfo> {
-    match handle {
-        Ok(h) => handle_to_info(context, h, connect_to_target).await,
-        Err(e) => async { Err(e) }.await,
-    }
-}
-
+// Convert the handle to a TargetInfo, filling in the information from the target if we are
+// asked to make a connection to RCS.
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
     connect_to_target: bool,
 ) -> Result<ffx::TargetInfo> {
-    let mut serial_number = None;
-    let (target_state, addresses) = match handle.state {
-        discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product { addrs: target_addrs, serial } => {
-            serial_number = serial;
-            (ffx::TargetState::Product, Some(target_addrs))
-        }
-        discovery::TargetState::Fastboot(fts) => {
-            let addresses = match fts.connection_state {
-                discovery::FastbootConnectionState::Usb => Some(vec![]),
-                discovery::FastbootConnectionState::Tcp(addresses)
-                | discovery::FastbootConnectionState::Udp(addresses) => {
-                    Some(addresses.into_iter().map(Into::into).collect())
-                }
-            };
-            (ffx::TargetState::Fastboot, addresses)
-        }
-        discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
-    };
-    let (rcs_state, product_config, board_config) = if connect_to_target {
-        if let Some(ref target_addrs) = addresses {
-            get_target_info(context, target_addrs).await?
+    let (rcs_state, product_config, board_config) =
+        if let discovery::TargetState::Product { ref addrs, .. } = handle.state {
+            // A let-chain would be cleaner, but they are only available in Rust 2024
+            if connect_to_target {
+                get_target_info(context, addrs).await?
+            } else {
+                (ffx::RemoteControlState::Unknown, None, None)
+            }
         } else {
             (ffx::RemoteControlState::Unknown, None, None)
-        }
-    } else {
-        (ffx::RemoteControlState::Unknown, None, None)
-    };
-    let addresses =
-        addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
-    Ok(ffx::TargetInfo {
-        nodename: handle.node_name,
-        addresses,
-        serial_number,
-        rcs_state: Some(rcs_state),
-        target_state: Some(target_state),
-        board_config,
-        product_config,
-        is_manual: Some(handle.manual),
-        ..Default::default()
-    })
+        };
+    let info: ffx::TargetInfo = handle.into();
+    Ok(ffx::TargetInfo { rcs_state: Some(rcs_state), board_config, product_config, ..info })
 }
 
 async fn local_list_targets(
@@ -252,11 +215,11 @@ async fn local_list_targets(
 }
 
 async fn handles_to_infos(
-    stream: impl futures::Stream<Item = Result<discovery::TargetHandle>>,
+    stream: impl futures::Stream<Item = discovery::TargetHandle>,
     ctx: &EnvironmentContext,
     connect: bool,
 ) -> Result<Vec<fidl_fuchsia_developer_ffx::TargetInfo>> {
-    let info_futures = stream.then(|t| handle_res_to_info(ctx, t, connect));
+    let info_futures = stream.then(|t| handle_to_info(ctx, t, connect));
     let infos: Vec<Result<ffx::TargetInfo>> = info_futures.collect().await;
     let targets = infos.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
     Ok(targets)
@@ -265,7 +228,7 @@ async fn handles_to_infos(
 async fn get_handle_stream(
     cmd: &ListCommand,
     ctx: &EnvironmentContext,
-) -> Result<impl futures::Stream<Item = Result<discovery::TargetHandle>>> {
+) -> Result<impl futures::Stream<Item = discovery::TargetHandle>> {
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
     let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
@@ -628,14 +591,14 @@ mod test {
     async fn test_serial_addresses() {
         // USB targets should have an empty list of addresses, not None
         let env = ffx_config::test_init().await.unwrap();
-        let handle = Ok(discovery::TargetHandle {
+        let handle = discovery::TargetHandle {
             node_name: Some("nodename".to_string()),
             state: discovery::TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "12345678".to_string(),
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
             manual: false,
-        });
+        };
         let stream = futures::stream::once(async { handle });
         let targets = handles_to_infos(stream, &env.context, true).await;
         let targets = targets.unwrap();
@@ -679,5 +642,30 @@ mod test {
         let tool = build_list_tool(list_cmd, &env, fho_env).await;
         let cmd = tool.update_from_target();
         assert_eq!(cmd.nodename, Some(String::from("mytarget")));
+    }
+
+    #[fuchsia::test]
+    async fn test_handle_to_info_address_sorting() {
+        let env = ffx_config::test_init().await.unwrap();
+        let non_link_local_addr: TargetAddr = "[2001:db8::1]:0".parse().unwrap();
+        let link_local_addr: TargetAddr = "[fe80::1]:0".parse().unwrap();
+
+        let handle = discovery::TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: discovery::TargetState::Product {
+                addrs: vec![non_link_local_addr.clone(), link_local_addr.clone()],
+                serial: None,
+            },
+            manual: false,
+        };
+
+        let info = handle_to_info(&env.context, handle, false).await.unwrap();
+
+        let addrs = info.addresses.unwrap();
+        assert_eq!(addrs.len(), 2);
+        let addrs: Vec<TargetAddr> = addrs.into_iter().map(|a| a.into()).collect();
+        // The link-local address should come first.
+        assert_eq!(addrs[0], link_local_addr);
+        assert_eq!(addrs[1], non_link_local_addr);
     }
 }

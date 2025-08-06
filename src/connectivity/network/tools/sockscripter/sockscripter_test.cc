@@ -29,6 +29,12 @@ TEST(SendBufferGenTest, LoadHexBuffer) {
   EXPECT_FALSE(gen.SetSendBufHex("-08"));
 }
 
+TEST(SendBufferGenTest, SetBufferLen) {
+  SendBufferGenerator gen;
+  EXPECT_TRUE(gen.SetSendBufLen(10));
+  EXPECT_EQ(gen.GetSndStr(), std::string(10, 0xAA));
+}
+
 TEST(SendBufferGenTest, CounterBuffer) {
   // SendBufferGenerator defaults to sending strings with incrementing packet count.
   SendBufferGenerator gen;
@@ -310,6 +316,19 @@ TEST(CommandLine, TcpShutdown) {
   EXPECT_CALL(test, shutdown(kSockFd, SHUT_RDWR)).WillOnce(testing::Return(0));
   EXPECT_CALL(test, getsockname(kSockFd, testing::_, testing::_)).WillOnce(testing::Return(0));
   EXPECT_EQ(test.RunCommandLine("tcp shutdown wrd"), 0);
+}
+
+TEST(CommandLine, LogError) {
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, getsockopt(kSockFd, SOL_SOCKET, SO_ERROR, testing::_, testing::_))
+      .WillOnce([](int, int, int, void* optval, socklen_t* optlen) {
+        *static_cast<int*>(optval) = ECONNREFUSED;
+        *optlen = sizeof(int);
+        return 0;
+      });
+  EXPECT_EQ(test.RunCommandLine("udp log-error"), 0);
 }
 
 TEST(CommandLine, JoinBlockDropMcast) {

@@ -12,6 +12,9 @@
         binary: "driver/framebuffer-bochs-display.so",
         bind: "meta/bind/framebuffer-bochs-display-bind.bindbc",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.display.engine.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
         {
@@ -19,6 +22,12 @@
                 "fuchsia.hardware.sysmem.Sysmem",
                 "fuchsia.sysmem2.Allocator",
             ],
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.display.engine.Service",
+            from: "self",
         },
     ],
 }

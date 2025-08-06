@@ -99,7 +99,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
       zx_instant_mono_ticks_t before = current_mono_ticks();
       //  Write some fake samples to each buffer on each cpu
       mp_sync_exec(
-          MP_IPI_TARGET_ALL, 0,
+          mp_ipi_target::ALL, 0,
           [](void* s) {
             auto test_thread_sampler = reinterpret_cast<TestThreadSampler*>(s);
             test_thread_sampler->SampleThread(arch_curr_cpu_num(), 1, GeneralRegsSource::None,

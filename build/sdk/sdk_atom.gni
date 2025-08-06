@@ -527,6 +527,6 @@ template("sdk_atom") {
     }
 
     # The manifest output contains the output directory.
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 }

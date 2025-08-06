@@ -20,7 +20,7 @@
         {
             protocol: [
                 "fuchsia.cobalt.AggregateAndUpload",
-                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.process.Launcher",
@@ -64,7 +64,7 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.buildinfo.Provider",
-                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.paver.Paver",

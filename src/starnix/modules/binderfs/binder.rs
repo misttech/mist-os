@@ -92,8 +92,9 @@ use starnix_uapi::{
     BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
     BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
+use std::cell::Cell;
 use std::collections::btree_map::Entry;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
@@ -284,7 +285,7 @@ impl FileOps for BinderConnection {
     ) -> Result<SyscallResult, Errno> {
         let binder_process = self.proc(current_task)?;
         release_after!(binder_process, current_task.kernel(), {
-            self.device.ioctl(locked, current_task, &binder_process, request, arg)
+            self.device.ioctl(locked, current_task, &binder_process, None, request, arg, Vec::new())
         })
     }
 
@@ -363,6 +364,11 @@ impl FileOps for BinderConnection {
     }
 }
 
+struct RemoteIoctl {
+    ioctl_writes: Cell<Vec<fbinder::IoctlWrite>>,
+    vmo: zx::Vmo,
+}
+
 /// A connection to a binder driver from a remote process.
 #[derive(Debug)]
 pub struct RemoteBinderConnection {
@@ -388,13 +394,22 @@ impl RemoteBinderConnection {
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
-    ) -> Result<(), Errno> {
+        vmo: zx::Vmo,
+        files: Vec<fbinder::FileHandle>,
+    ) -> Result<Vec<fbinder::IoctlWrite>, Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
         release_after!(binder_process, current_task.kernel(), {
-            self.binder_connection
-                .device
-                .ioctl(locked, current_task, &binder_process, request, arg)
-                .map(|_| ())
+            let remote_ioctl = RemoteIoctl { ioctl_writes: Cell::new(Vec::new()), vmo };
+            self.binder_connection.device.ioctl(
+                locked,
+                current_task,
+                &binder_process,
+                Some(&remote_ioctl),
+                request,
+                arg,
+                files,
+            )?;
+            Ok(remote_ioctl.ioctl_writes.take())
         })
     }
 
@@ -846,6 +861,18 @@ impl BinderProcess {
         task: &'a dyn ResourceAccessor,
     ) -> &'a dyn ResourceAccessor {
         get_resource_accessor(task, &self.remote_resource_accessor)
+    }
+
+    fn get_memory_accessor<'a>(
+        &'a self,
+        task: &'a dyn ResourceAccessor,
+        remote_memory_accessor: Option<&'a RemoteMemoryAccessor<'_>>,
+    ) -> &'a dyn MemoryAccessor {
+        if let Some(memory_accessor) = self.get_resource_accessor(task).as_memory_accessor() {
+            memory_accessor
+        } else {
+            remote_memory_accessor.expect("A RemoteMemoryAccessor should have been provided")
+        }
     }
 
     /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
@@ -2293,7 +2320,7 @@ impl Command {
     /// Serializes and writes the command into userspace memory at `buffer`.
     fn write_to_memory(
         &self,
-        resource_accessor: &dyn ResourceAccessor,
+        memory_accessor: &dyn MemoryAccessor,
         buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
         match self {
@@ -2311,7 +2338,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<AcquireRefData>() {
                     return error!(ENOMEM);
                 }
-                resource_accessor.write_object(
+                memory_accessor.write_object(
                     UserRef::new(buffer.address),
                     &AcquireRefData {
                         command: self.driver_return_code(),
@@ -2330,7 +2357,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<ErrorData>() {
                     return error!(ENOMEM);
                 }
-                resource_accessor.write_object(
+                memory_accessor.write_object(
                     UserRef::new(buffer.address),
                     &ErrorData { command: self.driver_return_code(), error_val: *error_val },
                 )
@@ -2348,7 +2375,7 @@ impl Command {
                     if buffer.length < std::mem::size_of::<TransactionData>() {
                         return error!(ENOMEM);
                     }
-                    resource_accessor.write_object(
+                    memory_accessor.write_object(
                         UserRef::new(buffer.address),
                         &TransactionData {
                             command: self.driver_return_code(),
@@ -2367,7 +2394,7 @@ impl Command {
                     if buffer.length < std::mem::size_of::<TransactionData>() {
                         return error!(ENOMEM);
                     }
-                    resource_accessor.write_object(
+                    memory_accessor.write_object(
                         UserRef::new(buffer.address),
                         &TransactionData {
                             command: self.driver_return_code(),
@@ -2386,7 +2413,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<binder_driver_return_protocol>() {
                     return error!(ENOMEM);
                 }
-                resource_accessor
+                memory_accessor
                     .write_object(UserRef::new(buffer.address), &self.driver_return_code())
             }
             Self::DeadBinder(cookie)
@@ -2401,7 +2428,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<CookieData>() {
                     return error!(ENOMEM);
                 }
-                resource_accessor.write_object(
+                memory_accessor.write_object(
                     UserRef::new(buffer.address),
                     &CookieData { command: self.driver_return_code(), cookie: *cookie },
                 )
@@ -2416,7 +2443,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<FreezeBinderData>() {
                     return error!(ENOMEM);
                 }
-                resource_accessor.write_object(
+                memory_accessor.write_object(
                     UserRef::new(buffer.address),
                     &FreezeBinderData { command: self.driver_return_code(), state: *state },
                 )
@@ -3174,7 +3201,7 @@ impl std::fmt::Display for Handle {
 
 /// Abstraction for accessing resources of a given process, whether it is a current process or a
 /// remote one.
-trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
+trait ResourceAccessor: std::fmt::Debug {
     // File related methods.
     fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno>;
     fn get_files_with_flags(
@@ -3192,7 +3219,7 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     ) -> Result<Vec<FdNumber>, Errno>;
 
     // Convenience method to allow passing a MemoryAccessor as a parameter.
-    fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
+    fn as_memory_accessor(&self) -> Option<&dyn MemoryAccessor>;
 }
 
 /// Return the `ResourceAccessor` to use to access the resources of `task`. If
@@ -3208,19 +3235,12 @@ fn get_resource_accessor<'a>(
     }
 }
 
-impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
-
-/// Implementation of `ResourceAccessor` for a remote client.
 struct RemoteResourceAccessor {
     process: zx::Process,
     process_accessor: fbinder::ProcessAccessorSynchronousProxy,
 }
 
 impl RemoteResourceAccessor {
-    fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
-        errno_from_code!(e.into_primitive() as i16)
-    }
-
     fn run_file_request(
         &self,
         request: fbinder::FileRequest,
@@ -3239,10 +3259,21 @@ impl std::fmt::Debug for RemoteResourceAccessor {
     }
 }
 
+struct RemoteMemoryAccessor<'b> {
+    remote_resource_accessor: Arc<RemoteResourceAccessor>,
+    remote_ioctl: &'b RemoteIoctl,
+}
+
+impl<'b> RemoteMemoryAccessor<'b> {
+    fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
+        errno_from_code!(e.into_primitive() as i16)
+    }
+}
+
 // The maximal size of buffers that zircon supports for process_{read|write}_memory.
 const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
-impl MemoryAccessor for RemoteResourceAccessor {
+impl<'b> MemoryAccessor for RemoteMemoryAccessor<'b> {
     fn read_memory<'a>(
         &self,
         addr: UserAddress,
@@ -3255,6 +3286,7 @@ impl MemoryAccessor for RemoteResourceAccessor {
         while !unread_bytes.is_empty() {
             let len = std::cmp::min(unread_bytes.len(), MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
             let (read_bytes, _unread_bytes) = self
+                .remote_resource_accessor
                 .process
                 .read_memory_uninit(addr, &mut unread_bytes[..len])
                 .map_err(|_| errno!(EINVAL))?;
@@ -3304,8 +3336,31 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
+        // No bytes to write.
+        if bytes.is_empty() {
+            return Ok(0);
+        }
+        // Writes are returned through ioctl, if there is space.
+        let mut ioctl_writes = self.remote_ioctl.ioctl_writes.take();
+        if ioctl_writes.len() < fbinder::MAX_IOCTL_WRITE_COUNT as usize {
+            let last = ioctl_writes.last().unwrap_or(&fbinder::IoctlWrite {
+                address: 0,
+                offset: 0,
+                length: 0,
+            });
+            let offset = last.offset + last.length;
+            ioctl_writes.push(fbinder::IoctlWrite {
+                address: addr.ptr() as u64,
+                offset,
+                length: bytes.len() as u64,
+            });
+            self.remote_ioctl.ioctl_writes.set(ioctl_writes);
+            self.remote_ioctl.vmo.write(bytes, offset).map_err(|_| errno!(ENOENT))?;
+            return Ok(bytes.len());
+        }
+        // Otherwise use ProcessAccessor to write to the process.
         if bytes.len() <= fbinder::MAX_WRITE_BYTES as usize {
-            self.process_accessor.write_bytes(
+            self.remote_resource_accessor.process_accessor.write_bytes(
                 addr.ptr() as u64,
                 bytes,
                 zx::MonotonicInstant::INFINITE,
@@ -3317,7 +3372,7 @@ impl MemoryAccessor for RemoteResourceAccessor {
             );
             vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
             vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
-            self.process_accessor.write_memory(
+            self.remote_resource_accessor.process_accessor.write_memory(
                 addr.ptr() as u64,
                 vmo,
                 zx::MonotonicInstant::INFINITE,
@@ -3425,8 +3480,8 @@ impl ResourceAccessor for RemoteResourceAccessor {
         }
     }
 
-    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
-        self
+    fn as_memory_accessor(&self) -> Option<&dyn MemoryAccessor> {
+        None
     }
 }
 
@@ -3472,8 +3527,8 @@ impl ResourceAccessor for CurrentTask {
         Ok(fds)
     }
 
-    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
-        self
+    fn as_memory_accessor(&self) -> Option<&dyn MemoryAccessor> {
+        Some(self)
     }
 }
 
@@ -3519,8 +3574,8 @@ impl ResourceAccessor for Task {
         Ok(fds)
     }
 
-    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
-        self
+    fn as_memory_accessor(&self) -> Option<&dyn MemoryAccessor> {
+        Some(self)
     }
 }
 
@@ -3678,11 +3733,23 @@ impl BinderDriver {
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
+        remote_ioctl: Option<&RemoteIoctl>,
         request: u32,
         arg: SyscallArg,
+        mut files: Vec<fbinder::FileHandle>,
     ) -> Result<SyscallResult, Errno> {
         trace_duration!(CATEGORY_STARNIX, NAME_BINDER_IOCTL, "request" => request);
         let user_arg = UserAddress::from(arg);
+        let remote_memory_accessor =
+            match (binder_proc.remote_resource_accessor.as_ref(), remote_ioctl) {
+                (Some(remote_resource_accessor), Some(remote_ioctl)) => {
+                    Some(&RemoteMemoryAccessor {
+                        remote_resource_accessor: remote_resource_accessor.clone(),
+                        remote_ioctl,
+                    })
+                }
+                _ => None,
+            };
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         release_after!(binder_thread, current_task.kernel(), {
             match request {
@@ -3695,7 +3762,7 @@ impl BinderDriver {
                         binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
                     log_trace!("binder version is {:?}", response);
                     binder_proc
-                        .get_resource_accessor(current_task)
+                        .get_memory_accessor(current_task, remote_memory_accessor)
                         .write_object(UserRef::new(user_arg), &response)?;
                     Ok(SUCCESS)
                 }
@@ -3708,7 +3775,7 @@ impl BinderDriver {
                         }
                         let user_ref = UserRef::<flat_binder_object>::new(user_arg);
                         let flat_binder_object = binder_proc
-                            .get_resource_accessor(current_task)
+                            .get_memory_accessor(current_task, remote_memory_accessor)
                             .read_object(user_ref)?;
                         BinderObjectFlags::parse(flat_binder_object.flags)?
                     } else {
@@ -3727,9 +3794,10 @@ impl BinderDriver {
                         return error!(EINVAL);
                     }
 
-                    let resource_accessor = binder_proc.get_resource_accessor(current_task);
+                    let memory_accessor =
+                        binder_proc.get_memory_accessor(current_task, remote_memory_accessor);
                     let user_ref = UserRef::<binder_write_read>::new(user_arg);
-                    let mut input = resource_accessor.read_object(user_ref)?;
+                    let mut input = memory_accessor.read_object(user_ref)?;
 
                     log_trace!("binder write/read request start {:?}", input);
                     let mut has_consumed_write = false;
@@ -3737,7 +3805,7 @@ impl BinderDriver {
                         if input.write_size > input.write_consumed {
                             // The calling thread wants to write some data to the binder driver.
                             let mut cursor = UserMemoryCursor::new(
-                                resource_accessor.as_memory_accessor(),
+                                memory_accessor,
                                 UserAddress::from(input.write_buffer),
                                 input.write_size,
                             )?;
@@ -3753,6 +3821,8 @@ impl BinderDriver {
                                     current_task,
                                     binder_proc,
                                     &binder_thread,
+                                    memory_accessor,
+                                    &mut files,
                                     &mut cursor,
                                 )?;
                                 has_consumed_write = true;
@@ -3772,6 +3842,7 @@ impl BinderDriver {
                                 current_task,
                                 binder_proc,
                                 &binder_thread,
+                                memory_accessor,
                                 &read_buffer,
                             ) {
                                 // If the wait was interrupted and some command has been consumed,
@@ -3788,7 +3859,7 @@ impl BinderDriver {
 
                     // Write back to the calling thread how much data was read/written, even when
                     // returning an error.
-                    resource_accessor.write_object(user_ref, &input)?;
+                    memory_accessor.write_object(user_ref, &input)?;
                     result
                 }
                 uapi::BINDER_SET_MAX_THREADS => {
@@ -3798,7 +3869,7 @@ impl BinderDriver {
 
                     let user_ref = UserRef::<u32>::new(user_arg);
                     let new_max_threads = binder_proc
-                        .get_resource_accessor(current_task)
+                        .get_memory_accessor(current_task, remote_memory_accessor)
                         .read_object(user_ref)? as usize;
                     log_trace!("setting max binder threads to {}", new_max_threads);
                     binder_proc.lock().max_thread_count = new_max_threads;
@@ -3833,8 +3904,9 @@ impl BinderDriver {
                     }
 
                     let user_ref = UserRef::<binder_freeze_info>::new(user_arg);
-                    let binder_freeze_info { pid, enable, timeout_ms } =
-                        binder_proc.get_resource_accessor(current_task).read_object(user_ref)?;
+                    let binder_freeze_info { pid, enable, timeout_ms } = binder_proc
+                        .get_memory_accessor(current_task, remote_memory_accessor)
+                        .read_object(user_ref)?;
                     let freezing = match enable {
                         0 => false,
                         1 => true,
@@ -3894,9 +3966,10 @@ impl BinderDriver {
                     }
 
                     let user_ref = UserRef::<binder_frozen_status_info>::new(user_arg);
-                    let resource_accessor = binder_proc.get_resource_accessor(current_task);
+                    let memory_accessor =
+                        binder_proc.get_memory_accessor(current_task, remote_memory_accessor);
                     let binder_frozen_status_info { pid, .. } =
-                        resource_accessor.read_object(user_ref)?;
+                        memory_accessor.read_object(user_ref)?;
                     let target_binder_procs = self.find_processes_by_pid(pid as pid_t);
                     if target_binder_procs.is_empty() {
                         return error!(EINVAL);
@@ -3910,7 +3983,7 @@ impl BinderDriver {
                             has_async_recv |= binder_proc_state.freeze_status.has_async_recv;
                         });
                     });
-                    resource_accessor.write_object(
+                    memory_accessor.write_object(
                         user_ref,
                         &binder_frozen_status_info {
                             pid,
@@ -3944,6 +4017,8 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
+        memory_accessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno>
     where
@@ -4013,6 +4088,8 @@ impl BinderDriver {
                     current_task,
                     binder_proc,
                     binder_thread,
+                    memory_accessor,
+                    files,
                     binder_transaction_data_sg { transaction_data: data, buffers_size: 0 },
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4025,6 +4102,8 @@ impl BinderDriver {
                     current_task,
                     binder_proc,
                     binder_thread,
+                    memory_accessor,
+                    files,
                     binder_transaction_data_sg { transaction_data: data, buffers_size: 0 },
                 )
                 .or_else(|err| err.dispatch(binder_thread))
@@ -4032,14 +4111,30 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_TRANSACTION_SG => {
                 profile_duration!("Transaction");
                 let data = cursor.read_object::<binder_transaction_data_sg>()?;
-                self.handle_transaction(locked, current_task, binder_proc, binder_thread, data)
-                    .or_else(|err| err.dispatch(binder_thread))
+                self.handle_transaction(
+                    locked,
+                    current_task,
+                    binder_proc,
+                    binder_thread,
+                    memory_accessor,
+                    files,
+                    data,
+                )
+                .or_else(|err| err.dispatch(binder_thread))
             }
             binder_driver_command_protocol_BC_REPLY_SG => {
                 profile_duration!("Reply");
                 let data = cursor.read_object::<binder_transaction_data_sg>()?;
-                self.handle_reply(locked, current_task, binder_proc, binder_thread, data)
-                    .or_else(|err| err.dispatch(binder_thread))
+                self.handle_reply(
+                    locked,
+                    current_task,
+                    binder_proc,
+                    binder_thread,
+                    memory_accessor,
+                    files,
+                    data,
+                )
+                .or_else(|err| err.dispatch(binder_thread))
             }
             binder_driver_command_protocol_BC_REQUEST_FREEZE_NOTIFICATION => {
                 profile_duration!("RequestFreezeNotif");
@@ -4080,6 +4175,8 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
+        memory_acessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
@@ -4143,8 +4240,10 @@ impl BinderDriver {
                     locked,
                     current_task,
                     binder_proc.get_resource_accessor(current_task),
+                    memory_acessor,
                     binder_proc,
                     binder_thread,
+                    files,
                     target_proc.get_resource_accessor(target_task.deref()),
                     &target_proc,
                     &data,
@@ -4294,6 +4393,8 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
+        memory_acessor: &dyn MemoryAccessor,
+        files: &mut Vec<fbinder::FileHandle>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
@@ -4311,8 +4412,10 @@ impl BinderDriver {
                     locked,
                     current_task,
                     binder_proc.get_resource_accessor(current_task),
+                    memory_acessor,
                     binder_proc,
                     binder_thread,
+                    files,
                     target_proc.get_resource_accessor(target_task.deref()),
                     &target_proc,
                     &data,
@@ -4374,10 +4477,10 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
+        memory_accessor: &dyn MemoryAccessor,
         read_buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
         profile_duration!("ThreadRead");
-        let resource_accessor = binder_proc.get_resource_accessor(current_task);
         loop {
             {
                 profile_duration!("RequestThread");
@@ -4385,7 +4488,7 @@ impl BinderDriver {
 
                 if binder_proc_state.should_request_thread(binder_thread) {
                     let bytes_written =
-                        Command::SpawnLooper.write_to_memory(resource_accessor, read_buffer)?;
+                        Command::SpawnLooper.write_to_memory(memory_accessor, read_buffer)?;
                     binder_proc_state.did_request_thread();
                     return Ok(bytes_written);
                 }
@@ -4422,7 +4525,7 @@ impl BinderDriver {
             if let Some(command) = command {
                 profile_duration!("ThreadReadCommand");
                 // Attempt to write the command to the thread's buffer.
-                let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
+                let bytes_written = command.write_to_memory(memory_accessor, read_buffer)?;
                 match command {
                     Command::Transaction { sender, scheduler_state, .. } => {
                         // The transaction is synchronous and we're expected to give a reply, so
@@ -4525,8 +4628,10 @@ impl BinderDriver {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
+        source_memory_acessor: &dyn MemoryAccessor,
         source_proc: &BinderProcess,
         source_thread: &BinderThread,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
@@ -4563,11 +4668,11 @@ impl BinderDriver {
         let userspace_addrs = unsafe { data.transaction_data.data.ptr };
 
         // Copy the data straight into the target's buffer.
-        source_resource_accessor.read_memory_to_slice(
+        source_memory_acessor.read_memory_to_slice(
             UserAddress::from(userspace_addrs.buffer),
             allocations.data_buffer.as_mut_bytes(),
         )?;
-        source_resource_accessor.read_objects_to_slice(
+        source_memory_acessor.read_objects_to_slice(
             UserRef::new(UserAddress::from(userspace_addrs.offsets)),
             allocations.offsets_buffer.as_mut_bytes(),
         )?;
@@ -4578,8 +4683,10 @@ impl BinderDriver {
             locked,
             current_task,
             source_resource_accessor,
+            source_memory_acessor,
             source_proc,
             source_thread,
+            source_files,
             target_resource_accessor,
             target_proc,
             allocations.offsets_buffer.as_bytes(),
@@ -4595,6 +4702,7 @@ impl BinderDriver {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         fds: Vec<FdNumber>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -4602,13 +4710,51 @@ impl BinderDriver {
     where
         L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
+        // Create a map of FD to index into `source_files`. This is used to check if the already
+        // file exists in `source_files`, allowing us to avoid fetching it via the
+        // `source_resource_accessor`.
+        let source_map = source_files
+            .iter()
+            .enumerate()
+            .map(|(i, file)| (file.fd.unwrap(), i))
+            .collect::<HashMap<_, _>>();
+        // Create a vector of FDs to fetch via the `source_resource_accessor`.
+        let fds_to_get = fds
+            .iter()
+            .filter(|fd| !source_map.contains_key(&fd.raw()))
+            .copied()
+            .collect::<Vec<_>>();
         let locked = locked.cast_locked::<ResourceAccessorLevel>();
-        let source_files =
-            source_resource_accessor.get_files_with_flags(locked, current_task, fds)?;
+        let mut get_files = if fds_to_get.is_empty() {
+            Vec::new()
+        } else {
+            source_resource_accessor.get_files_with_flags(locked, current_task, fds_to_get)?
+        };
+        let mut drain = get_files.drain(0..);
+        // Merge `source_files` and `get_files` together.
+        let mut target_files = Vec::with_capacity(fds.len());
+        for fd in fds {
+            let file = if let Some(pos) = source_map.get(&fd.raw()) {
+                let source_file = std::mem::replace(&mut source_files[*pos], Default::default());
+                let flags = source_file.flags.ok_or_else(|| errno!(ENOENT))?.into_fidl();
+                let new_file = if let Some(file) = source_file.file {
+                    new_remote_file(locked, current_task, file, flags)?
+                } else {
+                    new_null_file(locked, current_task, flags)
+                };
+                (new_file, FdFlags::empty())
+            } else if let Some(file) = drain.next() {
+                file
+            } else {
+                return error!(ENOENT);
+            };
+            target_files.push(file);
+        }
+        // Finally add the files to the `target_resource_accessor`.
         target_resource_accessor.add_files_with_flags(
             locked,
             current_task,
-            source_files,
+            target_files,
             add_action,
         )
     }
@@ -4635,8 +4781,10 @@ impl BinderDriver {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
+        source_memory_accessor: &dyn MemoryAccessor,
         source_proc: &BinderProcess,
         source_thread: &BinderThread,
+        source_files: &mut Vec<fbinder::FileHandle>,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         offsets: &[binder_uintptr_t],
@@ -4746,7 +4894,7 @@ impl BinderDriver {
                         if length > sg_remaining_buffer.length {
                             return error!(EINVAL)?;
                         }
-                        source_resource_accessor.read_memory_to_slice(
+                        source_memory_accessor.read_memory_to_slice(
                             buffer,
                             &mut sg_buffer.as_mut_bytes()
                                 [sg_buffer_offset..sg_buffer_offset + length],
@@ -4840,6 +4988,7 @@ impl BinderDriver {
                             locked,
                             current_task,
                             source_resource_accessor,
+                            source_files,
                             target_resource_accessor,
                             fd_array.iter().map(|fd| FdNumber::from_raw(*fd as i32)).collect(),
                             // Close this FD if the transaction ends either by success or failure.
@@ -4860,6 +5009,7 @@ impl BinderDriver {
                 locked,
                 current_task,
                 source_resource_accessor,
+                source_files,
                 target_resource_accessor,
                 files.iter().map(|TransientFile { fd, .. }| *fd).collect(),
                 // Close this FD if the transaction fails.
@@ -5492,6 +5642,7 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
+    use fidl_fuchsia_starnix_binder::FileFlags;
     use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
@@ -5533,8 +5684,8 @@ pub mod tests {
         ) -> Result<Vec<FdNumber>, Errno> {
             self.deref().add_files_with_flags(locked, current_task, files, add_action)
         }
-        fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
-            self.deref().as_memory_accessor()
+        fn as_memory_accessor(&self) -> Option<&dyn MemoryAccessor> {
+            Some(self.deref())
         }
     }
 
@@ -6669,8 +6820,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &transaction,
@@ -6744,8 +6897,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -6838,8 +6993,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -6921,8 +7078,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -7041,8 +7200,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -7196,8 +7357,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     current_task,
                     &receiver.proc,
                     &input,
@@ -7301,8 +7464,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -7385,8 +7550,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -7514,7 +7681,15 @@ pub mod tests {
 
             // Perform the translation and copying.
             device
-                .handle_transaction(locked, &current_task, &sender.proc, &sender.thread, input)
+                .handle_transaction(
+                    locked,
+                    &current_task,
+                    &sender.proc,
+                    &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
+                    input,
+                )
                 .expect("transaction queued");
 
             // Get the data buffer out of the receiver's queue.
@@ -7712,7 +7887,15 @@ pub mod tests {
 
             // Perform the translation and copying.
             device
-                .handle_transaction(locked, &current_task, &sender.proc, &sender.thread, input)
+                .handle_transaction(
+                    locked,
+                    &current_task,
+                    &sender.proc,
+                    &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
+                    input,
+                )
                 .expect("transaction queued");
         });
     }
@@ -7839,8 +8022,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &input,
@@ -7887,8 +8072,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[0 as binder_uintptr_t],
@@ -7924,8 +8111,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[0 as binder_uintptr_t],
@@ -7972,8 +8161,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &[
@@ -8083,6 +8274,7 @@ pub mod tests {
                     &current_task,
                     &binder_proc,
                     &binder_thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
                 )
                 .unwrap();
@@ -8355,8 +8547,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8409,6 +8603,79 @@ pub mod tests {
     }
 
     #[fuchsia::test]
+    async fn send_fd_in_transaction_with_prefetched_files() {
+        spawn_kernel_and_run(|locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+
+            // Open a file in the sender process.
+            let file = new_null_file(locked, &current_task, OpenFlags::empty());
+            let sender_fd =
+                current_task.add_file(locked, file.clone(), FdFlags::empty()).expect("add file");
+
+            let mut source_files = vec![fbinder::FileHandle {
+                file: file.to_handle(current_task).expect("to_handle"),
+                flags: Some(FileFlags::empty()),
+                fd: Some(sender_fd.raw()),
+                ..Default::default()
+            }];
+
+            // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
+            // driver doesn't touch them/passes them through.
+            let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            });
+            let offsets = [0];
+
+            let transient_transaction_state = device
+                .translate_objects(
+                    locked,
+                    &current_task,
+                    current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &sender.proc,
+                    &sender.thread,
+                    &mut source_files,
+                    receiver.task(),
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
+
+            // Simulate success by converting the transient state.
+            let transaction_state = transient_transaction_state.into_state();
+
+            // The receiver should now have a file.
+            let receiver_fd = receiver
+                .task()
+                .files
+                .get_all_fds()
+                .first()
+                .cloned()
+                .expect("receiver should have FD");
+
+            let expected_transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: receiver_fd.raw() as u32,
+            });
+
+            assert_eq!(expected_transaction_data, transaction_data);
+            transaction_state.release(());
+        });
+    }
+
+    #[fuchsia::test]
     async fn cleanup_fd_in_failed_transaction() {
         spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
@@ -8437,8 +8704,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8493,8 +8762,10 @@ pub mod tests {
                     locked,
                     &current_task,
                     current_task,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &sender.proc,
                     &sender.thread,
+                    &mut Vec::new(),
                     receiver.task(),
                     &receiver.proc,
                     &offsets,
@@ -8591,6 +8862,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8631,6 +8904,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("transaction queued");
@@ -8733,6 +9008,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8742,6 +9019,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8786,6 +9065,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("sync transaction queued");
@@ -8845,6 +9126,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8929,6 +9212,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8938,6 +9223,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     second_transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -8980,6 +9267,7 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
                 )
                 .expect("read command");
@@ -8994,6 +9282,7 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
                 )
                 .expect("read command");
@@ -9037,6 +9326,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9106,6 +9397,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9128,6 +9421,7 @@ pub mod tests {
                     current_task,
                     &receiver.proc,
                     &receiver.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
                 )
                 .expect("read command");
@@ -9192,6 +9486,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9213,6 +9509,7 @@ pub mod tests {
                     current_task,
                     &receiver.proc,
                     &receiver.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
                     &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
                 )
                 .expect("read command");
@@ -9233,7 +9530,15 @@ pub mod tests {
             // Submit the reply.
             assert_eq!(
                 device
-                    .handle_reply(locked, current_task, &receiver.proc, &receiver.thread, reply)
+                    .handle_reply(
+                        locked,
+                        current_task,
+                        &receiver.proc,
+                        &receiver.thread,
+                        current_task.as_memory_accessor().expect("as_memory_accessor"),
+                        &mut Vec::new(),
+                        reply
+                    )
                     .expect_err("transaction should have failed"),
                 TransactionError::Failure
             );
@@ -9335,6 +9640,21 @@ pub mod tests {
         })
     }
 
+    #[allow(dead_code)]
+    fn apply_writes(ioctl_writes: Vec<fbinder::IoctlWrite>, vmo: &zx::Vmo) {
+        for ioctl_write in ioctl_writes.iter() {
+            // SAFETY This is required to emulate the scattered writes for tests.
+            unsafe {
+                vmo.read_raw(
+                    ioctl_write.address as *mut u8,
+                    ioctl_write.length as usize,
+                    ioctl_write.offset,
+                )
+                .expect("read_raw")
+            }
+        }
+    }
+
     #[::fuchsia::test]
     async fn remote_binder_task() {
         const vector_size: usize = 128 * 1024 * 1024;
@@ -9355,28 +9675,50 @@ pub mod tests {
             let process = fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("process");
-            let remote_binder_task = RemoteResourceAccessor { process_accessor, process };
+            let remote_binder_task = Arc::new(RemoteResourceAccessor { process_accessor, process });
             let mut vector = Vec::with_capacity(vector_size);
             for i in 0..vector_size {
                 vector.push((i & 255) as u8);
             }
-            let other_vector = remote_binder_task
+            let remote_ioctl = RemoteIoctl {
+                ioctl_writes: Cell::new(Vec::new()),
+                vmo: zx::Vmo::create(vector_size as u64).expect("Vmo::create"),
+            };
+            let remote_memory_accessor = RemoteMemoryAccessor {
+                remote_resource_accessor: remote_binder_task.clone(),
+                remote_ioctl: &remote_ioctl,
+            };
+            let other_vector = remote_memory_accessor
                 .read_memory_to_vec((vector.as_ptr() as u64).into(), vector_size)
                 .expect("read_memory");
             assert_eq!(vector[1], 1);
             assert_eq!(vector, other_vector);
             vector.clear();
             vector.resize(vector_size, 0);
-            remote_binder_task
+            remote_memory_accessor
                 .write_memory((vector.as_ptr() as u64).into(), &other_vector)
                 .expect("write_memory");
+            apply_writes(remote_ioctl.ioctl_writes.take(), &remote_ioctl.vmo);
             assert_eq!(vector[1], 1);
             assert_eq!(vector, other_vector);
             vector.clear();
             vector.resize(vector_size, 0);
-            remote_binder_task
+            remote_memory_accessor
                 .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
                 .expect("write_memory");
+            apply_writes(remote_ioctl.ioctl_writes.take(), &remote_ioctl.vmo);
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector[..small_size], other_vector[..small_size]);
+
+            // Do one more write than there is space for. The last write should then use the
+            // ProcessAccessor to write to the address.
+            vector.clear();
+            vector.resize(vector_size, 0);
+            for _ in 0..=fbinder::MAX_IOCTL_WRITE_COUNT {
+                remote_memory_accessor
+                    .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
+                    .expect("write_memory");
+            }
             assert_eq!(vector[1], 1);
             assert_eq!(vector[..small_size], other_vector[..small_size]);
 
@@ -9413,6 +9755,7 @@ pub mod tests {
                 errno!(EBADF)
             );
 
+            std::mem::drop(remote_memory_accessor);
             std::mem::drop(remote_binder_task);
             let fds = process_accessor_thread.join().expect("join").expect("fds");
             // Close and get requests both remove file descriptors.
@@ -9465,6 +9808,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 )
                 .expect("failed to handle the transaction");
@@ -9522,8 +9867,10 @@ pub mod tests {
                     locked,
                     current_task,
                     &receiver.proc,
+                    None,
                     uapi::BINDER_FREEZE,
                     freeze_info_address.into(),
+                    Vec::new(),
                 )
                 .expect("BINDER_FREEZE ioctl");
 
@@ -9545,6 +9892,8 @@ pub mod tests {
                     &current_task,
                     &sender.proc,
                     &sender.thread,
+                    current_task.as_memory_accessor().expect("as_memory_accessor"),
+                    &mut Vec::new(),
                     transaction,
                 ),
                 Err(TransactionError::Frozen)
@@ -9569,13 +9918,15 @@ pub mod tests {
                     locked,
                     current_task,
                     &receiver.proc,
+                    None,
                     uapi::BINDER_GET_FROZEN_INFO,
                     frozen_status_info_address.into(),
+                    Vec::new(),
                 )
                 .expect("BINDER_GET_FROZEN_INFO ioctl");
             let read_frozen_status_info = receiver
                 .proc
-                .get_resource_accessor(current_task)
+                .get_memory_accessor(current_task, None)
                 .read_object(UserRef::<binder_frozen_status_info>::new(frozen_status_info_address))
                 .expect("read returned binder frozen status");
             assert_eq!(read_frozen_status_info.sync_recv, 1);

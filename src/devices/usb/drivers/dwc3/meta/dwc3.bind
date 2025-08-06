@@ -11,6 +11,7 @@ using fuchsia.interconnect;
 using fuchsia.hardware.interconnect;
 using fuchsia.hardware.usb.phy;
 using fuchsia.platform;
+using fuchsia.regulator;
 
 primary node "dwc3-phy" {
   fuchsia.hardware.usb.phy.Service == fuchsia.hardware.usb.phy.Service.DriverTransport;
@@ -72,3 +73,13 @@ optional node "sleep-clk" {
 optional node "utmi-clk" {
   fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.utmi-clk";
 }
+
+optional node "regulator-core" {
+  fuchsia.regulator.NAME == "pm5100_l12";
+}
+
+optional node "regulator-vdd18" {
+  fuchsia.regulator.NAME == "pm5100_l14";
+}
+
+// TODO(b/424561696): enable vdd33 (at pm5100_l25) when the multi-bind issue is fixed.

@@ -68,6 +68,8 @@ template("verify_manifest_elf_binaries") {
                                "visibility",
                              ])
       script = "//build/dist/verify_manifest_elf_binaries.py"
+      check_for_output_dir_leaks = false
+
       inputs = [ "//build/images/elfinfo.py" ]
       sources = [ input_manifest ]
       outputs = [ "$target_gen_dir/${target_name}" ]

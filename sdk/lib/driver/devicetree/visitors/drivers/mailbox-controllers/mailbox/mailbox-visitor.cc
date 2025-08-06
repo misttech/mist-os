@@ -155,7 +155,7 @@ zx::result<> MailboxVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   }
 
   fuchsia_hardware_platform_bus::Metadata pbus_metadata{{
-      .id = std::to_string(fuchsia_hardware_mailbox::kControllerInfoMetadataType),
+      .id = fuchsia_hardware_mailbox::ControllerInfo::kSerializableName,
       .data = *std::move(metadata),
   }};
   node.AddMetadata(std::move(pbus_metadata));

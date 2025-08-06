@@ -1602,7 +1602,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        yield_now, EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer,
+        yield_now, EHandle, LocalExecutor, SendExecutorBuilder, SpawnableFuture, Task,
+        TestExecutor, Timer,
     };
     use fuchsia_sync::{Condvar, Mutex};
     use futures::channel::mpsc;
@@ -2170,7 +2171,7 @@ mod tests {
 
     #[test]
     fn wake_all_with_active_guard_on_send_executor() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         let scope = executor.root_scope().new_child();
 
         let (tx, mut rx) = mpsc::unbounded();
@@ -2229,7 +2230,7 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_micros(rand::random_range(0..10)));
         }
         for _ in 0..2000 {
-            let mut executor = SendExecutor::new(2);
+            let mut executor = SendExecutorBuilder::new().num_threads(2).build();
             let scope = executor.root_scope().new_child();
             scope.spawn(async {
                 sleep_random();
@@ -2319,7 +2320,7 @@ mod tests {
 
     #[test]
     fn test_cancel_waits() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         let running = Arc::new((Mutex::new(false), Condvar::new()));
         let task = {
             let running = running.clone();
@@ -2344,7 +2345,7 @@ mod tests {
     }
 
     fn test_clean_up(callback: impl FnOnce(Task<()>) + Send + 'static) {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         let running = Arc::new((Mutex::new(false), Condvar::new()));
         let can_quit = Arc::new((Mutex::new(false), Condvar::new()));
         let task = {
@@ -2412,7 +2413,7 @@ mod tests {
 
     #[test]
     fn test_scope_stream() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let (stream, handle) = ScopeStream::new();
             handle.push(async { 1 });
@@ -2425,7 +2426,7 @@ mod tests {
 
     #[test]
     fn test_scope_stream_wakes_properly() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let (stream, handle) = ScopeStream::new();
             handle.push(async {
@@ -2444,7 +2445,7 @@ mod tests {
 
     #[test]
     fn test_scope_stream_drops_spawned_tasks() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let (stream, handle) = ScopeStream::new();
             handle.push(async { 1 });
@@ -2457,7 +2458,7 @@ mod tests {
 
     #[test]
     fn test_nested_scope_stream() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let (mut stream, handle) = ScopeStream::new();
             handle.clone().push(async move {
@@ -2480,7 +2481,7 @@ mod tests {
 
     #[test]
     fn test_dropping_scope_stream_cancels_all_tasks() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let (stream, handle) = ScopeStream::new();
             let (tx1, mut rx) = mpsc::unbounded::<()>();
@@ -2502,7 +2503,7 @@ mod tests {
 
     #[test]
     fn test_scope_stream_collect() {
-        let mut executor = SendExecutor::new(2);
+        let mut executor = SendExecutorBuilder::new().num_threads(2).build();
         executor.run(async move {
             let stream: ScopeStream<_> = (0..10).map(|i| async move { i }).collect();
             assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));

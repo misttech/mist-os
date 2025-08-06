@@ -20,6 +20,7 @@
  */
 #include "kernel/timer.h"
 
+#include <align.h>
 #include <assert.h>
 #include <debug.h>
 #include <inttypes.h>
@@ -39,7 +40,6 @@
 
 #include <cstdio>
 
-#include <kernel/align.h>
 #include <kernel/lockdep.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>

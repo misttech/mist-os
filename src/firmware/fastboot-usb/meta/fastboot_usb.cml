@@ -29,13 +29,11 @@
         {
             protocol: [
                 "fuchsia.buildinfo.Provider",
-                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
             ],
         },
-        {
-            service: "fuchsia.hardware.fastboot.Service",
-        },
+        { service: "fuchsia.hardware.fastboot.Service" },
     ],
 }

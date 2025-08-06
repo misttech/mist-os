@@ -371,7 +371,7 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
       .is_shared = IsShared(),
   };
 
-  mp_ipi_target_t target;
+  mp_ipi_target target;
   cpu_mask_t target_mask = 0;
   // We need to send the TLB invalidate to all CPUs if this aspace is shared because active_cpus
   // is inaccurate in that case (another CPU may be running a unified aspace with these shared
@@ -379,9 +379,9 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
   // TODO(https://fxbug.dev/319324081): Replace this global broadcast for shared aspaces with a more
   // targeted one once shared aspaces keep track of all the CPUs they are on.
   if (IsShared() || pending->contains_global) {
-    target = MP_IPI_TARGET_ALL;
+    target = mp_ipi_target::ALL;
   } else {
-    target = MP_IPI_TARGET_MASK;
+    target = mp_ipi_target::MASK;
     // Target only CPUs this aspace is active on. It may be the case that some other CPU will
     // become active in it after this load, or will have left it  just before this load.
     // In the absence of PCIDs there are two cases:

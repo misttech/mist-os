@@ -88,22 +88,22 @@ mod test {
         reboot(&target_proxy, cmd).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot() -> fho::Result<()> {
         run_reboot_test(RebootCommand { bootloader: false, recovery: false }).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_bootloader() -> fho::Result<()> {
         run_reboot_test(RebootCommand { bootloader: true, recovery: false }).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_recovery() -> fho::Result<()> {
         run_reboot_test(RebootCommand { bootloader: false, recovery: true }).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_error() {
         assert!(run_reboot_test(RebootCommand { bootloader: true, recovery: true }).await.is_err())
     }

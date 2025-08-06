@@ -117,6 +117,8 @@ closed protocol Sandbox {
                                 2: configuration fuchsia.component.name;
                                 /// The name of the exposed service.
                                 3: service fuchsia.component.name;
+                                /// The name of the exposed protocol (weak binding).
+                                4: weak_protocol fuchsia.component.name;
                             };
                         };
 

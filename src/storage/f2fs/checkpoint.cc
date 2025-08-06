@@ -85,7 +85,8 @@ zx::result<> F2fs::PurgeOrphanInode(nid_t ino) {
   if (vnode_or.is_error()) {
     return vnode_or.take_error();
   }
-  vnode_or->ClearNlink();
+  vnode_or->ClearLinkCount();
+  vnode_or->SetOrphan();
   // Here, |*vnode_or| should be deleted to purge its metadata.
   return zx::ok();
 }

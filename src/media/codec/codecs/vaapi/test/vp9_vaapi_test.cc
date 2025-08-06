@@ -7,7 +7,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/result.h>
-#include <lib/syslog/global.h>
 #include <stdio.h>
 
 #include <cstdint>

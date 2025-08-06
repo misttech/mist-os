@@ -6,7 +6,7 @@
 
 import logging
 import statistics
-from typing import Iterable, Iterator, Sequence
+from typing import Iterable, Iterator, MutableSequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
@@ -39,7 +39,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(

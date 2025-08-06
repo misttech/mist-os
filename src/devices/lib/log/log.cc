@@ -85,7 +85,7 @@ void Logger::VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char*
     fputc('\n', stdout);
     return;
   }
-  fuchsia_syslog::LogBuffer buffer;
+  fuchsia_logging::LogBuffer buffer;
   constexpr size_t kFormatStringLength = 1024;
   char fmt_string[kFormatStringLength];
   fmt_string[kFormatStringLength - 1] = 0;
@@ -115,13 +115,13 @@ void Logger::VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char*
   FlushRecord(buffer, severity);
 }
 
-void Logger::BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
+void Logger::BeginRecord(fuchsia_logging::LogBuffer& buffer, FuchsiaLogSeverity severity,
                          std::optional<std::string_view> file_name, unsigned int line,
                          std::optional<std::string_view> msg) const {
   buffer.BeginRecord(severity, file_name, line, msg, socket_.borrow(), 0, pid_, GetCurrentThread());
 }
 
-void Logger::FlushRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity) const {
+void Logger::FlushRecord(fuchsia_logging::LogBuffer& buffer, FuchsiaLogSeverity severity) const {
   buffer.FlushRecord();
 }
 

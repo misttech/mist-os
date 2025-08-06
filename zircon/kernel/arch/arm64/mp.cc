@@ -17,6 +17,7 @@
 #include <arch/quirks.h>
 #include <dev/interrupt.h>
 #include <kernel/cpu.h>
+#include <kernel/mp.h>
 #include <ktl/iterator.h>
 
 #include <ktl/enforce.h>
@@ -68,21 +69,21 @@ uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num) {
 }
 
 void arch_mp_reschedule(cpu_mask_t mask) {
-  arch_mp_send_ipi(MP_IPI_TARGET_MASK, mask, MP_IPI_RESCHEDULE);
+  arch_mp_send_ipi(mp_ipi_target::MASK, mask, mp_ipi::RESCHEDULE);
 }
 
-void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
-  LTRACEF("target %d mask %#x, ipi %d\n", target, mask, ipi);
+void arch_mp_send_ipi(mp_ipi_target target, cpu_mask_t mask, mp_ipi ipi) {
+  LTRACEF("target %d mask %#x, ipi %d\n", static_cast<int>(target), mask, static_cast<int>(ipi));
 
   // translate the high level target + mask mechanism into just a mask
   switch (target) {
-    case MP_IPI_TARGET_ALL:
+    case mp_ipi_target::ALL:
       mask = (1ul << SMP_MAX_CPUS) - 1;
       break;
-    case MP_IPI_TARGET_ALL_BUT_LOCAL:
+    case mp_ipi_target::ALL_BUT_LOCAL:
       mask = mask_all_but_one(arch_curr_cpu_num());
       break;
-    case MP_IPI_TARGET_MASK:;
+    case mp_ipi_target::MASK:;
   }
 
   interrupt_send_ipi(mask, ipi);

@@ -15,6 +15,7 @@
     },
     capabilities: [
         { service: "fuchsia.gpu.virtio.Service" },
+        { service: "fuchsia.hardware.display.engine.Service" },
     ],
     use: [
         { protocol: "fuchsia.sysmem2.Allocator" },
@@ -23,6 +24,10 @@
     expose: [
         {
             service: "fuchsia.gpu.virtio.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.display.engine.Service",
             from: "self",
         },
     ],

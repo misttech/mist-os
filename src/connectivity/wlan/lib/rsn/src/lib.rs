@@ -585,7 +585,7 @@ impl From<rsne::Error> for Error {
 mod tests {
     use crate::key::exchange::Key;
     use crate::rsna::{test_util, SecAssocStatus, SecAssocUpdate};
-    use wlan_common::assert_variant;
+    use assert_matches::assert_matches;
 
     #[test]
     fn supplicant_extract_sae_key() {
@@ -635,7 +635,7 @@ mod tests {
         );
 
         // ESSSA should also transmit an EAPOL frame since this is the Authenticator.
-        assert_variant!(&dummy_update_sink[3], &SecAssocUpdate::TxEapolKeyFrame { .. });
+        assert_matches!(&dummy_update_sink[3], &SecAssocUpdate::TxEapolKeyFrame { .. });
     }
 
     #[test]

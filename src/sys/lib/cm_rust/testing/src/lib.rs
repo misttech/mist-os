@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Error};
 use assert_matches::assert_matches;
-use cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative};
+use cm_rust::{push_box, CapabilityTypeName, ComponentDecl, FidlIntoNative};
 use cm_types::{LongName, Name, Path, RelativePath, Url};
 use derivative::Derivative;
 use std::collections::BTreeMap;
@@ -44,7 +44,7 @@ impl ComponentDeclBuilder {
 
     /// Add a child element.
     pub fn child(mut self, decl: impl Into<cm_rust::ChildDecl>) -> Self {
-        self.result.children.push(decl.into());
+        push_box(&mut self.result.children, decl.into());
         self
     }
 
@@ -55,7 +55,7 @@ impl ComponentDeclBuilder {
 
     // Add a collection element.
     pub fn collection(mut self, decl: impl Into<cm_rust::CollectionDecl>) -> Self {
-        self.result.collections.push(decl.into());
+        push_box(&mut self.result.collections, decl.into());
         self
     }
 
@@ -80,13 +80,13 @@ impl ComponentDeclBuilder {
 
     /// Add an offer decl.
     pub fn offer(mut self, offer: impl Into<cm_rust::OfferDecl>) -> Self {
-        self.result.offers.push(offer.into());
+        push_box(&mut self.result.offers, offer.into());
         self
     }
 
     /// Add an expose decl.
     pub fn expose(mut self, expose: impl Into<cm_rust::ExposeDecl>) -> Self {
-        self.result.exposes.push(expose.into());
+        push_box(&mut self.result.exposes, expose.into());
         self
     }
 
@@ -99,7 +99,7 @@ impl ComponentDeclBuilder {
                 "tried to add a use decl for a runner while program.runner is set"
             );
         }
-        self.result.uses.push(use_);
+        push_box(&mut self.result.uses, use_);
         self
     }
 
@@ -114,7 +114,7 @@ impl ComponentDeclBuilder {
 
     /// Add a capability declaration.
     pub fn capability(mut self, capability: impl Into<cm_rust::CapabilityDecl>) -> Self {
-        self.result.capabilities.push(capability.into());
+        push_box(&mut self.result.capabilities, capability.into());
         self
     }
 
@@ -145,7 +145,7 @@ impl ComponentDeclBuilder {
 
     /// Add an environment declaration.
     pub fn environment(mut self, environment: impl Into<cm_rust::EnvironmentDecl>) -> Self {
-        self.result.environments.push(environment.into());
+        push_box(&mut self.result.environments, environment.into());
         self
     }
 
@@ -348,9 +348,9 @@ impl EnvironmentBuilder {
         cm_rust::EnvironmentDecl {
             name: self.name.expect("name not set"),
             extends: self.extends,
-            runners: self.runners,
-            resolvers: self.resolvers,
-            debug_capabilities: self.debug_capabilities,
+            runners: self.runners.into(),
+            resolvers: self.resolvers.into(),
+            debug_capabilities: self.debug_capabilities.into(),
             stop_timeout_ms: self.stop_timeout_ms,
         }
     }
@@ -598,7 +598,7 @@ pub struct UseBuilder {
     availability: cm_rust::Availability,
     rights: fio::Operations,
     subdir: RelativePath,
-    scope: Option<Vec<cm_rust::EventScope>>,
+    scope: Option<Box<[cm_rust::EventScope]>>,
     filter: Option<BTreeMap<String, cm_rust::DictionaryValue>>,
     config_type: Option<cm_rust::ConfigValueType>,
 }
@@ -756,7 +756,7 @@ impl UseBuilder {
 
     pub fn scope(mut self, scope: Vec<cm_rust::EventScope>) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::EventStream);
-        self.scope = Some(scope);
+        self.scope = Some(scope.into());
         self
     }
 
@@ -1070,7 +1070,7 @@ pub struct OfferBuilder {
     renamed_instances: Option<Vec<cm_rust::NameMapping>>,
     rights: Option<fio::Operations>,
     subdir: RelativePath,
-    scope: Option<Vec<cm_rust::EventScope>>,
+    scope: Option<Box<[cm_rust::EventScope]>>,
     dependency_type: cm_rust::DependencyType,
     availability: cm_rust::Availability,
 }
@@ -1240,7 +1240,7 @@ impl OfferBuilder {
 
     pub fn scope(mut self, scope: Vec<cm_rust::EventScope>) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::EventStream);
-        self.scope = Some(scope);
+        self.scope = Some(scope.into());
         self
     }
 
@@ -1263,8 +1263,8 @@ impl OfferBuilder {
                 source_dictionary: self.source_dictionary,
                 target: self.target.expect("target is not set"),
                 target_name: self.target_name.expect("name not set"),
-                source_instance_filter: self.source_instance_filter,
-                renamed_instances: self.renamed_instances,
+                source_instance_filter: self.source_instance_filter.map(Into::into),
+                renamed_instances: self.renamed_instances.map(Into::into),
                 availability: self.availability,
                 dependency_type: Default::default(),
             }),

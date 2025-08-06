@@ -242,7 +242,6 @@ impl Crypt for InsecureCrypt {
                     return Err(zx::Status::NOT_FOUND);
                 }
             }
-            WrappedKey::DmDefaultKey(..) => UnwrappedKey::new(vec![]),
             _ => {
                 error!("Unsupported wrapped key {wrapped_key:?}");
                 return Err(zx::Status::NOT_SUPPORTED);

@@ -61,9 +61,9 @@ constexpr fuchsia_hardware_display_engine::wire::ModeFlag ToFidlModeFlag(
   return fidl_mode_flag;
 }
 
-constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_mode) {
+constexpr void DebugAssertBanjoDisplayTimingIsValid(const display_timing_t& display_mode) {
   // The >= 0 assertions are always true for uint32_t members in the
-  // `display_mode_t` struct and will be eventually optimized by the compiler.
+  // `display_timing_t` struct and will be eventually optimized by the compiler.
   //
   // These assertions, depsite being always true, match the member
   // definitions in `DisplayTiming` and they make it easier for readers to
@@ -114,10 +114,10 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
                       display_mode.flags & (~kFlagMask));
 }
 
-constexpr void DebugAssertFidlDisplayModeIsValid(
-    const fuchsia_hardware_display_engine::wire::DisplayMode& display_mode) {
+constexpr void DebugAssertFidlDisplayTimingIsValid(
+    const fuchsia_hardware_display_engine::wire::DisplayTiming& display_mode) {
   // The >= 0 assertions are always true for uint32_t members in the
-  // `DisplayMode` struct and will be eventually optimized by the compiler.
+  // `DisplayTiming` struct and will be eventually optimized by the compiler.
   //
   // These assertions, depsite being always true, match the member
   // definitions in `DisplayTiming` and they make it easier for readers to
@@ -163,10 +163,10 @@ constexpr void DebugAssertFidlDisplayModeIsValid(
 
 }  // namespace
 
-DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
-  DebugAssertBanjoDisplayModeIsValid(banjo_display_mode);
+DisplayTiming ToDisplayTiming(const display_timing_t& banjo_display_timing) {
+  DebugAssertBanjoDisplayTimingIsValid(banjo_display_timing);
 
-  // A valid display_mode_t guarantees that both h_front_porch and h_sync_pulse
+  // A valid display_timing_t guarantees that both h_front_porch and h_sync_pulse
   // are no more than kMaxTimingValue, so (h_front_porch + h_addressable) won't
   // overflow.
   //
@@ -174,43 +174,43 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
   // h_blanking - (h_front_porch + h_sync_pulse) won't overflow and will fit
   // in [0, kMaxTimingValue] -- so we can use int32_t.
   int32_t horizontal_back_porch_px =
-      static_cast<int32_t>(banjo_display_mode.h_blanking -
-                           (banjo_display_mode.h_front_porch + banjo_display_mode.h_sync_pulse));
+      static_cast<int32_t>(banjo_display_timing.h_blanking - (banjo_display_timing.h_front_porch +
+                                                              banjo_display_timing.h_sync_pulse));
 
   // Ditto for the vertical back porch.
   int32_t vertical_back_porch_lines =
-      static_cast<int32_t>(banjo_display_mode.v_blanking -
-                           (banjo_display_mode.v_front_porch + banjo_display_mode.v_sync_pulse));
+      static_cast<int32_t>(banjo_display_timing.v_blanking - (banjo_display_timing.v_front_porch +
+                                                              banjo_display_timing.v_sync_pulse));
 
   return DisplayTiming{
-      .horizontal_active_px = static_cast<int32_t>(banjo_display_mode.h_addressable),
-      .horizontal_front_porch_px = static_cast<int32_t>(banjo_display_mode.h_front_porch),
-      .horizontal_sync_width_px = static_cast<int32_t>(banjo_display_mode.h_sync_pulse),
+      .horizontal_active_px = static_cast<int32_t>(banjo_display_timing.h_addressable),
+      .horizontal_front_porch_px = static_cast<int32_t>(banjo_display_timing.h_front_porch),
+      .horizontal_sync_width_px = static_cast<int32_t>(banjo_display_timing.h_sync_pulse),
       .horizontal_back_porch_px = horizontal_back_porch_px,
-      .vertical_active_lines = static_cast<int32_t>(banjo_display_mode.v_addressable),
-      .vertical_front_porch_lines = static_cast<int32_t>(banjo_display_mode.v_front_porch),
-      .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_mode.v_sync_pulse),
+      .vertical_active_lines = static_cast<int32_t>(banjo_display_timing.v_addressable),
+      .vertical_front_porch_lines = static_cast<int32_t>(banjo_display_timing.v_front_porch),
+      .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_timing.v_sync_pulse),
       .vertical_back_porch_lines = vertical_back_porch_lines,
-      .pixel_clock_frequency_hz = banjo_display_mode.pixel_clock_hz,
-      .fields_per_frame = (banjo_display_mode.flags & MODE_FLAG_INTERLACED)
+      .pixel_clock_frequency_hz = banjo_display_timing.pixel_clock_hz,
+      .fields_per_frame = (banjo_display_timing.flags & MODE_FLAG_INTERLACED)
                               ? FieldsPerFrame::kInterlaced
                               : FieldsPerFrame::kProgressive,
-      .hsync_polarity = (banjo_display_mode.flags & MODE_FLAG_HSYNC_POSITIVE)
+      .hsync_polarity = (banjo_display_timing.flags & MODE_FLAG_HSYNC_POSITIVE)
                             ? SyncPolarity::kPositive
                             : SyncPolarity::kNegative,
-      .vsync_polarity = (banjo_display_mode.flags & MODE_FLAG_VSYNC_POSITIVE)
+      .vsync_polarity = (banjo_display_timing.flags & MODE_FLAG_VSYNC_POSITIVE)
                             ? SyncPolarity::kPositive
                             : SyncPolarity::kNegative,
-      .vblank_alternates = (banjo_display_mode.flags & MODE_FLAG_ALTERNATING_VBLANK) != 0,
-      .pixel_repetition = (banjo_display_mode.flags & MODE_FLAG_DOUBLE_CLOCKED) ? 1 : 0,
+      .vblank_alternates = (banjo_display_timing.flags & MODE_FLAG_ALTERNATING_VBLANK) != 0,
+      .pixel_repetition = (banjo_display_timing.flags & MODE_FLAG_DOUBLE_CLOCKED) ? 1 : 0,
   };
 }
 
 DisplayTiming ToDisplayTiming(
-    const fuchsia_hardware_display_engine::wire::DisplayMode& fidl_display_mode) {
-  DebugAssertFidlDisplayModeIsValid(fidl_display_mode);
+    const fuchsia_hardware_display_engine::wire::DisplayTiming& fidl_display_timing) {
+  DebugAssertFidlDisplayTimingIsValid(fidl_display_timing);
 
-  // A valid DisplayMode guarantees that both h_front_porch and h_sync_pulse
+  // A valid DisplayTiming guarantees that both h_front_porch and h_sync_pulse
   // are no more than kMaxTimingValue, so (h_front_porch + h_addressable) won't
   // overflow.
   //
@@ -218,49 +218,49 @@ DisplayTiming ToDisplayTiming(
   // h_blanking - (h_front_porch + h_sync_pulse) won't overflow and will fit
   // in [0, kMaxTimingValue] -- so we can use int32_t.
   int32_t horizontal_back_porch_px =
-      static_cast<int32_t>(fidl_display_mode.h_blanking -
-                           (fidl_display_mode.h_front_porch + fidl_display_mode.h_sync_pulse));
+      static_cast<int32_t>(fidl_display_timing.h_blanking -
+                           (fidl_display_timing.h_front_porch + fidl_display_timing.h_sync_pulse));
 
   // Ditto for the vertical back porch.
   int32_t vertical_back_porch_lines =
-      static_cast<int32_t>(fidl_display_mode.v_blanking -
-                           (fidl_display_mode.v_front_porch + fidl_display_mode.v_sync_pulse));
+      static_cast<int32_t>(fidl_display_timing.v_blanking -
+                           (fidl_display_timing.v_front_porch + fidl_display_timing.v_sync_pulse));
 
   return DisplayTiming{
-      .horizontal_active_px = static_cast<int32_t>(fidl_display_mode.h_addressable),
-      .horizontal_front_porch_px = static_cast<int32_t>(fidl_display_mode.h_front_porch),
-      .horizontal_sync_width_px = static_cast<int32_t>(fidl_display_mode.h_sync_pulse),
+      .horizontal_active_px = static_cast<int32_t>(fidl_display_timing.h_addressable),
+      .horizontal_front_porch_px = static_cast<int32_t>(fidl_display_timing.h_front_porch),
+      .horizontal_sync_width_px = static_cast<int32_t>(fidl_display_timing.h_sync_pulse),
       .horizontal_back_porch_px = horizontal_back_porch_px,
-      .vertical_active_lines = static_cast<int32_t>(fidl_display_mode.v_addressable),
-      .vertical_front_porch_lines = static_cast<int32_t>(fidl_display_mode.v_front_porch),
-      .vertical_sync_width_lines = static_cast<int32_t>(fidl_display_mode.v_sync_pulse),
+      .vertical_active_lines = static_cast<int32_t>(fidl_display_timing.v_addressable),
+      .vertical_front_porch_lines = static_cast<int32_t>(fidl_display_timing.v_front_porch),
+      .vertical_sync_width_lines = static_cast<int32_t>(fidl_display_timing.v_sync_pulse),
       .vertical_back_porch_lines = vertical_back_porch_lines,
-      .pixel_clock_frequency_hz = fidl_display_mode.pixel_clock_hz,
+      .pixel_clock_frequency_hz = fidl_display_timing.pixel_clock_hz,
       .fields_per_frame =
-          (fidl_display_mode.flags & fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced)
+          (fidl_display_timing.flags & fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced)
               ? FieldsPerFrame::kInterlaced
               : FieldsPerFrame::kProgressive,
-      .hsync_polarity = (fidl_display_mode.flags &
+      .hsync_polarity = (fidl_display_timing.flags &
                          fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive)
                             ? SyncPolarity::kPositive
                             : SyncPolarity::kNegative,
-      .vsync_polarity = (fidl_display_mode.flags &
+      .vsync_polarity = (fidl_display_timing.flags &
                          fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive)
                             ? SyncPolarity::kPositive
                             : SyncPolarity::kNegative,
       .vblank_alternates =
-          static_cast<bool>(fidl_display_mode.flags &
+          static_cast<bool>(fidl_display_timing.flags &
                             fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank),
-      .pixel_repetition = (fidl_display_mode.flags &
+      .pixel_repetition = (fidl_display_timing.flags &
                            fuchsia_hardware_display_engine::wire::ModeFlag::kDoubleClocked)
                               ? 1
                               : 0,
   };
 }
 
-display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing) {
+display_timing_t ToBanjoDisplayTiming(const DisplayTiming& display_timing) {
   display_timing.DebugAssertIsValid();
-  return display_mode_t{
+  return display_timing_t{
       .pixel_clock_hz = display_timing.pixel_clock_frequency_hz,
       .h_addressable = static_cast<uint32_t>(display_timing.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing.horizontal_front_porch_px),
@@ -282,10 +282,10 @@ display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing) {
   };
 }
 
-fuchsia_hardware_display_engine::wire::DisplayMode ToFidlDisplayMode(
+fuchsia_hardware_display_engine::wire::DisplayTiming ToFidlDisplayTiming(
     const DisplayTiming& display_timing) {
   display_timing.DebugAssertIsValid();
-  return fuchsia_hardware_display_engine::wire::DisplayMode{
+  return fuchsia_hardware_display_engine::wire::DisplayTiming{
       .pixel_clock_hz = display_timing.pixel_clock_frequency_hz,
       .h_addressable = static_cast<uint32_t>(display_timing.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing.horizontal_front_porch_px),

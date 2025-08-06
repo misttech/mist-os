@@ -7,11 +7,8 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl/txn_header.h>
 #include <lib/image-format/image_format.h>
-#include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -441,7 +438,7 @@ fuchsia_hardware_display_types::wire::ImageMetadata Image::GetMetadata() const {
       .dimensions = {.width = width_, .height = height_},
   };
   if (modifier_ != fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled) {
-    image_metadata.tiling_type = IMAGE_TILING_TYPE_LINEAR;
+    image_metadata.tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
   } else {
     image_metadata.tiling_type = 2;  // IMAGE_TILING_TYPE_Y_LEGACY
   }

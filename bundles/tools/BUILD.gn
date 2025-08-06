@@ -24,7 +24,7 @@ group("tools") {
     "//src/sys/tools/log",
     "//src/ui/tools:scenic",
     "//third_party/boringssl:boringssl_tool",
-    "//third_party/curl:curl_pkg",
+    "//third_party/curl/src:curl_pkg",
     "//third_party/iperf:iperf3_pkg",
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",

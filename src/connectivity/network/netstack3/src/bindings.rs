@@ -291,7 +291,7 @@ mod ctx {
 pub(crate) use ctx::{BindingsCtx, Ctx, NetstackSeed};
 
 /// Extends the methods available to [`DeviceId`].
-trait DeviceIdExt {
+pub(crate) trait DeviceIdExt {
     /// Returns the state associated with devices.
     fn external_state(&self) -> DeviceSpecificInfo<'_>;
 }
@@ -1080,7 +1080,7 @@ fn create_interface_event_producer(
     id: BindingId,
     properties: InterfaceProperties,
 ) -> InterfaceEventProducer {
-    interfaces_event_sink.add_interface(id, properties).expect("interface worker not running")
+    interfaces_event_sink.reserve_interface(id, properties).expect("interface worker not running")
 }
 
 impl Netstack {
@@ -1152,7 +1152,10 @@ impl Netstack {
             ),
         );
         let loopback: DeviceId<_> = loopback.into();
-        self.ctx.bindings_ctx().devices.add_device(binding_id_alloc, loopback.clone());
+        self.ctx
+            .bindings_ctx()
+            .devices
+            .add_device_and_start_publishing(binding_id_alloc, loopback.clone());
 
         self.ctx.apply_interface_defaults(&loopback);
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");

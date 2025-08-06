@@ -379,26 +379,25 @@ impl Injector for Injection {
         })?
     }
 
-    /// TODO(b/432297777)
-    #[allow(clippy::await_holding_lock)]
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
         let timeout_error = self.daemon_timeout_error();
         // XXX Note: if we are doing local discovery, that will eat into this time.
         //     and if local discovery is _longer_ than the proxy timeout, we'll get
         //     a confusing error.
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
-        let target_info = std::sync::Mutex::new(None);
+        // Use a RefCell to provide interior mutability across an await point
+        let target_info = std::cell::RefCell::new(None);
         let proxy = Box::pin(timeout(proxy_timeout, async {
             self.remote_once
                 .get_or_try_init(|_| async {
-                    self.init_remote_proxy(&mut *target_info.lock().unwrap()).await
+                    self.init_remote_proxy(&mut *target_info.borrow_mut()).await
                 })
                 .await
         }))
         .await
         .map_err(|_| {
             log::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
-            match target_info.lock().unwrap().take() {
+            match target_info.borrow_mut().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => {
                     FfxTargetError::DaemonError { err: DaemonError::Timeout, target: Some(name) }
                 }

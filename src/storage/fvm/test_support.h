@@ -28,7 +28,6 @@ namespace fvm {
 
 // Alias for simplicity in testing.
 using VolumeManagerInfo = fuchsia_hardware_block_volume::wire::VolumeManagerInfo;
-using RamdiskClient = ramdisk_client_t;
 
 constexpr uint64_t kPathMax = PATH_MAX;
 
@@ -140,7 +139,7 @@ class RamdiskRef final : public BlockDeviceAdapter {
                                             std::optional<zx::vmo> vmo = std::nullopt);
 
   RamdiskRef(const fbl::unique_fd& devfs_root, uint64_t block_size, const std::string& path,
-             zx::vmo vmo, RamdiskClient* client)
+             zx::vmo vmo, ramdisk_client_t* client)
       : BlockDeviceAdapter(devfs_root, path),
         ramdisk_client_(client),
         block_size_(block_size),
@@ -156,7 +155,7 @@ class RamdiskRef final : public BlockDeviceAdapter {
 
  private:
   // Only set when a ramdisk is created.
-  RamdiskClient* ramdisk_client_ = nullptr;
+  ramdisk_client_t* ramdisk_client_ = nullptr;
   uint64_t block_size_;
   zx::vmo vmo_;
 };

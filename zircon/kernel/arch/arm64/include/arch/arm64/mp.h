@@ -11,11 +11,11 @@
 
 #ifndef __ASSEMBLER__
 
+#include <align.h>
 #include <zircon/compiler.h>
 
 #include <arch/arm64.h>
 #include <arch/arm64/feature.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <ktl/bit.h>
 #include <ktl/type_traits.h>

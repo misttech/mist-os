@@ -24,8 +24,10 @@
         { service: "fuchsia.hardware.usb.phy.Metadata" },
     ],
     use: [
+        { service: "fuchsia.hardware.clock.Service" },
         { service: "fuchsia.hardware.interconnect.PathService" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.vreg.Service" },
         { service: "fuchsia.boot.metadata.MacAddressMetadata" },
         { service: "fuchsia.boot.metadata.SerialNumberMetadata" },
     ],

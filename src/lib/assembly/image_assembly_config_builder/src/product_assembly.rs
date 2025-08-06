@@ -6,11 +6,11 @@ use crate::image_assembly_config_builder::{ImageAssemblyConfigBuilder, Validatio
 
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSetLevel};
+use assembly_config_schema::{BoardConfig, BoardInputBundle, FeatureSetLevel, ProductConfig};
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_release_info::SystemReleaseInfo;
 
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
@@ -23,8 +23,8 @@ use image_assembly_config::ImageAssemblyConfig;
 pub struct ProductAssembly {
     builder: ImageAssemblyConfigBuilder,
     platform_artifacts: PlatformArtifacts,
-    product_config: AssemblyConfig,
-    board_config: BoardInformation,
+    product_config: ProductConfig,
+    board_config: BoardConfig,
     developer_only_options: Option<DeveloperOnlyOptions>,
     kernel_aib: Utf8PathBuf,
     boot_shim_aib: Utf8PathBuf,
@@ -37,8 +37,8 @@ pub struct ProductAssembly {
 impl ProductAssembly {
     pub fn new(
         platform_artifacts: PlatformArtifacts,
-        product_config: AssemblyConfig,
-        board_config: BoardInformation,
+        product_config: ProductConfig,
+        board_config: BoardConfig,
         include_example_aib_for_tests: bool,
     ) -> Result<Self> {
         let image_mode = product_config.platform.storage.filesystems.image_mode;
@@ -169,7 +169,7 @@ impl ProductAssembly {
             .with_context(|| format!("Adding boot shim ({})", &self.boot_shim_aib))?;
 
         // Parse the board's Board Input Bundles, if it has them, and merge their
-        // configuration fields into that of the board_info struct.
+        // configuration fields into that of the board_config struct.
         let mut board_input_bundles = Vec::new();
         for bundle_path in board_config.input_bundles.values() {
             let bundle = BoardInputBundle::from_dir(&bundle_path)
@@ -202,10 +202,9 @@ impl ProductAssembly {
 
         // Replace board_config with a new one that swaps its empty 'configuraton' field
         // for the consolidated one created from the board's input bundles.
-        let board_config =
-            BoardInformation { configuration: board_provided_config, ..board_config };
+        let board_config = BoardConfig { configuration: board_provided_config, ..board_config };
 
-        // Get platform configuration based on the AssemblyConfig and the BoardInformation.
+        // Get platform configuration based on the ProductConfig and the BoardConfig.
         let resource_dir = self.platform_artifacts.get_resources();
         let configuration = assembly_platform_configuration::define_configuration(
             &platform,

@@ -24,6 +24,7 @@
 // TODO(dje): rdpmc
 #include "arch/x86/perf_mon.h"
 
+#include <align.h>
 #include <assert.h>
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/ktrace.h>
@@ -50,7 +51,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
@@ -1482,7 +1482,7 @@ zx_status_t arch_perfmon_start() {
 
   // Make sure all relevant sysregs have been wiped clean.
   if (!perfmon_hw_initialized) {
-    mp_sync_exec(MP_IPI_TARGET_ALL, 0, x86_perfmon_reset_task, nullptr);
+    mp_sync_exec(mp_ipi_target::ALL, 0, x86_perfmon_reset_task, nullptr);
     perfmon_hw_initialized = true;
   }
 
@@ -1512,7 +1512,7 @@ zx_status_t arch_perfmon_start() {
     }
   }
 
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, x86_perfmon_start_cpu_task, state);
+  mp_sync_exec(mp_ipi_target::ALL, 0, x86_perfmon_start_cpu_task, state);
   perfmon_active.store(true);
 
   return ZX_OK;
@@ -1655,7 +1655,7 @@ static void arch_perfmon_stop_locked() TA_REQ(PerfmonLock::Get()) {
   // multiple stops and still read register values.
 
   auto state = perfmon_state.get();
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, x86_perfmon_stop_cpu_task, state);
+  mp_sync_exec(mp_ipi_target::ALL, 0, x86_perfmon_stop_cpu_task, state);
 
   // x86_perfmon_start currently maps the buffers in, so we unmap them here.
   // Make sure to do this after we've turned everything off so that we
@@ -1708,7 +1708,7 @@ void arch_perfmon_fini() {
     DEBUG_ASSERT(!perfmon_active.load());
   }
 
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, x86_perfmon_reset_task, nullptr);
+  mp_sync_exec(mp_ipi_target::ALL, 0, x86_perfmon_reset_task, nullptr);
 
   perfmon_state.reset();
 }

@@ -343,6 +343,9 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 		if d.Project == project.UnknownProject && len(d.Files) > 0 {
 			if _, ok := allowlist[d.Path]; !ok {
 				b.WriteString(fmt.Sprintf("-> %s\n", d.Path))
+				for _, f := range d.Files {
+					b.WriteString(fmt.Sprintf("  -> %s\n", f.AbsPath()))
+				}
 				count = count + 1
 			}
 		}

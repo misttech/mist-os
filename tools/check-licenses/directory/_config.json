@@ -4,6 +4,14 @@
         "skips": [
             {
                 "notes": [
+                    "Temporarily disabled to allow for third_party repository moves."
+                ],
+                "paths": [
+                    "build/secondary/third_party/glog"
+                ]
+            },
+            {
+                "notes": [
                     "Test directories under repos in bazel_vendor.",
                     "They don't have license files included."
                 ],
@@ -47,7 +55,8 @@
                     "third_party/bazel_vendor/OWNERS",
                     "third_party/bazel_vendor/README.md",
                     "third_party/bazel_vendor/VENDOR.bazel",
-                    "third_party/bazel_vendor/_registries/bcr.bazel.build"
+                    "third_party/bazel_vendor/_registries/bcr.bazel.build",
+                    "third_party/bazel_vendor/bazel-external"
                 ]
             },
             {
@@ -622,6 +631,15 @@
                 ],
                 "paths": [
                     "build/secondary/third_party/gflags"
+                ]
+            },
+            {
+                "paths": [
+                    "build/secondary/third_party/curl"
+                ],
+                "notes": [
+                    "Temporarily disabled to allow for third party repository moves.",
+                    "See https://fxbug.dev/432038197 for details."
                 ]
             }
         ]

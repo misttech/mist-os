@@ -54,6 +54,43 @@ async fn succeeds_even_if_retained_packages_fails() {
     ]));
 }
 
+#[fasync::run_singlethreaded(test)]
+async fn succeeds_even_if_retained_blobs_fails_packageless() {
+    let content_blob = vec![1; 200];
+    let content_blob_hash = fuchsia_merkle::from_slice(&content_blob).root();
+
+    let manifest = make_manifest([manifest::Blob {
+        uncompressed_size: content_blob.len() as u64,
+        delivery_blob_type: 1,
+        fuchsia_merkle_root: content_blob_hash,
+    }]);
+    let env = TestEnv::builder()
+        .unregister_protocol(crate::Protocol::RetainedBlobs)
+        .ota_manifest(manifest)
+        .blob(content_blob_hash, content_blob)
+        .build()
+        .await;
+
+    let () = env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_interactions(initial_interactions().chain([
+        // No RetainedBlobs use here b/c protocol is blocked
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        // No RetainedBlobs use here b/c protocol is blocked
+        Gc,
+        OtaDownloader(OtaDownloaderEvent::FetchBlob(content_blob_hash.into())),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
+}
+
 // Verifies that:
 //   1. pinned update pkg url causes both RetainedPackages uses to include the update package
 //   2. second RetainedPackages use includes packages from packages.json
@@ -406,4 +443,63 @@ async fn unpinned_url_and_empty_packages_json() {
             Reboot,
         ]
     );
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn non_empty_blobs_packageless() {
+    let content_blob = vec![1; 200];
+    let content_blob_hash = fuchsia_merkle::from_slice(&content_blob).root();
+
+    let manifest = make_manifest([manifest::Blob {
+        uncompressed_size: content_blob.len() as u64,
+        delivery_blob_type: 1,
+        fuchsia_merkle_root: content_blob_hash,
+    }]);
+    let env = TestEnv::builder()
+        .ota_manifest(manifest)
+        .blob(content_blob_hash, content_blob)
+        .build()
+        .await;
+
+    let () = env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into(), content_blob_hash.into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![content_blob_hash.into()]),
+        Gc,
+        OtaDownloader(OtaDownloaderEvent::FetchBlob(content_blob_hash.into())),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn empty_blobs_packageless() {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
+
+    let () = env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }

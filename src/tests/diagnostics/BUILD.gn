@@ -32,7 +32,10 @@ group("tests") {
   ]
 
   if (!fxfs_blob) {
-    deps += [ ":fshost-blobfs-metrics-tests" ]
+    deps += [
+      ":fshost-blobfs-metrics-emu-tests",
+      ":fshost-blobfs-metrics-tests",
+    ]
   }
 
   if (data_filesystem_format == "fxfs") {
@@ -40,7 +43,10 @@ group("tests") {
   }
 
   if (data_filesystem_format == "minfs") {
-    deps += [ ":fshost-minfs-metrics-tests" ]
+    deps += [
+      ":fshost-minfs-metrics-emu-tests",
+      ":fshost-minfs-metrics-tests",
+    ]
   }
 }
 
@@ -66,13 +72,22 @@ fuchsia_unittest_package("fshost-blobfs-metrics-tests") {
 
   test_specs = {
     environments = [
-      emu_env,
       {
         dimensions = {
           device_type = "Astro"
         }
       },
     ]
+  }
+}
+
+# TODO(https://fxbug.dev/435182357): unify emu and astro once they use the same paths again.
+fuchsia_unittest_package("fshost-blobfs-metrics-emu-tests") {
+  manifest = "meta/fshost_blobfs_metrics_emu_tests.cml"
+  test_type = "system"
+
+  test_specs = {
+    environments = [ emu_env ]
   }
 }
 
@@ -98,13 +113,22 @@ fuchsia_unittest_package("fshost-minfs-metrics-tests") {
 
   test_specs = {
     environments = [
-      emu_env,
       {
         dimensions = {
           device_type = "Astro"
         }
       },
     ]
+  }
+}
+
+# TODO(https://fxbug.dev/435182357): unify emu and astro once they use the same paths again.
+fuchsia_unittest_package("fshost-minfs-metrics-emu-tests") {
+  manifest = "meta/fshost_minfs_metrics_emu_tests.cml"
+  test_type = "system"
+
+  test_specs = {
+    environments = [ emu_env ]
   }
 }
 

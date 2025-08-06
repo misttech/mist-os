@@ -1763,56 +1763,182 @@ impl<'de> ::core::fmt::Debug for WireTable<'de> {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `Interface`
-    /// protocol.
-    pub type InterfaceProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Interface>;
+    impl ::fidl_next::CompatFrom<crate::FlexibleUnion> for ::fidl_test_doccomments::FlexibleUnion {
+        fn compat_from(value: crate::FlexibleUnion) -> Self {
+            match value {
+                crate::FlexibleUnion::Field(value) => {
+                    Self::Field(::fidl_next::CompatFrom::compat_from(value))
+                }
 
-    impl ::core::convert::From<crate::Interface> for ::fidl_test_doccomments::InterfaceMarker {
-        #[inline]
-        fn from(_: crate::Interface) -> Self {
-            Self
-        }
-    }
-
-    impl ::core::convert::From<crate::MyFlexibleBits> for ::fidl_test_doccomments::MyFlexibleBits {
-        #[inline]
-        fn from(from: crate::MyFlexibleBits) -> Self {
-            Self::from_bits_retain(from.bits())
-        }
-    }
-
-    impl ::core::convert::From<crate::MyFlexibleEnum> for ::fidl_test_doccomments::MyFlexibleEnum {
-        #[inline]
-        fn from(from: crate::MyFlexibleEnum) -> Self {
-            match crate::MyFlexibleEnum::from(from) {
-                crate::MyFlexibleEnum::Foo => Self::Foo,
-
-                crate::MyFlexibleEnum::Bar => Self::Bar,
-
-                crate::MyFlexibleEnum::UnknownOrdinal_(value) => {
-                    Self::__SourceBreaking { unknown_ordinal: value }
+                crate::FlexibleUnion::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
                 }
             }
         }
     }
 
-    impl ::core::convert::From<crate::MyStrictBits> for ::fidl_test_doccomments::MyStrictBits {
-        #[inline]
-        fn from(from: crate::MyStrictBits) -> Self {
-            Self::from_bits_retain(from.bits())
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::FlexibleUnion> for crate::FlexibleUnion {
+        fn compat_from(value: ::fidl_test_doccomments::FlexibleUnion) -> Self {
+            match value {
+                ::fidl_test_doccomments::FlexibleUnion::Field(value) => {
+                    Self::Field(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                ::fidl_test_doccomments::FlexibleUnion::__SourceBreaking { unknown_ordinal } => {
+                    Self::UnknownOrdinal_(unknown_ordinal)
+                }
+            }
         }
     }
 
-    impl ::core::convert::From<crate::MyStrictEnum> for ::fidl_test_doccomments::MyStrictEnum {
-        #[inline]
-        fn from(from: crate::MyStrictEnum) -> Self {
-            match crate::MyStrictEnum::from(from) {
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Interface`
+    /// protocol.
+    pub type InterfaceProxy = ::fidl_next::ClientSender<crate::Interface>;
+
+    impl ::fidl_next::CompatFrom<crate::Interface> for ::fidl_test_doccomments::InterfaceMarker {
+        fn compat_from(_: crate::Interface) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::InterfaceMarker> for crate::Interface {
+        fn compat_from(_: ::fidl_test_doccomments::InterfaceMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_doccomments::InterfaceProxy> for crate::Interface {
+        fn client_compat_from(
+            proxy: ::fidl_test_doccomments::InterfaceProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyFlexibleBits> for ::fidl_test_doccomments::MyFlexibleBits {
+        fn compat_from(value: crate::MyFlexibleBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::MyFlexibleBits> for crate::MyFlexibleBits {
+        fn compat_from(value: ::fidl_test_doccomments::MyFlexibleBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyFlexibleEnum> for ::fidl_test_doccomments::MyFlexibleEnum {
+        fn compat_from(value: crate::MyFlexibleEnum) -> Self {
+            match value {
+                crate::MyFlexibleEnum::Foo => Self::Foo,
+
+                crate::MyFlexibleEnum::Bar => Self::Bar,
+
+                crate::MyFlexibleEnum::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::MyFlexibleEnum> for crate::MyFlexibleEnum {
+        fn compat_from(value: ::fidl_test_doccomments::MyFlexibleEnum) -> Self {
+            match value {
+                ::fidl_test_doccomments::MyFlexibleEnum::Foo => Self::Foo,
+
+                ::fidl_test_doccomments::MyFlexibleEnum::Bar => Self::Bar,
+
+                ::fidl_test_doccomments::MyFlexibleEnum::__SourceBreaking {
+                    unknown_ordinal: value,
+                } => Self::UnknownOrdinal_(value),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyStrictBits> for ::fidl_test_doccomments::MyStrictBits {
+        fn compat_from(value: crate::MyStrictBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::MyStrictBits> for crate::MyStrictBits {
+        fn compat_from(value: ::fidl_test_doccomments::MyStrictBits) -> Self {
+            Self::from_bits_retain(value.bits())
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MyStrictEnum> for ::fidl_test_doccomments::MyStrictEnum {
+        fn compat_from(value: crate::MyStrictEnum) -> Self {
+            match value {
                 crate::MyStrictEnum::Foo => Self::Foo,
 
                 crate::MyStrictEnum::Bar => Self::Bar,
             }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::MyStrictEnum> for crate::MyStrictEnum {
+        fn compat_from(value: ::fidl_test_doccomments::MyStrictEnum) -> Self {
+            match value {
+                ::fidl_test_doccomments::MyStrictEnum::Foo => Self::Foo,
+
+                ::fidl_test_doccomments::MyStrictEnum::Bar => Self::Bar,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StrictUnion> for ::fidl_test_doccomments::StrictUnion {
+        fn compat_from(value: crate::StrictUnion) -> Self {
+            match value {
+                crate::StrictUnion::Field(value) => {
+                    Self::Field(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::StrictUnion> for crate::StrictUnion {
+        fn compat_from(value: ::fidl_test_doccomments::StrictUnion) -> Self {
+            match value {
+                ::fidl_test_doccomments::StrictUnion::Field(value) => {
+                    Self::Field(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Struct> for ::fidl_test_doccomments::Struct {
+        #[inline]
+        fn compat_from(value: crate::Struct) -> Self {
+            Self { field: ::fidl_next::CompatFrom::compat_from(value.field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::Struct> for crate::Struct {
+        #[inline]
+        fn compat_from(value: ::fidl_test_doccomments::Struct) -> Self {
+            Self { field: ::fidl_next::CompatFrom::compat_from(value.field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Table> for ::fidl_test_doccomments::Table {
+        fn compat_from(value: crate::Table) -> Self {
+            Self {
+                field: ::fidl_next::CompatFrom::compat_from(value.field),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_doccomments::Table> for crate::Table {
+        fn compat_from(value: ::fidl_test_doccomments::Table) -> Self {
+            Self { field: ::fidl_next::CompatFrom::compat_from(value.field) }
         }
     }
 }

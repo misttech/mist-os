@@ -82,7 +82,7 @@ impl sandbox::Routable<DirEntry> for AggregateRouter {
             metadata
                 .insert(
                     Name::new(METADATA_KEY_TYPE).unwrap(),
-                    Capability::Data(Data::String(self.porcelain_type.to_string())),
+                    Capability::Data(Data::String(self.porcelain_type.to_string().into())),
                 )
                 .expect("failed to build default metadata?");
             metadata.set_metadata(self.availability);

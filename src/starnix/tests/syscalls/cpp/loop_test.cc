@@ -81,7 +81,7 @@ TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
   fbl::unique_fd free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
-  fbl::unique_fd backing_file(open("data/hello_world.txt", O_RDONLY, 0644));
+  fbl::unique_fd backing_file(open("data/tests/deps/hello_world.txt", O_RDONLY, 0644));
   ASSERT_TRUE(backing_file.is_valid());
 
   // Configure an offset that we'll check for after re-opening the device.

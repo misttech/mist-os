@@ -13,6 +13,7 @@
 
 #include <kernel/event.h>
 #include <kernel/spinlock.h>
+#include <vm/page.h>
 
 class PmmNode;
 class PageQueues;
@@ -193,8 +194,10 @@ class Evictor {
   // and reclaim.
   // This method will either reclaim from the global page queues, or receive fake data from a test
   // instance.
-  ktl::optional<EvictedPageCounts> EvictPageQueuesHelper(VmCompression *compression,
-                                                         EvictionLevel eviction_level) const;
+  // The page that reclamation was attempted on is also returned for debug purposes. This is only
+  // populated for a real reclamation, not a fake one from a test instance.
+  ktl::optional<ktl::pair<EvictedPageCounts, const vm_page_t *>> EvictPageQueuesHelper(
+      VmCompression *compression, EvictionLevel eviction_level) const;
 
   // Target for eviction.
   EvictionTarget eviction_target_ TA_GUARDED(lock_) = {};

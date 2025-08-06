@@ -633,15 +633,161 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MyProtocol`
     /// protocol.
-    pub type MyProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MyProtocol>;
+    pub type MyProtocolProxy = ::fidl_next::ClientSender<crate::MyProtocol>;
 
-    impl ::core::convert::From<crate::MyProtocol>
+    impl ::fidl_next::CompatFrom<crate::MyProtocol>
         for ::fidl_test_experimentalmaybefromalias::MyProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::MyProtocol) -> Self {
+        fn compat_from(_: crate::MyProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_experimentalmaybefromalias::MyProtocolMarker>
+        for crate::MyProtocol
+    {
+        fn compat_from(_: ::fidl_test_experimentalmaybefromalias::MyProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_experimentalmaybefromalias::MyProtocolProxy>
+        for crate::MyProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_experimentalmaybefromalias::MyProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Testing> for ::fidl_test_experimentalmaybefromalias::Testing {
+        #[inline]
+        fn compat_from(value: crate::Testing) -> Self {
+            Self {
+                u1: ::fidl_next::CompatFrom::compat_from(value.u1),
+
+                u2: ::fidl_next::CompatFrom::compat_from(value.u2),
+
+                u3: ::fidl_next::CompatFrom::compat_from(value.u3),
+
+                u4: ::fidl_next::CompatFrom::compat_from(value.u4),
+
+                u5: ::fidl_next::CompatFrom::compat_from(value.u5),
+
+                u6: ::fidl_next::CompatFrom::compat_from(value.u6),
+
+                u7: ::fidl_next::CompatFrom::compat_from(value.u7),
+
+                v1: ::fidl_next::CompatFrom::compat_from(value.v1),
+
+                v2: ::fidl_next::CompatFrom::compat_from(value.v2),
+
+                v3: ::fidl_next::CompatFrom::compat_from(value.v3),
+
+                a1: ::fidl_next::CompatFrom::compat_from(value.a1),
+
+                a2: ::fidl_next::CompatFrom::compat_from(value.a2),
+
+                a3: ::fidl_next::CompatFrom::compat_from(value.a3),
+
+                r1: ::fidl_next::CompatFrom::compat_from(value.r1),
+
+                r2: ::fidl_next::CompatFrom::compat_from(value.r2),
+
+                r3: ::fidl_next::CompatFrom::compat_from(value.r3),
+
+                b1: ::fidl_next::CompatFrom::compat_from(value.b1),
+
+                b2: ::fidl_next::CompatFrom::compat_from(value.b2),
+
+                b3: ::fidl_next::CompatFrom::compat_from(value.b3),
+
+                s1: ::fidl_next::CompatFrom::compat_from(value.s1),
+
+                s2: ::fidl_next::CompatFrom::compat_from(value.s2),
+
+                s3: ::fidl_next::CompatFrom::compat_from(value.s3),
+
+                vv1: ::fidl_next::CompatFrom::compat_from(value.vv1),
+
+                vv2: ::fidl_next::CompatFrom::compat_from(value.vv2),
+
+                vv3: ::fidl_next::CompatFrom::compat_from(value.vv3),
+
+                aa1: ::fidl_next::CompatFrom::compat_from(value.aa1),
+
+                aa2: ::fidl_next::CompatFrom::compat_from(value.aa2),
+
+                aa3: ::fidl_next::CompatFrom::compat_from(value.aa3),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_experimentalmaybefromalias::Testing> for crate::Testing {
+        #[inline]
+        fn compat_from(value: ::fidl_test_experimentalmaybefromalias::Testing) -> Self {
+            Self {
+                u1: ::fidl_next::CompatFrom::compat_from(value.u1),
+
+                u2: ::fidl_next::CompatFrom::compat_from(value.u2),
+
+                u3: ::fidl_next::CompatFrom::compat_from(value.u3),
+
+                u4: ::fidl_next::CompatFrom::compat_from(value.u4),
+
+                u5: ::fidl_next::CompatFrom::compat_from(value.u5),
+
+                u6: ::fidl_next::CompatFrom::compat_from(value.u6),
+
+                u7: ::fidl_next::CompatFrom::compat_from(value.u7),
+
+                v1: ::fidl_next::CompatFrom::compat_from(value.v1),
+
+                v2: ::fidl_next::CompatFrom::compat_from(value.v2),
+
+                v3: ::fidl_next::CompatFrom::compat_from(value.v3),
+
+                a1: ::fidl_next::CompatFrom::compat_from(value.a1),
+
+                a2: ::fidl_next::CompatFrom::compat_from(value.a2),
+
+                a3: ::fidl_next::CompatFrom::compat_from(value.a3),
+
+                r1: ::fidl_next::CompatFrom::compat_from(value.r1),
+
+                r2: ::fidl_next::CompatFrom::compat_from(value.r2),
+
+                r3: ::fidl_next::CompatFrom::compat_from(value.r3),
+
+                b1: ::fidl_next::CompatFrom::compat_from(value.b1),
+
+                b2: ::fidl_next::CompatFrom::compat_from(value.b2),
+
+                b3: ::fidl_next::CompatFrom::compat_from(value.b3),
+
+                s1: ::fidl_next::CompatFrom::compat_from(value.s1),
+
+                s2: ::fidl_next::CompatFrom::compat_from(value.s2),
+
+                s3: ::fidl_next::CompatFrom::compat_from(value.s3),
+
+                vv1: ::fidl_next::CompatFrom::compat_from(value.vv1),
+
+                vv2: ::fidl_next::CompatFrom::compat_from(value.vv2),
+
+                vv3: ::fidl_next::CompatFrom::compat_from(value.vv3),
+
+                aa1: ::fidl_next::CompatFrom::compat_from(value.aa1),
+
+                aa2: ::fidl_next::CompatFrom::compat_from(value.aa2),
+
+                aa3: ::fidl_next::CompatFrom::compat_from(value.aa3),
+            }
         }
     }
 }

@@ -52,7 +52,7 @@ impl LocalExecutor {
     }
 
     /// Create a new single-threaded executor running with actual time, with a port.
-    pub fn new_with_port(port: zx::Port) -> Self {
+    pub(crate) fn new_with_port(port: zx::Port) -> Self {
         let inner = Arc::new(Executor::new_with_port(
             ExecutorTime::RealTime,
             /* is_local */ true,
@@ -141,6 +141,33 @@ impl Drop for LocalExecutor {
     }
 }
 
+/// A builder for `LocalExecutor`.
+#[derive(Default)]
+pub struct LocalExecutorBuilder {
+    port: Option<zx::Port>,
+}
+
+impl LocalExecutorBuilder {
+    /// Creates a new builder used for constructing a `LocalExecutor`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the port for the executor.
+    pub fn port(mut self, port: zx::Port) -> Self {
+        self.port = Some(port);
+        self
+    }
+
+    /// Builds the `LocalExecutor`, consuming this `LocalExecutorBuilder`.
+    pub fn build(self) -> LocalExecutor {
+        match self.port {
+            Some(port) => LocalExecutor::new_with_port(port),
+            None => LocalExecutor::new(),
+        }
+    }
+}
+
 /// A single-threaded executor for testing. Exposes additional APIs for manipulating executor state
 /// and validating behavior of executed tasks.
 ///
@@ -163,7 +190,7 @@ impl TestExecutor {
     }
 
     /// Create a new executor for testing from a port.
-    pub fn new_with_port(port: zx::Port) -> Self {
+    pub(crate) fn new_with_port(port: zx::Port) -> Self {
         Self { local: LocalExecutor::new_with_port(port) }
     }
 
@@ -405,6 +432,49 @@ impl TestExecutor {
     }
 }
 
+/// A builder for `TestExecutor`.
+#[derive(Default)]
+pub struct TestExecutorBuilder {
+    port: Option<zx::Port>,
+    fake_time: bool,
+}
+
+impl TestExecutorBuilder {
+    /// Creates a new builder used for constructing a `TestExecutor`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the port for the executor. Only supported
+    /// when fake time isn't also used.
+    pub fn port(mut self, port: zx::Port) -> Self {
+        self.port = Some(port);
+        self
+    }
+
+    /// Sets whether the executor should use fake time.
+    /// Only supported when a port isn't also used.
+    pub fn fake_time(mut self, fake_time: bool) -> Self {
+        self.fake_time = fake_time;
+        self
+    }
+
+    /// Builds the `TestExecutor`, consuming this `TestExecutorBuilder`.
+    pub fn build(self) -> TestExecutor {
+        if self.fake_time {
+            if self.port.is_some() {
+                panic!("Creating an executor with both fake time and a port isn't supported.");
+            }
+            TestExecutor::new_with_fake_time()
+        } else {
+            match self.port {
+                Some(port) => TestExecutor::new_with_port(port),
+                None => TestExecutor::new(),
+            }
+        }
+    }
+}
+
 struct StalledWatcher {
     waker: AtomicWaker,
     done: AtomicBool,
@@ -470,7 +540,7 @@ mod tests {
             }
         };
         let fut = Box::new(future::poll_fn(fut_fn));
-        let mut executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutorBuilder::new().fake_time(true).build();
         // Spawn the future rather than waking it the main task because run_until_stalled will wake
         // the main future on every call, and we want to wake it ourselves using the waker.
         executor.local.ehandle.spawn_local_detached(fut);
@@ -486,7 +556,7 @@ mod tests {
     #[test]
     // Runs a future that waits on a timer.
     fn stepwise_timer() {
-        let mut executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutorBuilder::new().fake_time(true).build();
         executor.set_fake_time(MonotonicInstant::from_nanos(0));
         let mut fut =
             pin!(Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_nanos(1000))));
@@ -502,7 +572,7 @@ mod tests {
     // Runs a future that waits on an event.
     #[test]
     fn stepwise_event() {
-        let mut executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutorBuilder::new().fake_time(true).build();
         let event = zx::Event::create();
         let mut fut = pin!(OnSignalsFuture::new(&event, zx::Signals::USER_0));
 
@@ -516,7 +586,7 @@ mod tests {
     // compared to normal execution.
     #[test]
     fn run_until_stalled_preserves_order() {
-        let mut executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutorBuilder::new().fake_time(true).build();
         let spawned_fut_completed = Arc::new(AtomicBool::new(false));
         let spawned_fut_completed_writer = spawned_fut_completed.clone();
         let spawned_fut = Box::pin(async move {
@@ -553,7 +623,7 @@ mod tests {
         }
         let mut dropped = Arc::new(AtomicBool::new(false));
         let drop_spawner = DropSpawner { dropped: dropped.clone() };
-        let mut executor = TestExecutor::new();
+        let mut executor = TestExecutorBuilder::new().build();
         let mut main_fut = pin!(async move {
             spawn(async move {
                 // Take ownership of the drop spawner
@@ -580,7 +650,7 @@ mod tests {
 
     #[test]
     fn time_now_real_time() {
-        let _executor = LocalExecutor::new();
+        let _executor = LocalExecutorBuilder::new().build();
         let t1 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0));
         let t2 = MonotonicInstant::now().into_zx();
         let t3 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0));
@@ -590,7 +660,7 @@ mod tests {
 
     #[test]
     fn time_now_fake_time() {
-        let executor = TestExecutor::new_with_fake_time();
+        let executor = TestExecutorBuilder::new().fake_time(true).build();
         let t1 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(MonotonicInstant::now(), t1);
@@ -602,7 +672,7 @@ mod tests {
 
     #[test]
     fn time_now_fake_time_boot() {
-        let executor = TestExecutor::new_with_fake_time();
+        let executor = TestExecutorBuilder::new().fake_time(true).build();
         let t1 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(MonotonicInstant::now(), t1);
@@ -621,7 +691,7 @@ mod tests {
 
     #[test]
     fn time_boot_now() {
-        let executor = TestExecutor::new_with_fake_time();
+        let executor = TestExecutorBuilder::new().fake_time(true).build();
         let t1 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(MonotonicInstant::now(), t1);
@@ -640,7 +710,7 @@ mod tests {
 
     #[test]
     fn time_after_overflow() {
-        let executor = TestExecutor::new_with_fake_time();
+        let executor = TestExecutorBuilder::new().fake_time(true).build();
 
         executor.set_fake_time(MonotonicInstant::INFINITE - zx::MonotonicDuration::from_nanos(100));
         assert_eq!(
@@ -676,7 +746,7 @@ mod tests {
     #[test]
     fn test_boot_time_tracks_mono_time() {
         const FAKE_TIME: i64 = 42;
-        let executor = TestExecutor::new_with_fake_time();
+        let executor = TestExecutorBuilder::new().fake_time(true).build();
         executor.set_fake_time(MonotonicInstant::from_nanos(FAKE_TIME));
         assert_eq!(
             BootInstant::from_nanos(FAKE_TIME),
@@ -697,12 +767,12 @@ mod tests {
     // such as the zx port queue limit.
     #[test]
     fn many_wakeups() {
-        let mut executor = LocalExecutor::new();
+        let mut executor = LocalExecutorBuilder::new().build();
         executor.run_singlethreaded(multi_wake(4096 * 2));
     }
 
     fn advance_to_with(timer_duration: impl WakeupTime) {
-        let mut executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutorBuilder::new().fake_time(true).build();
         executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let mut fut = pin!(async {

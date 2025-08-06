@@ -7,7 +7,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/fdio/vfs.h>
 #include <zircon/status.h>
 
 #include <string>
@@ -25,12 +24,6 @@ ServiceProxyDir::ServiceProxyDir(fidl::ClientEnd<fio::Directory> proxy_dir)
 void ServiceProxyDir::AddEntry(std::string name, fbl::RefPtr<fs::Vnode> node) {
   std::lock_guard lock(lock_);
   entries_[std::move(name)] = std::move(node);
-}
-
-zx::result<fs::VnodeAttributes> ServiceProxyDir::GetAttributes() const {
-  return zx::ok(fs::VnodeAttributes{
-      .mode = V_TYPE_DIR | V_IRUSR,
-  });
 }
 
 fuchsia_io::NodeProtocolKinds ServiceProxyDir::GetProtocols() const {

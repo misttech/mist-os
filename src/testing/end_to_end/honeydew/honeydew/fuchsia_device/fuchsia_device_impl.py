@@ -38,7 +38,10 @@ from honeydew.affordances.connectivity.netstack import (
     netstack_using_fc,
 )
 from honeydew.affordances.connectivity.wlan.utils import types as wlan_types
-from honeydew.affordances.connectivity.wlan.wlan import wlan, wlan_using_fc
+from honeydew.affordances.connectivity.wlan.wlan_core import (
+    wlan_core,
+    wlan_core_using_fc,
+)
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy,
     wlan_policy_using_fc,
@@ -598,13 +601,13 @@ class FuchsiaDeviceImpl(
         )
 
     @properties.Affordance
-    def wlan(self) -> wlan.Wlan:
+    def wlan_core(self) -> wlan_core.WlanCore:
         """Returns a wlan affordance object.
 
         Returns:
             wlan.Wlan object
         """
-        return wlan_using_fc.Wlan(
+        return wlan_core_using_fc.WlanCore(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
@@ -1102,7 +1105,11 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         _LOGGER.debug(
-            f"Attempting to log to device {self.device_name}: {tag}, message: {message}, level: {level}",
+            "Attempting to log to device %s: %s, message: %s, level: %s",
+            self.device_name,
+            tag,
+            message,
+            level,
         )
         try:
             rcs_proxy = fd_remotecontrol.RemoteControlClient(

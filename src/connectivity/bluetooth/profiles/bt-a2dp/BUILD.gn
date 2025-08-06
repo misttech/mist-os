@@ -129,6 +129,12 @@ fuchsia_package("source-only") {
   ]
 }
 
+fuchsia_package("without-config") {
+  package_name = "bt-a2dp"
+  validate_structured_config = false
+  deps = [ ":component" ]
+}
+
 fuchsia_unittest_package("bt-a2dp-tests") {
   deps = [ ":bin_test" ]
 }

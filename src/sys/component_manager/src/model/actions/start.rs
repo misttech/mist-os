@@ -592,6 +592,7 @@ mod tests {
     use ::routing::resolving::ComponentAddress;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
+    use cm_rust::push_box;
     use cm_rust_testing::{ChildBuilder, ComponentDeclBuilder};
     use errors::ModelError;
     use fuchsia_async as fasync;
@@ -821,11 +822,11 @@ mod tests {
                 TEST_CHILD_NAME,
                 ComponentDeclBuilder::new()
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::Capabilities(
                             cm_rust::ConfigSourceCapabilities {},
@@ -943,7 +944,7 @@ mod tests {
             .get_component_decl(TEST_CHILD_NAME)
             .expect("child decl not stored");
         let mut modified_decl = original_decl.clone();
-        modified_decl.children.push(ChildBuilder::new().name("foo").build());
+        push_box(&mut modified_decl.children, ChildBuilder::new().name("foo").build());
         test_harness.resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
 
         ActionsManager::register(

@@ -5352,33 +5352,452 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolOneWayAnonComposedRequest>
+        for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest
+    {
+        fn compat_from(value: crate::ComposedProtocolOneWayAnonComposedRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest,
+        > for crate::ComposedProtocolOneWayAnonComposedRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolTwoWayAnonComposedRequest>
+        for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest
+    {
+        fn compat_from(value: crate::ComposedProtocolTwoWayAnonComposedRequest) -> Self {
+            match value {
+                crate::ComposedProtocolTwoWayAnonComposedRequest::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest,
+        > for crate::ComposedProtocolTwoWayAnonComposedRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolTwoWayAnonComposedResponse>
+        for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse
+    {
+        fn compat_from(value: crate::ComposedProtocolTwoWayAnonComposedResponse) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse,
+        > for crate::ComposedProtocolTwoWayAnonComposedResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolTwoWayAnonComposedWithErrorRequest> for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest {
+    fn compat_from(value: crate::ComposedProtocolTwoWayAnonComposedWithErrorRequest) -> Self {
+        Self {
+
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest> for crate::ComposedProtocolTwoWayAnonComposedWithErrorRequest {
+    fn compat_from(value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest) -> Self {
+        Self {
+
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse> for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse {
+    fn compat_from(value: crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse) -> Self {
+        match value {
+
+                crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> for crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse {
+    fn compat_from(value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse) -> Self {
+        match value {
+
+                ::fidl_test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+        }
+    }
+}
+
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocolOnAnonComposedRequest>
+        for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest
+    {
+        fn compat_from(value: crate::ComposedProtocolOnAnonComposedRequest) -> Self {
+            match value {
+                crate::ComposedProtocolOnAnonComposedRequest::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest,
+        > for crate::ComposedProtocolOnAnonComposedRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TablePayload>
+        for ::fidl_test_protocollayoutssamelibrary::TablePayload
+    {
+        fn compat_from(value: crate::TablePayload) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::TablePayload>
+        for crate::TablePayload
+    {
+        fn compat_from(value: ::fidl_test_protocollayoutssamelibrary::TablePayload) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::UnionPayload>
+        for ::fidl_test_protocollayoutssamelibrary::UnionPayload
+    {
+        fn compat_from(value: crate::UnionPayload) -> Self {
+            match value {
+                crate::UnionPayload::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::UnionPayload>
+        for crate::UnionPayload
+    {
+        fn compat_from(value: ::fidl_test_protocollayoutssamelibrary::UnionPayload) -> Self {
+            match value {
+                ::fidl_test_protocollayoutssamelibrary::UnionPayload::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ComposedProtocol`
     /// protocol.
-    pub type ComposedProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ComposedProtocol>;
+    pub type ComposedProtocolProxy = ::fidl_next::ClientSender<crate::ComposedProtocol>;
 
-    impl ::core::convert::From<crate::ComposedProtocol>
+    impl ::fidl_next::CompatFrom<crate::ComposedProtocol>
         for ::fidl_test_protocollayoutssamelibrary::ComposedProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::ComposedProtocol) -> Self {
+        fn compat_from(_: crate::ComposedProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::ComposedProtocolMarker>
+        for crate::ComposedProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl
+        ::fidl_next::ClientCompatFrom<::fidl_test_protocollayoutssamelibrary::ComposedProtocolProxy>
+        for crate::ComposedProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocollayoutssamelibrary::ComposedProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolOneWayAnonRequest>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest
+    {
+        fn compat_from(value: crate::MainProtocolOneWayAnonRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest,
+        > for crate::MainProtocolOneWayAnonRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolTwoWayAnonRequest>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest
+    {
+        fn compat_from(value: crate::MainProtocolTwoWayAnonRequest) -> Self {
+            match value {
+                crate::MainProtocolTwoWayAnonRequest::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::MainProtocolTwoWayAnonRequest::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest,
+        > for crate::MainProtocolTwoWayAnonRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolTwoWayAnonResponse>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse
+    {
+        fn compat_from(value: crate::MainProtocolTwoWayAnonResponse) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse,
+        > for crate::MainProtocolTwoWayAnonResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolTwoWayAnonWithErrorRequest>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest
+    {
+        fn compat_from(value: crate::MainProtocolTwoWayAnonWithErrorRequest) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest,
+        > for crate::MainProtocolTwoWayAnonWithErrorRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolTwoWayAnonWithErrorResponse>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse
+    {
+        fn compat_from(value: crate::MainProtocolTwoWayAnonWithErrorResponse) -> Self {
+            match value {
+                crate::MainProtocolTwoWayAnonWithErrorResponse::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::MainProtocolTwoWayAnonWithErrorResponse::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse,
+        > for crate::MainProtocolTwoWayAnonWithErrorResponse
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MainProtocolOnAnonRequest>
+        for ::fidl_test_protocollayoutssamelibrary::MainProtocolOnAnonRequest
+    {
+        fn compat_from(value: crate::MainProtocolOnAnonRequest) -> Self {
+            match value {
+                crate::MainProtocolOnAnonRequest::B(value) => {
+                    Self::B(::fidl_next::CompatFrom::compat_from(value))
+                }
+
+                crate::MainProtocolOnAnonRequest::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::MainProtocolOnAnonRequest>
+        for crate::MainProtocolOnAnonRequest
+    {
+        fn compat_from(
+            value: ::fidl_test_protocollayoutssamelibrary::MainProtocolOnAnonRequest,
+        ) -> Self {
+            match value {
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolOnAnonRequest::B(value) =>
+                    Self::B(::fidl_next::CompatFrom::compat_from(value)),
+
+
+                ::fidl_test_protocollayoutssamelibrary::MainProtocolOnAnonRequest::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+
+        }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MainProtocol`
     /// protocol.
-    pub type MainProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MainProtocol>;
+    pub type MainProtocolProxy = ::fidl_next::ClientSender<crate::MainProtocol>;
 
-    impl ::core::convert::From<crate::MainProtocol>
+    impl ::fidl_next::CompatFrom<crate::MainProtocol>
         for ::fidl_test_protocollayoutssamelibrary::MainProtocolMarker
     {
-        #[inline]
-        fn from(_: crate::MainProtocol) -> Self {
+        fn compat_from(_: crate::MainProtocol) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_protocollayoutssamelibrary::MainProtocolMarker>
+        for crate::MainProtocol
+    {
+        fn compat_from(_: ::fidl_test_protocollayoutssamelibrary::MainProtocolMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_protocollayoutssamelibrary::MainProtocolProxy>
+        for crate::MainProtocol
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_protocollayoutssamelibrary::MainProtocolProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

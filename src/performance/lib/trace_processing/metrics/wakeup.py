@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """Wakeup trace metrics."""
 
-from typing import Sequence
+from typing import MutableSequence
 
 from trace_processing import trace_metrics, trace_model, trace_time
 
@@ -40,7 +40,7 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         """Calculate Wakeup metrics.
 
         Args:

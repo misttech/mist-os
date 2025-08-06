@@ -118,12 +118,9 @@ zx::result<> VnodeFile::UpdateAttributes(const fs::VnodeAttributesUpdate& attrib
   if (attributes.modification_time) {
     fs::SharedLock lock(mutex_);
     if (paged_vmo().is_valid()) {
-      zx_pager_vmo_stats vmo_stats;
-      zx_status_t status =
-          zx_pager_query_vmo_stats(memfs_.pager_for_next_vdso_syscalls().get(), paged_vmo().get(),
-                                   ZX_PAGER_RESET_VMO_STATS, &vmo_stats, sizeof(vmo_stats));
-      if (status != ZX_OK) {
-        return zx::error(status);
+      auto vmo_stats = memfs_.QueryVmoStats(paged_vmo(), ZX_PAGER_RESET_VMO_STATS);
+      if (vmo_stats.is_error()) {
+        return vmo_stats.take_error();
       }
     }
   }
@@ -173,12 +170,9 @@ void VnodeFile::UpdateModifiedIfVmoChanged() const {
     return;
   }
 
-  zx_pager_vmo_stats vmo_stats;
-  zx_status_t status =
-      zx_pager_query_vmo_stats(memfs_.pager_for_next_vdso_syscalls().get(), paged_vmo().get(),
-                               ZX_PAGER_RESET_VMO_STATS, &vmo_stats, sizeof(vmo_stats));
-  ZX_ASSERT(status == ZX_OK);
-  if (vmo_stats.modified == ZX_PAGER_VMO_STATS_MODIFIED) {
+  auto vmo_stats = memfs_.QueryVmoStats(paged_vmo(), ZX_PAGER_RESET_VMO_STATS);
+  ZX_ASSERT(vmo_stats.is_ok());
+  if (vmo_stats->modified == ZX_PAGER_VMO_STATS_MODIFIED) {
     UpdateModified();
   }
 }

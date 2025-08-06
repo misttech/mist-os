@@ -110,11 +110,11 @@ pub struct ComponentEventRoute {
     /// If None, refers to the root component.
     pub component: Option<ChildRef>,
     /// A list of scopes that this route applies to
-    pub scope: Option<Vec<EventScope>>,
+    pub scope: Option<Box<[EventScope]>>,
 }
 
 impl ComponentEventRoute {
-    fn from_moniker(moniker: &Moniker, scope: Option<Vec<EventScope>>) -> ComponentEventRoute {
+    fn from_moniker(moniker: &Moniker, scope: Option<Box<[EventScope]>>) -> ComponentEventRoute {
         let component = moniker.leaf().map(|leaf| ChildRef {
             name: leaf.name().into(),
             collection: leaf.collection().map(Into::into),

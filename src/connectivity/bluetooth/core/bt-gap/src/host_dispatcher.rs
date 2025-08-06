@@ -412,7 +412,10 @@ impl HostDispatcherState {
 
     /// Updates the active adapter and notifies listeners & host watchers.
     fn set_active_id(&mut self, id: Option<HostId>) {
-        info!("New active adapter: {}", id.map_or("<none>".to_string(), |id| id.to_string()));
+        info!(
+            "New active adapter: {}",
+            id.map_or_else(|| "<none>".to_string(), |id| id.to_string())
+        );
         self.active_id = id;
         self.notify_host_watchers();
     }

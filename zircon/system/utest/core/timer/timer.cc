@@ -271,7 +271,8 @@ TEST(Timer, BootTimersElapseDuringSuspend) {
       standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_CPU_BASE);
   ASSERT_OK(resource_result.status_value());
   const zx::time_boot deadline_suspend = zx::clock::get_boot() + zx::sec(7);
-  ASSERT_OK(zx_system_suspend_enter(resource_result->get(), deadline_suspend.get()));
+  ASSERT_OK(zx_system_suspend_enter(resource_result->get(), deadline_suspend.get(), 0, nullptr,
+                                    nullptr, 0, nullptr));
 
   // Verify that the boot timer was signaled before now, as explained in the block comment above.
   zx_port_packet_t pkt;

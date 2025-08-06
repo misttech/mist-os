@@ -66,7 +66,6 @@ TEST(Service, Lifecycle) {
   EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kConnector, svc->GetProtocols());
   zx::result attr = svc->GetAttributes();
   ASSERT_TRUE(attr.is_ok());
-  EXPECT_EQ(V_TYPE_FILE, attr->mode);
 
   // make some channels we can use for testing
   zx::channel c1, c2;

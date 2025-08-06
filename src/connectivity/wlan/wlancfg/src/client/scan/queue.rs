@@ -170,9 +170,9 @@ mod tests {
     use super::*;
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::{generate_channel, generate_random_channel, generate_ssid};
+    use assert_matches::assert_matches;
     use futures::channel::mpsc;
     use test_case::test_case;
-    use wlan_common::assert_variant;
 
     lazy_static! {
         static ref WILDCARD_STR: String = WILDCARD_SSID.to_string_not_redactable().into();
@@ -403,15 +403,15 @@ mod tests {
         // The matching request was removed from the queue
         assert_eq!(queue.queue.len(), 1);
         // The request fulfillment time was recorded
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, ScanRequestFulfillmentTime {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, ScanRequestFulfillmentTime {
                 duration,
                 reason: ScanReason::BssSelectionAugmentation
             } => assert_eq!(duration, scan_duration));
         });
         // The request fulfillment count was recorded
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, ScanQueueStatistics {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, ScanQueueStatistics {
                 fulfilled_requests: 1,
                 remaining_requests: 1,
             });

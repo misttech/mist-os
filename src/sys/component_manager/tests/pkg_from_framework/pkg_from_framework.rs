@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use cm_rust::push_box;
 use fidl_fuchsia_io as fio;
 use fuchsia_component_test::new::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -137,16 +138,18 @@ async fn expose_pkg_from_framework() {
         .add_child_from_decl(
             "config-provider",
             cm_rust::ComponentDecl {
-                exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
-                    source: cm_rust::ExposeSource::Framework,
-                    source_name: "pkg".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target: cm_rust::ExposeTarget::Parent,
-                    target_name: "config".parse().unwrap(),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: "data".parse().unwrap(),
-                    availability: cm_rust::Availability::Required,
-                })],
+                exposes: Box::from([cm_rust::ExposeDecl::Directory(
+                    cm_rust::ExposeDirectoryDecl {
+                        source: cm_rust::ExposeSource::Framework,
+                        source_name: "pkg".parse().unwrap(),
+                        source_dictionary: Default::default(),
+                        target: cm_rust::ExposeTarget::Parent,
+                        target_name: "config".parse().unwrap(),
+                        rights: Some(fio::R_STAR_DIR),
+                        subdir: "data".parse().unwrap(),
+                        availability: cm_rust::Availability::Required,
+                    },
+                )]),
                 ..cm_rust::ComponentDecl::default()
             },
             ChildOptions::new(),
@@ -188,16 +191,19 @@ async fn use_pkg_from_framework() {
         .await
         .unwrap();
     let mut config_reader_decl = builder.get_component_decl(&config_reader).await.unwrap();
-    config_reader_decl.uses.push(cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
-        source: cm_rust::UseSource::Framework,
-        source_name: "pkg".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target_path: "/config".parse().unwrap(),
-        rights: fio::R_STAR_DIR,
-        subdir: "data".parse().unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
+    push_box(
+        &mut config_reader_decl.uses,
+        cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
+            source: cm_rust::UseSource::Framework,
+            source_name: "pkg".parse().unwrap(),
+            source_dictionary: Default::default(),
+            target_path: "/config".parse().unwrap(),
+            rights: fio::R_STAR_DIR,
+            subdir: "data".parse().unwrap(),
+            dependency_type: cm_rust::DependencyType::Strong,
+            availability: cm_rust::Availability::Required,
+        }),
+    );
     builder.replace_component_decl(&config_reader, config_reader_decl).await.unwrap();
     let _instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();

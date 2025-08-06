@@ -6,6 +6,7 @@
 
 #include "kernel/percpu.h"
 
+#include <align.h>
 #include <debug.h>
 #include <lib/counters.h>
 #include <lib/system-topology.h>
@@ -13,7 +14,6 @@
 #include <arch/ops.h>
 #include <fbl/alloc_checker.h>
 #include <ffl/string.h>
-#include <kernel/align.h>
 #include <kernel/cpu_distance_map.h>
 #include <kernel/lockdep.h>
 #include <ktl/algorithm.h>
@@ -50,7 +50,7 @@ void percpu::InitializeBoot() {
   arch_setup_percpu(0, &boot_processor_.Get());
 }
 
-void percpu::InitializeSecondariesBegin(uint32_t /*init_level*/) {
+void percpu::InitializeSecondariesBegin() {
   processor_count_ = CpuDistanceMap::Get().cpu_count();
   DEBUG_ASSERT(processor_count_ != 0);
 
@@ -75,7 +75,7 @@ void percpu::InitializeSecondariesBegin(uint32_t /*init_level*/) {
     }
   }
 
-  // Compute the performance scale of each CPU.
+  // Compute the processing rate of each CPU.
   {
     fbl::AllocChecker checker;
     ktl::unique_ptr<uint8_t[]> performance_class{new (&checker) uint8_t[processor_count_]};
@@ -86,13 +86,13 @@ void percpu::InitializeSecondariesBegin(uint32_t /*init_level*/) {
         max_performance_class = ktl::max(performance_class[i], max_performance_class);
       }
 
-      dprintf(INFO, "CPU performance scales:\n");
+      dprintf(INFO, "CPU processing rates:\n");
       for (cpu_num_t i = 0; i < processor_count_; i++) {
-        const SchedPerformanceScale scale =
+        const SchedProcessingRate processing_rate =
             ffl::FromRatio(performance_class[i] + 1, max_performance_class + 1);
-        processor_index_[i]->scheduler.InitializePerformanceScale(scale);
-        CpuSearchSet::SetPerfScale(i, scale.raw_value());
-        dprintf(INFO, "CPU %2u: %s\n", i, Format(scale).c_str());
+        processor_index_[i]->scheduler.InitializeProcessingRate(processing_rate);
+        CpuSearchSet::SetPerfScale(i, processing_rate.raw_value());
+        dprintf(INFO, "CPU %2u: %s\n", i, Format(processing_rate).c_str());
       }
     } else {
       dprintf(INFO, "Failed to allocate temp buffer, using default performance for all CPUs\n");
@@ -119,7 +119,3 @@ void percpu::InitializeSecondaryFinish() {
   DEBUG_ASSERT(cpu_num < processor_count());
   arch_setup_percpu(cpu_num, processor_index_[cpu_num]);
 }
-
-// Allocate secondary percpu instances before booting other processors, after
-// vm and system topology are initialized.
-LK_INIT_HOOK(percpu_heap_init, percpu::InitializeSecondariesBegin, LK_INIT_LEVEL_KERNEL)

@@ -1185,19 +1185,19 @@ impl Display for InfoResult {
 
 /// Returns the [Display] representation of the option value, if it exists, or a placeholder.
 fn or_unknown(value: &Option<impl ToString>) -> String {
-    value.as_ref().map_or("<unknown>".to_string(), |value| value.to_string())
+    value.as_ref().map_or_else(|| "<unknown>".to_string(), |value| value.to_string())
 }
 fn or_yes_missing(value: &Option<impl ToString>) -> String {
-    value.as_ref().map_or("✅ Yes <missing>".to_string(), |value| value.to_string())
+    value.as_ref().map_or_else(|| "✅ Yes <missing>".to_string(), |value| value.to_string())
 }
 fn or_no_missing(value: &Option<impl ToString>) -> String {
-    value.as_ref().map_or("❌ No <missing>".to_string(), |value| value.to_string())
+    value.as_ref().map_or_else(|| "❌ No <missing>".to_string(), |value| value.to_string())
 }
 fn or_full_range_none(value: &Option<impl ToString>) -> String {
-    value.as_ref().map_or("Full range <none>".to_string(), |value| value.to_string())
+    value.as_ref().map_or_else(|| "Full range <none>".to_string(), |value| value.to_string())
 }
 fn or_nothing(value: &Option<impl ToString>) -> String {
-    value.as_ref().map_or("".to_string(), |value| value.to_string())
+    value.as_ref().map_or_else(|| "".to_string(), |value| value.to_string())
 }
 impl From<(Info, Selector)> for InfoResult {
     fn from(value: (Info, Selector)) -> Self {

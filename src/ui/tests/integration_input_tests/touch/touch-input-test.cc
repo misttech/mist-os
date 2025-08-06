@@ -20,7 +20,6 @@
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
-#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <lib/async/cpp/task.h>

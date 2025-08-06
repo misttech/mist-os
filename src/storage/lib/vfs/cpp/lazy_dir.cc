@@ -4,13 +4,21 @@
 
 #include "src/storage/lib/vfs/cpp/lazy_dir.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fdio/vfs.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <string_view>
 
+#include <fbl/ref_ptr.h>
+
 #include "src/storage/lib/vfs/cpp/vfs.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;

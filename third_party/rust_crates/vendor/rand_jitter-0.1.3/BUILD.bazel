@@ -80,10 +80,10 @@ rust_library(
         "//third_party/rust_crates/vendor/rand_core-0.4.2:rand_core",
     ] + select({
         "@rules_rust//rust/platform:aarch64-apple-darwin": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(any(target_os = "macos", target_os = "ios"))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(any(target_os = "macos", target_os = "ios"))
         ],
         "@rules_rust//rust/platform:x86_64-apple-darwin": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(any(target_os = "macos", target_os = "ios"))
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # cfg(any(target_os = "macos", target_os = "ios"))
         ],
         "//conditions:default": [],
     }),

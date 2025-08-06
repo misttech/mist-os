@@ -4,7 +4,7 @@
 
 use crate::bedrock::program::{Program, StopConclusion, StopDisposition};
 use crate::framework::{controller, get_framework_router};
-use crate::model::actions::{shutdown, StopAction};
+use crate::model::actions::StopAction;
 use crate::model::component::{
     Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
     WeakComponentInstance, WeakExtendedInstance,
@@ -66,8 +66,8 @@ use sandbox::{
     Router, RouterResponse, WeakInstanceToken,
 };
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::sync::Arc;
+use std::{fmt, mem};
 use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
@@ -256,47 +256,6 @@ impl UnresolvedInstanceState {
     }
 }
 
-/// Expose instance state in the format in which the `shutdown` action expects
-/// to see it.
-///
-/// Largely shares its implementation with `ResolvedInstanceInterface`.
-impl shutdown::Component for ResolvedInstanceState {
-    fn uses(&self) -> Vec<UseDecl> {
-        <Self as ResolvedInstanceInterface>::uses(self)
-    }
-
-    fn exposes(&self) -> Vec<cm_rust::ExposeDecl> {
-        <Self as ResolvedInstanceInterface>::exposes(self)
-    }
-
-    fn offers(&self) -> Vec<cm_rust::OfferDecl> {
-        // Includes both static and dynamic offers.
-        <Self as ResolvedInstanceInterface>::offers(self)
-    }
-
-    fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
-        <Self as ResolvedInstanceInterface>::capabilities(self)
-    }
-
-    fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
-        <Self as ResolvedInstanceInterface>::collections(self)
-    }
-
-    fn environments(&self) -> Vec<cm_rust::EnvironmentDecl> {
-        self.resolved_component.decl.environments.clone()
-    }
-
-    fn children(&self) -> Vec<shutdown::Child> {
-        // Includes both static and dynamic children.
-        ResolvedInstanceState::children(self)
-            .map(|(moniker, instance)| shutdown::Child {
-                moniker: moniker.clone(),
-                environment_name: instance.environment().name().cloned(),
-            })
-            .collect()
-    }
-}
-
 /// The mutable state of a resolved component instance.
 pub struct ResolvedInstanceState {
     /// Weak reference to the component that owns this state.
@@ -340,7 +299,7 @@ pub struct ResolvedInstanceState {
     /// Invariant: the `target` field of all offers must refer to a live dynamic
     /// child (i.e., a member of `live_children`), and if the `source` field
     /// refers to a dynamic child, it must also be live.
-    dynamic_offers: Vec<cm_rust::OfferDecl>,
+    pub dynamic_offers: Box<[cm_rust::OfferDecl]>,
 
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.
@@ -459,7 +418,7 @@ impl ResolvedInstanceState {
             namespace_dir: Once::default(),
             exposed_dict: Once::default(),
             exposed_dir: Once::default(),
-            dynamic_offers: vec![],
+            dynamic_offers: Box::from([]),
             address,
             sandbox: Default::default(),
             program_escrow,
@@ -943,19 +902,22 @@ impl ResolvedInstanceState {
 
         // Delete any dynamic offers whose `source` or `target` matches the
         // component we're deleting.
-        self.dynamic_offers.retain(|offer| {
-            let source_matches = offer.source()
-                == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                    name: moniker.name().into(),
-                    collection: moniker.collection().map(|c| c.into()),
-                });
-            let target_matches = offer.target()
-                == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                    name: moniker.name().into(),
-                    collection: moniker.collection().map(|c| c.into()),
-                });
-            !source_matches && !target_matches
-        });
+        let dynamic_offers = mem::replace(&mut self.dynamic_offers, Box::from([]));
+        self.dynamic_offers = IntoIterator::into_iter(dynamic_offers)
+            .filter(|offer| {
+                let source_matches = offer.source()
+                    == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
+                        name: moniker.name().into(),
+                        collection: moniker.collection().map(|c| c.into()),
+                    });
+                let target_matches = offer.target()
+                    == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                        name: moniker.name().into(),
+                        collection: moniker.collection().map(|c| c.into()),
+                    });
+                !source_matches && !target_matches
+            })
+            .collect();
     }
 
     /// Creates a set of Environments instantiated from their EnvironmentDecls.
@@ -1041,7 +1003,7 @@ impl ResolvedInstanceState {
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
         );
-        let dynamic_offers =
+        let mut dynamic_offers =
             self.validate_and_convert_dynamic_component(dynamic_offers, child, collection)?;
 
         let child_name =
@@ -1096,7 +1058,10 @@ impl ResolvedInstanceState {
         .await;
         self.children.insert(child_name, child.clone());
 
-        self.dynamic_offers.extend(dynamic_offers.into_iter());
+        let new_dynamic_offers = mem::replace(&mut self.dynamic_offers, Box::from([]));
+        let mut new_dynamic_offers: Vec<_> = new_dynamic_offers.into();
+        new_dynamic_offers.append(&mut dynamic_offers);
+        self.dynamic_offers = new_dynamic_offers.into();
         Ok(child)
     }
 
@@ -1148,8 +1113,9 @@ impl ResolvedInstanceState {
         dynamic_offers: Vec<fdecl::Offer>,
     ) -> Result<(), AddChildError> {
         // Combine all our dynamic offers.
-        let mut all_dynamic_offers: Vec<_> =
-            self.dynamic_offers.clone().into_iter().map(NativeIntoFidl::native_into_fidl).collect();
+        let mut all_dynamic_offers: Vec<_> = IntoIterator::into_iter(self.dynamic_offers.clone())
+            .map(NativeIntoFidl::native_into_fidl)
+            .collect();
         all_dynamic_offers.append(&mut dynamic_offers.clone());
 
         // Validate!
@@ -1260,15 +1226,15 @@ impl ResolvedInstanceState {
 impl ResolvedInstanceInterface for ResolvedInstanceState {
     type Component = ComponentInstance;
 
-    fn uses(&self) -> Vec<UseDecl> {
+    fn uses(&self) -> Box<[UseDecl]> {
         self.resolved_component.decl.uses.clone()
     }
 
-    fn exposes(&self) -> Vec<cm_rust::ExposeDecl> {
+    fn exposes(&self) -> Box<[cm_rust::ExposeDecl]> {
         self.resolved_component.decl.exposes.clone()
     }
 
-    fn offers(&self) -> Vec<cm_rust::OfferDecl> {
+    fn offers(&self) -> Box<[cm_rust::OfferDecl]> {
         self.resolved_component
             .decl
             .offers
@@ -1278,11 +1244,11 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
             .collect()
     }
 
-    fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
+    fn capabilities(&self) -> Box<[cm_rust::CapabilityDecl]> {
         self.resolved_component.decl.capabilities.clone()
     }
 
-    fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
+    fn collections(&self) -> Box<[cm_rust::CollectionDecl]> {
         self.resolved_component.decl.collections.clone()
     }
 

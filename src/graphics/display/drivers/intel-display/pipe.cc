@@ -5,26 +5,41 @@
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
-#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <memory>
+#include <limits>
 #include <optional>
+#include <span>
+#include <utility>
+#include <vector>
 
+#include "src/graphics/display/drivers/intel-display/gtt.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
+#include "src/graphics/display/drivers/intel-display/power.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe-scaler.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace {
@@ -386,11 +401,11 @@ void Pipe::LoadActiveMode(display::DisplayTiming* mode) {
   pipe_size.WriteTo(mmio_space_);
 }
 
-void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
+void Pipe::ApplyConfiguration(const display::ColorConversion& color_conversion,
+                              cpp20::span<const display::DriverLayer> layers,
                               display::DriverConfigStamp config_stamp,
-                              const SetupGttImageFunc& get_gtt_region_fn,
+                              const SetupGttImageFunc& setup_gtt_image,
                               const GetImagePixelFormatFunc& get_pixel_format) {
-  ZX_ASSERT(banjo_display_config);
   ZX_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
 
   // The values of the config stamps in `pending_eviction_config_stamps_` must
@@ -402,65 +417,40 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
 
-  if (banjo_display_config->cc_flags) {
-    float zero_offset[3] = {};
-    SetColorConversionOffsets(true, banjo_display_config->cc_flags & COLOR_CONVERSION_PREOFFSET
-                                        ? banjo_display_config->cc_preoffsets
-                                        : zero_offset);
-    SetColorConversionOffsets(false, banjo_display_config->cc_flags & COLOR_CONVERSION_POSTOFFSET
-                                         ? banjo_display_config->cc_postoffsets
-                                         : zero_offset);
+  SetColorConversionOffsets(true, color_conversion.preoffsets());
+  SetColorConversionOffsets(false, color_conversion.postoffsets());
+  for (uint32_t i = 0; i < 3; i++) {
+    for (uint32_t j = 0; j < 3; j++) {
+      float val = color_conversion.coefficients()[i][j];
+      ZX_DEBUG_ASSERT(std::isfinite(val));
 
-    float identity[3][3] = {
-        {
-            1,
-            0,
-            0,
-        },
-        {
-            0,
-            1,
-            0,
-        },
-        {
-            0,
-            0,
-            1,
-        },
-    };
-    for (uint32_t i = 0; i < 3; i++) {
-      for (uint32_t j = 0; j < 3; j++) {
-        float val = banjo_display_config->cc_flags & COLOR_CONVERSION_COEFFICIENTS
-                        ? banjo_display_config->cc_coefficients[i][j]
-                        : identity[i][j];
-
-        auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
-        reg.coefficient(i, j).set(float_to_intel_display_csc_coefficient(val));
-        reg.WriteTo(mmio_space_);
-      }
+      auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
+      reg.coefficient(i, j).set(float_to_intel_display_csc_coefficient(val));
+      reg.WriteTo(mmio_space_);
     }
   }
+
   regs.csc_mode = pipe_regs.CscMode().ReadFrom(mmio_space_).reg_value();
 
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
-  bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
-  bool has_color_layer =
-      banjo_display_config->layers_count &&
-      (banjo_display_config->layers_list[0].image_metadata.dimensions.width == 0 ||
-       banjo_display_config->layers_list[0].image_metadata.dimensions.height == 0);
-  if (has_color_layer) {
-    const layer_t* layer = &banjo_display_config->layers_list[0];
-    const auto format =
-        static_cast<fuchsia_images2::wire::PixelFormat>(layer->fallback_color.format);
 
-    if (format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
-      bottom_color.set_r(encode_pipe_color_component(layer->fallback_color.bytes[2]));
-      bottom_color.set_g(encode_pipe_color_component(layer->fallback_color.bytes[1]));
-      bottom_color.set_b(encode_pipe_color_component(layer->fallback_color.bytes[0]));
-    } else if (format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
-      bottom_color.set_r(encode_pipe_color_component(layer->fallback_color.bytes[0]));
-      bottom_color.set_g(encode_pipe_color_component(layer->fallback_color.bytes[1]));
-      bottom_color.set_b(encode_pipe_color_component(layer->fallback_color.bytes[2]));
+  const bool should_enable_color_space_conversion =
+      color_conversion != display::ColorConversion::kIdentity;
+  bottom_color.set_csc_enable(should_enable_color_space_conversion);
+  bool has_color_layer = !layers.empty() && (layers[0].image_metadata().dimensions().width() == 0 ||
+                                             layers[0].image_metadata().dimensions().height() == 0);
+  if (has_color_layer) {
+    const display::DriverLayer& layer = layers[0];
+    const display::PixelFormat format = layer.fallback_color().format();
+
+    if (format == display::PixelFormat::kB8G8R8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer.fallback_color().bytes()[2]));
+      bottom_color.set_g(encode_pipe_color_component(layer.fallback_color().bytes()[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer.fallback_color().bytes()[0]));
+    } else if (format == display::PixelFormat::kR8G8B8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer.fallback_color().bytes()[0]));
+      bottom_color.set_g(encode_pipe_color_component(layer.fallback_color().bytes()[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer.fallback_color().bytes()[2]));
     } else {
       // CheckConfig() was supposed to reject this format.
       ZX_DEBUG_ASSERT(false);
@@ -474,17 +464,18 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
   bool scaler_1_claimed = false;
   for (unsigned plane = 0; plane < 3; plane++) {
-    const layer_t* primary = nullptr;
-    for (unsigned layer_index = 0; layer_index < banjo_display_config->layers_count;
-         ++layer_index) {
-      const layer_t& layer = banjo_display_config->layers_list[layer_index];
-      if (layer.image_handle != INVALID_DISPLAY_ID && layer_index == plane + has_color_layer) {
+    const display::DriverLayer* primary = nullptr;
+    for (size_t layer_index = 0; layer_index < layers.size(); ++layer_index) {
+      const display::DriverLayer& layer = layers[layer_index];
+      if (layer.image_id() != display::kInvalidDriverImageId &&
+          layer_index == plane + has_color_layer) {
         primary = &layer;
         break;
       }
     }
-    ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->cc_flags, &scaler_1_claimed,
-                          &regs, config_stamp, get_gtt_region_fn, get_pixel_format);
+    ConfigurePrimaryPlane(plane, primary, /*enable_csc=*/should_enable_color_space_conversion,
+                          &scaler_1_claimed, &regs, config_stamp, setup_gtt_image,
+                          get_pixel_format);
   }
   DisableCursorPlane(&regs, config_stamp);
 
@@ -509,8 +500,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   }
 }
 
-void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
-                                 bool* scaler_1_claimed, registers::pipe_arming_regs_t* regs,
+void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const display::DriverLayer* primary,
+                                 bool enable_csc, bool* scaler_1_claimed,
+                                 registers::pipe_arming_regs_t* regs,
                                  display::DriverConfigStamp config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {
@@ -525,47 +517,47 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
   plane_ctrl.set_decompress_render_compressed_surfaces(false)
       .set_double_buffer_update_disabling_allowed(true);
 
-  const image_metadata_t& image_metadata = primary->image_metadata;
-  const GttRegion& region = setup_gtt_image(primary->image_metadata, primary->image_handle,
-                                            primary->image_source_transformation);
+  const display::ImageMetadata& image_metadata = primary->image_metadata();
+  const GttRegion& region = setup_gtt_image(primary->image_metadata(), primary->image_id(),
+                                            primary->image_source_transformation());
   uint32_t base_address = static_cast<uint32_t>(region.base());
-  uint32_t plane_width;
-  uint32_t plane_height;
+  int32_t plane_width;
+  int32_t plane_height;
   uint32_t stride;
-  uint32_t x_offset;
-  uint32_t y_offset;
-  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
-      primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
-    plane_width = primary->image_source.width;
-    plane_height = primary->image_source.height;
+  int32_t x_offset;
+  int32_t y_offset;
+  if (primary->image_source_transformation() == display::CoordinateTransformation::kIdentity ||
+      primary->image_source_transformation() == display::CoordinateTransformation::kRotateCcw180) {
+    plane_width = primary->image_source().width();
+    plane_height = primary->image_source().height();
     stride =
         [&]() {
           uint64_t stride =
-              region.bytes_per_row() / get_tile_byte_width(image_metadata.tiling_type);
+              region.bytes_per_row() / get_tile_byte_width(image_metadata.tiling_type());
           ZX_DEBUG_ASSERT_MSG(stride <= std::numeric_limits<uint32_t>::max(),
                               "%lu overflows uint32_t", stride);
           return static_cast<uint32_t>(stride);
         }(),
-    x_offset = primary->image_source.x;
-    y_offset = primary->image_source.y;
+    y_offset = primary->image_source().y();
+    x_offset = primary->image_source().x();
   } else {
     uint32_t tile_height =
-        height_in_tiles(image_metadata.tiling_type, image_metadata.dimensions.height);
-    uint32_t tile_px_height = get_tile_px_height(image_metadata.tiling_type);
+        height_in_tiles(image_metadata.tiling_type(), image_metadata.dimensions().height());
+    uint32_t tile_px_height = get_tile_px_height(image_metadata.tiling_type());
     uint32_t total_height = tile_height * tile_px_height;
 
-    plane_width = primary->image_source.height;
-    plane_height = primary->image_source.width;
+    plane_width = primary->image_source().height();
+    plane_height = primary->image_source().width();
     stride = tile_height;
-    x_offset = total_height - primary->image_source.y - primary->image_source.height;
-    y_offset = primary->image_source.x;
+    x_offset = total_height - primary->image_source().y() - primary->image_source().height();
+    y_offset = primary->image_source().x();
   }
 
-  if (plane_width == primary->display_destination.width &&
-      plane_height == primary->display_destination.height) {
+  if (plane_width == primary->display_destination().width() &&
+      plane_height == primary->display_destination().height()) {
     auto plane_pos = pipe_regs.PlanePosition(plane_num).FromValue(0);
-    plane_pos.set_x_pos(primary->display_destination.x);
-    plane_pos.set_y_pos(primary->display_destination.y);
+    plane_pos.set_x_pos(primary->display_destination().x());
+    plane_pos.set_y_pos(primary->display_destination().y());
     plane_pos.WriteTo(mmio_space_);
 
     // If there's a scaler pointed at this plane, immediately disable it
@@ -590,11 +582,11 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
     ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
     if (platform_ != registers::Platform::kTigerLake) {
       // The mode bits are different in Tiger Lake.
-      if (primary->image_source.width > 2048) {
+      if (primary->image_source().width() > 2048) {
         float max_dynamic_height =
             static_cast<float>(plane_height) *
             registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
-        if (static_cast<uint32_t>(max_dynamic_height) < primary->display_destination.height) {
+        if (static_cast<int32_t>(max_dynamic_height) < primary->display_destination().height()) {
           // TODO(stevensd): This misses some cases where 7x5 can be used.
           ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
         }
@@ -606,13 +598,13 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
     ps_ctrl.WriteTo(mmio_space_);
 
     auto ps_win_pos = pipe_scaler_regs.PipeScalerWindowPosition().FromValue(0);
-    ps_win_pos.set_x_position(primary->display_destination.x);
-    ps_win_pos.set_x_position(primary->display_destination.y);
+    ps_win_pos.set_x_position(static_cast<uint32_t>(primary->display_destination().x()));
+    ps_win_pos.set_x_position(static_cast<uint32_t>(primary->display_destination().y()));
     ps_win_pos.WriteTo(mmio_space_);
 
     auto ps_win_size = pipe_scaler_regs.PipeScalerWindowSize().FromValue(0);
-    ps_win_size.set_x_size(primary->display_destination.width);
-    ps_win_size.set_y_size(primary->display_destination.height);
+    ps_win_size.set_x_size(static_cast<uint32_t>(primary->display_destination().width()));
+    ps_win_size.set_y_size(static_cast<uint32_t>(primary->display_destination().height()));
     regs->ps_win_sz[*scaler_1_claimed] = ps_win_size.reg_value();
 
     scaled_planes_[pipe_id()][plane_num] = (*scaler_1_claimed) + 1;
@@ -634,12 +626,12 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
   stride_reg.WriteTo(mmio_space_);
 
   registers::PlaneControlAlphaMode alpha_mode;
-  if (primary->alpha_mode == ALPHA_DISABLE) {
+  if (primary->alpha_mode() == display::AlphaMode::kDisable) {
     alpha_mode = registers::PlaneControlAlphaMode::kAlphaIgnored;
-  } else if (primary->alpha_mode == ALPHA_PREMULTIPLIED) {
+  } else if (primary->alpha_mode() == display::AlphaMode::kPremultiplied) {
     alpha_mode = registers::PlaneControlAlphaMode::kAlphaPreMultiplied;
   } else {
-    ZX_ASSERT(primary->alpha_mode == ALPHA_HW_MULTIPLY);
+    ZX_ASSERT(primary->alpha_mode() == display::AlphaMode::kHwMultiply);
     alpha_mode = registers::PlaneControlAlphaMode::kAlphaHardwareMultiply;
   }
 
@@ -655,10 +647,11 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
   }
 
   auto plane_key_mask = pipe_regs.PlaneKeyMask(plane_num).FromValue(0);
-  if (primary->alpha_mode != ALPHA_DISABLE && !isnan(primary->alpha_layer_val)) {
+  if (primary->alpha_mode() != display::AlphaMode::kDisable &&
+      !isnan(primary->alpha_coefficient())) {
     plane_key_mask.set_plane_alpha_enable(1);
 
-    uint8_t alpha = static_cast<uint8_t>(round(primary->alpha_layer_val * 255));
+    uint8_t alpha = static_cast<uint8_t>(round(primary->alpha_coefficient() * 255));
 
     auto plane_key_max = pipe_regs.PlaneKeyMax(plane_num).FromValue(0);
     plane_key_max.set_plane_alpha_value(alpha);
@@ -678,7 +671,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
         registers::PlaneControl::ColorFormatKabyLake::kRgb8888);
   }
 
-  PixelFormatAndModifier pixel_format = get_pixel_format(primary->image_handle);
+  PixelFormatAndModifier pixel_format = get_pixel_format(primary->image_id());
   switch (pixel_format.pixel_format) {
     case fuchsia_images2::PixelFormat::kR8G8B8A8:
       plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
@@ -695,28 +688,32 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
                     static_cast<uint32_t>(pixel_format.pixel_format));
   }
 
-  if (image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR) {
+  if (image_metadata.tiling_type() == display::ImageTilingType::kLinear) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kLinear);
-  } else if (image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+  } else if (image_metadata.tiling_type() == display::ImageTilingType(IMAGE_TILING_TYPE_X_TILED)) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingX);
-  } else if (image_metadata.tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED) {
+  } else if (image_metadata.tiling_type() ==
+             display::ImageTilingType(IMAGE_TILING_TYPE_Y_LEGACY_TILED)) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYLegacy);
   } else {
-    ZX_ASSERT(image_metadata.tiling_type == IMAGE_TILING_TYPE_YF_TILED);
+    ZX_ASSERT(image_metadata.tiling_type() == display::ImageTilingType(IMAGE_TILING_TYPE_YF_TILED));
     if (platform_ == registers::Platform::kTigerLake) {
       // TODO(https://fxbug.dev/42062668): Remove this warning or turn it into an error.
       fdf::error("The Tiger Lake display engine may not support YF tiling.");
     }
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);
   }
-  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY) {
+  if (primary->image_source_transformation() == display::CoordinateTransformation::kIdentity) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::kIdentity);
-  } else if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90) {
+  } else if (primary->image_source_transformation() ==
+             display::CoordinateTransformation::kRotateCcw90) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k90degrees);
-  } else if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
+  } else if (primary->image_source_transformation() ==
+             display::CoordinateTransformation::kRotateCcw180) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k180degrees);
   } else {
-    ZX_ASSERT(primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270);
+    ZX_ASSERT(primary->image_source_transformation() ==
+              display::CoordinateTransformation::kRotateCcw270);
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k270degrees);
   }
   plane_ctrl.WriteTo(mmio_space_);
@@ -725,7 +722,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
   plane_surface.set_surface_base_addr(base_address >> plane_surface.kRShiftCount);
   regs->plane_surf[plane_num] = plane_surface.reg_value();
 
-  latest_config_stamp_with_image_[primary->image_handle] = config_stamp;
+  latest_config_stamp_with_image_[primary->image_id()] = config_stamp;
 }
 
 void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
@@ -737,14 +734,15 @@ void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
   regs->cur_base = regs->cur_pos = 0;
 }
 
-display::DriverConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
+display::DriverConfigStamp Pipe::GetVsyncConfigStamp(
+    const std::vector<display::DriverImageId>& image_ids) {
   display::DriverConfigStamp oldest_config_stamp = display::kInvalidDriverConfigStamp;
 
   if (config_stamp_with_color_layer_ != display::kInvalidDriverConfigStamp) {
     oldest_config_stamp = config_stamp_with_color_layer_;
   }
-  for (const uint64_t handle : image_handles) {
-    auto config_it = latest_config_stamp_with_image_.find(handle);
+  for (const display::DriverImageId image_id : image_ids) {
+    auto config_it = latest_config_stamp_with_image_.find(image_id);
     if (config_it == latest_config_stamp_with_image_.end()) {
       continue;
     }
@@ -787,7 +785,7 @@ display::DriverConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>
   return pending_eviction_config_stamps_.front();
 }
 
-void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
+void Pipe::SetColorConversionOffsets(bool preoffsets, std::span<const float, 3> vals) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   for (uint32_t i = 0; i < 3; i++) {

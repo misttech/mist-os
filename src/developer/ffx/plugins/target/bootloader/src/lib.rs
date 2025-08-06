@@ -188,7 +188,7 @@ Reboot the Target to the bootloader and re-run this command."
                         let seen = seen.clone();
                         async move {
                             match ev {
-                                Ok(TargetEvent::Added(ref h)) => {
+                                TargetEvent::Added(ref h) => {
                                     if seen.borrow().contains(h) {
                                         None
                                     } else {
@@ -207,23 +207,21 @@ Reboot the Target to the bootloader and re-run this command."
                                             _ => {}
                                         }
                                         seen.borrow_mut().insert(h.clone());
-                                        Some(Ok((*h).clone()))
+                                        Some((*h).clone())
                                     }
                                 }
                                 // We've only asked for Added events
-                                Ok(_) => unreachable!(),
-                                Err(e) => Some(Err(e)),
+                                _ => unreachable!(),
                             }
                         }
                     })
                     .take_until(futures_lite::future::race(timer, found_it));
 
-                let mut discovered_devices =
-                    discovered_devices_stream.collect::<Vec<Result<_, _>>>().await;
+                let mut discovered_devices = discovered_devices_stream.collect::<Vec<_>>().await;
 
                 assert!(discovered_devices.len() == 1);
                 let device_res = discovered_devices.pop().unwrap();
-                (device_res?).state
+                device_res.state
             }
             Some(FidlTargetState::Unknown) => {
                 ffx_bail!("Target is in an Unknown state.");
@@ -617,7 +615,7 @@ mod test {
     use ffx_writer::Format;
     use tempfile::NamedTempFile;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_stages_file_and_calls_boot() -> fho::Result<()> {
         let zbi_file = NamedTempFile::new().expect("tmp access failed");
         let zbi_file_name = zbi_file.path().to_string_lossy().to_string();
@@ -647,7 +645,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_stages_file_and_calls_boot_with_just_zbi() -> fho::Result<()> {
         let zbi_file = NamedTempFile::new().expect("tmp access failed");
         let zbi_file_name = zbi_file.path().to_string_lossy().to_string();
@@ -675,7 +673,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_fails_with_just_vbmeta() {
         let vbmeta_file = NamedTempFile::new().expect("tmp access failed");
         let vbmeta_file_name = vbmeta_file.path().to_string_lossy().to_string();
@@ -700,7 +698,7 @@ mod test {
         .is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_lock_calls_oem_command() -> fho::Result<()> {
         let (state, proxy) = setup();
         {

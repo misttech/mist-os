@@ -79,6 +79,8 @@ impl SignalActions {
         Arc::new(SignalActions { actions: RwLock::new(*self.actions.read()) })
     }
 
+    /// Resets all signal actions to the default, except that ignored
+    /// signals remain ignored.
     pub fn reset_for_exec(&self) {
         for action in self.actions.write().iter_mut() {
             let handler = action.sa_handler;
@@ -86,6 +88,13 @@ impl SignalActions {
             if handler == SIG_IGN {
                 action.sa_handler = SIG_IGN;
             }
+        }
+    }
+
+    /// Resets all signal actions to the default.
+    pub fn reset_to_default(&self) {
+        for action in self.actions.write().iter_mut() {
+            *action = sigaction_t::default();
         }
     }
 }
@@ -168,6 +177,10 @@ pub struct QueuedSignals {
 }
 
 impl QueuedSignals {
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+
     pub fn enqueue(&mut self, siginfo: SignalInfo) {
         if siginfo.signal.is_real_time() {
             // Real-time signals are stored in `rt_queue` in the order they will be delivered,
@@ -372,6 +385,10 @@ impl SignalState {
 
     pub fn num_queued(&self) -> usize {
         self.queue.num_queued()
+    }
+
+    pub fn reset_to_default(&mut self) {
+        *self = SignalState::default();
     }
 
     #[cfg(test)]

@@ -8,11 +8,8 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
 declare_args() {
-  # The console tool is intended only for interactive use. Currently, this tool
-  # is included in the build by default, but we plan to remove it from the
-  # default build so that we do not accidentally rely on the tool in automated
-  # tests.
-  starnix_enable_console_tool = true
+  # The console tool is intended only for developers. Disabled by default to prevent automated use.
+  starnix_enable_console_tool = false
 }
 
 rustc_library("lib") {
@@ -64,9 +61,12 @@ rustc_library("lib") {
     "src/adb.rs",
     "src/common.rs",
     "src/console.rs",
+    "src/kill.rs",
     "src/lib.rs",
     "src/vmo.rs",
   ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
 
   features = []
   if (starnix_enable_console_tool) {

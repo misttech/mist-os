@@ -26,11 +26,11 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "board-info"
+          "arg_name": "board-config"
         }
       },
       "optionality": "required",
-      "long": "--board-info",
+      "long": "--board-config",
       "short": null,
       "description": "the board configuration directory.",
       "hidden": false

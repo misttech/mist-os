@@ -21,13 +21,6 @@
                     },
                     "type": "array"
                 },
-                "fidl_deps": {
-                    "description": "List of FIDL libraries this library depends on",
-                    "items": {
-                        "$ref": "common.json#/definitions/fidl_library_name"
-                    },
-                    "type": "array"
-                },
                 "fidl_binding_deps": {
                     "description": "List of FIDL libraries this library depends on, separated by binding type",
                     "items": {
@@ -90,7 +83,6 @@
             "required": [
                 "bind_deps",
                 "deps",
-                "fidl_deps",
                 "headers",
                 "include_dir",
                 "root",

@@ -47,7 +47,7 @@ class HelloWorldUsingFfx(hello_world.HelloWorld):
             greeting's message str
 
         Raises:
-            HelloWorldError: Failed to construct greeting's message.
+            HelloWorldAffordanceError: Failed to construct greeting's message.
         """
         target_name: str = self._ffx.get_target_name()
 

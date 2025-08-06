@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/coordinator/waiting-image-list.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 
@@ -69,10 +70,9 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
            draft_display_config_list_node_.InContainer();
   }
 
-  const image_metadata_t& draft_image_metadata() const {
-    return draft_layer_config_.image_metadata;
+  const display::ImageMetadata& draft_image_metadata() const {
+    return draft_layer_config_.image_metadata();
   }
-  uint64_t draft_image_handle() const { return draft_layer_config_.image_handle; }
 
   // If the layer properties were changed in the draft configuration, this
   // retires all images as they are invalidated with layer properties change.
@@ -126,13 +126,11 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
   // configuration's layer list. No changes are made.
   bool AppendToConfigLayerList(fbl::DoublyLinkedList<LayerNode*>& config_layer_list);
 
-  void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
-  void SetPrimaryPosition(
-      fuchsia_hardware_display_types::wire::CoordinateTransformation image_source_transformation,
-      fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
-  void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
-  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
-                      fuchsia_math::wire::RectU display_destination);
+  void SetPrimaryConfig(display::ImageMetadata image_metadata);
+  void SetPrimaryPosition(display::CoordinateTransformation image_source_transformation,
+                          display::Rectangle image_source, display::Rectangle display_destination);
+  void SetPrimaryAlpha(display::AlphaMode alpha_mode, float alpha_coefficient);
+  void SetColorConfig(display::Color color, display::Rectangle display_destination);
   void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
   // Called on all waiting images when any fence fires. Returns true if an image is ready to
@@ -158,8 +156,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
 
   Controller& controller_;
 
-  layer_t draft_layer_config_;
-  layer_t applied_layer_config_;
+  display::DriverLayer draft_layer_config_;
+  display::DriverLayer applied_layer_config_;
 
   // True if `draft_layer_` is different from `applied_layer_`.
   bool draft_layer_config_differs_from_applied_;

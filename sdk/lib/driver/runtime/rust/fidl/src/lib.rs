@@ -389,7 +389,7 @@ mod test {
         DeviceServerHandler,
     };
     use fuchsia_async::OnSignals;
-    use zx::{AsHandleRef, Event, HandleBased, Signals};
+    use zx::{AsHandleRef, Event, Signals};
 
     use super::*;
     use fdf_core::dispatcher::{CurrentDispatcher, OnDispatcher};
@@ -419,7 +419,7 @@ mod test {
         ) {
             let event = Event::create();
             event.signal_handle(Signals::empty(), Signals::USER_0).unwrap();
-            let response = DeviceGetEventResponse { event: event.into_handle() };
+            let response = DeviceGetEventResponse { event };
             responder.respond(&sender, response).unwrap().await.unwrap();
         }
     }
@@ -465,12 +465,12 @@ mod test {
                     .await
                     .unwrap()
                     .take::<DeviceGetEventResponse>();
-                let event = Event::from_handle(res.event);
 
                 // wait for the event on a fuchsia_async executor
                 let mut executor = fuchsia_async::LocalExecutor::new();
-                let signalled =
-                    executor.run_singlethreaded(OnSignals::new(event, Signals::USER_0)).unwrap();
+                let signalled = executor
+                    .run_singlethreaded(OnSignals::new(res.event, Signals::USER_0))
+                    .unwrap();
                 assert_eq!(Signals::USER_0, signalled);
             }
         });

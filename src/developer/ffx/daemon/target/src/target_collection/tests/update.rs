@@ -13,7 +13,7 @@ const NODENAME: &str = "nodename";
 const SERIAL: &str = "serial";
 const ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2324);
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_update_single() {
     let tc = TargetCollection::new_with_queue();
 
@@ -77,7 +77,7 @@ async fn test_update_single() {
     assert!(t.rcs().is_none());
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_update_create_new() {
     let tc = TargetCollection::new_with_queue();
 
@@ -99,7 +99,7 @@ async fn test_update_create_new() {
     assert_matches!(t.get_connection_state(), TargetConnectionState::Fastboot(_));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_update_multi() {
     let tc = TargetCollection::new_with_queue();
 

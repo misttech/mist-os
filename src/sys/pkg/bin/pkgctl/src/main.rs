@@ -27,7 +27,7 @@ use {fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fas
 mod args;
 
 pub fn main() -> Result<(), anyhow::Error> {
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     let Args { command } = argh::from_env();
     exit(executor.run_singlethreaded(main_helper(command))?)
 }

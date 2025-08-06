@@ -74,10 +74,10 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
             runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
-        exposes: vec![ExposeBuilder::protocol()
+        exposes: Box::from([ExposeBuilder::protocol()
             .source(ExposeSource::Framework)
             .name(fcomponent::BinderMarker::DEBUG_NAME)
-            .build()],
+            .build()]),
         ..Default::default()
     }
 }
@@ -354,12 +354,8 @@ macro_rules! instantiate_common_routing_tests {
         instantiate_common_routing_tests! { $builder_impl, $($remaining),+ }
     };
     ($builder_impl:path, $test:ident) => {
-        // TODO(https://fxbug.dev/42157685): #[fuchsia::test] did not work inside a declarative macro, so this
-        // falls back on fuchsia_async and manual logging initialization for now.
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn $test() {
-            fuchsia::init_logging_for_component_with_executor(
-                || {}, fuchsia::LoggingOptions::default())();
             $crate::CommonRoutingTest::<$builder_impl>::new().$test().await
         }
     };
@@ -4183,11 +4179,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     )
                     .use_(use_config.clone())
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
                     })
@@ -4244,11 +4240,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(use_config.clone())
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
                     })
@@ -4308,11 +4304,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(use_config.clone())
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
                     })

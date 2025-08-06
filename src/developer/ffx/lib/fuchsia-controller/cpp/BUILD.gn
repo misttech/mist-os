@@ -51,7 +51,7 @@ python_c_extension("fidl_codec") {
     "fidl_codec/utils.h",
   ]
 
-  stubs_root = "fidl_codec/stubs"
+  stubs_root = "fidl_codec"
   stubs = [ "__init__.pyi" ]
 
   deps = [
@@ -76,7 +76,7 @@ python_c_extension("fuchsia_controller_internal") {
     "fuchsia_controller_internal/mod.h",
   ]
 
-  stubs_root = "fuchsia_controller_internal/stubs"
+  stubs_root = "fuchsia_controller_internal"
   stubs = [ "__init__.pyi" ]
 
   deps = [

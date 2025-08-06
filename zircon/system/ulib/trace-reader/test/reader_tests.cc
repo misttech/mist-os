@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include <iterator>
+#include <string>
 #include <vector>
 
 #include <trace-reader/reader.h>
@@ -94,7 +95,7 @@ TEST(TraceReader, NonEmptyChunk) {
     EXPECT_TRUE(value.has_value());
     EXPECT_EQ(12, value.value().length());
     EXPECT_EQ(reinterpret_cast<const char*>(kData + 6), value.value().data());
-    EXPECT_TRUE(fbl::String(value.value()) == "Hello World!");
+    EXPECT_EQ(value.value(), "Hello World!");
     EXPECT_EQ(3u, chunk.remaining_words());
   }
 

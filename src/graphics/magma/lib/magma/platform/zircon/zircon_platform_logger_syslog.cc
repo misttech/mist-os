@@ -94,7 +94,7 @@ void PlatformLogger::LogVa(LogLevel level, const char* file, int line, const cha
   }
 
   std::string file_string = StripPath(file);
-  fuchsia_syslog::LogBuffer log_buffer;
+  fuchsia_logging::LogBuffer log_buffer;
   uint64_t tid = PlatformThreadId().id();
   uint64_t pid = PlatformProcessHelper::GetCurrentProcessId();
   log_buffer.BeginRecord(get_severity(level), file, line, fmt_string,

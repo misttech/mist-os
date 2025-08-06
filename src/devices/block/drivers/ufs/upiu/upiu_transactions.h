@@ -126,7 +126,11 @@ class AbstractRequestUpiu : public AbstractUpiu {
     data_ = std::make_unique<RequestData>();
     SetData(data_.get());
   }
-  explicit AbstractRequestUpiu(void* data) = delete;
+
+  explicit AbstractRequestUpiu(const RequestData& data) {
+    data_ = std::make_unique<RequestData>(data);
+    SetData(data_.get());
+  }
 
   ~AbstractRequestUpiu() override = default;
 
@@ -222,6 +226,8 @@ class CommandUpiu : public AbstractRequestUpiu<CommandUpiuData, ResponseUpiuData
       GetData<CommandUpiuData>()->set_header_flags_w(true);
     }
   }
+
+  explicit CommandUpiu(const CommandUpiuData& data) : AbstractRequestUpiu(data) {}
 
   ~CommandUpiu() override = default;
 
@@ -471,6 +477,8 @@ class QueryRequestUpiu : public AbstractRequestUpiu<QueryRequestUpiuData, QueryR
     GetData<QueryRequestUpiuData>()->idn = type;
     GetData<QueryRequestUpiuData>()->index = index;
   }
+
+  explicit QueryRequestUpiu(const QueryRequestUpiuData& data) : AbstractRequestUpiu(data) {}
 
   ~QueryRequestUpiu() override = default;
 

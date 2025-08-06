@@ -15,6 +15,7 @@
 #include "src/storage/f2fs/timestamp.h"
 #include "src/storage/f2fs/xattr.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/lib/vfs/cpp/watcher.h"
 
@@ -38,7 +39,7 @@ enum class FAdvise {
 
 // InodeInfo->flags keeping only in memory
 enum class InodeInfoFlag {
-  kInit = 0,      // indicate inode is being initialized
+  kInit = 0,      // not used
   kActive,        // indicate open_count > 0
   kNewInode,      // indicate newly allocated vnode
   kNeedCp,        // need to do checkpoint during fsync
@@ -63,7 +64,7 @@ class VnodeF2fs : public fs::PagedVnode,
                   public fbl::WAVLTreeContainable<VnodeF2fs *>,
                   public fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>> {
  public:
-  explicit VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode);
+  explicit VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode, LockedPage node_page = {});
   ~VnodeF2fs();
 
   uint32_t InlineDataOffset() const {
@@ -81,8 +82,7 @@ class VnodeF2fs : public fs::PagedVnode,
             .ValueOrDie());
   }
 
-  void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
-  void InitTime() __TA_EXCLUDES(mutex_);
+  void InitializeFromPage(LockedPage &node_page) __TA_EXCLUDES(mutex_);
   zx_status_t InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
@@ -171,13 +171,23 @@ class VnodeF2fs : public fs::PagedVnode,
   void UpdateExtentCache(pgoff_t file_offset, block_t blk_addr, uint32_t len = 1);
   zx::result<block_t> LookupExtentCacheBlock(pgoff_t file_offset);
 
-  void InitNlink() { nlink_.store(1, std::memory_order_release); }
-  void IncNlink() { nlink_.fetch_add(1); }
-  void DropNlink() { nlink_.fetch_sub(1); }
-  void ClearNlink() { nlink_.store(0, std::memory_order_release); }
-  void SetNlink(const uint32_t nlink) { nlink_.store(nlink, std::memory_order_release); }
-  uint32_t GetNlink() const { return nlink_.load(std::memory_order_acquire); }
-  bool HasLink() const { return nlink_.load(std::memory_order_acquire) > 0; }
+  void IncrementLink() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    IncrementLinkUnsafe();
+  }
+  void ClearLinkCount() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    ClearLinkCountUnsafe();
+  }
+  void DecrementLink() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    DecrementLinkUnsafe();
+  }
+  uint32_t GetLinkCount() const __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return GetLinkCountUnsafe();
+  }
+  bool IsValid() const { return !TestFlag(InodeInfoFlag::kBad) && !file_cache_->IsOrphan(); }
 
   void SetMode(const umode_t &mode);
   umode_t GetMode() const;
@@ -237,7 +247,6 @@ class VnodeF2fs : public fs::PagedVnode,
   void DecreaseDirtyPageCount() { dirty_pages_.fetch_sub(1); }
   block_t GetDirtyPageCount() const { return dirty_pages_.load(std::memory_order_acquire); }
 
-  void SetGeneration(const uint32_t &gen) { generation_ = gen; }
   void SetUid(const uid_t &uid) { uid_ = uid; }
   void SetGid(const gid_t &gid) { gid_ = gid; }
 
@@ -289,10 +298,6 @@ class VnodeF2fs : public fs::PagedVnode,
   void Deactivate();
   bool IsActive() const;
   void WaitForDeactive(std::mutex &mutex);
-
-  bool IsBad() const { return TestFlag(InodeInfoFlag::kBad); }
-
-  bool IsValid() const { return HasLink() && !IsBad() && !file_cache_->IsOrphan(); }
 
   zx_status_t FindPage(pgoff_t index, fbl::RefPtr<Page> *out) {
     return file_cache_->FindPage(index, out);
@@ -363,6 +368,11 @@ class VnodeF2fs : public fs::PagedVnode,
   }
 
  protected:
+  void IncrementLinkUnsafe() __TA_REQUIRES(mutex_) { ++nlink_; }
+  void ClearLinkCountUnsafe() __TA_REQUIRES(mutex_) { nlink_ = 0; }
+  void DecrementLinkUnsafe() __TA_REQUIRES(mutex_) { --nlink_; }
+  uint32_t GetLinkCountUnsafe() const __TA_REQUIRES_SHARED(mutex_) { return nlink_; }
+
   block_t GetBlockAddrOnDataSegment(LockedPage &page);
 
   void RecycleNode() override;
@@ -391,7 +401,7 @@ class VnodeF2fs : public fs::PagedVnode,
   gid_t gid_ = 0;
   uint32_t generation_ = 0;
   std::atomic<block_t> num_blocks_ = 0;
-  std::atomic<uint32_t> nlink_ = 0;
+  uint32_t nlink_ __TA_GUARDED(mutex_) = 0;
   std::atomic<block_t> dirty_pages_ = 0;  // # of dirty dentry/data pages
   std::atomic<ino_t> parent_ino_ = kNullIno;
   std::array<std::atomic_flag, static_cast<uint8_t>(InodeInfoFlag::kFlagSize)> flags_ = {

@@ -73,13 +73,12 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
 
-  fidl::Status NotifyDisplayChanges(
+  void NotifyDisplayChanges(
       std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
       std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
-  fidl::Status NotifyOwnershipChange(bool client_has_ownership);
-  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
-                           display::ConfigStamp config_stamp,
-                           display::VsyncAckCookie vsync_ack_cookie);
+  void NotifyOwnershipChange(bool client_has_ownership);
+  void NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                   display::ConfigStamp config_stamp, display::VsyncAckCookie vsync_ack_cookie);
 
   // Applies a previously applied configuration.
   //
@@ -99,10 +98,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void CaptureCompleted();
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
-
-  display::VsyncAckCookie LastAckedCookie() const { return acked_cookie_; }
-
-  size_t ImportedImagesCountForTesting() const { return images_.size(); }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -135,8 +130,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void ApplyConfig3(ApplyConfig3RequestView request,
                     ApplyConfig3Completer::Sync& _completer) override;
   void GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& _completer) override;
-  void SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
-                             SetVsyncEventDeliveryCompleter::Sync& _completer) override;
+
   void SetVirtconMode(SetVirtconModeRequestView request,
                       SetVirtconModeCompleter::Sync& _completer) override;
   void ImportBufferCollection(ImportBufferCollectionRequestView request,
@@ -168,7 +162,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // CheckConfig() implementation for a single display configuration.
   //
   // `display_config`'s draft configuration must have a non-empty layer list.
-  display::ConfigCheckResult CheckConfigForDisplay(const DisplayConfig& display_config);
+  display::ConfigCheckResult CheckConfigForDisplay(
+      const DisplayConfig& display_config, std::span<const display::ModeAndId> preferred_modes);
 
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
@@ -276,8 +271,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // an in-progress capture, we defer the release operation until the capture
   // completes. The deferred release is tracked here.
   display::ImageId pending_release_capture_image_id_ = display::kInvalidImageId;
-
-  display::VsyncAckCookie acked_cookie_ = display::kInvalidVsyncAckCookie;
 };
 
 }  // namespace display_coordinator

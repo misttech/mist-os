@@ -3,15 +3,17 @@
 // found in the LICENSE file.
 
 use super::parser::PolicyCursor;
+use super::view::ArrayView;
 use super::{
     array_type, array_type_validate_deref_both, AccessVector, Array, ClassId, Counted, Parse,
-    RoleId, TypeId, Validate, ValidateArray,
+    PolicyValidationContext, RoleId, TypeId, Validate, ValidateArray,
 };
 use crate::policy::error::{ParseError, ValidateError};
 use crate::policy::extensible_bitmap::ExtensibleBitmap;
 use crate::policy::symbols::{MlsLevel, MlsRange};
 use crate::policy::UserId;
 use anyhow::Context as _;
+
 use std::num::NonZeroU32;
 use std::ops::Shl;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
@@ -93,8 +95,23 @@ impl<T: Validate> Validate for SimpleArray<T> {
 
     /// Defers to `self.data` for validation. `self.data` has access to all information, including
     /// size stored in `self.metadata`.
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.data.validate()
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
+        self.data.validate(context)
+    }
+}
+
+pub(super) type SimpleArrayView<T> = ArrayView<le::U32, T>;
+
+impl<T: Validate + Parse> Validate for SimpleArrayView<T> {
+    type Error = <T as Validate>::Error;
+
+    /// Defers to `self.data` for validation. `self.data` has access to all information, including
+    /// size stored in `self.metadata`.
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
+        for item in self.data().iter(&context.data) {
+            item.validate(context)?;
+        }
+        Ok(())
     }
 }
 
@@ -110,7 +127,7 @@ impl Validate for ConditionalNodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`ConditionalNode`] instances.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -124,9 +141,10 @@ impl ValidateArray<ConditionalNodeMetadata, ConditionalNodeDatum> for Conditiona
 
     /// TODO: Validate internal consistency between [`ConditionalNodeMetadata`] consecutive
     /// [`ConditionalNodeDatum`].
-    fn validate_array<'a>(
-        _metadata: &'a ConditionalNodeMetadata,
-        _data: &'a [ConditionalNodeDatum],
+    fn validate_array(
+        _context: &mut PolicyValidationContext,
+        _metadata: &ConditionalNodeMetadata,
+        _items: &[ConditionalNodeDatum],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -182,7 +200,7 @@ impl Validate for ConditionalNodeMetadata {
     type Error = anyhow::Error;
 
     /// TODO: Validate [`ConditionalNodeMetadata`] internals.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -198,7 +216,7 @@ impl Validate for [ConditionalNodeDatum] {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`ConditionalNodeDatum`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -216,9 +234,9 @@ pub(super) type AccessVectorRules = Vec<AccessVectorRule>;
 impl Validate for AccessVectorRules {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for access_vector_rule in self {
-            access_vector_rule.validate()?;
+            access_vector_rule.validate(context)?;
         }
         Ok(())
     }
@@ -386,7 +404,7 @@ impl Parse for AccessVectorRule {
 impl Validate for AccessVectorRule {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         if self.metadata.class.get() == 0 {
             return Err(ValidateError::NonOptionalIdIsZero.into());
         }
@@ -537,11 +555,12 @@ impl ValidateArray<le::U32, RoleTransition> for RoleTransitions {
     type Error = anyhow::Error;
 
     /// [`RoleTransitions`] have no additional metadata (beyond length encoding).
-    fn validate_array<'a>(
-        _metadata: &'a le::U32,
-        _data: &'a [RoleTransition],
+    fn validate_array(
+        context: &mut PolicyValidationContext,
+        _metadata: &le::U32,
+        items: &[RoleTransition],
     ) -> Result<(), Self::Error> {
-        _data.validate()
+        items.validate(context)
     }
 }
 
@@ -575,7 +594,7 @@ impl RoleTransition {
 impl Validate for [RoleTransition] {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for role_transition in self {
             NonZeroU32::new(role_transition.role.get())
                 .ok_or(ValidateError::NonOptionalIdIsZero)?;
@@ -598,11 +617,12 @@ impl ValidateArray<le::U32, RoleAllow> for RoleAllows {
     type Error = anyhow::Error;
 
     /// [`RoleAllows`] have no additional metadata (beyond length encoding).
-    fn validate_array<'a>(
-        _metadata: &'a le::U32,
-        _data: &'a [RoleAllow],
+    fn validate_array(
+        context: &mut PolicyValidationContext,
+        _metadata: &le::U32,
+        items: &[RoleAllow],
     ) -> Result<(), Self::Error> {
-        Ok(())
+        items.validate(context)
     }
 }
 
@@ -626,7 +646,7 @@ impl RoleAllow {
 impl Validate for [RoleAllow] {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for rule in self {
             NonZeroU32::new(rule.role.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
             NonZeroU32::new(rule.new_role.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
@@ -644,10 +664,14 @@ pub(super) enum FilenameTransitionList {
 impl Validate for FilenameTransitionList {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         match self {
-            Self::PolicyVersionLeq32(list) => list.validate().map_err(Into::<anyhow::Error>::into),
-            Self::PolicyVersionGeq33(list) => list.validate().map_err(Into::<anyhow::Error>::into),
+            Self::PolicyVersionLeq32(list) => {
+                list.validate(context).map_err(Into::<anyhow::Error>::into)
+            }
+            Self::PolicyVersionGeq33(list) => {
+                list.validate(context).map_err(Into::<anyhow::Error>::into)
+            }
         }
     }
 }
@@ -658,7 +682,7 @@ impl Validate for FilenameTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`FilenameTransition`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -776,7 +800,7 @@ impl Validate for DeprecatedFilenameTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`DeprecatedFilenameTransition`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -851,7 +875,7 @@ impl Validate for InitialSids {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`InitialSid`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for initial_sid in crate::InitialSid::all_variants() {
             self.iter()
                 .find(|initial| initial.id().get() == *initial_sid as u32)
@@ -962,7 +986,7 @@ impl Validate for NamedContextPairs {
     ///
     /// TODO: Is different validation required for `filesystems` and `network_interfaces`? If so,
     /// create wrapper types with different [`Validate`] implementations.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1006,7 +1030,7 @@ impl Validate for Ports {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Ports`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1051,7 +1075,7 @@ impl Validate for Nodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Node`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1099,7 +1123,7 @@ impl Validate for Node {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between fields of [`Node`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1109,9 +1133,9 @@ pub(super) type FsUses = Vec<FsUse>;
 impl Validate for FsUses {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for fs_use in self {
-            fs_use.validate()?;
+            fs_use.validate(context)?;
         }
         Ok(())
     }
@@ -1162,7 +1186,7 @@ where
 impl Validate for FsUse {
     type Error = anyhow::Error;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         FsUseType::try_from(self.behavior_and_name.metadata.behavior)?;
 
         Ok(())
@@ -1212,7 +1236,7 @@ impl Validate for IPv6Nodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`IPv6Node`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1263,7 +1287,7 @@ impl Validate for InfinitiBandPartitionKeys {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`InfinitiBandPartitionKey`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1310,7 +1334,7 @@ impl Validate for InfinitiBandPartitionKey {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between fields of [`InfinitiBandPartitionKey`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1321,7 +1345,7 @@ impl Validate for InfinitiBandEndPorts {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`InfinitiBandEndPort`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1373,7 +1397,7 @@ impl Validate for GenericFsContexts {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of  [`GenericFsContext`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -1485,7 +1509,7 @@ impl Validate for RangeTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`RangeTransition`] objects.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         for range_transition in self {
             if range_transition.metadata.target_class.get() == 0 {
                 return Err(ValidateError::NonOptionalIdIsZero.into());
@@ -1550,14 +1574,13 @@ pub(super) struct RangeTransitionMetadata {
 #[cfg(test)]
 mod tests {
     use super::super::{find_class_by_name, parse_policy_by_value};
-    use super::*;
 
     #[test]
     fn parse_allowxperm_one_ioctl() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_one_ioctl")
             .expect("look up class_one_ioctl")
@@ -1565,7 +1588,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1584,9 +1606,9 @@ mod tests {
     #[test]
     fn parse_allowxperm_two_ioctls_same_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_two_ioctls_same_range")
             .expect("look up class_two_ioctls_same_range")
@@ -1594,7 +1616,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1614,9 +1635,9 @@ mod tests {
     #[test]
     fn parse_allowxperm_two_ioctls_different_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_two_ioctls_diff_range")
             .expect("look up class_two_ioctls_diff_range")
@@ -1624,7 +1645,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1648,9 +1668,9 @@ mod tests {
     #[test]
     fn parse_allowxperm_one_driver_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_one_driver_range")
             .expect("look up class_one_driver_range")
@@ -1658,7 +1678,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1676,9 +1695,9 @@ mod tests {
     #[test]
     fn parse_allowxperm_all_ioctls() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_all_ioctls")
             .expect("look up class_all_ioctls")
@@ -1686,7 +1705,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1705,9 +1723,9 @@ mod tests {
     #[test]
     fn parse_allowxperm_overlapping_ranges() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_overlapping_ranges")
             .expect("look up class_overlapping_ranges")
@@ -1715,7 +1733,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1744,9 +1761,9 @@ mod tests {
     #[test]
     fn parse_auditallowxperm() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_auditallowxperm")
             .expect("look up class_auditallowxperm")
@@ -1754,7 +1771,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 
@@ -1778,9 +1794,9 @@ mod tests {
     #[test]
     fn parse_dontauditxperm() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        parsed_policy.validate().expect("validate policy");
 
         let class_id = find_class_by_name(parsed_policy.classes(), "class_dontauditxperm")
             .expect("look up class_dontauditxperm")
@@ -1788,7 +1804,6 @@ mod tests {
 
         let rules: Vec<_> = parsed_policy
             .access_vector_rules()
-            .into_iter()
             .filter(|rule| rule.target_class() == class_id)
             .collect();
 

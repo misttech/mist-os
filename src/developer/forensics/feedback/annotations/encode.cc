@@ -27,7 +27,6 @@ fuchsia::feedback::Annotations Encode(const Annotations& annotations) {
   if (!vec.empty()) {
     // Cap annotations at its lower max size compared to annotations2 if vec's size ever
     // approaches that max size.
-    result.set_annotations(vec);
     result.set_annotations2(std::move(vec));
   }
 

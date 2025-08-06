@@ -9,6 +9,7 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 def _feature_flag(ctx):
     toolchain = find_cpp_toolchain(ctx)

@@ -53,9 +53,7 @@ pub async fn resolve_raw_config_capabilities(
     }
 
     let manifest = resolve_manifest(moniker, realm_query, url).await?;
-    let config_uses: Vec<_> = manifest
-        .uses
-        .into_iter()
+    let config_uses: Vec<_> = IntoIterator::into_iter(manifest.uses)
         .filter_map(|u| if let cm_rust::UseDecl::Config(c) = u { Some(c) } else { None })
         .collect();
 
@@ -95,9 +93,7 @@ pub(crate) async fn resolve_config_decls(
         .map(|c| c.fields)
         .flatten()
         .map(UseConfigurationOrConfigField::ConfigField);
-    Ok(manifest
-        .uses
-        .into_iter()
+    Ok(IntoIterator::into_iter(manifest.uses)
         .filter_map(|u| if let cm_rust::UseDecl::Config(c) = u { Some(c) } else { None })
         .map(UseConfigurationOrConfigField::UseConfiguration)
         .chain(config_decls)

@@ -57,6 +57,9 @@ use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
     io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
+    io_uring_register_op_IORING_REGISTER_IOWQ_MAX_WORKERS as IORING_REGISTER_IOWQ_MAX_WORKERS,
+    io_uring_register_op_IORING_REGISTER_PBUF_RING as IORING_REGISTER_PBUF_RING,
+    io_uring_register_op_IORING_REGISTER_RING_FDS as IORING_REGISTER_RING_FDS,
     io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, off_t,
     pid_t, pollfd, pselect6_sigmask, sigset_t, statx, timespec, uapi, uid_t, AT_EACCESS,
     AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
@@ -66,13 +69,13 @@ use starnix_uapi::{
     F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETLK64, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLK64, F_SETLKW, F_SETLKW64, F_SETOWN,
-    F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC,
-    MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT,
-    O_NOFOLLOW, O_PATH, O_TMPFILE, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
-    POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE,
-    POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED,
-    RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET,
-    XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
+    MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW,
+    O_PATH, O_TMPFILE, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND,
+    POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
+    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
+    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
+    XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -142,6 +145,43 @@ uapi::check_arch_independent_layout! {
         stx_atomic_write_unit_min,
         stx_atomic_write_unit_max,
         stx_atomic_write_segments_max,
+    }
+
+    io_sqring_offsets {
+        head,
+        tail,
+        ring_mask,
+        ring_entries,
+        flags,
+        dropped,
+        array,
+        resv1,
+        user_addr,
+    }
+
+    io_cqring_offsets {
+        head,
+        tail,
+        ring_mask,
+        ring_entries,
+        overflow,
+        cqes,
+        flags,
+        resv1,
+        user_addr,
+    }
+
+    io_uring_params {
+        sq_entries,
+        cq_entries,
+        flags,
+        sq_thread_cpu,
+        sq_thread_idle,
+        features,
+        wq_fd,
+        resv,
+        sq_off,
+        cq_off,
     }
 }
 
@@ -886,10 +926,21 @@ pub fn sys_faccessat2(
     mode: u32,
     flags: u32,
 ) -> Result<(), Errno> {
-    let mode = Access::try_from(mode)?;
-    let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
-    let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
-    name.check_access(locked, current_task, mode, CheckAccessReason::Access)
+    current_task.override_creds(
+        |creds| {
+            // Unless `AT_ACCESS` is set, perform lookup & access-checking using real UID & GID.
+            if flags & AT_EACCESS == 0 {
+                creds.creds.fsuid = creds.creds.uid;
+                creds.creds.fsgid = creds.creds.gid;
+            }
+        },
+        || {
+            let mode = Access::try_from(mode)?;
+            let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
+            let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
+            name.check_access(locked, current_task, mode, CheckAccessReason::Access)
+        },
+    )
 }
 
 pub fn sys_getdents64(
@@ -3199,13 +3250,6 @@ pub fn sys_io_uring_setup(
         }
     }
 
-    const SUPPORTED_FLAGS: u32 = IORING_SETUP_CQSIZE;
-    let unsupported_flags = params.flags & !SUPPORTED_FLAGS;
-    if unsupported_flags != 0 {
-        track_stub!(TODO("https://fxbug.dev/297431387"), "io_uring flags", unsupported_flags);
-        return error!(EINVAL);
-    }
-
     let file = IoUringFileObject::new_file(locked, current_task, entries, &mut params)?;
 
     // io_uring file descriptors are always created with CLOEXEC.
@@ -3259,7 +3303,39 @@ pub fn sys_io_uring_register(
             io_uring.unregister_buffers();
             return Ok(SUCCESS);
         }
-        _ => return error!(EINVAL),
+        IORING_REGISTER_IOWQ_MAX_WORKERS => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_IOWQ_MAX_WORKERS",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+        IORING_REGISTER_RING_FDS => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_RING_FDS",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+        IORING_REGISTER_PBUF_RING => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_PBUF_RING",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+
+        _ => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register unknown op",
+                opcode
+            );
+            return error!(EINVAL);
+        }
     }
 }
 
@@ -3683,19 +3759,21 @@ mod arch32 {
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_io_cancel as sys_arch32_io_cancel,
         sys_io_destroy as sys_arch32_io_destroy, sys_io_getevents as sys_arch32_io_getevents,
         sys_io_setup as sys_arch32_io_setup, sys_io_submit as sys_arch32_io_submit,
-        sys_lgetxattr as sys_arch32_lgetxattr, sys_linkat as sys_arch32_linkat,
-        sys_listxattr as sys_arch32_listxattr, sys_llistxattr as sys_arch32_llistxattr,
-        sys_lsetxattr as sys_arch32_lsetxattr, sys_mkdirat as sys_arch32_mkdirat,
-        sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
-        sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
-        sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
-        sys_readv as sys_arch32_readv, sys_removexattr as sys_arch32_removexattr,
-        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
-        sys_sendfile as sys_arch32_sendfile, sys_setxattr as sys_arch32_setxattr,
-        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
-        sys_statx as sys_arch32_statx, sys_symlinkat as sys_arch32_symlinkat,
-        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
-        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_io_uring_enter as sys_arch32_io_uring_enter,
+        sys_io_uring_register as sys_arch32_io_uring_register,
+        sys_io_uring_setup as sys_arch32_io_uring_setup, sys_lgetxattr as sys_arch32_lgetxattr,
+        sys_linkat as sys_arch32_linkat, sys_listxattr as sys_arch32_listxattr,
+        sys_llistxattr as sys_arch32_llistxattr, sys_lsetxattr as sys_arch32_lsetxattr,
+        sys_mkdirat as sys_arch32_mkdirat, sys_mknodat as sys_arch32_mknodat,
+        sys_pidfd_getfd as sys_arch32_pidfd_getfd, sys_pidfd_open as sys_arch32_pidfd_open,
+        sys_ppoll as sys_arch32_ppoll, sys_preadv as sys_arch32_preadv,
+        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
+        sys_removexattr as sys_arch32_removexattr, sys_renameat2 as sys_arch32_renameat2,
+        sys_select as sys_arch32__newselect, sys_sendfile as sys_arch32_sendfile,
+        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
+        sys_statfs as sys_arch32_statfs, sys_statx as sys_arch32_statx,
+        sys_symlinkat as sys_arch32_symlinkat, sys_sync as sys_arch32_sync,
+        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,

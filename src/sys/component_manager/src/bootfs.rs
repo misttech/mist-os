@@ -402,7 +402,7 @@ impl BootfsSvc {
         // Run the service with its own executor to avoid reentrancy issues.
         std::thread::spawn(move || {
             const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
-            fasync::LocalExecutor::new().run_singlethreaded(async move {
+            fasync::LocalExecutorBuilder::new().build().run_singlethreaded(async move {
                 let scope = ExecutionScope::new();
                 FLAGS
                     .to_object_request(directory_server_end)

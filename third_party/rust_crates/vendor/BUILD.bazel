@@ -91,14 +91,14 @@ alias(
 )
 
 alias(
-    name = "anyhow-1.0.97",
-    actual = "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+    name = "anyhow-1.0.98",
+    actual = "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
     tags = ["manual"],
 )
 
 alias(
     name = "anyhow",
-    actual = "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+    actual = "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
     tags = ["manual"],
 )
 
@@ -415,14 +415,14 @@ alias(
 )
 
 alias(
-    name = "bytes-1.10.0",
-    actual = "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
+    name = "bytes-1.10.1",
+    actual = "//third_party/rust_crates/vendor/bytes-1.10.1:bytes",
     tags = ["manual"],
 )
 
 alias(
     name = "bytes",
-    actual = "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
+    actual = "//third_party/rust_crates/vendor/bytes-1.10.1:bytes",
     tags = ["manual"],
 )
 
@@ -799,14 +799,14 @@ alias(
 )
 
 alias(
-    name = "either-1.14.0",
-    actual = "//third_party/rust_crates/vendor/either-1.14.0:either",
+    name = "either-1.15.0",
+    actual = "//third_party/rust_crates/vendor/either-1.15.0:either",
     tags = ["manual"],
 )
 
 alias(
     name = "either",
-    actual = "//third_party/rust_crates/vendor/either-1.14.0:either",
+    actual = "//third_party/rust_crates/vendor/either-1.15.0:either",
     tags = ["manual"],
 )
 
@@ -1279,14 +1279,14 @@ alias(
 )
 
 alias(
-    name = "indoc-1.0.3",
-    actual = "//third_party/rust_crates/vendor/indoc-1.0.3:indoc",
+    name = "indoc-2.0.6",
+    actual = "//third_party/rust_crates/vendor/indoc-2.0.6:indoc",
     tags = ["manual"],
 )
 
 alias(
     name = "indoc",
-    actual = "//third_party/rust_crates/vendor/indoc-1.0.3:indoc",
+    actual = "//third_party/rust_crates/vendor/indoc-2.0.6:indoc",
     tags = ["manual"],
 )
 
@@ -1315,14 +1315,14 @@ alias(
 )
 
 alias(
-    name = "itoa-1.0.14",
-    actual = "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+    name = "itoa-1.0.15",
+    actual = "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
     tags = ["manual"],
 )
 
 alias(
     name = "itoa",
-    actual = "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
+    actual = "//third_party/rust_crates/vendor/itoa-1.0.15:itoa",
     tags = ["manual"],
 )
 
@@ -1351,14 +1351,14 @@ alias(
 )
 
 alias(
-    name = "libc-0.2.171",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
+    name = "libc-0.2.174",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.174:libc",
     tags = ["manual"],
 )
 
 alias(
     name = "libc",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.174:libc",
     tags = ["manual"],
 )
 
@@ -2395,14 +2395,14 @@ alias(
 )
 
 alias(
-    name = "schemars-0.8.10",
-    actual = "//third_party/rust_crates/vendor/schemars-0.8.10:schemars",
+    name = "schemars-0.8.22",
+    actual = "//third_party/rust_crates/vendor/schemars-0.8.22:schemars",
     tags = ["manual"],
 )
 
 alias(
     name = "schemars",
-    actual = "//third_party/rust_crates/vendor/schemars-0.8.10:schemars",
+    actual = "//third_party/rust_crates/vendor/schemars-0.8.22:schemars",
     tags = ["manual"],
 )
 
@@ -2851,14 +2851,14 @@ alias(
 )
 
 alias(
-    name = "thiserror-2.0.11",
-    actual = "//third_party/rust_crates/vendor/thiserror-2.0.11:thiserror",
+    name = "thiserror-2.0.12",
+    actual = "//third_party/rust_crates/vendor/thiserror-2.0.12:thiserror",
     tags = ["manual"],
 )
 
 alias(
     name = "thiserror",
-    actual = "//third_party/rust_crates/vendor/thiserror-2.0.11:thiserror",
+    actual = "//third_party/rust_crates/vendor/thiserror-2.0.12:thiserror",
     tags = ["manual"],
 )
 

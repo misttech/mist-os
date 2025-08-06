@@ -8,7 +8,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
-import fidl_fuchsia_wlan_common as f_wlan_common
 import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
@@ -220,8 +219,8 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
                 f"AccessPointController.StartAccessPoint() error {status}"
             ) from status
 
-        request_status = f_wlan_common.RequestStatus(resp.status)
-        if request_status is not f_wlan_common.RequestStatus.ACKNOWLEDGED:
+        request_status = f_wlan_policy.RequestStatus(resp.status)
+        if request_status is not f_wlan_policy.RequestStatus.ACKNOWLEDGED:
             raise wlan_errors.HoneydewWlanRequestRejectedError(
                 "AccessPointController.StartAccessPoint()",
                 request_status,
@@ -260,8 +259,8 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
                 f"AccessPointController.StopAccessPoint() error {status}"
             ) from status
 
-        request_status = f_wlan_common.RequestStatus(resp.status)
-        if request_status is not f_wlan_common.RequestStatus.ACKNOWLEDGED:
+        request_status = f_wlan_policy.RequestStatus(resp.status)
+        if request_status is not f_wlan_policy.RequestStatus.ACKNOWLEDGED:
             raise wlan_errors.HoneydewWlanRequestRejectedError(
                 "AccessPointController.StopAccessPoint()",
                 request_status,

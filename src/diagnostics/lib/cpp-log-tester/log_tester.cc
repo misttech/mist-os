@@ -29,15 +29,6 @@ class FakeLogSink : public fuchsia::logger::LogSink {
     bindings_.AddBinding(this, std::move(request), dispatcher);
   }
 
-  /// Send this socket to be drained.
-  ///
-  /// See //zircon/system/ulib/syslog/include/lib/syslog/wire_format.h for what
-  /// is expected to be received over the socket.
-  void Connect(::zx::socket socket) override {
-    // Not supported by this test.
-    abort();
-  }
-
   void WaitForInterestChange(WaitForInterestChangeCallback callback) override {
     // Ignored.
   }

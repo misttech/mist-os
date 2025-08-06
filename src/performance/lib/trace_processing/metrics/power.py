@@ -7,7 +7,7 @@
 import dataclasses
 import itertools
 import logging
-from typing import Callable, Sequence
+from typing import Callable, MutableSequence, Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 from trace_processing.metrics import suspend as suspend_metrics
@@ -159,7 +159,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         """Calculate power metrics, excluding power/trace sync signals.
 
         In order to sync power measurements with a system trace, our test harness

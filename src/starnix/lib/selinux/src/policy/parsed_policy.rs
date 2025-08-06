@@ -5,36 +5,41 @@
 use crate::NullessByteStr;
 
 use super::arrays::{
-    AccessVectorRules, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+    AccessVectorRule, ConditionalNodes, Context, DeprecatedFilenameTransitions,
     FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
     InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
     RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
-    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY, XPERMS_TYPE_IOCTL_PREFIXES,
+    SimpleArrayView, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY, XPERMS_TYPE_IOCTL_PREFIXES,
     XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES,
 };
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
-use super::parser::PolicyCursor;
+use super::parser::{PolicyCursor, PolicyData};
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
     Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, MlsLevel, Role,
     Sensitivity, SymbolList, Type, User,
 };
 use super::{
-    AccessDecision, AccessVector, CategoryId, ClassId, IoctlAccessDecision, Parse, RoleId,
-    SensitivityId, TypeId, UserId, Validate, XpermsBitmap, SELINUX_AVD_FLAGS_PERMISSIVE,
+    AccessDecision, AccessVector, CategoryId, ClassId, IoctlAccessDecision, Parse,
+    PolicyValidationContext, RoleId, SensitivityId, TypeId, UserId, Validate, XpermsBitmap,
+    SELINUX_AVD_FLAGS_PERMISSIVE,
 };
 
 use anyhow::Context as _;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::iter::Iterator;
 use zerocopy::little_endian as le;
 
 /// A parsed binary policy.
 #[derive(Debug)]
 pub struct ParsedPolicy {
+    /// The raw policy data.
+    pub data: PolicyData,
+
     /// A distinctive number that acts as a binary format-specific header for SELinux binary policy
     /// files.
     magic: Magic,
@@ -65,7 +70,7 @@ pub struct ParsedPolicy {
     /// The set of categories referenced by this policy.
     categories: SymbolList<Category>,
     /// The set of access vector rules referenced by this policy.
-    access_vector_rules: SimpleArray<AccessVectorRules>,
+    access_vector_rules: SimpleArrayView<AccessVectorRule>,
     conditional_lists: SimpleArray<ConditionalNodes>,
     /// The set of role transitions to apply when instantiating new objects.
     role_transitions: RoleTransitions,
@@ -144,7 +149,7 @@ impl ParsedPolicy {
         let mut computed_audit_allow = AccessVector::NONE;
         let mut computed_audit_deny = AccessVector::ALL;
 
-        for access_vector_rule in self.access_vector_rules.data.iter() {
+        for access_vector_rule in self.access_vector_rules() {
             // Ignore `access_vector_rule` entries not relayed to "allow" or
             // audit statements.
             //
@@ -257,7 +262,7 @@ impl ParsedPolicy {
         let mut auditallow = XpermsBitmap::NONE;
         let mut auditdeny = XpermsBitmap::ALL;
 
-        for access_vector_rule in self.access_vector_rules.data.iter() {
+        for access_vector_rule in self.access_vector_rules() {
             if !access_vector_rule.is_allowxperm()
                 && !access_vector_rule.is_auditallowxperm()
                 && !access_vector_rule.is_dontauditxperm()
@@ -413,8 +418,8 @@ impl ParsedPolicy {
         &self.range_transitions.data
     }
 
-    pub(super) fn access_vector_rules(&self) -> &AccessVectorRules {
-        &self.access_vector_rules.data
+    pub(super) fn access_vector_rules(&self) -> impl Iterator<Item = AccessVectorRule> {
+        self.access_vector_rules.data().iter(&self.data)
     }
 
     pub(super) fn compute_filename_transition(
@@ -484,177 +489,142 @@ impl ParsedPolicy {
     }
 }
 
-impl ParsedPolicy
-where
-    Self: Parse,
-{
+impl ParsedPolicy {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub(super) fn parse(bytes: PolicyCursor) -> Result<(Self, Vec<u8>), anyhow::Error> {
-        let (policy, tail) =
-            <ParsedPolicy as Parse>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
+    pub(super) fn parse(data: PolicyData) -> Result<Self, anyhow::Error> {
+        let cursor = PolicyCursor::new(data.clone());
+        let (policy, tail) = parse_policy_internal(cursor, data)?;
         let num_bytes = tail.len();
         if num_bytes > 0 {
             return Err(ParseError::TrailingBytes { num_bytes }.into());
         }
-        Ok((policy, tail.into_inner()))
+        Ok(policy)
     }
 }
 
-/// Parse a data structure from a prefix of a [`ParseStrategy`].
-impl Parse for ParsedPolicy
-where
-    Signature: Parse,
-    ExtensibleBitmap: Parse,
-    SymbolList<CommonSymbol>: Parse,
-    SymbolList<Class>: Parse,
-    SymbolList<Role>: Parse,
-    SymbolList<Type>: Parse,
-    SymbolList<User>: Parse,
-    SymbolList<ConditionalBoolean>: Parse,
-    SymbolList<Sensitivity>: Parse,
-    SymbolList<Category>: Parse,
-    SimpleArray<AccessVectorRules>: Parse,
-    SimpleArray<ConditionalNodes>: Parse,
-    RoleTransitions: Parse,
-    RoleAllows: Parse,
-    SimpleArray<FilenameTransitions>: Parse,
-    SimpleArray<DeprecatedFilenameTransitions>: Parse,
-    SimpleArray<InitialSids>: Parse,
-    SimpleArray<NamedContextPairs>: Parse,
-    SimpleArray<Ports>: Parse,
-    SimpleArray<Nodes>: Parse,
-    SimpleArray<FsUses>: Parse,
-    SimpleArray<IPv6Nodes>: Parse,
-    SimpleArray<InfinitiBandPartitionKeys>: Parse,
-    SimpleArray<InfinitiBandEndPorts>: Parse,
-    SimpleArray<GenericFsContexts>: Parse,
-    SimpleArray<RangeTransitions>: Parse,
-{
-    /// A [`Policy`] may add context to underlying [`ParseError`] values.
-    type Error = anyhow::Error;
+/// Parses an entire binary policy.
+fn parse_policy_internal(
+    bytes: PolicyCursor,
+    data: PolicyData,
+) -> Result<(ParsedPolicy, PolicyCursor), anyhow::Error> {
+    let tail = bytes;
 
-    /// Parses an entire binary policy.
-    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
-        let tail = bytes;
+    let (magic, tail) = PolicyCursor::parse::<Magic>(tail).context("parsing magic")?;
 
-        let (magic, tail) = PolicyCursor::parse::<Magic>(tail).context("parsing magic")?;
+    let (signature, tail) =
+        Signature::parse(tail).map_err(Into::<anyhow::Error>::into).context("parsing signature")?;
 
-        let (signature, tail) = Signature::parse(tail)
+    let (policy_version, tail) =
+        PolicyCursor::parse::<PolicyVersion>(tail).context("parsing policy version")?;
+    let policy_version_value = policy_version.policy_version();
+
+    let (config, tail) = Config::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing policy config")?;
+
+    let (counts, tail) =
+        PolicyCursor::parse::<Counts>(tail).context("parsing high-level policy object counts")?;
+
+    let (policy_capabilities, tail) = ExtensibleBitmap::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing policy capabilities")?;
+
+    let (permissive_map, tail) = ExtensibleBitmap::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing permissive map")?;
+
+    let (common_symbols, tail) = SymbolList::<CommonSymbol>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing common symbols")?;
+
+    let (classes, tail) = SymbolList::<Class>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing classes")?;
+
+    let (roles, tail) = SymbolList::<Role>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing roles")?;
+
+    let (types, tail) = SymbolList::<Type>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing types")?;
+
+    let (users, tail) = SymbolList::<User>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing users")?;
+
+    let (conditional_booleans, tail) = SymbolList::<ConditionalBoolean>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing conditional booleans")?;
+
+    let (sensitivities, tail) = SymbolList::<Sensitivity>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing sensitivites")?;
+
+    let (categories, tail) = SymbolList::<Category>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing categories")?;
+
+    let (access_vector_rules, tail) = SimpleArrayView::<AccessVectorRule>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing access vector rules")?;
+
+    let (conditional_lists, tail) = SimpleArray::<ConditionalNodes>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing conditional lists")?;
+
+    let (role_transitions, tail) = RoleTransitions::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing role transitions")?;
+
+    let (role_allowlist, tail) = RoleAllows::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing role allow rules")?;
+
+    let (filename_transition_list, tail) = if policy_version_value >= 33 {
+        let (filename_transition_list, tail) = SimpleArray::<FilenameTransitions>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing signature")?;
-
-        let (policy_version, tail) =
-            PolicyCursor::parse::<PolicyVersion>(tail).context("parsing policy version")?;
-        let policy_version_value = policy_version.policy_version();
-
-        let (config, tail) = Config::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing policy config")?;
-
-        let (counts, tail) = PolicyCursor::parse::<Counts>(tail)
-            .context("parsing high-level policy object counts")?;
-
-        let (policy_capabilities, tail) = ExtensibleBitmap::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing policy capabilities")?;
-
-        let (permissive_map, tail) = ExtensibleBitmap::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing permissive map")?;
-
-        let (common_symbols, tail) = SymbolList::<CommonSymbol>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing common symbols")?;
-
-        let (classes, tail) = SymbolList::<Class>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing classes")?;
-
-        let (roles, tail) = SymbolList::<Role>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing roles")?;
-
-        let (types, tail) = SymbolList::<Type>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing types")?;
-
-        let (users, tail) = SymbolList::<User>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing users")?;
-
-        let (conditional_booleans, tail) = SymbolList::<ConditionalBoolean>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing conditional booleans")?;
-
-        let (sensitivities, tail) = SymbolList::<Sensitivity>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing sensitivites")?;
-
-        let (categories, tail) = SymbolList::<Category>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing categories")?;
-
-        let (access_vector_rules, tail) = SimpleArray::<AccessVectorRules>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing access vector rules")?;
-
-        let (conditional_lists, tail) = SimpleArray::<ConditionalNodes>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing conditional lists")?;
-
-        let (role_transitions, tail) = RoleTransitions::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing role transitions")?;
-
-        let (role_allowlist, tail) = RoleAllows::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing role allow rules")?;
-
-        let (filename_transition_list, tail) = if policy_version_value >= 33 {
-            let (filename_transition_list, tail) = SimpleArray::<FilenameTransitions>::parse(tail)
+            .context("parsing standard filename transitions")?;
+        (FilenameTransitionList::PolicyVersionGeq33(filename_transition_list), tail)
+    } else {
+        let (filename_transition_list, tail) =
+            SimpleArray::<DeprecatedFilenameTransitions>::parse(tail)
                 .map_err(Into::<anyhow::Error>::into)
-                .context("parsing standard filename transitions")?;
-            (FilenameTransitionList::PolicyVersionGeq33(filename_transition_list), tail)
-        } else {
-            let (filename_transition_list, tail) =
-                SimpleArray::<DeprecatedFilenameTransitions>::parse(tail)
-                    .map_err(Into::<anyhow::Error>::into)
-                    .context("parsing deprecated filename transitions")?;
-            (FilenameTransitionList::PolicyVersionLeq32(filename_transition_list), tail)
-        };
+                .context("parsing deprecated filename transitions")?;
+        (FilenameTransitionList::PolicyVersionLeq32(filename_transition_list), tail)
+    };
 
-        let (initial_sids, tail) = SimpleArray::<InitialSids>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing initial sids")?;
+    let (initial_sids, tail) = SimpleArray::<InitialSids>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing initial sids")?;
 
-        let (filesystems, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing filesystem contexts")?;
+    let (filesystems, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing filesystem contexts")?;
 
-        let (ports, tail) = SimpleArray::<Ports>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing ports")?;
+    let (ports, tail) = SimpleArray::<Ports>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing ports")?;
 
-        let (network_interfaces, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing network interfaces")?;
+    let (network_interfaces, tail) = SimpleArray::<NamedContextPairs>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing network interfaces")?;
 
-        let (nodes, tail) = SimpleArray::<Nodes>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing nodes")?;
+    let (nodes, tail) = SimpleArray::<Nodes>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing nodes")?;
 
-        let (fs_uses, tail) = SimpleArray::<FsUses>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing fs uses")?;
+    let (fs_uses, tail) = SimpleArray::<FsUses>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing fs uses")?;
 
-        let (ipv6_nodes, tail) = SimpleArray::<IPv6Nodes>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing ipv6 nodes")?;
+    let (ipv6_nodes, tail) = SimpleArray::<IPv6Nodes>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing ipv6 nodes")?;
 
-        let (infinitiband_partition_keys, infinitiband_end_ports, tail) = if policy_version_value
-            >= MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY
-        {
+    let (infinitiband_partition_keys, infinitiband_end_ports, tail) =
+        if policy_version_value >= MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY {
             let (infinity_band_partition_keys, tail) =
                 SimpleArray::<InfinitiBandPartitionKeys>::parse(tail)
                     .map_err(Into::<anyhow::Error>::into)
@@ -667,175 +637,198 @@ where
             (None, None, tail)
         };
 
-        let (generic_fs_contexts, tail) = SimpleArray::<GenericFsContexts>::parse(tail)
+    let (generic_fs_contexts, tail) = SimpleArray::<GenericFsContexts>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing generic filesystem contexts")?;
+
+    let (range_transitions, tail) = SimpleArray::<RangeTransitions>::parse(tail)
+        .map_err(Into::<anyhow::Error>::into)
+        .context("parsing range transitions")?;
+
+    let primary_names_count = types.metadata.primary_names_count();
+    let mut attribute_maps = Vec::with_capacity(primary_names_count as usize);
+    let mut tail = tail;
+
+    for i in 0..primary_names_count {
+        let (item, next_tail) = ExtensibleBitmap::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing generic filesystem contexts")?;
-
-        let (range_transitions, tail) = SimpleArray::<RangeTransitions>::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing range transitions")?;
-
-        let primary_names_count = types.metadata.primary_names_count();
-        let mut attribute_maps = Vec::with_capacity(primary_names_count as usize);
-        let mut tail = tail;
-
-        for i in 0..primary_names_count {
-            let (item, next_tail) = ExtensibleBitmap::parse(tail)
-                .map_err(Into::<anyhow::Error>::into)
-                .with_context(|| format!("parsing {}th attribtue map", i))?;
-            attribute_maps.push(item);
-            tail = next_tail;
-        }
-        let tail = tail;
-        let attribute_maps = attribute_maps;
-
-        Ok((
-            Self {
-                magic,
-                signature,
-                policy_version,
-                config,
-                counts,
-                policy_capabilities,
-                permissive_map,
-                common_symbols,
-                classes,
-                roles,
-                types,
-                users,
-                conditional_booleans,
-                sensitivities,
-                categories,
-                access_vector_rules,
-                conditional_lists,
-                role_transitions,
-                role_allowlist,
-                filename_transition_list,
-                initial_sids,
-                filesystems,
-                ports,
-                network_interfaces,
-                nodes,
-                fs_uses,
-                ipv6_nodes,
-                infinitiband_partition_keys,
-                infinitiband_end_ports,
-                generic_fs_contexts,
-                range_transitions,
-                attribute_maps,
-            },
-            tail,
-        ))
+            .with_context(|| format!("parsing {}th attribute map", i))?;
+        attribute_maps.push(item);
+        tail = next_tail;
     }
+    let tail = tail;
+    let attribute_maps = attribute_maps;
+
+    Ok((
+        ParsedPolicy {
+            data,
+            magic,
+            signature,
+            policy_version,
+            config,
+            counts,
+            policy_capabilities,
+            permissive_map,
+            common_symbols,
+            classes,
+            roles,
+            types,
+            users,
+            conditional_booleans,
+            sensitivities,
+            categories,
+            access_vector_rules,
+            conditional_lists,
+            role_transitions,
+            role_allowlist,
+            filename_transition_list,
+            initial_sids,
+            filesystems,
+            ports,
+            network_interfaces,
+            nodes,
+            fs_uses,
+            ipv6_nodes,
+            infinitiband_partition_keys,
+            infinitiband_end_ports,
+            generic_fs_contexts,
+            range_transitions,
+            attribute_maps,
+        },
+        tail,
+    ))
 }
 
-impl Validate for ParsedPolicy {
-    /// A [`Policy`] may add context to underlying [`ValidateError`] values.
-    type Error = anyhow::Error;
+impl ParsedPolicy {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        let mut context = PolicyValidationContext { data: self.data.clone() };
 
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.magic.validate().map_err(Into::<anyhow::Error>::into).context("validating magic")?;
+        self.magic
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating magic")?;
         self.signature
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating signature")?;
         self.policy_version
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating policy_version")?;
-        self.config.validate().map_err(Into::<anyhow::Error>::into).context("validating config")?;
-        self.counts.validate().map_err(Into::<anyhow::Error>::into).context("validating counts")?;
+        self.config
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating config")?;
+        self.counts
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating counts")?;
         self.policy_capabilities
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating policy_capabilities")?;
         self.permissive_map
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating permissive_map")?;
         self.common_symbols
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating common_symbols")?;
         self.classes
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating classes")?;
-        self.roles.validate().map_err(Into::<anyhow::Error>::into).context("validating roles")?;
-        self.types.validate().map_err(Into::<anyhow::Error>::into).context("validating types")?;
-        self.users.validate().map_err(Into::<anyhow::Error>::into).context("validating users")?;
+        self.roles
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating roles")?;
+        self.types
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating types")?;
+        self.users
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating users")?;
         self.conditional_booleans
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating conditional_booleans")?;
         self.sensitivities
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating sensitivities")?;
         self.categories
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating categories")?;
         self.access_vector_rules
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating access_vector_rules")?;
         self.conditional_lists
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating conditional_lists")?;
         self.role_transitions
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating role_transitions")?;
         self.role_allowlist
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating role_allowlist")?;
         self.filename_transition_list
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating filename_transition_list")?;
         self.initial_sids
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating initial_sids")?;
         self.filesystems
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating filesystems")?;
-        self.ports.validate().map_err(Into::<anyhow::Error>::into).context("validating ports")?;
+        self.ports
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating ports")?;
         self.network_interfaces
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating network_interfaces")?;
-        self.nodes.validate().map_err(Into::<anyhow::Error>::into).context("validating nodes")?;
+        self.nodes
+            .validate(&mut context)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("validating nodes")?;
         self.fs_uses
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating fs_uses")?;
         self.ipv6_nodes
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating ipv6 nodes")?;
         self.infinitiband_partition_keys
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating infinitiband_partition_keys")?;
         self.infinitiband_end_ports
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating infinitiband_end_ports")?;
         self.generic_fs_contexts
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating generic_fs_contexts")?;
         self.range_transitions
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating range_transitions")?;
         self.attribute_maps
-            .validate()
+            .validate(&mut context)
             .map_err(Into::<anyhow::Error>::into)
             .context("validating attribute_maps")?;
 
@@ -906,7 +899,7 @@ impl Validate for ParsedPolicy {
         }
 
         // Validate that types output by access vector rules are defined.
-        for access_vector_rule in &self.access_vector_rules.data {
+        for access_vector_rule in self.access_vector_rules() {
             if let Some(type_id) = access_vector_rule.new_type() {
                 validate_id(&type_ids, type_id, "new_type")?;
             }

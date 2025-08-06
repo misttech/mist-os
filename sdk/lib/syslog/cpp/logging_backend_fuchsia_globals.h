@@ -7,9 +7,7 @@
 
 #include <zircon/types.h>
 
-#include <cstdint>
-
-namespace syslog_runtime::internal {
+namespace fuchsia_logging::internal {
 class LogState;
 
 // These functions are an internal contract between the Fuchsia logging
@@ -35,6 +33,6 @@ LogState* FuchsiaLogGetStateLocked();
 zx_koid_t FuchsiaLogGetCurrentThreadKoid();
 
 }  // extern "C"
-}  // namespace syslog_runtime::internal
+}  // namespace fuchsia_logging::internal
 
 #endif  // LIB_SYSLOG_CPP_LOGGING_BACKEND_FUCHSIA_GLOBALS_H_

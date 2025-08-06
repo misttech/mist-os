@@ -79,22 +79,15 @@ fn keys_from_context(
                     )]
                 }
             } else {
-                // TODO(https://fxbug.dev/393449584): This is broken. Replace with FscryptPerFile.
-                // This is just a stop-gap. We don't support reading per-file encrypted data yet.
-                vec![(
-                    FSCRYPT_KEY_ID,
-                    EncryptionKey::FscryptInoLblk32File {
-                        key_identifier: context.main_key_identifier,
-                    },
-                )]
+                bail!("Unsupported fscrypt encryption policy.");
             },
         ))
     } else {
-        // Assume default-key encryption.
+        // TODO(https://fxbug.dev/393449584): This should use a valid volumedata key.
         Ok((
             if parent_is_fscrypt { Some(0) } else { None },
             VOLUME_DATA_KEY_ID,
-            vec![(VOLUME_DATA_KEY_ID, EncryptionKey::DmDefaultKey)],
+            vec![(VOLUME_DATA_KEY_ID, EncryptionKey::Fxfs(Default::default()))],
         ))
     }
 }
@@ -739,7 +732,8 @@ async fn migrate_device(device: DeviceHolder) -> DeviceHolder {
                 vol.store_object_id(),
                 Mutation::insert_object(
                     ObjectKey::keys(object_id),
-                    ObjectValue::Keys(vec![(0, EncryptionKey::DmDefaultKey)].into()),
+                    // TODO(https://fxbug.dev/393449584): This should use a valid volumedata key.
+                    ObjectValue::Keys(vec![(0, EncryptionKey::Fxfs(Default::default()))].into()),
                 ),
             );
             transaction.add(
@@ -846,7 +840,7 @@ async fn test_fxfs_read_lblk32_ino_file() {
 
     // Inode numbers should remain the same across migration, so we can lookup in f2fs and jump to
     // the inode in fxfs (i.e. we are testing file encryption without directory parsing).
-    let ino = recurse_resolve_f2fs(&f2fs, f2fs.root_ino(), "fscrypt_lblk32/file").await;
+    let ino = recurse_resolve_f2fs(&f2fs, f2fs.root_ino(), "fscrypt/a/b/inlined").await;
     let inode = f2fs.read_inode(ino).await.expect("read file");
     let f2fs_data = f2fs.read_data(&inode, 0).await.expect("read data");
 

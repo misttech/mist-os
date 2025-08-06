@@ -5,8 +5,8 @@
 use crate::signals::RunState;
 use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
-use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
+use slab::Slab;
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_stack::clean_stack;
 use starnix_sync::{
@@ -186,48 +186,17 @@ struct WaitCancelerQueue {
 
 struct WaitCancelerZxio {
     zxio: ZxioWeak,
-    inner: HandleWaitCanceler,
+    inner: PortWaitCanceler,
 }
 
-struct WaitCancelerEvent {
-    event: Weak<zx::Event>,
-    inner: HandleWaitCanceler,
-}
-
-struct WaitCancelerEventPair {
-    event_pair: Weak<zx::EventPair>,
-    inner: HandleWaitCanceler,
-}
-
-struct WaitCancelerBootTimer {
-    timer: Weak<zx::BootTimer>,
-    inner: HandleWaitCanceler,
-}
-
-struct WaitCancelerMonoTimer {
-    timer: Weak<zx::MonotonicTimer>,
-    inner: HandleWaitCanceler,
-}
-
-struct WaitCancelerVmo {
-    vmo: Weak<zx::Vmo>,
-    inner: HandleWaitCanceler,
-}
-
-struct WaitCancelerCounter {
-    counter: Weak<zx::Counter>,
-    inner: HandleWaitCanceler,
+struct WaitCancelerPort {
+    inner: PortWaitCanceler,
 }
 
 enum WaitCancelerInner {
     Zxio(WaitCancelerZxio),
     Queue(WaitCancelerQueue),
-    Event(WaitCancelerEvent),
-    EventPair(WaitCancelerEventPair),
-    BootTimer(WaitCancelerBootTimer),
-    MonoTimer(WaitCancelerMonoTimer),
-    Vmo(WaitCancelerVmo),
-    SyncFile(WaitCancelerCounter),
+    Port(WaitCancelerPort),
 }
 
 const WAIT_CANCELER_COMMON_SIZE: usize = 2;
@@ -251,32 +220,36 @@ impl WaitCanceler {
         Self { cancellers: Default::default() }
     }
 
-    pub fn new_zxio(zxio: ZxioWeak, inner: HandleWaitCanceler) -> Self {
+    pub fn new_zxio(zxio: ZxioWeak, inner: PortWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
     }
 
-    pub fn new_event(event: Weak<zx::Event>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::Event(WaitCancelerEvent { event, inner }))
+    pub fn new_timer(_timer: Weak<zx::Timer>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
-    pub fn new_event_pair(event_pair: Weak<zx::EventPair>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }))
+    pub fn new_event(_event: Weak<zx::Event>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
-    pub fn new_mono_timer(timer: Weak<zx::MonotonicTimer>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::MonoTimer(WaitCancelerMonoTimer { timer, inner }))
+    pub fn new_event_pair(_event_pair: Weak<zx::EventPair>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
-    pub fn new_boot_timer(timer: Weak<zx::BootTimer>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::BootTimer(WaitCancelerBootTimer { timer, inner }))
+    pub fn new_mono_timer(_timer: Weak<zx::MonotonicTimer>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
-    pub fn new_vmo(vmo: Weak<zx::Vmo>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }))
+    pub fn new_boot_timer(_timer: Weak<zx::BootTimer>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
-    pub fn new_counter(counter: Weak<zx::Counter>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }))
+    pub fn new_vmo(_vmo: Weak<zx::Vmo>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
+    }
+
+    pub fn new_counter(_counter: Weak<zx::Counter>, inner: PortWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Port(WaitCancelerPort { inner }))
     }
 
     /// Equivalent to `merge_unbounded`, except that it enforces that the resulting vector of
@@ -315,9 +288,8 @@ impl WaitCanceler {
             match canceller {
                 WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }) => {
                     let Some(zxio) = zxio.upgrade() else { return };
-                    let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
-                    assert!(!handle.is_invalid());
-                    inner.cancel(handle);
+                    let (_, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
+                    inner.cancel();
                     zxio.wait_end(signals);
                 }
                 WaitCancelerInner::Queue(WaitCancelerQueue {
@@ -328,42 +300,20 @@ impl WaitCanceler {
                 }) => {
                     let Some(wait_queue) = wait_queue.upgrade() else { return };
                     waiter.remove_callback(&wait_key);
-                    match wait_queue.lock().waiters.entry(key) {
-                        dense_map::Entry::Vacant(_) => {}
-                        dense_map::Entry::Occupied(entry) => {
-                            // The map of waiters in a wait queue uses a
-                            // `DenseMap` which recycles keys. To make sure we
-                            // are removing the right entry, make sure the ID
-                            // value matches what we expect to remove.
-                            if entry.get().id == id {
-                                entry.remove();
-                            }
+                    let mut wait_queue = wait_queue.lock();
+                    let waiters = &mut wait_queue.waiters;
+                    if let Some(entry) = waiters.get_mut(key) {
+                        // The map of waiters in a wait queue uses a `Slab` which
+                        // recycles keys. To make sure we are removing the right
+                        // entry, make sure the ID value matches what we expect
+                        // to remove.
+                        if entry.id == id {
+                            waiters.remove(key);
                         }
-                    };
+                    }
                 }
-                WaitCancelerInner::Event(WaitCancelerEvent { event, inner }) => {
-                    let Some(event) = event.upgrade() else { return };
-                    inner.cancel(event.as_handle_ref());
-                }
-                WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }) => {
-                    let Some(event_pair) = event_pair.upgrade() else { return };
-                    inner.cancel(event_pair.as_handle_ref());
-                }
-                WaitCancelerInner::BootTimer(WaitCancelerBootTimer { timer, inner }) => {
-                    let Some(timer) = timer.upgrade() else { return };
-                    inner.cancel(timer.as_handle_ref());
-                }
-                WaitCancelerInner::MonoTimer(WaitCancelerMonoTimer { timer, inner }) => {
-                    let Some(timer) = timer.upgrade() else { return };
-                    inner.cancel(timer.as_handle_ref());
-                }
-                WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }) => {
-                    let Some(vmo) = vmo.upgrade() else { return };
-                    inner.cancel(vmo.as_handle_ref());
-                }
-                WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }) => {
-                    let Some(counter) = counter.upgrade() else { return };
-                    inner.cancel(counter.as_handle_ref());
+                WaitCancelerInner::Port(WaitCancelerPort { inner }) => {
+                    inner.cancel();
                 }
             }
         }
@@ -376,19 +326,19 @@ impl WaitCanceler {
 ///
 /// Does not implement `Clone` or `Copy` so that only a single canceler exists
 /// per wait.
-pub struct HandleWaitCanceler {
+pub struct PortWaitCanceler {
     waiter: Weak<PortWaiter>,
     key: WaitKey,
 }
 
-impl HandleWaitCanceler {
+impl PortWaitCanceler {
     /// Cancel the pending wait.
     ///
     /// Takes `self` by value since a wait can only be canceled once.
-    pub fn cancel(self, handle: zx::HandleRef<'_>) {
+    pub fn cancel(self) {
         let Self { waiter, key } = self;
         if let Some(waiter) = waiter.upgrade() {
-            let _ = waiter.port.cancel(&handle, key.raw);
+            let _ = waiter.port.cancel(key.raw);
             waiter.remove_callback(&key);
         }
     }
@@ -569,13 +519,13 @@ impl PortWaiter {
     /// confused with POSIX signals), optionally running a FnOnce. Wait operations will return
     /// the error code present in the provided SignalHandler.
     ///
-    /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
+    /// Returns a `PortWaitCanceler` that can be used to cancel the wait.
     fn wake_on_zircon_signals(
         self: &Arc<Self>,
         handle: &dyn zx::AsHandleRef,
         zx_signals: zx::Signals,
         handler: SignalHandler,
-    ) -> Result<HandleWaitCanceler, zx::Status> {
+    ) -> Result<PortWaitCanceler, zx::Status> {
         profile_duration!("PortWaiterWakeOnZirconSignals");
 
         let callback = WaitCallback::SignalHandler(handler);
@@ -586,7 +536,7 @@ impl PortWaiter {
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
-        Ok(HandleWaitCanceler { waiter: Arc::downgrade(self), key })
+        Ok(PortWaitCanceler { waiter: Arc::downgrade(self), key })
     }
 
     fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
@@ -765,13 +715,13 @@ impl Waiter {
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
     /// confused with POSIX signals), optionally running a FnOnce.
     ///
-    /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
+    /// Returns a `PortWaitCanceler` that can be used to cancel the wait.
     pub fn wake_on_zircon_signals(
         &self,
         handle: &dyn zx::AsHandleRef,
         zx_signals: zx::Signals,
         handler: SignalHandler,
-    ) -> Result<HandleWaitCanceler, zx::Status> {
+    ) -> Result<PortWaitCanceler, zx::Status> {
         self.inner.wake_on_zircon_signals(handle, zx_signals, handler)
     }
 
@@ -804,7 +754,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.lock().waiters.key_ordered_retain(|entry| entry.entry.waiter != *self)
+                wait_queue.lock().waiters.retain(|_, entry| entry.entry.waiter != *self)
             }
         }
     }
@@ -837,10 +787,7 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue
-                    .lock()
-                    .waiters
-                    .key_ordered_retain(|entry| entry.entry.waiter != self.event)
+                wait_queue.lock().waiters.retain(|_, entry| entry.entry.waiter != self.event)
             }
         }
     }
@@ -1010,7 +957,7 @@ struct WaitEntryWithId {
 }
 
 struct WaitEntryId {
-    key: dense_map::Key,
+    key: usize,
     id: u64,
 }
 
@@ -1025,7 +972,7 @@ struct WaitQueueImpl {
     /// The list of waiters.
     ///
     /// The waiter's wait_queues lock is nested inside this lock.
-    waiters: dense_map::DenseMap<WaitEntryWithId>,
+    waiters: Slab<WaitEntryWithId>,
 }
 
 /// An entry in a WaitQueue.
@@ -1049,7 +996,7 @@ impl WaitQueue {
             .checked_add(1)
             .expect("all possible wait entry ID values exhausted");
         wait_queue.next_wait_entry_id = id;
-        WaitEntryId { key: wait_queue.waiters.push(WaitEntryWithId { entry, id }), id }
+        WaitEntryId { key: wait_queue.waiters.insert(WaitEntryWithId { entry, id }), id }
     }
 
     /// Establish a wait for the given entry.
@@ -1130,7 +1077,7 @@ impl WaitQueue {
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
-        self.0.lock().waiters.key_ordered_retain(|WaitEntryWithId { entry, id: _ }| {
+        self.0.lock().waiters.retain(|_, WaitEntryWithId { entry, id: _ }| {
             if limit > 0 && entry.filter.intercept(&events) {
                 if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;

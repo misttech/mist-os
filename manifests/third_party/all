@@ -92,7 +92,7 @@
     <project name="third_party/crashpad"
              path="third_party/crashpad/src"
              remote="https://fuchsia.googlesource.com/third_party/crashpad"
-             revision="2918808a641484f5499c1174b9c9fa8b817c8dc4"
+             revision="498191b41a4a388fe8fc72aa1d8ae764b8d7b5e3"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="chromium/mini_chromium"
              path="third_party/mini_chromium/src"
@@ -105,7 +105,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="91582664cf9631a23102de4eee3b42ade75cd8e8"/>
     <project name="third_party/curl"
-             path="third_party/curl"
+             path="third_party/curl/src"
              remote="https://fuchsia.googlesource.com/third_party/curl"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="0605361a38cc37ede3a30d194294e892b956d81f"/>
@@ -143,7 +143,7 @@
              path="third_party/fuchsia-infra-bazel-rules/src"
              remote="https://fuchsia.googlesource.com/fuchsia-infra-bazel-rules"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="53f1f1e23553ca10b23d4b08254fe5ba7625bcca"/>
+             revision="7a6aaba051decf8ccfbc0b811d19f2f5b8dd6e3b"/>
     <project name="third_party/shac-project/checks-cpp"
              path="third_party/shac-project/checks-cpp/src"
              remote="https://fuchsia.googlesource.com/shac-project/checks-cpp"
@@ -190,7 +190,7 @@
     <project name="third_party/go"
              remote="https://fuchsia.googlesource.com/third_party/go"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="771304dd4279cdced80182197ea9a8d8a9fde430"
+             revision="ae8a62a711a8656bbca4cb693d8b49eae89b2db2"
              path="third_party/go"/>
     <project name="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
              path="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
@@ -198,7 +198,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="262f0c97f2fbc3839a59523cc6c6bcf500e2850b"/>
     <project name="third_party/glog"
-             path="third_party/glog"
+             path="third_party/glog/src"
              remote="https://fuchsia.googlesource.com/third_party/glog"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="41613c4940b57f13550c609c20ff31cc0b257fac"/>
@@ -295,7 +295,7 @@
     <project name="llvm-project/libc"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="71c6ed21d1c9bd9a83e354e1068da9315de73ba9"/>
+             revision="ee4999c218896456c98c8deab2858d0d932d816d"/>
     <project name="third_party/luci-go"
              path="third_party/luci-go"
              revision="fd977bf9e01d199a529f28af6dc10fe0fa35d9e7"
@@ -324,7 +324,7 @@
     <project name="third_party/mesa"
              path="third_party/mesa"
              remote="https://fuchsia.googlesource.com/third_party/mesa"
-             revision="488e3abddca47ebb70d4e0fa48c741e711bfc8d9"
+             revision="7c5bdb5ada09515b5088b33fe6d736eaa1b04ab2"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/github.com/jd/tenacity"
              path="third_party/github.com/jd/tenacity/src"
@@ -410,12 +410,12 @@
              path="third_party/perfetto"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/perfetto"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="4d963b9c6f29901989b692fbb24f1606abc9f999" />
+             revision="3c38ea7d11d3f46c5ce034e8e983b406b4e6f6d6" />
     <project name="third_party/pigweed"
              path="third_party/pigweed/src"
              remote="https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="3be1c116149fb281d5a8606b27ba4232ddcda174"/>
+             revision="494717f520908dc9d351dc612b9741270d3f117d"/>
     <project name="third_party/github.com/google/python_portpicker"
              path="third_party/python_portpicker/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/python_portpicker"
@@ -470,7 +470,7 @@
     <project name="scudo"
              path="third_party/scudo/src"
              remote="https://llvm.googlesource.com/scudo"
-             revision="61d6928d64cef1cda2b0cf743c50a6667a2227a9"/>
+             revision="936bda383527bf13d26849cdb7ce0939fea1337e"/>
     <project name="gwp-asan"
              path="third_party/scudo/gwp_asan"
              remote="https://llvm.googlesource.com/gwp-asan"

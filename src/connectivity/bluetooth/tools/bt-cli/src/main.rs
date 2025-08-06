@@ -205,8 +205,8 @@ fn peer_to_table_row(peer: &Peer) -> Row {
         peer.id.to_string(),
         peer.address.to_string(),
         format! {"{:?}", peer.technology},
-        peer.name.as_ref().map_or("".to_string(), |x| format!("{:?}", x)),
-        peer.appearance.as_ref().map_or("".to_string(), |x| format!("{:?}", x)),
+        peer.name.as_ref().map_or_else(|| "".to_string(), |x| format!("{:?}", x)),
+        peer.appearance.as_ref().map_or_else(|| "".to_string(), |x| format!("{:?}", x)),
         peer.connected.to_string(),
         peer.bonded.to_string(),
     ]
@@ -636,7 +636,7 @@ fn cmd_stream(
     let (ack_sender, mut ack_receiver) = mpsc::channel(0);
 
     let repl_thread = thread::spawn(move || -> Result<(), Error> {
-        let mut exec = fasync::LocalExecutor::new();
+        let mut exec = fasync::LocalExecutorBuilder::new().build();
 
         let fut = async {
             let config = Config::builder()

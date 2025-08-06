@@ -59,7 +59,7 @@ impl TaskManager {
 mod tests {
     use super::*;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_drain() {
         let t = TaskManager::new();
         t.spawn(futures::future::pending());
@@ -67,7 +67,7 @@ mod tests {
         assert_eq!(v.len(), 1);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_cleanup() {
         let t = TaskManager::new();
         t.spawn(futures::future::ready(()));
@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(v.len(), 0);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_task_completion_sans_polling() {
         let t = TaskManager::new();
         let (s, r) = async_channel::bounded(1);

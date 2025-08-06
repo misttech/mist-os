@@ -299,7 +299,7 @@ mod test {
         Ok((noop_proxy.into_proxy(), register))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_stop() -> Result<()> {
         let (noop_proxy, register) = create_noop_proxy().await?;
         noop_proxy.do_noop().await?;
@@ -308,7 +308,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_err_on_open_after_shutdown() -> Result<()> {
         let register = create_noop_register();
         let (noop_proxy, server) = fidl::endpoints::create_endpoints::<ffx_test::NoopMarker>();
@@ -326,7 +326,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_err_double_shutdown() -> Result<()> {
         let register = create_noop_register();
         register.shutdown(Context::new(TestDaemon::default())).await?;

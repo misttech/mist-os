@@ -303,7 +303,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn noop_test() {
         let daemon = FakeDaemonBuilder::new()
             .register_instanced_protocol_closure::<ffx_test::NoopMarker, _>(noop_protocol_closure())
@@ -344,7 +344,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn counter_test() {
         let daemon = FakeDaemonBuilder::new()
             .register_instanced_protocol_closure::<ffx_test::NoopMarker, _>(noop_protocol_closure())
@@ -390,7 +390,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn protocol_error_ensures_drop_test() -> Result<()> {
         let daemon =
             FakeDaemonBuilder::new().register_fidl_protocol::<NoopProtocolPanicker>().build();
@@ -454,7 +454,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn counter_test_singleton() {
         let daemon = FakeDaemonBuilder::new()
             .register_instanced_protocol_closure::<ffx_test::NoopMarker, _>(noop_protocol_closure())

@@ -11,6 +11,7 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <format>
 
 #include <fbl/unique_fd.h>
@@ -24,7 +25,7 @@
 
 namespace {
 
-static bool skip_binder_tests = false;
+bool skip_binder_tests = false;
 
 class BinderTest : public ::testing::Test {
  public:
@@ -175,7 +176,7 @@ TEST_F(BinderTest, BinderControl) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = "binder-test";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device), SyscallSucceeds());
 
   // The ioctl set the correct major and minor numbers.
@@ -217,7 +218,7 @@ TEST_F(BinderTest, BinderControlExists) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = "binder";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EEXIST));
 }
@@ -229,7 +230,7 @@ TEST_F(BinderTest, BinderControlInvalidPathDot) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = ".";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EACCES));
 }
@@ -241,7 +242,7 @@ TEST_F(BinderTest, BinderControlInvalidPathDotDot) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = "..";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EACCES));
 }
@@ -252,8 +253,8 @@ TEST_F(BinderTest, BinderControlInvalidPathEmpty) {
   ASSERT_TRUE(binder_control) << strerror(errno);
 
   struct binderfs_device new_device = {};
-  std::string kBinderName = "";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::string kBinderName;
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EACCES));
 }
@@ -265,7 +266,7 @@ TEST_F(BinderTest, BinderControlInvalidPathReserved) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = "binder-control";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EEXIST));
 }
@@ -277,7 +278,7 @@ TEST_F(BinderTest, BinderControlInvalidPathSlash) {
 
   struct binderfs_device new_device = {};
   std::string kBinderName = "my/binder";
-  std::copy(kBinderName.begin(), kBinderName.end(), new_device.name);
+  std::ranges::copy(kBinderName, new_device.name);
   EXPECT_THAT(ioctl(binder_control.get(), BINDER_CTL_ADD, &new_device),
               SyscallFailsWithErrno(EACCES));
 }

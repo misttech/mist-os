@@ -141,7 +141,7 @@ zx::result<> sampler::ThreadSamplerDispatcher::StartImpl() TA_EXCL(get_lock()) {
   }
 
   mp_sync_exec(
-      MP_IPI_TARGET_ALL, 0,
+      mp_ipi_target::ALL, 0,
       [](void* s) { reinterpret_cast<sampler::ThreadSamplerDispatcher*>(s)->SetCurrCpuTimer(); },
       this);
   state_ = SamplingState::Running;

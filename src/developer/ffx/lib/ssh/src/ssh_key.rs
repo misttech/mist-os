@@ -653,7 +653,7 @@ mod test {
     use serde_json::json;
     use tempfile::TempDir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load() {
         // Set up the test environment and set the ssh key paths
         let env = test_init().await.expect("test env init");

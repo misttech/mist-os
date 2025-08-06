@@ -11,6 +11,12 @@ option to make the output smaller. The Fuchsia platform uses the GN and Bazel
 build systems. You must not generate Cargo.toml, CMakeLists.txt, or Makefile
 build files.
 
+By default, `fx build` triggers an incremental build. In most cases, `fx build`
+is sufficient for building. While `fx clean && fx build` or `fx clean-build` will
+trigger a full Fuchsia build, it is slow and you should avoid using it.  Always
+ask the user before running `fx clean` or `fx clean-build` and avoid running it
+as much as possible.
+
 To run a test, run `fx --invoker=gemini test <name of test>`. You can list
 available tests with `fx test --dry`. You can get JSON output by adding the
 arguments `--logpath -`. Run `fx test --help` for more information.
@@ -35,21 +41,48 @@ Documentation for Fuchsia is in the `docs/` subdirectory and the
 struggling with a concept. Additional documentation is at https://fuchsia.dev if
 the in-tree documentation doesn't solve your problem.
 
-When generating new code, follow the existing coding style. Remember to
-build code before suggesting it as a solution to ensure it compiles.
+When generating new code, follow the existing coding style.
 
-## Searching the codebase
+## Code Authoring Workflow
 
-IMPORTANT: Do not use the SearchText tool or the `grep` shell command
-in this code-base. If you want to use either of those tools, use `git grep` instead.
-For instance, if you'd like to search for `foo`, run `git --no-pager grep foo`.
+To ensure code quality and minimize errors, you must follow a strict
+"analyze-first" methodology for all code changes, regardless of the language.
+The primary goal is to prevent compilation and logic errors through proactive
+investigation of the existing codebase *before* writing new code.
 
-If you feel you must use the SearchText first run a `git grep` for your search term
-piped to `wc -l`. For example, `git --no-pager grep foo | wc -l`.
+**The Mandatory Workflow:**
 
-If `wc` returns more than 100 lines, narrow your search terms and try
-to use `tree` to find the right directory to search from rather than
-running over the whole codebase.
+1.  **Analyze and Plan:** Before writing any code, use the available tools to
+    understand the context.
+    *   Use `hover` on existing variables and function calls to understand their
+        types and read documentation.
+    *   Use `definition` to navigate to the source code of types and functions
+        to understand their complete API and implementation.
+    *   Use `references` to see how existing code uses the APIs you plan to
+        interact with.
+    *   Formulate a clear plan based on your findings.
+
+2.  **Implement and Test:** Write your code according to the plan. Add or update
+    tests to validate your changes.
+
+3.  **Verify with Build:** After implementation, run `fx --invoker=gemini build
+    -q` to confirm your changes compile correctly. This is a final verification
+    step, not a tool for initial API discovery.
+
+For language-specific guidance, see the relevant sections below or in the
+`.gemini/extensions/` directory.
+
+### C++ Development
+
+When working with C++ (`.cc`, `.h`, `.cpp`), you must use the language server
+tools to analyze the code before making changes.
+
+*   **Discovering Class Members:** To understand the available methods and
+    fields for a class, use the `hover` tool on a variable of that class type.
+    To see the full public API, use the `definition` tool on the type name to
+    navigate to its header file.
+*   **Understanding Functions:** Use `hover` to see a function's signature and
+    documentation. Use `definition` to inspect its implementation.
 
 ## Finding or moving a FIDL method
 

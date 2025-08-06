@@ -5,7 +5,9 @@
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <zircon/assert.h>
 
+#include <string_view>
 #include <type_traits>
 
 namespace display {
@@ -21,5 +23,15 @@ static_assert(std::is_trivially_move_constructible_v<ImageTilingType>);
 // Ensure that the Banjo constants match the FIDL constants.
 static_assert(ImageTilingType::kLinear.ToBanjo() == IMAGE_TILING_TYPE_LINEAR);
 static_assert(ImageTilingType::kCapture.ToBanjo() == IMAGE_TILING_TYPE_CAPTURE);
+
+std::string_view ImageTilingType::ToString() const {
+  switch (tiling_type_id_) {
+    case fuchsia_hardware_display_types::wire::kImageTilingTypeLinear:
+      return "Linear";
+    case fuchsia_hardware_display_types::wire::kImageTilingTypeCapture:
+      return "Capture";
+  }
+  return "(vendor-specific value)";
+}
 
 }  // namespace display

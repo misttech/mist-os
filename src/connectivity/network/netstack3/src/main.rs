@@ -12,6 +12,7 @@ mod bindings;
 use std::num::NonZeroU8;
 
 use fidl::endpoints::RequestStream as _;
+use fuchsia_async::SendExecutorBuilder;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{Future, StreamExt as _};
 use log::{error, info};
@@ -24,7 +25,7 @@ pub fn main() {
     let config = ns3_config::Config::take_from_startup_handle();
     let ns3_config::Config { num_threads, debug_logs, opaque_iids, suspend_enabled } = &config;
     let num_threads = NonZeroU8::new(*num_threads).expect("invalid 0 thread count value");
-    let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
+    let mut executor = SendExecutorBuilder::new().num_threads(num_threads.get().into()).build();
 
     let mut log_options = diagnostics_log::PublishOptions::default();
 

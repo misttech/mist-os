@@ -85,10 +85,6 @@ network_unified_binary_regular_and_gub_packages("netstack-migration") {
   ]
 }
 
-# TODO(https://fxbug.dev/42073789) Remove transitional labels
-group("virtualization-core-shard") {
-}
-
 group("drivers") {
   deps = [ "drivers/network-device" ]
 }

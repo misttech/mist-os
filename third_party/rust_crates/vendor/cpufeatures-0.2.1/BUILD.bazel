@@ -75,7 +75,7 @@ rust_library(
     version = "0.2.1",
     deps = select({
         "@rules_rust//rust/platform:aarch64-apple-darwin": [
-            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # aarch64-apple-darwin
+            "//third_party/rust_crates/vendor/libc-0.2.174:libc",  # aarch64-apple-darwin
         ],
         "//conditions:default": [],
     }),

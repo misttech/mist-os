@@ -101,7 +101,7 @@ foreach(target, archive_targets + paver_targets) {
 
     # TODO(https://fxbug.dev/42061843): Remove this once the assembly inputs stop leaking
     # output_dir.
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
     outputs = target.outputs
     depfile = "${outputs[0]}.d"
     script = "//build/images/pack-images.py"

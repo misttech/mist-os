@@ -168,4 +168,19 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::ByteAndBytes> for ::fidl_test_byteandbytes::ByteAndBytes {
+        #[inline]
+        fn compat_from(value: crate::ByteAndBytes) -> Self {
+            Self { single_byte: ::fidl_next::CompatFrom::compat_from(value.single_byte) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_byteandbytes::ByteAndBytes> for crate::ByteAndBytes {
+        #[inline]
+        fn compat_from(value: ::fidl_test_byteandbytes::ByteAndBytes) -> Self {
+            Self { single_byte: ::fidl_next::CompatFrom::compat_from(value.single_byte) }
+        }
+    }
+}

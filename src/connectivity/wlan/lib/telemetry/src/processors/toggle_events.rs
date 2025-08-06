@@ -177,10 +177,10 @@ impl ToggleLogger {
 mod tests {
     use super::*;
     use crate::testing::{setup_test, TestHelper};
+    use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
     use futures::task::Poll;
     use std::pin::pin;
-    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn test_toggle_is_recorded_to_inspect() {
@@ -268,7 +268,7 @@ mod tests {
         // Check that a metric is logged for the quick stop and start.
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID);
-        assert_variant!(&logged_metrics[..], [metric] => {
+        assert_matches!(&logged_metrics[..], [metric] => {
             let expected_metric = fidl_fuchsia_metrics::MetricEvent {
                 metric_id: metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID,
                 event_codes: vec![],

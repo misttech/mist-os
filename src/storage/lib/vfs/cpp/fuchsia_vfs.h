@@ -5,27 +5,35 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_FUCHSIA_VFS_H_
 #define SRC_STORAGE_LIB_VFS_CPP_FUCHSIA_VFS_H_
 
-#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.fs/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
+#include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/result.h>
-#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
 
-#include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_hash_table.h>
-#include <fbl/macros.h>
-#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
-#include "fidl/fuchsia.io/cpp/common_types.h"
 #include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 
@@ -94,15 +102,15 @@ class FuchsiaVfs : public Vfs {
     friend class FuchsiaVfs;
 
     // Adopts a strong reference.
-    SharedPtr(FuchsiaVfs* vfs) : vfs_(vfs) {}
+    explicit SharedPtr(FuchsiaVfs* vfs) : vfs_(vfs) {}
 
     FuchsiaVfs* vfs_ = nullptr;
   };
 
   class WeakPtr {
    public:
-    WeakPtr(FuchsiaVfs* vfs) : ref_(vfs->ref_) { ref_->weak_count.fetch_add(1); }
-    WeakPtr(const SharedPtr& ptr) : ref_(ptr->ref_) { ref_->weak_count.fetch_add(1); }
+    explicit WeakPtr(FuchsiaVfs* vfs) : ref_(vfs->ref_) { ref_->weak_count.fetch_add(1); }
+    explicit WeakPtr(const SharedPtr& ptr) : ref_(ptr->ref_) { ref_->weak_count.fetch_add(1); }
     WeakPtr(const WeakPtr&) = delete;
     WeakPtr& operator=(const WeakPtr&) = delete;
     ~WeakPtr() {
@@ -117,7 +125,7 @@ class FuchsiaVfs : public Vfs {
     friend class FuchsiaVfs;
 
     // Adopts a weak reference.
-    WeakPtr(Ref* ref) : ref_(ref) {}
+    explicit WeakPtr(Ref* ref) : ref_(ref) {}
 
     Ref* ref_;
   };

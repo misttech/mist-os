@@ -12,24 +12,28 @@ group("testing") {
 library_headers("headers") {
   testonly = true
 
-  headers = [ "lib/ld/testing/test-elf-object.h" ]
+  headers = [
+    "lib/ld/testing/interp.h",
+    "lib/ld/testing/test-elf-object.h",
+  ]
   public_deps = [
     ":abi-headers",
-    "//src/lib/elfldltl",
+    "//src/lib/elfldltl:headers",
+    "//src/lib/elfldltl/testing:headers",
   ]
   if (is_fuchsia) {
     headers += [
+      "lib/ld/testing/get-test-vmo.h",
       "lib/ld/testing/mock-debugdata.h",
       "lib/ld/testing/mock-loader-service.h",
       "lib/ld/testing/test-processargs.h",
-      "lib/ld/testing/test-vmo.h",
+      "lib/ld/testing/vdso.h",
     ]
     public_deps += [
       "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
       "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
-      "//src/lib/elfldltl:headers",
       "//third_party/googletest:gmock",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
@@ -45,14 +49,18 @@ static_library("ld-testing") {
     ":ld-abi-testing",
   ]
 
-  sources = [ "test-elf-object.cc" ]
+  sources = [
+    "interp.cc",
+    "test-elf-object.cc",
+  ]
   deps = [ "//src/lib/elfldltl/testing" ]
   if (is_fuchsia) {
     sources += [
+      "get-test-vmo.cc",
       "mock-debugdata.cc",
       "mock-loader-service.cc",
       "test-processargs.cc",
-      "test-vmo.cc",
+      "vdso.cc",
     ]
     deps += [
       "//sdk/lib/async",
@@ -61,6 +69,7 @@ static_library("ld-testing") {
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fdio",
+      "//src/lib/elfldltl/testing",
       "//src/storage/lib/vfs/cpp",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/zx",

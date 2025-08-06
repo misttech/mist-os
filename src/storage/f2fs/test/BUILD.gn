@@ -26,8 +26,10 @@ test_deps = [
   "//src/storage/f2fs",
   "//src/storage/lib/block_client/cpp:fake_device",
   "//src/storage/lib/fs_management",
+  "//src/storage/volume_image/utils:lz4-decompress-reader",
   "//third_party/googletest:gmock",
   "//third_party/googletest:gtest",
+  "//third_party/zstd",
   "//zircon/system/ulib/storage/buffer",
   "//zircon/system/ulib/storage/operation",
   "//zircon/system/ulib/sync",
@@ -128,6 +130,25 @@ fuchsia_unittest_component("f2fs-component-runner-test") {
   deps = [ ":f2fs_component_runner_test" ]
 }
 
+resource("test-images") {
+  sources = [ "unit/compatibility/images/simple_io.img.zst" ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+test("f2fs_compatibility_test") {
+  output_name = "f2fs_compatibility_test"
+  sources = [
+    "unit/compatibility/simple_io.cc",
+    "unit/unit_lib.cc",
+    "unit/unit_lib.h",
+  ]
+  deps = test_deps + [ ":test-images" ]
+}
+
+fuchsia_unittest_component("f2fs-compatibility-test") {
+  deps = [ ":f2fs_compatibility_test" ]
+}
+
 fs_test_config("f2fs") {
   timestamp_granularity = 1
   supports_hard_links = true
@@ -173,6 +194,7 @@ fs_test_suite("f2fs") {
     ":f2fs-large-volume-unittest",
     ":f2fs-slow-unittest",
     ":f2fs-component-runner-test",
+    ":f2fs-compatibility-test",
   ]
 
   # TODO(b/297201368): These tests timeout on RISC-V builders currently.
@@ -181,6 +203,7 @@ fs_test_suite("f2fs") {
       ":f2fs-unittest",
       ":f2fs-large-volume-unittest",
       ":f2fs-gc-unittest",
+      ":f2fs-compatibility-test",
     ]
   }
 }
@@ -197,6 +220,7 @@ slow_fs_test_suite("f2fs") {
       ":f2fs-unittest",
       ":f2fs-large-volume-unittest",
       ":f2fs-gc-unittest",
+      ":f2fs-compatibility-test",
     ]
   }
 }

@@ -947,4 +947,149 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::Int16Int8> for ::fidl_test_encapsulatedstructs::Int16Int8 {
+        #[inline]
+        fn compat_from(value: crate::Int16Int8) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::Int16Int8> for crate::Int16Int8 {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::Int16Int8) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ArrayInt16Int8>
+        for ::fidl_test_encapsulatedstructs::ArrayInt16Int8
+    {
+        #[inline]
+        fn compat_from(value: crate::ArrayInt16Int8) -> Self {
+            Self { arr: ::fidl_next::CompatFrom::compat_from(value.arr) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::ArrayInt16Int8>
+        for crate::ArrayInt16Int8
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::ArrayInt16Int8) -> Self {
+            Self { arr: ::fidl_next::CompatFrom::compat_from(value.arr) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::Int8Int32> for ::fidl_test_encapsulatedstructs::Int8Int32 {
+        #[inline]
+        fn compat_from(value: crate::Int8Int32) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::Int8Int32> for crate::Int8Int32 {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::Int8Int32) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::NonInlineStructTestStruct>
+        for ::fidl_test_encapsulatedstructs::NonInlineStructTestStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::NonInlineStructTestStruct) -> Self {
+            Self {
+                element: ::fidl_next::CompatFrom::compat_from(value.element),
+
+                h: ::fidl_next::CompatFrom::compat_from(value.h),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::NonInlineStructTestStruct>
+        for crate::NonInlineStructTestStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::NonInlineStructTestStruct) -> Self {
+            Self {
+                element: ::fidl_next::CompatFrom::compat_from(value.element),
+
+                h: ::fidl_next::CompatFrom::compat_from(value.h),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::StructPaddingTestStruct>
+        for ::fidl_test_encapsulatedstructs::StructPaddingTestStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::StructPaddingTestStruct) -> Self {
+            Self {
+                trailing: ::fidl_next::CompatFrom::compat_from(value.trailing),
+
+                inner: ::fidl_next::CompatFrom::compat_from(value.inner),
+
+                array: ::fidl_next::CompatFrom::compat_from(value.array),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::StructPaddingTestStruct>
+        for crate::StructPaddingTestStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::StructPaddingTestStruct) -> Self {
+            Self {
+                trailing: ::fidl_next::CompatFrom::compat_from(value.trailing),
+
+                inner: ::fidl_next::CompatFrom::compat_from(value.inner),
+
+                array: ::fidl_next::CompatFrom::compat_from(value.array),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::TopLevelStruct>
+        for ::fidl_test_encapsulatedstructs::TopLevelStruct
+    {
+        #[inline]
+        fn compat_from(value: crate::TopLevelStruct) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_encapsulatedstructs::TopLevelStruct>
+        for crate::TopLevelStruct
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_encapsulatedstructs::TopLevelStruct) -> Self {
+            Self {
+                a: ::fidl_next::CompatFrom::compat_from(value.a),
+
+                b: ::fidl_next::CompatFrom::compat_from(value.b),
+            }
+        }
+    }
+}

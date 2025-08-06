@@ -538,16 +538,14 @@ impl Port {
         Ok(Packet(packet))
     }
 
-    /// Cancel pending wait_async calls for an object with the given key.
+    /// Cancel pending wait_async calls for a given key.
     ///
     /// Wraps the
-    /// [zx_port_cancel](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_cancel.md)
+    /// [zx_port_cancel_key](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_cancel_key.md)
     /// syscall.
-    pub fn cancel<H>(&self, source: &H, key: u64) -> Result<(), Status>
-    where
-        H: AsHandleRef,
-    {
-        let status = unsafe { sys::zx_port_cancel(self.raw_handle(), source.raw_handle(), key) };
+    pub fn cancel(&self, key: u64) -> Result<(), Status> {
+        let options = 0;
+        let status = unsafe { sys::zx_port_cancel_key(self.raw_handle(), options, key) };
         ok(status)
     }
 }
@@ -563,8 +561,8 @@ bitflags! {
         /// When set, causes the system to capture a boot timestamp when the wait triggered.
         const BOOT_TIMESTAMP = sys::ZX_WAIT_ASYNC_BOOT_TIMESTAMP;
 
-        // When set, causes the port to not enqueue a packet for signals active at
-        // the time of the zx_object_wait_async() call.
+        /// When set, causes the port to not enqueue a packet for signals active at
+        /// the time of the zx_object_wait_async() call.
         const EDGE_TRIGGERED = sys::ZX_WAIT_ASYNC_EDGE;
     }
 }
@@ -648,13 +646,13 @@ mod tests {
         // Calling wait_async_handle then cancel, we should not get a packet as cancel will
         // remove it from  the queue.
         assert!(event.wait_async_handle(&port, key, Signals::USER_0, no_opts).is_ok());
-        assert!(port.cancel(&event, key).is_ok());
+        assert!(port.cancel(key).is_ok());
         assert_eq!(port.wait(MonotonicInstant::after(ten_ms)), Err(Status::TIMED_OUT));
 
         // If the event is signalled after the cancel, we also shouldn't get a packet.
         assert!(event.signal_handle(Signals::USER_0, Signals::NONE).is_ok()); // clear signal
         assert!(event.wait_async_handle(&port, key, Signals::USER_0, no_opts).is_ok());
-        assert!(port.cancel(&event, key).is_ok());
+        assert!(port.cancel(key).is_ok());
         assert!(event.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
         assert_eq!(port.wait(MonotonicInstant::after(ten_ms)), Err(Status::TIMED_OUT));
     }

@@ -35,6 +35,12 @@ struct fdf_env_driver_shutdown_observer {
 // roles previously registered via the `fdf_env_add_allowed_scheduler_role_for_driver` API.
 #define FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES ((uint32_t)1u << 0)
 
+// Enable on-demand spawning of threads for dispatchers that allow sync calls, rather than always
+// starting a new thread when the dispatcher is created. If this flag is used, the caller is
+// responsible for periodically calling `fdf_env_scan_threads_for_stalls` to make sure threads
+// are spawned when all threads are blocked from making progress.
+#define FDF_ENV_DYNAMIC_THREAD_SPAWNING ((uint32_t)1u << 1)
+
 // Start the driver runtime. This sets up the initial thread that the dispatchers run on.
 zx_status_t fdf_env_start(uint32_t options);
 
@@ -154,9 +160,22 @@ zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
 //
 // # Thread requirements
 //
-// This should not be called from a thread managed by the driver runtime,
-// such as from tasks or ChannelRead callbacks.
-void fdf_env_scan_threads_for_stalls(void) ZX_AVAILABLE_SINCE(HEAD);
+// This should not be called from a thread managed by the driver runtime, such as from tasks or
+// ChannelRead callbacks.
+void fdf_env_scan_threads_for_stalls(void)
+    ZX_DEPRECATED_SINCE(28, NEXT, "use fdf_env_scan_threads_for_stalls_wait_time instead");
+
+// Scans active thread pools for threads that are stalled on long running tasks and potentially
+// spawn new threads to compensate.
+//
+// Returns the amount of time the caller should wait before calling this again as a
+// `zx_duration_mono_t`.
+//
+// # Thread requirements
+//
+// This should not be called from a thread managed by the driver runtime, such as from tasks or
+// ChannelRead callbacks.
+zx_duration_mono_t fdf_env_scan_threads_for_stalls_wait_time(void) ZX_AVAILABLE_SINCE(NEXT);
 
 __END_CDECLS
 

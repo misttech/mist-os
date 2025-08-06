@@ -51,14 +51,6 @@ type WrappedKey = flexible union {
     ///   In: 16-byte key_identifier + 16-byte UUID.
     ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash.
     4: fscrypt_ino_lblk32_file FscryptKeyIdentifier;
-
-    /// Devicemapper DefaultKey (For use with starnix only)
-    ///   In: None. This is a singleton. wrapping_key_id should be set to 0.
-    ///   Out: 32-byte xts_key1, 32-byte xts_key2.
-    5: dm_default_key EmptyStruct;
-
-    /// fscrypt default per-file encryption.
-    6: fscrypt_per_file FscryptKeyIdentifierAndNonce;
 };
 
 @discoverable

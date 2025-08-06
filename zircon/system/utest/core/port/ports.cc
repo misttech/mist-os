@@ -9,6 +9,7 @@
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
@@ -16,6 +17,7 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <barrier>
 #include <cstdio>
 #include <iterator>
 #include <string>
@@ -423,6 +425,144 @@ TEST(PortTest, CancelKey) {
   EXPECT_EQ(port.wait(zx::time::infinite_past(), &packet), ZX_ERR_TIMED_OUT);
 
   EXPECT_EQ(port.cancel_key(0, 3), ZX_ERR_NOT_FOUND);
+}
+
+// Set up a scenario where one thread dequeues a packet while another thread raises an observed
+// signal on an object and another thread attempts to cancel the wait via zx_port_cancel_key().
+// Verified that either zx_port_wait() returns a packet or zx_port_cancel_key() returns ZX_OK, but
+// not both for any wait.
+TEST(PortStressTest, CancelKeyDuringMatchRace) {
+  zx::port port;
+
+  zx::event race_event, cancel_event;
+  ASSERT_OK(zx::event::create(0u, &race_event));
+  ASSERT_OK(zx::event::create(0u, &cancel_event));
+
+  constexpr uint64_t kCancelEventKey = 1;
+
+  uint64_t race_event_packets{
+      0};  // Stored only by wait_thread, read only after this thread is joined.
+  uint64_t race_event_cancel_not_found{0};
+  uint64_t race_event_canceled{0};
+
+  // Flow:
+  // - All threads prepare and wait on the ready barrier.
+  // - wait_thread waits on the port.
+  // - cancel_thread cancels the wait.
+  // - signal_thread signals the event, waits a bit, then signals the cancel event.
+  // - wait_thread and cancel_thread report results into counters/log.
+  // - All threads wait on the complete barrier.
+
+  uint64_t race_key = 0xf0f0f0f0;
+  std::barrier ready(3);
+  std::barrier complete(3);
+
+  constexpr size_t kIters = 500;
+
+  // Thread 'wait_thread' will be dequeuing packets using zx_port_wait() and
+  // counting how many packets it receives for the racing object.
+  auto wait_thread = std::thread([&]() {
+    for (size_t i = 0; i < kIters; ++i) {
+      // Create a fresh port for each iteration.
+      ASSERT_OK(zx::port::create(0u, &port));
+
+      // Clear signals on events.
+      race_event.signal(ZX_EVENT_SIGNALED, 0u);
+      cancel_event.signal(ZX_EVENT_SIGNALED, 0u);
+
+      // Wait on the port until either the race or cancel event has a signal raised.
+      race_event.wait_async(port, race_key, ZX_EVENT_SIGNALED, 0);
+      cancel_event.wait_async(port, kCancelEventKey, ZX_EVENT_SIGNALED, 0);
+
+      ready.arrive_and_wait();
+      zx_port_packet_t packet{};
+      zx_status_t wait_status = port.wait(zx::time::infinite(), &packet);
+      ZX_ASSERT_MSG(wait_status == ZX_OK, "wait_status: %u", wait_status);
+      if (packet.key == race_key) {
+        ++race_event_packets;
+      } else {
+        ZX_ASSERT_MSG(packet.key == kCancelEventKey, "key: %lu", packet.key);
+      }
+
+      // Let other threads know we're done.
+      complete.arrive_and_wait();
+    }
+  });
+
+  auto signal_thread = std::thread([&]() {
+    for (size_t i = 0; i < kIters; ++i) {
+      ready.arrive_and_wait();
+      race_event.signal(0u, ZX_EVENT_SIGNALED);
+      // Sleep for a little bit to give the signal on race_event a chance to trigger.
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+      // Signal cancel_event to get wait_thread out of the port wait even if the wait on
+      // race_event is successfully canceled.
+      cancel_event.signal(0u, ZX_EVENT_SIGNALED);
+      complete.arrive_and_wait();
+    }
+  });
+
+  auto cancel_thread = std::thread([&]() {
+    for (size_t i = 0; i < kIters; ++i) {
+      ready.arrive_and_wait();
+      zx_status_t status = port.cancel_key(0u, race_key);
+      if (status == ZX_OK) {
+        ++race_event_canceled;
+      } else if (status == ZX_ERR_NOT_FOUND) {
+        ++race_event_cancel_not_found;
+      } else {
+        ZX_ASSERT_MSG(false, "unexpected status from zx_port_cancel_key: %u", status);
+      }
+      complete.arrive_and_wait();
+    }
+  });
+
+  wait_thread.join();
+  signal_thread.join();
+  cancel_thread.join();
+
+  // For each iteration, we should have either generated a port packet or a canceled status.
+  EXPECT_EQ(race_event_packets, race_event_cancel_not_found);
+  EXPECT_EQ(race_event_canceled + race_event_cancel_not_found, kIters);
+}
+
+// Tests matching a port observer concurrently with closing the last handle to the port.
+TEST(PortStressTest, MatchHandleCloseRace) {
+  zx::port port;
+
+  zx::event race_event;
+  ASSERT_OK(zx::event::create(0u, &race_event));
+
+  // Flow:
+  // - Both threads wait for the ready barrier.
+  // - Match thread raises signal on waited-on event.
+  // - This thread closes handle to port.
+  // - Both threads wait for the complete barrier.
+
+  std::barrier ready(2);
+  std::barrier complete(2);
+
+  constexpr size_t kIters = 20000;
+
+  auto match_thread = std::thread([&]() {
+    for (size_t i = 0; i < kIters; ++i) {
+      ready.arrive_and_wait();
+
+      ASSERT_OK(race_event.signal(0u, ZX_EVENT_SIGNALED));
+
+      complete.arrive_and_wait();
+    }
+  });
+
+  for (size_t i = 0; i < kIters; ++i) {
+    ASSERT_OK(zx::port::create(0u, &port));
+    ASSERT_OK(race_event.wait_async(port, 1, ZX_EVENT_SIGNALED, 0));
+    ready.arrive_and_wait();
+    port.reset();
+    complete.arrive_and_wait();
+  }
+
+  match_thread.join();
 }
 
 TEST(PortTest, ThreadEvents) {

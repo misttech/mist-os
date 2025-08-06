@@ -14,7 +14,7 @@
 #include <kernel/mp.h>
 
 /* send inter processor interrupt, if supported */
-void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi);
+void arch_mp_send_ipi(mp_ipi_target target, cpu_mask_t mask, mp_ipi ipi);
 
 /* Reschedules tasks on the cpus specified by mask. Mask will not
  * contain the local cpu_id.

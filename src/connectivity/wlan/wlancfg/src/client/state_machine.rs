@@ -1228,6 +1228,7 @@ mod tests {
         generate_random_scanned_candidate, poll_sme_req, random_connection_data,
         ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
     };
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
     use fidl_fuchsia_wlan_policy as fidl_policy;
@@ -1237,7 +1238,7 @@ mod tests {
     use lazy_static::lazy_static;
     use rand::Rng;
     use std::pin::pin;
-    use wlan_common::{assert_variant, random_fidl_bss_description};
+    use wlan_common::random_fidl_bss_description;
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
 
     lazy_static! {
@@ -1317,7 +1318,7 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Check that the saved networks manager has the expected initial data
         let saved_networks = exec.run_singlethreaded(
@@ -1335,10 +1336,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -1364,14 +1365,14 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -1382,14 +1383,14 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Check that the connection was recorded to SavedNetworksManager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
@@ -1401,10 +1402,10 @@ mod tests {
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure no further updates were sent to listeners
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
@@ -1425,7 +1426,7 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Prepare state machine
         let connecting_options =
@@ -1437,10 +1438,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -1462,7 +1463,7 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
@@ -1477,13 +1478,13 @@ mod tests {
             .expect("failed to send singal report");
 
         // Run the state machine. Should still be pending
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Wake up the next timer, which is the timeout for the connect request.
         assert!(exec.wake_next_timer().is_some());
 
         // State machine should exit.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -1512,13 +1513,13 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
         let time_to_connect = zx::MonotonicDuration::from_seconds(30);
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -1545,14 +1546,14 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -1563,14 +1564,14 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Check that the saved networks manager has the connection result recorded
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
@@ -1582,7 +1583,7 @@ mod tests {
         });
 
         // Check that connected telemetry event is sent
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state, network_is_likely_hidden: _ })) => {
                 assert_eq!(bss_description, ap_state.original().clone().into());
@@ -1593,17 +1594,17 @@ mod tests {
         );
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure no further updates were sent to listeners
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
 
         // Verify the Connected status was set.
         let status = test_values.status_reader.read_status().expect("failed to read status");
-        assert_variant!(status, Status::Connected { .. });
+        assert_matches!(status, Status::Connected { .. });
 
         // Send a disconnect and check that the connection data is correctly recorded
         let is_sme_reconnecting = false;
@@ -1611,15 +1612,15 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let expected_recorded_connection = ConnectionRecord {
             id: connect_selection.target.network.clone(),
@@ -1637,7 +1638,7 @@ mod tests {
                 average_tx_rate: 0,
             },
         };
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [data] => {
             assert_eq!(data, &expected_recorded_connection);
         });
     }
@@ -1660,10 +1661,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        let mut connect_txn_handle = assert_variant!(
+        let mut connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
@@ -1693,19 +1694,19 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert!(exec.wake_next_timer().is_some());
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check that connect result telemetry event is sent
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state, network_is_likely_hidden: _ })) => {
                 assert_eq!(bss_description, ap_state.original().clone().into());
@@ -1716,7 +1717,7 @@ mod tests {
         );
 
         // Ensure a disconnect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::FailedToConnect }) => {
                 responder.send().expect("could not send sme response");
@@ -1724,10 +1725,10 @@ mod tests {
         );
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        connect_txn_handle = assert_variant!(
+        connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
@@ -1745,10 +1746,10 @@ mod tests {
             .expect("failed to send connection completion");
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Empty update sent to NotifyListeners (which in this case, will not actually be sent.)
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
                 state: fidl_policy::WlanClientState::ConnectionsEnabled,
@@ -1759,7 +1760,7 @@ mod tests {
         );
 
         // A defect should be logged.
-        assert_variant!(
+        assert_matches!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
@@ -1776,17 +1777,17 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure no further updates were sent to listeners
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
@@ -1821,10 +1822,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -1846,7 +1847,7 @@ mod tests {
 
         // After failing to reconnect, the state machine should exit so that the state machine
         // monitor can attempt to reconnect the interface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -1857,14 +1858,14 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::ConnectionFailed),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Check that failure was recorded in SavedNetworksManager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let connect_result = fidl_sme::ConnectResult {
                 code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                 is_credential_rejected: false,
@@ -1881,7 +1882,7 @@ mod tests {
         });
 
         // A defect should be logged.
-        assert_variant!(
+        assert_matches!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
@@ -1915,10 +1916,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -1941,7 +1942,7 @@ mod tests {
 
         // The state machine should exit when bad credentials are detected so that the state
         // machine monitor can try to connect to another network.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -1952,14 +1953,14 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::CredentialsFailed),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Check that failure was recorded to SavedNetworksManager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let connect_result = fidl_sme::ConnectResult {
                 code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                 is_credential_rejected: true,
@@ -1976,7 +1977,7 @@ mod tests {
         });
 
         // No defect should have been observed.
-        assert_variant!(test_values.defect_receiver.try_next(), Ok(None));
+        assert_matches!(test_values.defect_receiver.try_next(), Ok(None));
     }
 
     #[fuchsia::test]
@@ -1997,7 +1998,7 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a connecting update
         let client_state_update = ClientStateUpdate {
@@ -2011,7 +2012,7 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
@@ -2027,10 +2028,10 @@ mod tests {
         client.connect(duplicate_request).expect("failed to make request");
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
@@ -2048,7 +2049,7 @@ mod tests {
             .expect("failed to send connection completion");
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -2059,17 +2060,17 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure no further updates were sent to listeners
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
@@ -2092,7 +2093,7 @@ mod tests {
         drop(test_values.sme_req_stream);
 
         // Ensure the state machine exits
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -2130,37 +2131,37 @@ mod tests {
             fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
         exec.set_fake_time(disconnect_time);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a disconnect request
         let mut client = Client::new(test_values.client_req_sender);
@@ -2170,10 +2171,10 @@ mod tests {
             .expect("failed to make request");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the SME disconnect
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest }) => {
                 responder.send().expect("could not send sme response");
@@ -2181,7 +2182,7 @@ mod tests {
         );
 
         // Once the disconnect is processed, the state machine should exit.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Check for a disconnect update and the responder
         let client_state_update = ClientStateUpdate {
@@ -2192,18 +2193,18 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
-        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
 
         // Disconnect telemetry event sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(!track_subsequent_downtime);
-                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                assert_matches!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest));
@@ -2230,7 +2231,7 @@ mod tests {
                 average_tx_rate: 0,
             },
         };
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
             assert_eq!(connection_data, &expected_recorded_connection);
         });
     }
@@ -2255,7 +2256,7 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        assert_matches!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
@@ -2275,15 +2276,15 @@ mod tests {
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let disconnect_time =
             fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
@@ -2294,7 +2295,7 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // The disconnect should have been recorded for the saved network config.
         let expected_recorded_connection = ConnectionRecord {
@@ -2313,15 +2314,15 @@ mod tests {
                 average_tx_rate: 0,
             },
         };
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
             assert_eq!(connection_data, &expected_recorded_connection);
         });
 
         // Disconnect telemetry event sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(track_subsequent_downtime);
-                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                assert_matches!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_disconnect_info.disconnect_source);
@@ -2367,37 +2368,37 @@ mod tests {
             fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection score metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
         exec.set_fake_time(disconnect_time);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy of disconnection with SME-initiated reconnect
         let is_sme_reconnecting = true;
@@ -2405,11 +2406,11 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Disconnect telemetry event sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info: Some(info), .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info: Some(info), .. } => {
                 assert_eq!(info.connected_duration, zx::MonotonicDuration::from_hours(12));
             });
         });
@@ -2422,8 +2423,8 @@ mod tests {
             .send_on_connect_result(&connect_result)
             .expect("failed to send connect result event");
 
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { .. }))
         );
@@ -2435,11 +2436,11 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Another disconnect telemetry event sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().connected_duration, zx::MonotonicDuration::from_hours(2));
             });
         });
@@ -2474,16 +2475,16 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         let time_to_connect = zx::MonotonicDuration::from_seconds(10);
         exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
 
         // Process connect request sent to SME
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                  // Send connection response.
@@ -2495,7 +2496,7 @@ mod tests {
         connect_txn_handle
             .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
-        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // SME notifies Policy of disconnection.
         let disconnect_time = fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(5));
@@ -2504,14 +2505,14 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&generate_disconnect_info(is_sme_reconnecting))
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
-        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
         // The connection data should have been recorded at disconnect.
         let expected_recorded_connection = ConnectionRecord {
             id: connect_selection.target.network.clone(),
@@ -2528,7 +2529,7 @@ mod tests {
                 average_tx_rate: 0,
             },
         };
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
             assert_eq!(connection_data, &expected_recorded_connection);
         });
     }
@@ -2569,13 +2570,13 @@ mod tests {
         client.connect(connect_selection.clone()).expect("failed to make request");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure nothing was sent to the SME
-        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
         // No telemetry event is sent
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
+        assert_matches!(telemetry_receiver.try_next(), Err(_));
     }
 
     #[fuchsia::test]
@@ -2618,48 +2619,48 @@ mod tests {
             fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
         exec.set_fake_time(disconnect_time);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a different connect request
         let mut client = Client::new(test_values.client_req_sender);
         client.connect(second_connect_selection.clone()).expect("failed to make request");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // There should be 2 requests to the SME stacked up
         // First SME request: disconnect
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch }) => {
                 responder.send().expect("could not send sme response");
@@ -2667,9 +2668,9 @@ mod tests {
         );
         // Progress the state machine
         // TODO(https://fxbug.dev/42130926): remove this once the disconnect request is fire-and-forget
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
         // Second SME request: connect to the second network
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, second_connect_selection.target.network.ssid.clone().to_vec());
@@ -2683,7 +2684,7 @@ mod tests {
             .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a disconnect update
         let client_state_update = ClientStateUpdate {
@@ -2694,17 +2695,17 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Disconnect telemetry event sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(!track_subsequent_downtime);
-                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                assert_matches!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch));
@@ -2726,7 +2727,7 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
@@ -2743,17 +2744,17 @@ mod tests {
                 status: None,
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure no further updates were sent to listeners
-        assert_variant!(
+        assert_matches!(
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
@@ -2775,7 +2776,7 @@ mod tests {
                 average_tx_rate: 0,
             },
         };
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [connection_data] => {
             assert_eq!(connection_data, &expected_recorded_connection);
         });
     }
@@ -2811,15 +2812,15 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy of disconnection.
         let is_sme_reconnecting = false;
@@ -2828,10 +2829,10 @@ mod tests {
             .expect("failed to send disconnection event");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a disconnect request to SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
                 responder.send().expect("could not send sme response");
@@ -2839,7 +2840,7 @@ mod tests {
         );
 
         // The state machine should exit since there is no attempt to reconnect.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -2871,7 +2872,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;
@@ -2880,7 +2881,7 @@ mod tests {
             .expect("failed to send disconnection event");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy that reconnects succeeds
         let connect_result =
@@ -2890,10 +2891,10 @@ mod tests {
             .expect("failed to send reconnection result");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check there were no state updates
-        assert_variant!(test_values.update_receiver.try_next(), Err(_));
+        assert_matches!(test_values.update_receiver.try_next(), Err(_));
     }
 
     #[fuchsia::test]
@@ -2930,15 +2931,15 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Set time to indicate a decent uptime before the disconnect so the AP is retried
         exec.set_fake_time(start_time + fasync::MonotonicDuration::from_hours(24));
@@ -2950,7 +2951,7 @@ mod tests {
             .expect("failed to send disconnection event");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy that reconnects fails
         let connect_result = fidl_sme::ConnectResult {
@@ -2963,10 +2964,10 @@ mod tests {
             .expect("failed to send reconnection result");
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for an SME disconnect request
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
                 responder.send().expect("could not send sme response");
@@ -2974,7 +2975,7 @@ mod tests {
         );
 
         // The state machine should exit since there is no policy attempt to reconnect.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Check for a disconnect update
         let client_state_update = ClientStateUpdate {
@@ -2985,7 +2986,7 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::ConnectionFailed),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
@@ -3001,7 +3002,7 @@ mod tests {
 
         // Verify the status is initialized to default.
         let status = test_values.status_reader.read_status().expect("failed to read status");
-        assert_variant!(status, Status::Disconnected);
+        assert_matches!(status, Status::Disconnected);
 
         // Set initial RSSI and SNR values
         let mut connect_selection = generate_connect_selection();
@@ -3050,16 +3051,16 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let request = test_values
             .roam_service_request_receiver
             .try_next()
             .expect("error receiving roam service request")
             .expect("received None roam service request");
-        assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor{ mut roam_trigger_data_receiver, .. } => {
+        assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor{ mut roam_trigger_data_receiver, .. } => {
             // Run the state machine
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Send the first signal report from SME
             let rssi_1 = -50;
@@ -3069,18 +3070,18 @@ mod tests {
             connect_txn_handle
                 .send_on_signal_report(&fidl_signal_report)
                 .expect("failed to send signal report");
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Do a quick check that state machine does not exist and there's no disconnect to SME
-            assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+            assert_matches!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
             // Verify telemetry event
-            assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-                assert_variant!(event, TelemetryEvent::OnSignalReport { .. });
+            assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+                assert_matches!(event, TelemetryEvent::OnSignalReport { .. });
             });
 
             // Verify that signal report is sent to the roam monitor
-            assert_variant!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
+            assert_matches!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
 
             // Verify that the status is updated.
             let status = test_values.status_reader.read_status().expect("failed to read status");
@@ -3101,15 +3102,15 @@ mod tests {
             connect_txn_handle
                 .send_on_signal_report(&fidl_signal_report)
                 .expect("failed to send signal report");
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
             // Verify telemetry events;
-            assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-                assert_variant!(event, TelemetryEvent::OnSignalReport { .. });
+            assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+                assert_matches!(event, TelemetryEvent::OnSignalReport { .. });
             });
 
             // Verify that signal report is sent to the roam monitor
-            assert_variant!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
+            assert_matches!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
         });
     }
 
@@ -3147,34 +3148,34 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
                 assert_eq!(ap_state.tracked.channel.primary, bss_description.channel.primary)
             });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let channel_switch_info = fidl_internal::ChannelSwitchInfo { new_channel: 10 };
         connect_txn_handle
             .send_on_channel_switched(&channel_switch_info)
             .expect("failed to send signal report");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify telemetry event
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::OnChannelSwitched { info } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::OnChannelSwitched { info } => {
                 assert_eq!(info, channel_switch_info);
             });
         });
 
         // Verify the roam monitor was re-initialized with the new channel
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
                 assert_eq!(ap_state.tracked.channel.primary, 10)
             });
         });
@@ -3186,11 +3187,11 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify telemetry event
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().ap_state.tracked.channel.primary, 10);
             });
         });
@@ -3228,12 +3229,12 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor selection was sent.
         let mut roam_sender;
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
                 roam_sender = roam_request_sender;
             });
         });
@@ -3245,10 +3246,10 @@ mod tests {
             .unwrap();
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify state machine issues a roam to SME.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Roam{ req, ..}) => {
                 assert_eq!(req.bss_description, Sequestered::release(roam_candidate.clone().bss.bss_description));
@@ -3256,8 +3257,8 @@ mod tests {
         );
 
         // Verify roam attempt telemetry event.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PolicyRoamAttempt { request, connected_duration } => {
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PolicyRoamAttempt { request, connected_duration } => {
                 assert_eq!(request.candidate, roam_candidate);
                 assert_eq!(request.reasons, vec![]);
                 assert_eq!(connected_duration, zx::Duration::from_minutes(0));
@@ -3303,11 +3304,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Send a successful roam result
@@ -3321,27 +3322,27 @@ mod tests {
             is_credential_rejected: false,
         };
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the roam monitor was re-initialized with the new BSS
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
                 assert_eq!(ap_state.original().bssid.to_array(), bss_desc.bssid);
             });
         });
 
         // Verify a disconnect was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
             assert_eq!(id, &connect_selection.target.network.clone());
             assert_eq!(credential, &connect_selection.target.credential.clone());
-            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+            assert_matches!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
                 assert_eq!(bssid, &connect_selection.target.bss.bssid);
                 assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
             })
         });
 
         // Verify the successful connect result was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
@@ -3357,15 +3358,15 @@ mod tests {
         });
 
         // Verify telemetry event for roam result
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
 
         // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
         // ESS.
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
+        assert_matches!(telemetry_receiver.try_next(), Err(_));
 
         // Run time forward past the timeout for the pending roam request.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -3373,7 +3374,7 @@ mod tests {
         ));
 
         // Run the state machine and verify that it does NOT fire the pending timer and exit.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -3413,11 +3414,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Send a failed roam result, where the original association was maintained.
@@ -3430,10 +3431,10 @@ mod tests {
             is_credential_rejected: false,
         };
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the failed connect result was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
@@ -3449,24 +3450,24 @@ mod tests {
         });
 
         // A defect should be logged.
-        assert_variant!(
+        assert_matches!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
 
         // Verify telemetry event for roam result
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
 
         // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
         // ESS.
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
+        assert_matches!(telemetry_receiver.try_next(), Err(_));
 
         // Verify the roam monitor was _not_ re-initialized.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Err(_));
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Err(_));
 
         // Run time forward past the timeout for the pending roam request.
         exec.set_fake_time(fasync::MonotonicInstant::after(
@@ -3474,7 +3475,7 @@ mod tests {
         ));
 
         // Run the state machine and verify that it does NOT fire the pending timer and exit.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -3516,11 +3517,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Send a failed roam result, where the original association was *NOT* maintained.
@@ -3540,10 +3541,10 @@ mod tests {
             is_credential_rejected: false,
         };
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the failed connect result was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
@@ -3559,37 +3560,37 @@ mod tests {
         });
 
         // Verify a disconnect was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
             assert_eq!(id, &connect_selection.target.network.clone());
             assert_eq!(credential, &connect_selection.target.credential.clone());
-            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+            assert_matches!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
                 assert_eq!(bssid, &connect_selection.target.bss.bssid);
                 assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
             })
         });
 
         // Verify telemetry event for disconnect
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().disconnect_source, disconnect_info.disconnect_source);
             });
         });
 
         // Verify telemetry event for roam result
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
 
         // A defect should be logged.
-        assert_variant!(
+        assert_matches!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
 
         // Check for an SME disconnect request
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect { .. })
         );
@@ -3600,7 +3601,7 @@ mod tests {
         ));
 
         // Run the state machine and verify that it does NOT fire the pending timer and exit.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
     #[fuchsia::test]
     fn connected_state_on_unexpected_policy_roam_result_disconnects() {
@@ -3641,11 +3642,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Send a roam result with a BSSID that does NOT match the roam request.
@@ -3661,10 +3662,10 @@ mod tests {
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
 
         // Run forward the state machine.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify a disconnect request is sent to SME.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
                 responder.send().expect("could not send sme response");
@@ -3672,27 +3673,27 @@ mod tests {
         );
 
         // Ensure the state machine exits once the disconnect is processed.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify a disconnect was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
             assert_eq!(id, &connect_selection.target.network.clone());
             assert_eq!(credential, &connect_selection.target.credential.clone());
-            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+            assert_matches!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
                 assert_eq!(bssid, &connect_selection.target.bss.bssid);
                 assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
             })
         });
 
         // Verify a disconnect event was logged to telemetry
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
         // Verify a disconnected listener update is sent.
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
                 state: fidl_policy::WlanClientState::ConnectionsEnabled,
@@ -3743,11 +3744,11 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Break the SME by dropping the server end of the SME stream, so it causes an error
@@ -3766,27 +3767,27 @@ mod tests {
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
 
         // Ensure the state machine exits.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify a disconnect was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
             assert_eq!(id, &connect_selection.target.network.clone());
             assert_eq!(credential, &connect_selection.target.credential.clone());
-            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+            assert_matches!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
                 assert_eq!(bssid, &connect_selection.target.bss.bssid);
                 assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
             })
         });
 
         // Verify a disconnect event was logged to telemetry
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
         // Verify a disconnected listener update is sent.
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
                 state: fidl_policy::WlanClientState::ConnectionsEnabled,
@@ -3833,14 +3834,14 @@ mod tests {
 
         // Verify roam monitor init was sent.
         let mut roam_sender;
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
                 roam_sender = roam_request_sender;
             });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a roam request to state machine.
         let roam_candidate = generate_random_scanned_candidate();
@@ -3849,10 +3850,10 @@ mod tests {
             .unwrap();
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify state machine issues a roam to SME.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Roam{ req, ..}) => {
                 assert_eq!(req.bss_description, Sequestered::release(roam_candidate.clone().bss.bss_description));
@@ -3860,8 +3861,8 @@ mod tests {
         );
 
         // Verify roam attempt telemetry event.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PolicyRoamAttempt { request, .. } => {
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::PolicyRoamAttempt { request, .. } => {
                 assert_eq!(request.candidate,
                     roam_candidate);
                 assert_eq!(request.reasons, vec![]);
@@ -3874,10 +3875,10 @@ mod tests {
         ));
 
         // Run forward the state machine.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify a disconnect request is sent to SME.
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
                 responder.send().expect("could not send sme response");
@@ -3885,27 +3886,27 @@ mod tests {
         );
 
         // Ensure the state machine exits once the disconnect is processed.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify a disconnect was logged to saved networks manager
-        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+        assert_matches!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
             assert_eq!(id, &connect_selection.target.network.clone());
             assert_eq!(credential, &connect_selection.target.credential.clone());
-            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+            assert_matches!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
                 assert_eq!(bssid, &connect_selection.target.bss.bssid);
                 assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
             })
         });
 
         // Verify a disconnect event was logged to telemetry
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+        assert_matches!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::Disconnected { info, .. } => {
                 assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
         // Verify a disconnected listener update is sent.
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
                 state: fidl_policy::WlanClientState::ConnectionsEnabled,
@@ -3938,10 +3939,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a disconnect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::RegulatoryRegionChange }) => {
                 responder.send().expect("could not send sme response");
@@ -3949,10 +3950,10 @@ mod tests {
         );
 
         // Ensure the state machine exits once the disconnect is processed.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // The state machine should have sent a listener update
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
                 state: fidl_policy::WlanClientState::ConnectionsEnabled,
@@ -3996,10 +3997,10 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a disconnect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch }) => {
                 responder.send().expect("could not send sme response");
@@ -4007,7 +4008,7 @@ mod tests {
         );
 
         // Progress the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a disconnect update and the disconnect responder
         let client_state_update = ClientStateUpdate {
@@ -4018,16 +4019,16 @@ mod tests {
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
         };
-        assert_variant!(
+        assert_matches!(
             test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
-        assert_variant!(exec.run_until_stalled(&mut disconnect_receiver), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut disconnect_receiver), Poll::Ready(Ok(())));
 
         // Ensure a connect request is sent to the SME
-        assert_variant!(
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, next_connect_selection.target.network.ssid.clone().to_vec());
@@ -4064,10 +4065,10 @@ mod tests {
         drop(test_values.sme_req_stream);
 
         // Ensure the state machine exits
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Expect the responder to have an error
-        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Err(_)));
+        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]
@@ -4099,8 +4100,8 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::Startup }) => {
                 responder.send().expect("could not send sme response");
@@ -4108,7 +4109,7 @@ mod tests {
         );
 
         // Run the future again and ensure that it has not exited after receiving the response.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -4149,8 +4150,8 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::Startup }) => {
                 responder.send().expect("could not send sme response");
@@ -4158,12 +4159,12 @@ mod tests {
         );
 
         // Run the future again and ensure that it has not exited after receiving the response.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         sme_control_handle.shutdown_with_epitaph(zx::Status::UNAVAILABLE);
 
         // Ensure the state machine has no further actions and is exited
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that a disconnect event was logged on exit.
         let mut telemetry_events = Vec::new();
@@ -4171,7 +4172,7 @@ mod tests {
             telemetry_events.push(event)
         }
 
-        assert_variant!(
+        assert_matches!(
             telemetry_events.last(),
             Some(&TelemetryEvent::Disconnected { track_subsequent_downtime: false, info: None })
         );
@@ -4205,8 +4206,8 @@ mod tests {
         let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::Startup }) => {
                 responder.send().expect("could not send sme response");
@@ -4214,10 +4215,10 @@ mod tests {
         );
 
         // Run the future again and ensure that it has not exited after receiving the response.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Absorb the connect request.
-        let connect_txn_handle = assert_variant!(
+        let connect_txn_handle = assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                 // Send connection response.
@@ -4229,15 +4230,15 @@ mod tests {
         connect_txn_handle
             .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify roam monitor request was sent.
-        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        assert_matches!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_matches!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
         });
 
         // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a disconnect request
         let mut client = Client::new(client_req_sender);
@@ -4250,8 +4251,8 @@ mod tests {
             .expect("failed to make request");
 
         // Run the state machine so that it handles the disconnect message.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::NetworkConfigUpdated }) => {
                 responder.send().expect("could not send sme response");
@@ -4259,10 +4260,10 @@ mod tests {
         );
 
         // The state machine should exit following the disconnect request.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Expect the responder to be acknowledged
-        assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -4299,7 +4300,7 @@ mod tests {
         drop(test_values.sme_req_stream);
 
         // Ensure the state machine exits
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the state has been set to disconnected.
         let status = test_values.status_reader.read_status().expect("could not get reader");
@@ -4331,7 +4332,7 @@ mod tests {
         let initial_state = disconnecting_state(test_values.common_options, disconnecting_options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the disconnecting state has been reported.
         let status = test_values.status_reader.read_status().expect("could not get reader");
@@ -4353,11 +4354,11 @@ mod tests {
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the status was set.
         let status = test_values.status_reader.read_status().expect("failed to read status");
-        assert_variant!(status, Status::Connecting);
+        assert_matches!(status, Status::Connecting);
     }
 
     struct InspectTestValues {
@@ -4381,7 +4382,7 @@ mod tests {
             fuchsia_inspect_contrib::inspect_log!(self.status_node, "status" => status);
             let read_fut = fuchsia_inspect::reader::read(&self.inspector);
             let mut read_fut = pin!(read_fut);
-            assert_variant!(
+            assert_matches!(
                 self.exec.run_until_stalled(&mut read_fut),
                 Poll::Ready(Ok(hierarchy)) => hierarchy
             )

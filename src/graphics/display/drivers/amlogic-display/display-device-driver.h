@@ -6,18 +6,16 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
-#include <lib/driver/compat/cpp/banjo_server.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/result.h>
 
 #include <memory>
-#include <optional>
 
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace amlogic_display {
 
@@ -46,13 +44,15 @@ class DisplayDeviceDriver : public fdf::DriverBase {
       inspect::Inspector inspector);
 
   std::unique_ptr<inspect::ComponentInspector> component_inspector_;
-  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
-  // Must outlive `banjo_server_`.
+  // Must outlive `display_engine_` and `engine_fidl_adapter_`.
+  std::unique_ptr<display::DisplayEngineEventsFidl> engine_events_;
+
+  // Must outlive `engine_fidl_adapter_`.
   std::unique_ptr<DisplayEngine> display_engine_;
 
-  std::optional<compat::BanjoServer> banjo_server_;
+  std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
 };
 
 }  // namespace amlogic_display

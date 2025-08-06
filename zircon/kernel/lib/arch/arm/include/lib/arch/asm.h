@@ -62,10 +62,13 @@ pcrel.bias = 8
 
 // The FP prologue is mostly rolled into a single push spilling all registers.
 // The same adjustment (register count) used for CFI goes the other way to
-// recover the CFA: the FP points two words below the CFA.
+// recover the CFA: the FP points two words below the CFA.  This emits
+// .stack_sizes metadata unconditionally; there's no provision for a frame size
+// more than just the FP linkage setup and other spilled registers.
 .macro .prologue.fp regs:vararg
   _.push.spill .L.prologue.fp.\@.adjust, \regs, fp, lr
   add fp, sp, #.L.prologue.fp.\@.adjust - 8
+  .llvm.stack_size .L.prologue.fp.\@.adjust
 .endm
 
 // Does pop, but with CFI updates assuming SP is still the CFA register.

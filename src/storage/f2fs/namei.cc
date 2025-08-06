@@ -9,6 +9,7 @@
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/node.h"
 #include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 
@@ -24,7 +25,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
   }
 
   if (zx_status_t err = AddLink(name, (*vnode_or).get()); err != ZX_OK) {
-    vnode_or->ClearNlink();
+    vnode_or->ClearLinkCount();
     vnode_or->ClearDirty();
     fs()->GetNodeManager().AddFreeNid(vnode_or->Ino());
     return err;
@@ -150,7 +151,7 @@ zx_status_t Dir::DoUnlink(VnodeF2fs *vnode, std::string_view name) {
 
 //   //   return err;
 //   // out:
-//   //   vnode->ClearNlink();
+//   //   vnode->ClearLinkCount();
 //   //   UnlockNewInode(vnode);
 //   //   fs()->GetNodeManager().AllocNidFailed(vnode->Ino());
 //   //   return err;
@@ -166,7 +167,7 @@ zx_status_t Dir::Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnod
   vnode_or->SetFlag(InodeInfoFlag::kIncLink);
   if (zx_status_t err = AddLink(name, (*vnode_or).get()); err != ZX_OK) {
     vnode_or->ClearFlag(InodeInfoFlag::kIncLink);
-    vnode_or->ClearNlink();
+    vnode_or->ClearLinkCount();
     vnode_or->ClearDirty();
     fs()->GetNodeManager().AddFreeNid(vnode_or->Ino());
     return err;
@@ -212,7 +213,7 @@ zx_status_t Dir::Rmdir(Dir *vnode, std::string_view name) {
 
 //   return 0;
 // out:
-//   vnode->ClearNlink();
+//   vnode->ClearLinkCount();
 //   UnlockNewInode(vnode);
 //   fs()->GetNodeManager().AllocNidFailed(vnode->Ino());
 //   return err;
@@ -251,7 +252,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
 
     std::lock_guard dir_lock(mutex_);
-    if (new_dir->GetNlink() == 0) {
+    if ((is_same_dir && !GetLinkCountUnsafe()) || (!is_same_dir && !new_dir->GetLinkCount())) {
       return ZX_ERR_NOT_FOUND;
     }
 
@@ -341,10 +342,10 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
 
       new_vnode->SetTime<Timestamps::ChangeTime>();
       if (old_dir_entry.is_ok()) {
-        new_vnode->DropNlink();
+        new_vnode->DecrementLink();
       }
-      new_vnode->DropNlink();
-      if (!new_vnode->GetNlink()) {
+      new_vnode->DecrementLink();
+      if (!new_vnode->GetLinkCount()) {
         new_vnode->SetOrphan();
       }
       new_vnode->SetDirty();
@@ -360,7 +361,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
           return err;
         }
         if (old_dir_entry.is_ok()) {
-          IncNlink();
+          IncrementLinkUnsafe();
           SetDirty();
         }
       } else {
@@ -368,7 +369,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
           return err;
         }
         if (old_dir_entry.is_ok()) {
-          new_dir->IncNlink();
+          new_dir->IncrementLink();
           new_dir->SetDirty();
         }
       }
@@ -386,7 +387,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         fbl::RefPtr<Dir>::Downcast(old_vnode)->SetLinkSafe(*old_dir_entry, old_dir_page,
                                                            new_dir.get());
       }
-      DropNlink();
+      DecrementLinkUnsafe();
       SetDirty();
     }
 
@@ -423,8 +424,9 @@ zx::result<fbl::RefPtr<fs::Vnode>> Dir::CreateWithMode(std::string_view name, um
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
     std::lock_guard dir_lock(mutex_);
-    if (GetNlink() == 0)
+    if (!GetLinkCountUnsafe()) {
       return zx::error(ZX_ERR_NOT_FOUND);
+    }
 
     if (LookUpEntries(name).is_ok()) {
       return zx::error(ZX_ERR_ALREADY_EXISTS);

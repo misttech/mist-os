@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use assert_matches::assert_matches;
-use cm_rust::OfferDeclCommon;
+use cm_rust::{push_box, OfferDeclCommon};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::server as fserver;
 use fuchsia_component_test::new::{
@@ -138,17 +138,18 @@ async fn new_realm(
         .await
         .unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.collections.push(cm_rust::CollectionDecl {
-        name: "dynamic_children".parse().unwrap(),
-        durability: fdecl::Durability::Transient,
-        environment: None,
-        allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
-        allow_long_names: false,
-        persistent_storage: None,
-    });
-    realm_decl.offers = realm_decl
-        .offers
-        .into_iter()
+    push_box(
+        &mut realm_decl.collections,
+        cm_rust::CollectionDecl {
+            name: "dynamic_children".parse().unwrap(),
+            durability: fdecl::Durability::Transient,
+            environment: None,
+            allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
+            allow_long_names: false,
+            persistent_storage: None,
+        },
+    );
+    realm_decl.offers = IntoIterator::into_iter(realm_decl.offers)
         .filter(|o| {
             o.target() != &cm_rust::OfferTarget::Collection("dynamic_children".parse().unwrap())
         })

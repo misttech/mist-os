@@ -29,14 +29,14 @@ pub enum ManualTargetEvent {
 
 pub trait ManualTargetEventHandler: Send + 'static {
     /// Handles an event.
-    fn handle_event(&mut self, event: Result<ManualTargetEvent>);
+    fn handle_event(&mut self, event: ManualTargetEvent);
 }
 
 impl<F> ManualTargetEventHandler for F
 where
-    F: FnMut(Result<ManualTargetEvent>) -> () + Send + 'static,
+    F: FnMut(ManualTargetEvent) -> () + Send + 'static,
 {
-    fn handle_event(&mut self, x: Result<ManualTargetEvent>) -> () {
+    fn handle_event(&mut self, x: ManualTargetEvent) -> () {
         self(x)
     }
 }
@@ -252,7 +252,7 @@ where
     F: ManualTargetEventHandler,
 {
     loop {
-        let event = receiver.recv().await.map_err(|e| anyhow!(e));
+        let event = receiver.recv().await.expect("ManualTargetEvent stream closed?");
         log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event);
     }
@@ -426,7 +426,7 @@ mod test {
 
         let (sender, mut queue) = unbounded();
         let watcher = ManualTargetWatcher::new(
-            move |res: Result<ManualTargetEvent>| {
+            move |res: ManualTargetEvent| {
                 let _ = sender.unbounded_send(res);
             },
             target_finder,
@@ -442,7 +442,7 @@ mod test {
         drop(watcher);
         let mut events = Vec::<ManualTargetEvent>::new();
         while let Ok(Some(event)) = queue.try_next() {
-            events.push(event.unwrap());
+            events.push(event);
         }
 
         let manual_target_v6 = ManualTarget {
@@ -531,7 +531,7 @@ mod test {
 
         let (sender, mut queue) = unbounded();
         let watcher = ManualTargetWatcher::new(
-            move |res: Result<ManualTargetEvent>| {
+            move |res: ManualTargetEvent| {
                 let _ = sender.unbounded_send(res);
             },
             target_finder,
@@ -547,7 +547,7 @@ mod test {
         drop(watcher);
         let mut events = Vec::<ManualTargetEvent>::new();
         while let Ok(Some(event)) = queue.try_next() {
-            events.push(event.unwrap());
+            events.push(event);
         }
 
         let manual_target_v4 = ManualTarget {

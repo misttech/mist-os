@@ -1,27 +1,35 @@
 {% if !union_.is_result %}
 
-{#
-{{ restriction }}
-impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
-    #[inline]
-    fn from(from: crate::{{ name }}) -> Self {
-        match from {
+{{ denylist }}
+impl ::fidl_next::CompatFrom<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    fn compat_from(value: crate::{{ name }}) -> Self {
+        match value {
             {% for member in union_.members %}
-                crate::{{ name }}::{{ member.name|camel }}(value) => Self::{{ member.name|compat_camel }}(value.into()),
+                crate::{{ name }}::{{ member.name|camel }}(value) =>
+                    Self::{{ member.name|compat_camel }}(::fidl_next::CompatFrom::compat_from(value)),
             {% endfor %}
             {% if !union_.is_strict %}
-                crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) => Self::__SourceBreaking { unknown_ordinal },
+                crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
             {% endif %}
         }
     }
 }
 
-impl ::core::convert::From<Option<Box<crate::{{ name }}>>> for Option<Box<::{{ compat_crate_name }}::{{ compat_name }}>> {
-    #[inline]
-    fn from(from: Option<Box<crate::{{ name }}>>) -> Self {
-        from.map(|inner| Box::new(::core::convert::From::from(*inner)))
+{{ denylist }}
+impl ::fidl_next::CompatFrom<::{{ compat.crate_name }}::{{ compat_name }}> for crate::{{ name }} {
+    fn compat_from(value: ::{{ compat.crate_name }}::{{ compat_name }}) -> Self {
+        match value {
+            {% for member in union_.members %}
+                ::{{ compat.crate_name }}::{{ compat_name }}::{{ member.name|compat_camel }}(value) =>
+                    Self::{{ member.name|camel }}(::fidl_next::CompatFrom::compat_from(value)),
+            {% endfor %}
+            {% if !union_.is_strict %}
+                ::{{ compat.crate_name }}::{{ compat_name }}::__SourceBreaking { unknown_ordinal } =>
+                    Self::UnknownOrdinal_(unknown_ordinal),
+            {% endif %}
+        }
     }
 }
-#}
 
 {% endif %}

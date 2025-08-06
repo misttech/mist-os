@@ -23,6 +23,15 @@ type NodeBandwidth = table {
     2: requests vector<BandwidthRequest>:EDGES_MAX;
 };
 
+type AggregatedBandwidth = table {
+    /// Unique ID that refers to the node this bandwidth is requested for.
+    1: node_id uint32;
+    /// The computed aggregate average bandwidth value, derived from requests.
+    2: average_bandwidth_bps uint64;
+    /// The computed aggregate peak bandwidth value, derived from requests.
+    3: peak_bandwidth_bps uint64;
+};
+
 type Node = table {
     /// Unique ID that refers to this node in other structs.
     1: id uint32;
@@ -71,7 +80,9 @@ type Metadata = table {
 open protocol Device {
     flexible SetNodesBandwidth(struct {
         nodes vector<NodeBandwidth>:MAX;
-    }) -> () error zx.Status;
+    }) -> (struct {
+        aggregated_bandwidth vector<AggregatedBandwidth>:MAX;
+    }) error zx.Status;
 
     /// Returns a list of all nodes and edges between those nodes.
     /// Edges are directional, so if an interconnect allows bidirectional traffic,

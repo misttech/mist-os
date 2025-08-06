@@ -107,18 +107,12 @@ import("//build/toolchain/toolchain_environment.gni")
 #     See `sdk_source_set` for example about its significance.
 #     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #
-#   include_base (optional)
-#     Path to the root directory for includes.
-#     Defaults to "include".
-#     TODO(https://fxbug.dev/333125197): Remove this parameter.
-#
 #   See source_set() for other parameters.
 #
 template("zx_library") {
   # Parameters that are not forwarded to the underlying target
   # TODO(https://fxbug.dev/333125197): Remove when removing the parameters.
   unforwarded_params = [
-    "include_base",
     "sdk",
     "sdk_area",
     "sdk_headers",
@@ -129,8 +123,7 @@ template("zx_library") {
   assert(defined(invoker.sdk_publishable) ||
          (!defined(invoker.sdk_area) && !defined(invoker.stable) &&
           !defined(invoker.sdk_name) &&
-          !defined(invoker.sdk_headers_for_internal_use) &&
-          !defined(invoker.include_base)))
+          !defined(invoker.sdk_headers_for_internal_use)))
 
   if (zircon_toolchain != false) {
     _library_name = target_name
@@ -374,13 +367,6 @@ template("zx_library") {
         public = []
         foreach(header, invoker.sdk_headers) {
           public += [ "include/$header" ]
-        }
-        if (sdkable && sdk_category == "internal") {
-          # By default, templates like sdk_source_set() set the `include_base` value to "//" for
-          # targets in the 'internal' category. Set if to the correct value here to avoid
-          # issues later when trying to use the library from the SDK.
-          # See https://fxbug.dev/42066095 for details.
-          include_base = "include"
         }
       }
 

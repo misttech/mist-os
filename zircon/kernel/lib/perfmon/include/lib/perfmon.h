@@ -4,12 +4,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <align.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <arch/arch_perfmon.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>

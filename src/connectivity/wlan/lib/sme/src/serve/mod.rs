@@ -268,13 +268,13 @@ async fn serve_fidl_endpoint<
 mod tests {
     use super::*;
     use crate::test_utils;
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
     use fuchsia_inspect::Inspector;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::assert_variant;
     use wlan_common::test_utils::fake_features::{
         fake_security_support, fake_spectrum_management_support_empty,
     };
@@ -327,13 +327,13 @@ mod tests {
         )
         .unwrap();
         let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Also close secondary SME endpoint in the Generic SME.
         drop(generic_sme_proxy);
 
         // Verify SME future finished cleanly.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Ok(())));
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Ok(())));
     }
 
     struct GenericSmeTestHelper {
@@ -376,7 +376,7 @@ mod tests {
             generic_sme_stream,
         )?;
         let mut serve_fut = Box::pin(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         Ok((
             GenericSmeTestHelper {
@@ -398,15 +398,15 @@ mod tests {
 
         let (client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             helper.exec.run_until_stalled(&mut client_sme_fut),
             Poll::Ready(Ok(Ok(())))
         );
 
         let mut status_fut = client_proxy.status();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             helper.exec.run_until_stalled(&mut status_fut),
             Poll::Ready(Ok(fidl_sme::ClientStatusResponse::Idle(_)))
         );
@@ -419,8 +419,8 @@ mod tests {
 
         let (_ap_proxy, ap_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_ap_sme(ap_server);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             helper.exec.run_until_stalled(&mut client_sme_fut),
             Poll::Ready(Ok(Err(_)))
         );
@@ -433,12 +433,12 @@ mod tests {
 
         let (ap_proxy, ap_server) = create_proxy();
         let mut ap_sme_fut = helper.proxy.get_ap_sme(ap_server);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(helper.exec.run_until_stalled(&mut ap_sme_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut ap_sme_fut), Poll::Ready(Ok(Ok(()))));
 
         let mut status_fut = ap_proxy.status();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             helper.exec.run_until_stalled(&mut status_fut),
             Poll::Ready(Ok(fidl_sme::ApStatusResponse { .. }))
         );
@@ -451,8 +451,8 @@ mod tests {
 
         let (_client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(
             helper.exec.run_until_stalled(&mut client_sme_fut),
             Poll::Ready(Ok(Err(_)))
         );
@@ -464,8 +464,8 @@ mod tests {
     ) -> fidl_sme::TelemetryProxy {
         let (proxy, server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(server);
-        assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
-        assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Ok(()))));
+        assert_matches!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Ok(()))));
         proxy
     }
 
@@ -477,16 +477,16 @@ mod tests {
 
         // Forward request to MLME.
         let mut support_fut = telemetry_proxy.query_telemetry_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Mock response from MLME. Use a fake error code to make the response easily verifiable.
-        let support_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let support_responder = assert_variant!(support_req, crate::MlmeRequest::QueryTelemetrySupport(responder) => responder);
+        let support_req = assert_matches!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
+        let support_responder = assert_matches!(support_req, crate::MlmeRequest::QueryTelemetrySupport(responder) => responder);
         support_responder.respond(Err(1337));
 
         // Verify that the response made it to us without alteration.
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let support_result = assert_variant!(helper.exec.run_until_stalled(&mut support_fut), Poll::Ready(Ok(support_result)) => support_result);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let support_result = assert_matches!(helper.exec.run_until_stalled(&mut support_fut), Poll::Ready(Ok(support_result)) => support_result);
         assert_eq!(support_result, Err(1337));
     }
 
@@ -498,16 +498,16 @@ mod tests {
 
         // Forward request to MLME.
         let mut histogram_fut = telemetry_proxy.get_histogram_stats();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Mock response from MLME. Use a fake error code to make the response easily verifiable.
-        let histogram_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let histogram_responder = assert_variant!(histogram_req, crate::MlmeRequest::GetIfaceHistogramStats(responder) => responder);
+        let histogram_req = assert_matches!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
+        let histogram_responder = assert_matches!(histogram_req, crate::MlmeRequest::GetIfaceHistogramStats(responder) => responder);
         histogram_responder.respond(fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(1337));
 
         // Verify that the response made it to us without alteration.
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let histogram_result = assert_variant!(helper.exec.run_until_stalled(&mut histogram_fut), Poll::Ready(Ok(histogram_result)) => histogram_result);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let histogram_result = assert_matches!(helper.exec.run_until_stalled(&mut histogram_fut), Poll::Ready(Ok(histogram_result)) => histogram_result);
         assert_eq!(histogram_result, Err(1337));
     }
 
@@ -519,17 +519,17 @@ mod tests {
 
         // Forward request to MLME.
         let mut counter_fut = telemetry_proxy.get_iface_stats();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Mock response from MLME. Use a fake error code to make the response easily verifiable.
-        let counter_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
+        let counter_req = assert_matches!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
         let counter_responder =
-            assert_variant!(counter_req, crate::MlmeRequest::GetIfaceStats(responder) => responder);
+            assert_matches!(counter_req, crate::MlmeRequest::GetIfaceStats(responder) => responder);
         counter_responder.respond(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(1337));
 
         // Verify that the response made it to us without alteration.
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let counter_result = assert_variant!(helper.exec.run_until_stalled(&mut counter_fut), Poll::Ready(Ok(counter_result)) => counter_result);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let counter_result = assert_matches!(helper.exec.run_until_stalled(&mut counter_fut), Poll::Ready(Ok(counter_result)) => counter_result);
         assert_eq!(counter_result, Err(1337));
     }
 
@@ -540,8 +540,8 @@ mod tests {
 
         let (_telemetry_proxy, telemetry_server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(telemetry_server);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Err(_))));
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Err(_))));
     }
 
     #[test_case(fidl_common::WlanMacRole::Client)]
@@ -550,11 +550,11 @@ mod tests {
         let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
 
         let mut query_fut = helper.proxy.query();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let query_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
+        let query_req = assert_matches!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
         let query_responder =
-            assert_variant!(query_req, crate::MlmeRequest::QueryDeviceInfo(responder) => responder);
+            assert_matches!(query_req, crate::MlmeRequest::QueryDeviceInfo(responder) => responder);
         query_responder.respond(fidl_mlme::DeviceInfo {
             role: mac_role,
             sta_addr: [2; 6],
@@ -563,8 +563,8 @@ mod tests {
             qos_capable: false,
         });
 
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let query_result = assert_variant!(helper.exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(result)) => result);
+        assert_matches!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let query_result = assert_matches!(helper.exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(result)) => result);
         assert_eq!(query_result.role, mac_role);
         assert_eq!(query_result.sta_addr, [2; 6]);
     }

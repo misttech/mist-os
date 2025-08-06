@@ -7,11 +7,18 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/power/cpu-manager/node_config/node_config.gni")
 
+declare_args() {
+  # Whether the CPU manager acts on power hints from Android
+  # TODO(b/323269528): Revisit if accepting cpu boost from Android power HAL is necessary.
+  enable_android_power_hints = false
+}
+
 cpu_manager_deps = [
   ":cpu-manager-config-lib",
   "energy_model_config/parser",
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+  "//sdk/fidl/fuchsia.power.cpu.manager:fuchsia.power.cpu.manager_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
   "//sdk/rust/zx",
   "//src/lib/async-utils",
@@ -75,6 +82,11 @@ rustc_binary("bin") {
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
   ]
+
+  features = []
+  if (enable_android_power_hints) {
+    features += [ "enable_android_power_hints" ]
+  }
 }
 
 rustc_binary("bin_with_fake_time") {

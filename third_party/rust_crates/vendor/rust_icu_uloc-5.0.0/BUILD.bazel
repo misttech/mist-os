@@ -80,7 +80,7 @@ rust_library(
     }),
     version = "5.0.0",
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
         "//third_party/rust_crates/vendor/log-0.4.22:log",
         "//third_party/rust_crates/vendor/rust_icu_common-5.0.0:rust_icu_common",
         "//third_party/rust_crates/vendor/rust_icu_sys-5.0.0:rust_icu_sys",
@@ -146,7 +146,7 @@ cargo_build_script(
     version = "5.0.0",
     visibility = ["//visibility:private"],
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
     ],
 )
 

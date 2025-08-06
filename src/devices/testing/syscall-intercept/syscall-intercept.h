@@ -30,7 +30,4 @@ class SuspendObserver {
 
 }  // namespace syscall_intercept
 
-// This is an intercepted syscall.
-extern "C" __EXPORT zx_status_t zx_system_suspend_enter(zx_handle_t, zx_time_t time);
-
 #endif  // SRC_DEVICES_TESTING_SYSCALL_INTERCEPT_SYSCALL_INTERCEPT_H_

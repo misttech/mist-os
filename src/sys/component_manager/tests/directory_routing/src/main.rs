@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_rust::push_box;
 use cm_types::{LongName, Name, Path, RelativePath};
 use fidl_fuchsia_io as fio;
 use fuchsia_component_test::new::{ChildOptions, RealmBuilder, RealmInstance};
@@ -102,16 +103,19 @@ async fn set_up_realm_builder_and_get_proxy(
         .unwrap();
 
     let mut provider_manifest = builder.get_component_decl(&provider).await.unwrap();
-    provider_manifest.capabilities.push(cm_rust::CapabilityDecl::Directory(capability_decl));
-    provider_manifest.exposes.push(cm_rust::ExposeDecl::Directory(expose_decl));
+    push_box(
+        &mut provider_manifest.capabilities,
+        cm_rust::CapabilityDecl::Directory(capability_decl),
+    );
+    push_box(&mut provider_manifest.exposes, cm_rust::ExposeDecl::Directory(expose_decl));
     builder.replace_component_decl(&provider, provider_manifest).await.unwrap();
 
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.offers.push(cm_rust::OfferDecl::Directory(offer_decl));
+    push_box(&mut realm_decl.offers, cm_rust::OfferDecl::Directory(offer_decl));
     builder.replace_realm_decl(realm_decl).await.unwrap();
 
     let mut consumer_manifest = builder.get_component_decl(&consumer).await.unwrap();
-    consumer_manifest.uses.push(cm_rust::UseDecl::Directory(use_decl));
+    push_box(&mut consumer_manifest.uses, cm_rust::UseDecl::Directory(use_decl));
     builder.replace_component_decl(&consumer, consumer_manifest).await.unwrap();
 
     let instance =

@@ -559,7 +559,7 @@ def Main(args):
                 ).format(path, "\n".join(GetUsbDisks()))
             )
             return 1
-        if not IsUsbDisk(path):
+        if not IsUsbDisk(path) and not args.force:
             logging.critical(
                 (
                     "Path {} is not a USB device. Use -f to force.\n"

@@ -25,6 +25,7 @@
 #include "src/ui/lib/escher/util/fuchsia_utils.h"
 #include "src/ui/lib/escher/util/image_utils.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
+#include "src/ui/scenic/lib/flatland/image_formats.h"
 #include "src/ui/scenic/lib/utils/shader_warmup.h"
 
 #include <glm/glm.hpp>
@@ -50,7 +51,7 @@ const std::vector<vk::Format>& GetSupportedImageFormatsForBufferCollectionUsage(
     BufferCollectionUsage usage) {
   switch (usage) {
     case BufferCollectionUsage::kClientImage:
-      return utils::SupportedClientImageFormats();
+      return flatland::SupportedClientImageFormats();
       break;
     case BufferCollectionUsage::kRenderTarget:
       return kSupportedRenderTargetImageFormats;

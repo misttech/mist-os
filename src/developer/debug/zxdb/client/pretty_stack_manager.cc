@@ -118,20 +118,20 @@ void PrettyStackManager::LoadDefaultMatchers() {
   // be best to hardcode this rust annotation scheme rather than try to express this with globs.
   matchers.push_back(StackGlob(
       "Rust library",
-      {PrettyFrameGlob::Func("__llvm_libc::__abort_impl__"),
+      {PrettyFrameGlob::Func("__fuchsia_libc::__abort_impl__"),
        PrettyFrameGlob::Wildcard(0, 16),
-       PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_end_short_backtrace<*>")}));
+       PrettyFrameGlob::Func("std::sys::backtrace::__rust_end_short_backtrace<*>")}));
 
   // Rust startup code. The "call_once()" in function.rs is present in debug mode but not release.
   matchers.push_back(StackGlob(
       "Rust startup",
       {PrettyFrameGlob::File("library/core/src/ops/function.rs"),
-       PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_begin_short_backtrace<*>"),
+       PrettyFrameGlob::Func("std::sys::backtrace::__rust_begin_short_backtrace<*>"),
        PrettyFrameGlob::Wildcard(0, 16),
        libc_start}));
   matchers.push_back(StackGlob(
       "Rust startup",
-      {PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_begin_short_backtrace<*>"),
+      {PrettyFrameGlob::Func("std::sys::backtrace::__rust_begin_short_backtrace<*>"),
        PrettyFrameGlob::Wildcard(0, 16),
        libc_start}));
 
@@ -140,7 +140,7 @@ void PrettyStackManager::LoadDefaultMatchers() {
   // don't know how stable those symbols are.
   matchers.push_back(StackGlob(
       "Rust thread startup",
-      {PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_begin_short_backtrace<*>"),
+      {PrettyFrameGlob::Func("std::sys::backtrace::__rust_begin_short_backtrace<*>"),
        PrettyFrameGlob::Wildcard(0, 16),
        PrettyFrameGlob::Func("thread_trampoline")}));
 

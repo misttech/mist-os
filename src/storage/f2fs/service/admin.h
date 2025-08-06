@@ -5,6 +5,10 @@
 #ifndef SRC_STORAGE_F2FS_SERVICE_ADMIN_H_
 #define SRC_STORAGE_F2FS_SERVICE_ADMIN_H_
 
+#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fit/function.h>
+
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 

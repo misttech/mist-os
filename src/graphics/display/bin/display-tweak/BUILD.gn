@@ -39,13 +39,9 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_package_with_single_component("display-tweak-pkg") {
+fuchsia_package_with_single_component("display-tweak") {
   component_name = "display_tweak"
   manifest = "meta/display-tweak.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_package("display-tweak") {
   deps = [ ":bin" ]
 }
 

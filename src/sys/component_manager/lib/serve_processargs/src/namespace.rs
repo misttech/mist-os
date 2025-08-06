@@ -213,7 +213,6 @@ pub fn ignore_not_found() -> UnboundedSender<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::multishot;
     use anyhow::Result;
     use assert_matches::assert_matches;
     use fidl::endpoints::{self, Proxy, ServerEnd};
@@ -221,7 +220,7 @@ mod tests {
     use fuchsia_fs::directory::DirEntry;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use sandbox::Directory;
+    use sandbox::{Connector, Directory, Receiver};
     use std::sync::Arc;
     use test_case::test_case;
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
@@ -229,6 +228,11 @@ mod tests {
     use vfs::{path, pseudo_directory, ObjectRequestRef};
     use zx::AsHandleRef;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+    fn multishot() -> (Connector, Receiver) {
+        let (receiver, sender) = Connector::new();
+        (sender, receiver)
+    }
 
     fn connector_cap() -> Capability {
         let (sender, _receiver) = multishot();

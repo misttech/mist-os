@@ -15,7 +15,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, Future, StreamExt, TryStreamExt};
 use starnix_core::execution::{create_init_child_process, execute_task_with_prerun_result};
 use starnix_core::fs::devpts::create_main_and_replica;
 use starnix_core::fs::fuchsia::create_fuchsia_pipe;
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel, LockedAndTask};
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel, LockedAndTask, ProcessEntryRef};
 use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
@@ -25,6 +25,7 @@ use starnix_modules_framebuffer::Framebuffer;
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::UncheckedSignal;
 use starnix_uapi::uapi;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -242,6 +243,43 @@ pub async fn serve_container_controller(
                         ),
                         ..Default::default()
                     });
+                }
+                fstarcontainer::ControllerRequest::SendSignal {
+                    payload:
+                        fstarcontainer::ControllerSendSignalRequest {
+                            pid: Some(pid),
+                            signal: Some(signal),
+                            ..
+                        },
+                    responder,
+                } => {
+                    let pids = system_task.kernel().pids.read();
+                    if let Some(ProcessEntryRef::Process(target_thread_group)) =
+                        pids.get_process(pid)
+                    {
+                        match unsafe {
+                            target_thread_group.send_signal_unchecked_debug(
+                                system_task,
+                                UncheckedSignal::new(signal),
+                            )
+                        } {
+                            Ok(_) => {
+                                let _result = responder.send(Ok(()));
+                            }
+                            Err(_) => {
+                                let _result =
+                                    responder.send(Err(fstarcontainer::SignalError::InvalidSignal));
+                            }
+                        };
+                    } else {
+                        let _result =
+                            responder.send(Err(fstarcontainer::SignalError::InvalidTarget));
+                    };
+                }
+                // The request did not contain both a signal and a target pid.
+                fstarcontainer::ControllerRequest::SendSignal { responder, .. } => {
+                    log_error!("malformed SendSignal request");
+                    let _result = responder.send(Err(fstarcontainer::SignalError::InvalidTarget));
                 }
                 fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }

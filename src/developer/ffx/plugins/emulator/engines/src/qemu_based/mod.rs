@@ -587,7 +587,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 return_user_error!(
                     "Upscript {} returned non-zero exit code {}",
                     script.display(),
-                    status.code().map_or("None".to_string(), |v| format!("{}", v))
+                    status.code().map_or_else(|| "None".to_string(), |v| format!("{}", v))
                 );
             }
         }

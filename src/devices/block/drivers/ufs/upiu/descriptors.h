@@ -23,6 +23,7 @@ enum class DescriptorType {
   kGeometry = 0x07,
   kPower = 0x08,
   kDeviceHealth = 0x09,
+  kDescriptorCount = 0x0a,
 };
 
 // UFS Specification Version 3.1, section 14.1.4.2 "Device Descriptor".
@@ -340,8 +341,8 @@ class ReadDescriptorUpiu : public QueryReadRequestUpiu {
 
 class WriteDescriptorUpiu : public QueryWriteRequestUpiu {
  public:
-  explicit WriteDescriptorUpiu(DescriptorType type, void* descriptor_data)
-      : QueryWriteRequestUpiu(QueryOpcode::kWriteDescriptor, static_cast<uint8_t>(type)) {
+  explicit WriteDescriptorUpiu(DescriptorType type, void* descriptor_data, uint8_t index = 0)
+      : QueryWriteRequestUpiu(QueryOpcode::kWriteDescriptor, static_cast<uint8_t>(type), index) {
     uint16_t length = safemath::checked_cast<uint16_t>(GetDescriptorSize(type));
     GetData<QueryRequestUpiuData>()->length = htobe16(length);
 

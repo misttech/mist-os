@@ -126,7 +126,7 @@ group("non_hermetic_deps") {
   visibility += [ "//build/rust:*" ]
 
   # rustdoc-link merges an arbitrary tree of rustdoc `--out-dir`s
-  visibility += [ "//build/rust/tests:rustdoc-link" ]
+  visibility += [ "//build/rust/tests/rustdoc-link/*" ]
 
   # See: https://fxbug.dev/42148579
   visibility += [ "//sdk:cts_generate" ]
@@ -539,11 +539,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/tools/lz4:*",
     "//zircon/tools/zbi:*",
   ]
-}
-
-# TODO(https://fxbug.dev/42176904): to be populated.
-group("output_dir_leaking_allowlist") {
-  visibility = [ "*" ]
 }
 
 group("config_data_template_allowlist") {

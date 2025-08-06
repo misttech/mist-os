@@ -21,15 +21,17 @@ extern std::string DoPrePolicyLoadWork() { return "binder.pp"; }
 namespace {
 
 constexpr int kServiceManagerHandle = 0;
-const long kBinderMMapSize = sysconf(_SC_PAGESIZE);
+const size_t kBinderMMapSize = sysconf(_SC_PAGESIZE);
 
 // Opens the binder
-fbl::unique_fd OpenBinder() { return fbl::unique_fd(open("/tmp/binder", O_RDWR | O_CLOEXEC)); }
+fbl::unique_fd OpenBinder(std::string_view dir) {
+  return fbl::unique_fd(open((std::string(dir) + "/binder").c_str(), O_RDWR | O_CLOEXEC));
+}
 
 // Makes the current process register itself as a binder context manager,
 // and reads in an infinite loop the messages.
-void ContextManagerLoop() {
-  fbl::unique_fd binder = OpenBinder();
+void ContextManagerLoop(std::string_view dir) {
+  fbl::unique_fd binder = OpenBinder(dir);
   EXPECT_TRUE(binder) << strerror(errno);
 
   auto mapping = test_helper::ScopedMMap::MMap(nullptr, kBinderMMapSize, PROT_READ, MAP_PRIVATE,
@@ -61,10 +63,10 @@ void ContextManagerLoop() {
 
 // Starts a context manager process.
 // Returns a value that on destruction kills the process.
-auto ScopedContextManagerProcess() {
+auto ScopedContextManagerProcess(std::string_view dir) {
   std::unique_ptr<test_helper::ForkHelper> helper = std::make_unique<test_helper::ForkHelper>();
   pid_t pid = RunInForkedProcessWithLabel(*helper, "test_u:test_r:binder_context_manager_test_t:s0",
-                                          [] { ContextManagerLoop(); });
+                                          [dir] { ContextManagerLoop(dir); });
   auto cleanup = fit::defer([pid, helper = std::move(helper)]() {
     ASSERT_THAT(kill(pid, SIGKILL), SyscallSucceeds());
     helper->ExpectSignal(SIGKILL);
@@ -74,16 +76,20 @@ auto ScopedContextManagerProcess() {
 }
 
 class BinderTest : public ::testing::Test {
- public:
+ protected:
   void SetUp() override {
-    EXPECT_THAT(mount("binder", "/tmp", "binder", 0, nullptr), SyscallSucceeds());
+    EXPECT_THAT(mount(nullptr, temp_dir_.path().c_str(), "binder", 0, nullptr), SyscallSucceeds());
   }
+
+  void TearDown() override { EXPECT_THAT(umount(temp_dir_.path().c_str()), SyscallSucceeds()); }
+
+  test_helper::ScopedTempDir temp_dir_;
 };
 
 // Test opening binder from the default domain.
 TEST_F(BinderTest, OpenBinderNoTestDomain) {
   auto enforce = ScopedEnforcement::SetEnforcing();
-  fbl::unique_fd binder = OpenBinder();
+  fbl::unique_fd binder = OpenBinder(temp_dir_.path());
   EXPECT_TRUE(binder) << strerror(errno);
 }
 
@@ -91,19 +97,21 @@ TEST_F(BinderTest, OpenBinderNoTestDomain) {
 TEST_F(BinderTest, OpenBinderWithTestDomain) {
   auto enforce = ScopedEnforcement::SetEnforcing();
   ASSERT_TRUE(RunSubprocessAs("test_u:test_r:binder_open_test_t:s0", [&] {
-    fbl::unique_fd binder = OpenBinder();
+    fbl::unique_fd binder = OpenBinder(temp_dir_.path());
     EXPECT_TRUE(binder) << strerror(errno);
   }));
 }
 
-class ContextManagerPermission : public testing::TestWithParam<std::pair<const char *, bool>> {};
+class ContextManagerPermission : public BinderTest,
+                                 public testing::WithParamInterface<std::pair<const char*, bool>> {
+};
 
 // Test becoming the service manager with and without the `set_context_mgr` permission.
 TEST_P(ContextManagerPermission, BecomeServiceManager) {
   auto enforce = ScopedEnforcement::SetEnforcing();
   const auto [label, expect_success] = ContextManagerPermission::GetParam();
   ASSERT_TRUE(RunSubprocessAs(label, [&] {
-    fbl::unique_fd binder = OpenBinder();
+    fbl::unique_fd binder = OpenBinder(temp_dir_.path());
     EXPECT_TRUE(binder) << strerror(errno);
     if (expect_success) {
       EXPECT_THAT(ioctl(binder.get(), BINDER_SET_CONTEXT_MGR, 0), SyscallSucceeds());
@@ -119,17 +127,18 @@ const auto kContextManagerPermissionValues =
 INSTANTIATE_TEST_SUITE_P(ContextManagerPermission, ContextManagerPermission,
                          kContextManagerPermissionValues);
 
-class CallPermission : public testing::TestWithParam<std::pair<const char *, bool>> {};
+class CallPermission : public BinderTest,
+                       public testing::WithParamInterface<std::pair<const char*, bool>> {};
 
 // Test doing a binder call with and without the `call` permission.
 TEST_P(CallPermission, DoCall) {
   auto enforce = ScopedEnforcement::SetEnforcing();
   const auto [label, expect_success] = CallPermission::GetParam();
 
-  auto context_manager = ScopedContextManagerProcess();
+  auto context_manager = ScopedContextManagerProcess(temp_dir_.path());
 
   ASSERT_TRUE(RunSubprocessAs(label, [&] {
-    fbl::unique_fd binder = OpenBinder();
+    fbl::unique_fd binder = OpenBinder(temp_dir_.path());
     ASSERT_TRUE(binder) << strerror(errno);
 
     auto mapping = test_helper::ScopedMMap::MMap(nullptr, kBinderMMapSize, PROT_READ, MAP_PRIVATE,

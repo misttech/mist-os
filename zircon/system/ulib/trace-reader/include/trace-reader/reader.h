@@ -17,7 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include <fbl/intrusive_hash_table.h>
 #include <trace-reader/records.h>
 
 namespace trace {
@@ -77,7 +76,7 @@ class TraceReader {
   bool ReadStringRecord(Chunk& record, RecordHeader header);
   bool ReadThreadRecord(Chunk& record, RecordHeader header);
   bool ReadEventRecord(Chunk& record, RecordHeader header);
-  bool ReadBlobRecord(Chunk& record, RecordHeader header, void** out_ptr);
+  bool ReadBlobRecord(Chunk& record, RecordHeader header, void** out_blob);
   bool ReadKernelObjectRecord(Chunk& record, RecordHeader header);
   bool ReadSchedulerRecord(Chunk& record, RecordHeader header);
   bool ReadLogRecord(Chunk& record, RecordHeader header);
@@ -125,19 +124,15 @@ class TraceReader {
     static size_t GetHash(trace_thread_index_t key) { return key; }
   };
 
-  struct ProviderInfo : public fbl::SinglyLinkedListable<std::unique_ptr<ProviderInfo>> {
+  struct ProviderInfo {
     ProviderId id;
     std::string name;
 
     std::unordered_map<trace_string_index_t, StringTableEntry> string_table;
     std::unordered_map<trace_thread_index_t, ThreadTableEntry> thread_table;
-
-    // Used by the hash table.
-    ProviderId GetKey() const { return id; }
-    static size_t GetHash(ProviderId key) { return key; }
   };
 
-  fbl::HashTable<ProviderId, std::unique_ptr<ProviderInfo>> providers_;
+  std::unordered_map<ProviderId, std::unique_ptr<ProviderInfo>> providers_;
   ProviderInfo* current_provider_ = nullptr;
 
   TraceReader(const TraceReader&) = delete;

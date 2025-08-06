@@ -17,8 +17,10 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pin-project",
   ]
-
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib//fuchsia",
+    "//src/lib/fuchsia-async",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

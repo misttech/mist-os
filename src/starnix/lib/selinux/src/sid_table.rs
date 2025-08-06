@@ -137,7 +137,7 @@ mod tests {
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
 
     fn test_policy() -> Arc<Policy> {
-        let (unvalidated, _binary) = parse_policy_by_value(TESTS_BINARY_POLICY.to_vec()).unwrap();
+        let unvalidated = parse_policy_by_value(TESTS_BINARY_POLICY.to_vec()).unwrap();
         Arc::new(unvalidated.validate().unwrap())
     }
 

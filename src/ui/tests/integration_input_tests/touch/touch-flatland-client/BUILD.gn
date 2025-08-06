@@ -39,7 +39,7 @@ executable("touch-flatland-client-binary") {
     "//zircon/system/ulib/zx",
 
     # TODO(https://fxbug.dev/355738783): Fix after scenic helper support new C++ binding.
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp_hlcpp_conversion",
     "//sdk/lib/fidl/cpp:hlcpp_conversion",
   ]
 }

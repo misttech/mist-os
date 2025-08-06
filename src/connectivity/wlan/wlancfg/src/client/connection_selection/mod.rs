@@ -754,6 +754,7 @@ mod tests {
         generate_random_connect_reason, generate_random_network_identifier,
         generate_random_password, generate_random_scan_result, generate_random_scanned_candidate,
     };
+    use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
     use futures::task::Poll;
     use ieee80211_testutils::BSSID_REGEX;
@@ -763,9 +764,9 @@ mod tests {
     use std::rc::Rc;
     use test_case::test_case;
     use wlan_common::bss::BssDescription;
+    use wlan_common::random_fidl_bss_description;
     use wlan_common::scan::Compatible;
     use wlan_common::security::SecurityDescriptor;
-    use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
@@ -1020,7 +1021,7 @@ mod tests {
         let mut fut = pin!(fut);
 
         // The connect_req comes out the other side with no change
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(res) => {
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(res) => {
             assert_eq!(&res, &candidate);
         });
     }
@@ -1317,7 +1318,7 @@ mod tests {
         }
 
         // Check that the metrics were logged
-        assert_variant!(
+        assert_matches!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ActiveScanRequested{num_ssids_requested})) => {
                 if hidden {
@@ -1344,7 +1345,7 @@ mod tests {
         let mut connection_selection_fut = pin!(connection_selector
             .find_and_select_connection_candidate(None, generate_random_connect_reason()));
         // Check that nothing is returned
-        assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(None));
+        assert_matches!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(None));
 
         // Check that the right scan request was sent
         assert_eq!(
@@ -1365,14 +1366,14 @@ mod tests {
         });
 
         // Verify TelemetryEvent for network selection was sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Undirected,
                 num_candidates: Err(()),
                 selected_count: 0,
             });
         });
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::BssSelectionResult { selected_candidate: None, .. }))
         );
@@ -1558,11 +1559,11 @@ mod tests {
         });
 
         // Verify TelemetryEvents for network selection were sent
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ActiveScanRequested { num_ssids_requested: 0 }))
         );
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
                 saved_network_count, bss_count_per_saved_network, saved_network_count_found_by_active_scan
             })) => {
@@ -1571,14 +1572,14 @@ mod tests {
                 assert_eq!(saved_network_count_found_by_active_scan, 0);
             }
         );
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Undirected,
                 num_candidates: Ok(2),
                 selected_count: 2,
             });
         });
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
         );
@@ -1649,14 +1650,14 @@ mod tests {
             vec![(ScanReason::BssSelection, vec![test_id_1.ssid.clone()], vec![])]
         );
         // Verify that NetworkSelectionDecision telemetry event is sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Directed,
                 num_candidates: Ok(1),
                 selected_count: 1,
             });
         });
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
         );
@@ -1698,15 +1699,15 @@ mod tests {
         );
 
         // Verify that NetworkSelectionDecision telemetry event is sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
+        assert_matches!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_matches!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Directed,
                 num_candidates: Err(()),
                 selected_count: 1,
             });
         });
 
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
         );
@@ -1849,7 +1850,7 @@ mod tests {
 
         record_metrics_on_scan(mock_scan_results, &telemetry_sender);
 
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
                 saved_network_count, mut bss_count_per_saved_network, saved_network_count_found_by_active_scan
             })) => {
@@ -1870,7 +1871,7 @@ mod tests {
 
         record_metrics_on_scan(mock_scan_results, &telemetry_sender);
 
-        assert_variant!(
+        assert_matches!(
             telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
                 saved_network_count, bss_count_per_saved_network, saved_network_count_found_by_active_scan
             })) => {
@@ -1921,7 +1922,7 @@ mod tests {
         let (request_sender, request_receiver) = mpsc::channel(5);
         let mut serve_fut =
             pin!(serve_connection_selection_request_loop(connection_selector, request_receiver));
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Create a requester struct
         let mut requester = ConnectionSelectionRequester { sender: request_sender };
@@ -1930,13 +1931,13 @@ mod tests {
         let mut connection_selection_fut =
             pin!(requester
                 .do_connection_selection(None, types::ConnectReason::IdleInterfaceAutoconnect));
-        assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Pending);
 
         // Run the service loop forward
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that receiver gets expected result, confirming the request was plumbed correctly.
-        assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
+        assert_matches!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
             assert_eq!(selected_candidate, candidate);
         });
     }
@@ -1956,7 +1957,7 @@ mod tests {
         let (request_sender, request_receiver) = mpsc::channel(5);
         let mut serve_fut =
             pin!(serve_connection_selection_request_loop(connection_selector, request_receiver));
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Create a requester struct
         let mut requester = ConnectionSelectionRequester { sender: request_sender };
@@ -1971,13 +1972,13 @@ mod tests {
             candidate.credential.clone(),
             bss_desc.protection().into()
         ));
-        assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Pending);
 
         // Run the service loop forward
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that receiver gets expected result, confirming the request was plumbed correctly.
-        assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
+        assert_matches!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
             assert_eq!(selected_candidate, candidate);
         });
     }

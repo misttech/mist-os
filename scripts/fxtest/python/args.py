@@ -94,6 +94,7 @@ class Flags:
     use_test_interface: bool
     extra_args: typing.List[str]
     env: typing.List[str]
+    allow_temporary_package_server: bool
 
     output: bool
     simple: bool
@@ -506,6 +507,12 @@ def parse_args(
         `--breakpoint my_source_file.cc:37` will insert a breakpoint at line 37 of any file
         named my_source_file.cc. May be specified multiple times to add multiple breakpoints.""",
         default=[],
+    )
+    execution.add_argument(
+        "--allow-temporary-package-server",
+        action=argparse.BooleanOptionalAction,
+        help="Allow this script to start a temporary package server if one is not already running. Default is True.",
+        default=True,
     )
 
     execution.add_argument(

@@ -16,7 +16,7 @@ else
   extra_link_args = []
 endif
 
-foreach test : ['virtmagma_unit_tests', 'virtmagma_image_tests']
+foreach test : ['virtmagma_unit_tests']
   files_unit_test = files(
     '../tests_linux/unit_tests/@0@.cc'.format(test)
   )

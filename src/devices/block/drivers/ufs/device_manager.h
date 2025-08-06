@@ -151,9 +151,9 @@ class DeviceManager {
 
   zx::result<uint32_t> ReadAttribute(Attributes attribute, uint8_t index = 0);
   zx::result<> WriteAttribute(Attributes attribute, uint32_t value, uint8_t index = 0);
-  zx::result<uint32_t> DmeGet(uint16_t mbi_attribute);
-  zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
-  zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
+  zx::result<uint32_t> DmeGet(uint16_t mib_attribute);
+  zx::result<uint32_t> DmePeerGet(uint16_t mib_attribute);
+  zx::result<> DmeSet(uint16_t mib_attribute, uint32_t value);
 
   template <typename DescriptorReturnType>
   zx::result<DescriptorReturnType> ReadDescriptor(DescriptorType descriptor, uint8_t index = 0);

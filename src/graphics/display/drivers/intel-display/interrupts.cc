@@ -276,13 +276,13 @@ void Interrupts::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase
   //                         pipe and transcoder D.
   zx::time_monotonic timestamp(interrupt->timestamp);
   if (display_interrupts.pipe_c_pending()) {
-    HandlePipeInterrupt(PipeId::PIPE_C, timestamp.get());
+    HandlePipeInterrupt(PipeId::PIPE_C, timestamp);
   }
   if (display_interrupts.pipe_b_pending()) {
-    HandlePipeInterrupt(PipeId::PIPE_B, timestamp.get());
+    HandlePipeInterrupt(PipeId::PIPE_B, timestamp);
   }
   if (display_interrupts.pipe_a_pending()) {
-    HandlePipeInterrupt(PipeId::PIPE_A, timestamp.get());
+    HandlePipeInterrupt(PipeId::PIPE_A, timestamp);
   }
 
   {
@@ -317,7 +317,7 @@ void Interrupts::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase
   zx::unowned_interrupt(irq->object())->ack();
 }
 
-void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx_instant_mono_t timestamp) {
+void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx::time_monotonic timestamp) {
   registers::PipeRegs regs(pipe_id);
   auto interrupt_identity =
       regs.PipeInterrupt(registers::PipeRegs::InterruptRegister::kIdentity).ReadFrom(mmio_space_);

@@ -7,6 +7,7 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <stdint.h>
+#include <sys/eventfd.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -402,6 +403,29 @@ class ScopedMount {
 
 std::optional<size_t> parse_field_in_kb(std::string_view value);
 
+// A semaphore implemented with EventFd. Works across Threads and Forks.
+class EventFdSem {
+ public:
+  EventFdSem(int initial_value) { fd_ = fbl::unique_fd(eventfd(initial_value, EFD_SEMAPHORE)); }
+
+  ~EventFdSem() = default;
+  EventFdSem(EventFdSem &&other) noexcept = default;
+  EventFdSem &operator=(EventFdSem &&other) noexcept = default;
+
+  EventFdSem(const EventFdSem &) = delete;
+  EventFdSem &operator=(const EventFdSem &) = delete;
+
+  int Wait() {
+    eventfd_t val;
+    return static_cast<int>(TEMP_FAILURE_RETRY(eventfd_read(fd_.get(), &val)));
+  }
+
+  int Notify(int value) { return eventfd_write(fd_.get(), value); }
+
+ private:
+  fbl::unique_fd fd_;
+};
+
 // Returns the first memory mapping that matches the given predicate.
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
                                                  std::string_view maps);
@@ -442,6 +466,9 @@ bool TryWrite(uintptr_t addr);
 
 // Wrapper for the memfd_create system call.
 int MemFdCreate(const char *name, unsigned int flags);
+
+// Wrapper for the pidfd_open system call.
+int PidFdOpen(pid_t pid, unsigned int flags);
 
 void WaitUntilBlocked(pid_t target, bool ignore_tracer);
 

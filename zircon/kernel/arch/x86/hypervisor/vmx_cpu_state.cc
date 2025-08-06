@@ -162,7 +162,7 @@ void broadcast_invept(uint64_t eptp) {
   Guard<Mutex> guard(GuestMutex::Get());
   if (num_guests != 0) {
     mp_sync_exec(
-        MP_IPI_TARGET_ALL, 0,
+        mp_ipi_target::ALL, 0,
         [](void* eptp) { invept(InvEpt::SINGLE_CONTEXT, *static_cast<uint64_t*>(eptp)); }, &eptp);
   }
 }
@@ -249,7 +249,7 @@ zx::result<> alloc_vmx_state() {
     // Enable VMX for all online CPUs.
     cpu_mask_t cpu_mask = hypervisor::percpu_exec(vmxon_task, &state);
     if (cpu_mask != mp_get_online_mask()) {
-      mp_sync_exec(MP_IPI_TARGET_MASK, cpu_mask, vmxoff_task, nullptr);
+      mp_sync_exec(mp_ipi_target::MASK, cpu_mask, vmxoff_task, nullptr);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     ept_supports_large_pages.store(large_page_support.load());
@@ -264,7 +264,7 @@ void free_vmx_state() {
   Guard<Mutex> guard(GuestMutex::Get());
   num_guests--;
   if (num_guests == 0) {
-    mp_sync_exec(MP_IPI_TARGET_ALL, 0, vmxoff_task, nullptr);
+    mp_sync_exec(mp_ipi_target::ALL, 0, vmxoff_task, nullptr);
     vmxon_pages.reset();
   }
 }

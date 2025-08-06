@@ -11,6 +11,7 @@
 // TODO(https://fxbug.dev/42108268): combine common parts with x86 (after things settle)
 // TODO(https://fxbug.dev/42108269): chain event handling
 
+#include <align.h>
 #include <assert.h>
 #include <lib/perfmon.h>
 #include <lib/zircon-internal/mtrace.h>
@@ -30,7 +31,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
@@ -631,7 +631,7 @@ zx_status_t arch_perfmon_start() {
 
   // Make sure all relevant sysregs have been wiped clean.
   if (!perfmon_hw_initialized) {
-    mp_sync_exec(MP_IPI_TARGET_ALL, 0, arm64_perfmon_reset_task, nullptr);
+    mp_sync_exec(mp_ipi_target::ALL, 0, arm64_perfmon_reset_task, nullptr);
     perfmon_hw_initialized = true;
   }
 
@@ -662,7 +662,7 @@ zx_status_t arch_perfmon_start() {
     }
   }
 
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, arm64_perfmon_start_task, state);
+  mp_sync_exec(mp_ipi_target::ALL, 0, arm64_perfmon_start_task, state);
   perfmon_active.store(true);
 
   return ZX_OK;
@@ -787,7 +787,7 @@ static void arch_perfmon_stop_locked() TA_REQ(PerfmonLock::Get()) {
   // multiple stops and still read register values.
 
   auto state = perfmon_state.get();
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, arm64_perfmon_stop_task, state);
+  mp_sync_exec(mp_ipi_target::ALL, 0, arm64_perfmon_stop_task, state);
 
   // arm64_perfmon_start currently maps the buffers in, so we unmap them here.
   // Make sure to do this after we've turned everything off so that we
@@ -840,7 +840,7 @@ void arch_perfmon_fini() {
     DEBUG_ASSERT(!perfmon_active.load());
   }
 
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, arm64_perfmon_reset_task, nullptr);
+  mp_sync_exec(mp_ipi_target::ALL, 0, arm64_perfmon_reset_task, nullptr);
 
   perfmon_state.reset();
 }

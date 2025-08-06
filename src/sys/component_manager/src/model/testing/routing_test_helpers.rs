@@ -26,7 +26,7 @@ use cm_rust::*;
 use cm_types::{Name, Url};
 use component_id_index::InstanceId;
 use errors::ModelError;
-use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy};
+use fidl::endpoints::{self, create_proxy, Proxy};
 use fidl::{self};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
@@ -523,9 +523,7 @@ impl RoutingTest {
             .expect("component not in component decl list");
         // Two services installed into the same dir will cause duplicates, so use a HashSet to remove
         // them.
-        let expected_paths_hs: HashSet<String> = decl
-            .uses
-            .into_iter()
+        let expected_paths_hs: HashSet<String> = IntoIterator::into_iter(decl.uses)
             .filter_map(|u| match u {
                 UseDecl::Directory(d) => Some(d.target_path.to_string()),
                 UseDecl::Service(s) => Some(s.target_path.parent().to_string()),
@@ -1578,8 +1576,7 @@ pub mod capability_util {
         dir_proxy: fio::DirectoryProxy,
     ) {
         let mut ns = namespace.lock().await;
-        // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-        let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
+        let client_end = dir_proxy.into_client_end().unwrap();
         ns.add(path, client_end).unwrap();
     }
 

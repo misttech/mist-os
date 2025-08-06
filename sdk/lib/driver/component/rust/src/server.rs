@@ -19,6 +19,7 @@ use fdf::{fdf_handle_t, DriverHandle, Message};
 use crate::{Driver, DriverContext};
 use fdf_sys::fdf_dispatcher_get_current_dispatcher;
 use fidl_fuchsia_driver_framework::DriverStartArgs;
+use fuchsia_async::LocalExecutorBuilder;
 
 /// Implements the lifecycle management of a rust driver, including starting and stopping it
 /// and setting up the rust async dispatcher and logging for the driver to use, and running a
@@ -83,7 +84,8 @@ impl<T: Driver> DriverServer<T> {
                     // create and run a fuchsia-async executor, giving it the "root" dispatcher to
                     // actually execute driver tasks on, as this thread will be effectively blocked
                     // by the reactor loop.
-                    let mut executor = fuchsia_async::LocalExecutor::new();
+                    let port = zx::Port::create_with_opts(zx::PortOptions::BIND_TO_INTERRUPT);
+                    let mut executor = LocalExecutorBuilder::new().port(port).build();
                     executor.run_singlethreaded(async move {
                         server.message_loop(root_dispatcher).await;
                         // take the server handle so it can drop after the async block is done,

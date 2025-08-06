@@ -538,7 +538,7 @@ TEST(FsckTest, WrongInodeHardlinkCount) {
 
     // Save the inode number for fsck to retrieve it.
     ino = child_file->GetKey();
-    links = child_file->GetNlink();
+    links = child_file->GetLinkCount();
     ASSERT_EQ(links, 3u);
 
     ASSERT_EQ(child_file->Close(), ZX_OK);

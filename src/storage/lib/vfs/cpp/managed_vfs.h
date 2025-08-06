@@ -10,9 +10,14 @@
 #endif
 
 #include <lib/async/cpp/task.h>
+#include <lib/async/dispatcher.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/function.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
-#include <atomic>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -20,6 +25,7 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

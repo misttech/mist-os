@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
-use assembly_config_schema::platform_config::kernel_config::{
+use assembly_config_schema::platform_settings::kernel_config::{
     MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PagetableEvictionPolicy,
     PlatformKernelConfig,
 };
@@ -67,7 +67,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         if let Some(hysteresis_sec) = kernel_config.oom.hysteresis_seconds {
             builder.kernel_arg(KernelArg::OomHysteresisSeconds(hysteresis_sec));
         }
-        match (&context.board_info.kernel.serial_mode, &context.build_type) {
+        match (&context.board_config.kernel.serial_mode, &context.build_type) {
             (SerialMode::NoOutput, &BuildType::User) => {
                 builder.kernel_arg(KernelArg::Serial("none".to_string()))
             }
@@ -78,7 +78,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {}
         }
 
-        if let Some(serial) = &context.board_info.kernel.serial {
+        if let Some(serial) = &context.board_config.kernel.serial {
             if context.build_type == &BuildType::Eng {
                 builder.kernel_arg(KernelArg::Serial(serial.to_string()));
             }
@@ -96,34 +96,34 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
 
         // If the board supports the PMM checker, and this is an eng build-type
         // build, enable the pmm checker.
-        if context.board_info.provides_feature("fuchsia::pmm_checker")
-            && context.board_info.provides_feature("fuchsia::pmm_checker_auto")
+        if context.board_config.provides_feature("fuchsia::pmm_checker")
+            && context.board_config.provides_feature("fuchsia::pmm_checker_auto")
         {
             anyhow::bail!("Board provides conflicting features of 'fuchsia::pmm_checker' and 'fuchsia::pmm_checker_auto'");
         }
-        if context.board_info.provides_feature("fuchsia::pmm_checker")
+        if context.board_config.provides_feature("fuchsia::pmm_checker")
             && context.build_type == &BuildType::Eng
         {
             builder.platform_bundle("kernel_pmm_checker_enabled");
-        } else if context.board_info.provides_feature("fuchsia::pmm_checker_auto")
+        } else if context.board_config.provides_feature("fuchsia::pmm_checker_auto")
             && context.build_type == &BuildType::Eng
         {
             builder.platform_bundle("kernel_pmm_checker_enabled_auto");
         }
 
-        if context.board_info.kernel.contiguous_physical_pages {
+        if context.board_config.kernel.contiguous_physical_pages {
             builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
-        if context.board_info.kernel.scheduler_prefer_little_cpus {
+        if context.board_config.kernel.scheduler_prefer_little_cpus {
             builder.kernel_arg(KernelArg::SchedulerPreferLittleCpus(true));
         }
 
-        if !context.board_info.kernel.arm64_event_stream_enable {
+        if !context.board_config.kernel.arm64_event_stream_enable {
             builder.platform_bundle("kernel_arm64_event_stream_disable");
         }
 
-        if context.board_info.kernel.quiet_early_boot {
+        if context.board_config.kernel.quiet_early_boot {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
@@ -140,7 +140,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             }
         }
 
-        if context.board_info.kernel.halt_on_panic {
+        if context.board_config.kernel.halt_on_panic {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
                 "'kernel.halt-on-panic' can only be enabled in 'eng' builds"
@@ -196,7 +196,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(KernelArg::KtraceBufsize(ktrace_bufsize));
         }
 
-        for thread_roles_file in &context.board_info.configuration.thread_roles {
+        for thread_roles_file in &context.board_config.configuration.thread_roles {
             let filename = thread_roles_file
                 .file_name()
                 .ok_or_else(|| {
@@ -228,7 +228,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),

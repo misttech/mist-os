@@ -312,11 +312,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
 
-    // Enable Vsync so that vsync events will be given to this client.
     std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
         display_coordinator = display_manager_->default_display_coordinator();
-    [[maybe_unused]] fidl::OneWayStatus enable_vsync_result =
-        display_coordinator->sync()->SetVsyncEventDelivery(true);
   }
 
   void TearDown() override {

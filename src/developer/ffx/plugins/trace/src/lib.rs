@@ -352,7 +352,7 @@ pub async fn trace(
             };
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
-                categories: Some(opts.categories.clone()),
+                categories: Some(expanded_categories.clone()),
                 buffering_mode: Some(opts.buffering_mode),
                 defer_transfer: Some(defer_transfer),
                 ..ffx_trace::map_categories_to_providers(&expanded_categories)
@@ -362,6 +362,7 @@ pub async fn trace(
             let options = ffx::TraceOptions {
                 duration_ns: opts.duration.map(|d| Duration::from_secs(d.into()).as_nanos() as i64),
                 triggers,
+                requested_categories: Some(opts.categories.clone()),
                 ..Default::default()
             };
             writer.line(format!("Tracing categories: [{}]...", expanded_categories.join(","),))?;
@@ -383,8 +384,6 @@ pub async fn trace(
             }
 
             let provisioner = provisioner.await?;
-            let trace_config =
-                TraceConfig { categories: Some(expanded_categories.clone()), ..trace_config };
             let task =
                 direct::trace(provisioner.clone(), output.clone(), options, trace_config.clone())
                     .await?;
@@ -396,8 +395,7 @@ pub async fn trace(
             }
 
             writer.line("Trace completed! Copying trace from device...")?;
-            let mut trace_data = direct::stop_tracing(task, output).await?;
-            trace_data.categories = opts.categories;
+            let trace_data = direct::stop_tracing(task, output).await?;
 
             finalize_trace(
                 &context,

@@ -8,12 +8,13 @@ mod array;
 mod buffer;
 mod hashmap;
 mod lock;
+mod lpm_trie;
 mod ring_buffer;
 mod vmar;
 
 pub use ring_buffer::{RingBuffer, RingBufferWakeupPolicy, RINGBUF_SIGNAL};
 
-use ebpf::{BpfValue, EbpfBufferPtr, MapReference, MapSchema};
+use ebpf::{BpfValue, EbpfBufferPtr, MapFlags, MapReference, MapSchema};
 use fidl_fuchsia_ebpf as febpf;
 use inspect_stubs::track_stub;
 use linux_uapi::{
@@ -61,8 +62,72 @@ pub enum MapError {
     // Invalid VMO was passed for a shared map.
     InvalidVmo,
 
+    // Specified map configuration is not supported.
+    NotSupported,
+
     // An internal issue, e.g. failed to allocate VMO.
     Internal,
+}
+const SUPPORTED_FLAGS: MapFlags = MapFlags::NoPrealloc
+    .union(MapFlags::SyscallReadOnly)
+    .union(MapFlags::SyscallWriteOnly)
+    .union(MapFlags::Mmapable);
+
+fn map_flags_from_fidl(flags: febpf::MapFlags) -> MapFlags {
+    let mut r = MapFlags::empty();
+    if flags.contains(febpf::MapFlags::NO_PREALLOC) {
+        r = r | MapFlags::NoPrealloc;
+    }
+    if flags.contains(febpf::MapFlags::SYSCALL_READ_ONLY) {
+        r = r | MapFlags::SyscallReadOnly;
+    }
+    if flags.contains(febpf::MapFlags::SYSCALL_WRITE_ONLY) {
+        r = r | MapFlags::SyscallWriteOnly;
+    }
+    if flags.contains(febpf::MapFlags::MMAPABLE) {
+        r = r | MapFlags::Mmapable;
+    }
+    r
+}
+
+fn map_flags_to_fidl(flags: MapFlags) -> Result<febpf::MapFlags, MapError> {
+    if flags.contains(!SUPPORTED_FLAGS) {
+        return Err(MapError::NotSupported);
+    }
+
+    let mut r = febpf::MapFlags::empty();
+    if flags.contains(MapFlags::NoPrealloc) {
+        r = r | febpf::MapFlags::NO_PREALLOC;
+    }
+    if flags.contains(MapFlags::SyscallReadOnly) {
+        r = r | febpf::MapFlags::SYSCALL_READ_ONLY;
+    }
+    if flags.contains(MapFlags::SyscallWriteOnly) {
+        r = r | febpf::MapFlags::SYSCALL_WRITE_ONLY;
+    }
+    if flags.contains(MapFlags::Mmapable) {
+        r = r | febpf::MapFlags::MMAPABLE;
+    }
+    Ok(r)
+}
+
+fn validate_map_flags(schema: &MapSchema) -> Result<(), MapError> {
+    let flags = schema.flags;
+    if flags.contains(!SUPPORTED_FLAGS) {
+        return Err(MapError::InvalidParam);
+    }
+
+    // Read-only and write-only flags are mutually exclusive.
+    if flags.contains(MapFlags::SyscallReadOnly) && flags.contains(MapFlags::SyscallWriteOnly) {
+        return Err(MapError::InvalidParam);
+    }
+
+    // `MMAPABLE` is valid only for arrays.
+    if flags.contains(MapFlags::Mmapable) && schema.map_type != bpf_map_type_BPF_MAP_TYPE_ARRAY {
+        return Err(MapError::InvalidParam);
+    }
+
+    Ok(())
 }
 
 trait MapImpl: Send + Sync + Debug {
@@ -87,7 +152,6 @@ trait MapImpl: Send + Sync + Debug {
 #[derive(Debug)]
 pub struct Map {
     pub schema: MapSchema,
-    pub flags: u32,
 
     // The impl because it's required for some map implementations need to be
     // pinned, particularly ring buffers.
@@ -141,9 +205,10 @@ const BASE_MAP_RIGHTS: zx::Rights = zx::Rights::READ
 const SHARED_MAP_RIGHTS: zx::Rights = BASE_MAP_RIGHTS.union(zx::Rights::TRANSFER);
 
 impl Map {
-    pub fn new(schema: MapSchema, flags: u32) -> Result<PinnedMap, MapError> {
+    pub fn new(schema: MapSchema) -> Result<PinnedMap, MapError> {
+        validate_map_flags(&schema)?;
         let map_impl = create_map_impl(&schema, None)?;
-        Ok(PinnedMap(Arc::pin(Self { schema, flags, map_impl })))
+        Ok(PinnedMap(Arc::pin(Self { schema, map_impl })))
     }
 
     pub fn new_shared(shared: febpf::Map) -> Result<PinnedMap, MapError> {
@@ -162,10 +227,11 @@ impl Map {
             key_size: fidl_schema.key_size,
             value_size: fidl_schema.value_size,
             max_entries: fidl_schema.max_entries,
+            flags: map_flags_from_fidl(fidl_schema.flags),
         };
 
         let map_impl = create_map_impl(&schema, Some(vmo))?;
-        Ok(PinnedMap(Arc::pin(Self { schema, flags: 0, map_impl })))
+        Ok(PinnedMap(Arc::pin(Self { schema, map_impl })))
     }
 
     pub fn share(&self) -> Result<febpf::Map, MapError> {
@@ -175,6 +241,7 @@ impl Map {
                 key_size: self.schema.key_size,
                 value_size: self.schema.value_size,
                 max_entries: self.schema.max_entries,
+                flags: map_flags_to_fidl(self.schema.flags)?,
             }),
             vmo: Some(
                 self.map_impl
@@ -231,6 +298,7 @@ impl Map {
 pub enum MapValueRef<'a> {
     PlainRef(EbpfBufferPtr<'a>),
     HashMapRef(hashmap::HashMapEntryRef<'a>),
+    LpmTrieRef(lpm_trie::LpmTrieEntryRef<'a>),
 }
 
 impl<'a> MapValueRef<'a> {
@@ -242,14 +310,22 @@ impl<'a> MapValueRef<'a> {
         Self::HashMapRef(hash_map_ref)
     }
 
+    fn new_from_lpm_trie(lpm_trie_ref: lpm_trie::LpmTrieEntryRef<'a>) -> Self {
+        Self::LpmTrieRef(lpm_trie_ref)
+    }
+
     pub fn is_ref_counted(&self) -> bool {
-        matches!(&self, MapValueRef::HashMapRef(_))
+        match self {
+            Self::PlainRef(_) => false,
+            Self::HashMapRef(_) | Self::LpmTrieRef(_) => true,
+        }
     }
 
     pub fn ptr(&self) -> EbpfBufferPtr<'a> {
         match self {
-            MapValueRef::PlainRef(buf) => *buf,
-            MapValueRef::HashMapRef(hash_map_ref) => hash_map_ref.ptr(),
+            Self::PlainRef(buf) => *buf,
+            Self::HashMapRef(hash_map_ref) => hash_map_ref.ptr(),
+            Self::LpmTrieRef(lpm_trie_ref) => lpm_trie_ref.ptr(),
         }
     }
 }
@@ -262,16 +338,17 @@ fn create_map_impl(
         bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema, vmo)?),
+        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => Ok(Box::pin(lpm_trie::LpmTrie::new(schema, vmo)?)),
 
         // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
         // these
         bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP_HASH");
-            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
-        }
-        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => {
-            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LPM_TRIE");
-            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
+            // `BPF_F_RDONLY_PROG` is not yet implemented, but it's always set
+            // for `DEVMAP` maps.
+            let schema =
+                MapSchema { flags: schema.flags.difference(MapFlags::ProgReadOnly), ..*schema };
+            Ok(Box::pin(hashmap::HashMap::new(&schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
@@ -440,10 +517,11 @@ mod test {
             key_size: 4,
             value_size: 4,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
         // Create two array maps sharing the content.
-        let map1 = Map::new(schema, 0).unwrap();
+        let map1 = Map::new(schema).unwrap();
         let map2 = Map::new_shared(map1.share().unwrap()).unwrap();
 
         // Set a value in one map and check that it's updated in the other.
@@ -460,10 +538,11 @@ mod test {
             key_size: 4,
             value_size: 4,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
         // Create two array maps sharing the content.
-        let map1 = Map::new(schema, 0).unwrap();
+        let map1 = Map::new(schema).unwrap();
         let map2 = Map::new_shared(map1.share().unwrap()).unwrap();
 
         // Set a value in one map and check that it's updated in the other.
@@ -480,6 +559,7 @@ mod test {
             key_size: 5,
             value_size: 25,
             max_entries: 10000,
+            flags: MapFlags::empty(),
         };
 
         let get_key = |i| {
@@ -493,7 +573,7 @@ mod test {
         };
         let get_value = |i, v| format!("--{:010} {:010}--", i, v).into_bytes();
 
-        let map = Map::new(schema, 0).unwrap();
+        let map = Map::new(schema).unwrap();
 
         for i in 0..10000 {
             assert!(map.update(get_key(i), &get_value(i, 0), 0).is_ok());
@@ -542,9 +622,10 @@ mod test {
             key_size: 5,
             value_size: 11,
             max_entries: 10,
+            flags: MapFlags::empty(),
         };
 
-        let map = Map::new(schema, 0).unwrap();
+        let map = Map::new(schema).unwrap();
         let key = MapKey::from_vec("12345".to_string().into_bytes());
         let value = (0..11).collect::<Vec<u8>>();
         assert!(map.update(key.clone(), &value, 0).is_ok());
@@ -565,9 +646,10 @@ mod test {
             key_size: 5,
             value_size: 11,
             max_entries: 2,
+            flags: MapFlags::empty(),
         };
 
-        let map = Map::new(schema, 0).unwrap();
+        let map = Map::new(schema).unwrap();
         let key = MapKey::from_vec("12345".to_string().into_bytes());
         let key2 = MapKey::from_vec("24122".to_string().into_bytes());
         let value = (0..11).collect::<Vec<u8>>();
@@ -591,9 +673,10 @@ mod test {
             key_size: 0,
             value_size: 0,
             max_entries: 4096 * 2,
+            flags: MapFlags::empty(),
         };
 
-        let map = Map::new(schema, 0).unwrap();
+        let map = Map::new(schema).unwrap();
         map.ringbuf_reserve(8000, 0).expect("ringbuf_reserve failed");
 
         let map2 = Map::new_shared(map.share().unwrap()).unwrap();

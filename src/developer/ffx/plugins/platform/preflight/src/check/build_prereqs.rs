@@ -154,7 +154,7 @@ mod test {
     use super::*;
     use crate::command_runner::ExitStatus;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_success_linux() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["uname", "-m"] {
@@ -173,7 +173,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_arm_linux() -> Result<()> {
         // Return "arm64" from uname -m, which should cause a Failure().
         let run_command: CommandRunner = |args| {
@@ -189,7 +189,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_non_debian_linux() -> Result<()> {
         // Fail one of the queries for a package.
         let run_command: CommandRunner = |args| {
@@ -208,7 +208,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_missing_package_linux() -> Result<()> {
         // Fail one of the queries for a package.
         let run_command: CommandRunner = |args| {
@@ -232,7 +232,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_success_macos_10_15_and_newer() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["uname", "-p"] {
@@ -258,7 +258,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_warning_macos_10_15_m1_chipset() -> Result<()> {
         {
             let run_command: CommandRunner = |args| {
@@ -288,7 +288,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_failure_macos_10_15_and_older() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["uname", "-p"] {
@@ -316,7 +316,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_failure_old_macos() -> Result<()> {
         let run_command: CommandRunner = |_| {
             unreachable!();

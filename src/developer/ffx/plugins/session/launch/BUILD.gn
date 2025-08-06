@@ -24,7 +24,7 @@ ffx_plugin("ffx_session_launch") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   args_sources = [ "src/args.rs" ]
   args_deps = [

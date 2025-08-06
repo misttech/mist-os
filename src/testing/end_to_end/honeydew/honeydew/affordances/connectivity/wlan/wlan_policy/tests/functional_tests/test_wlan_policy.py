@@ -8,7 +8,7 @@ import string
 import time
 from collections.abc import Iterator
 
-import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_policy as f_wlan_policy
 from antlion.controllers import access_point
 from antlion.controllers.ap_lib import hostapd_constants
 from mobly import asserts, signals, test_runner
@@ -233,7 +233,7 @@ class WlanPolicyTests(wlan_base_test.WlanBaseTest):
         test_ssid = random_str()
         asserts.assert_equal(
             self.device.wlan_policy.connect(test_ssid, SecurityType.NONE),
-            f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED,
+            f_wlan_policy.RequestStatus.REJECTED_NOT_SUPPORTED,
             "Connect requests should be rejected when client connections are "
             "disabled.",
         )

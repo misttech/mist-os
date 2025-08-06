@@ -21,13 +21,13 @@ pub trait Generate {
 
 impl Generate for bool {
     fn generate(rng: &mut impl Rng) -> Self {
-        rng.gen_bool(0.5)
+        rng.random_bool(0.5)
     }
 }
 
 impl Generate for u32 {
     fn generate(rng: &mut impl Rng) -> Self {
-        rng.gen()
+        rng.random()
     }
 }
 
@@ -39,7 +39,7 @@ impl<T: Generate> Generate for Box<T> {
 
 impl<T: Generate> Generate for Option<T> {
     fn generate(rng: &mut impl Rng) -> Self {
-        if rng.gen_bool(0.5) {
+        if rng.random_bool(0.5) {
             Some(T::generate(rng))
         } else {
             None

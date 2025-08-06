@@ -270,7 +270,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         &self.policy_checker
     }
 
-    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+    fn config_parent_overrides(&self) -> Option<&[cm_rust::ConfigOverride]> {
         // TODO(https://fxbug.dev/42077231) ensure static parent overrides are captured
         None
     }
@@ -306,23 +306,23 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
 impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
     type Component = Self;
 
-    fn uses(&self) -> Vec<UseDecl> {
+    fn uses(&self) -> Box<[UseDecl]> {
         self.decl.uses.clone()
     }
 
-    fn exposes(&self) -> Vec<ExposeDecl> {
+    fn exposes(&self) -> Box<[ExposeDecl]> {
         self.decl.exposes.clone()
     }
 
-    fn offers(&self) -> Vec<OfferDecl> {
+    fn offers(&self) -> Box<[OfferDecl]> {
         self.decl.offers.clone()
     }
 
-    fn capabilities(&self) -> Vec<CapabilityDecl> {
+    fn capabilities(&self) -> Box<[CapabilityDecl]> {
         self.decl.capabilities.clone()
     }
 
-    fn collections(&self) -> Vec<CollectionDecl> {
+    fn collections(&self) -> Box<[CollectionDecl]> {
         self.decl.collections.clone()
     }
 

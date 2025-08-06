@@ -24,7 +24,7 @@
   .cfi_same_value x1
 
   // Provide a complete FP backtrace in case of crashes in the dynamic linker.
-  .prologue.fp
+  .prologue.fp 16
 
   // Save the incoming arguments to pass them again to the user entry point.
   // StartLd still gets these in the original two argument registers.  These
@@ -32,10 +32,9 @@
   // process startup.  But LdStartupInProcessTests::Run() expects to be able to
   // call this entry point as if it's calling the user entry point as a normal
   // function, where call-saved registers must not be clobbered.
-  stp x0, x1, [sp, #-16]!
-  .cfi_adjust_cfa_offset 16
-  .cfi_rel_offset x0, 0
-  .cfi_rel_offset x1, 8
+  stp x0, x1, [sp, #16]  // The first two words are the FP, LR pair.
+  .cfi_rel_offset x0, 16 // These are above those two, further from the SP.
+  .cfi_rel_offset x1, 24
 
   bl StartLd
 
@@ -43,13 +42,12 @@
   mov x2, x1   // Third user argument returned in x1.
 
   // Restore the original first and second user arguments.
-  ldp x0, x1, [sp], #16
-  .cfi_adjust_cfa_offset 16
+  ldp x0, x1, [sp, #16]
   .cfi_same_value x0
   .cfi_same_value x1
 
   // This restores the incoming FP and x30 (return address), both usually zero.
-  .epilogue.fp
+  .epilogue.fp 16
 
   // With stack unwound and arguments in place, jump to the user entry point.
   br x16
@@ -93,7 +91,7 @@
   .cfi_same_value %rsi
 
   // Provide a complete FP backtrace in case of crashes in the dynamic linker.
-  .prologue.fp
+  .prologue.fp frame_extra_size_for_metadata=16  // Two more pushes below.
 
   // Save the incoming arguments to pass them again to the user entry point.
   // StartLd still gets these in the original two argument registers.

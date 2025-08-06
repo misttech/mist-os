@@ -15,6 +15,7 @@ use fidl_fuchsia_hardware_google_nanohub as fnanohub;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_uapi::file_mode::mode;
 
 pub fn build_display_comms_directory(device: &Device, dir: &SimpleDirectoryMutator) {
@@ -38,6 +39,13 @@ pub fn build_display_comms_directory(device: &Device, dir: &SimpleDirectoryMutat
 
 pub fn build_nanohub_comms_directory(device: &Device, dir: &SimpleDirectoryMutator) {
     build_device_directory(device, dir);
+
+    dir.entry(
+        "display_panel_name",
+        BytesFile::new_node(b"FL22-BOE-WJ014SGM".to_vec()),
+        mode!(IFREG, 0o440),
+    );
+
     dir.entry("download_firmware", FirmwareFile::new(), mode!(IFREG, 0o220));
     dir.entry(
         "firmware_name",

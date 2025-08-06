@@ -1333,6 +1333,8 @@ class_permission_enum! {
         SetSockCreate("setsockcreate"),
         /// Permission to send SIGCHLD to a process.
         SigChld("sigchld"),
+        /// Permission to inherit the parent process's signal state.
+        SigInh("siginh"),
         /// Permission to send SIGKILL to a process.
         SigKill("sigkill"),
         /// Permission to send SIGSTOP to a process.
@@ -1539,7 +1541,7 @@ pub struct SeLinuxStatus {
 }
 
 /// Interface for security server to interact with selinuxfs status file.
-pub trait SeLinuxStatusPublisher: Send {
+pub trait SeLinuxStatusPublisher: Send + Sync {
     /// Sets the value part of the associated selinuxfs status file.
     fn set_status(&mut self, policy_status: SeLinuxStatus);
 }

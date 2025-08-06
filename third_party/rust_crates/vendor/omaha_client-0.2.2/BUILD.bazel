@@ -79,7 +79,7 @@ rust_library(
     }),
     version = "0.2.2",
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
         "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
         "//third_party/rust_crates/vendor/ecdsa-0.14.8:ecdsa",
         "//third_party/rust_crates/vendor/elliptic-curve-0.12.3:elliptic_curve",
@@ -97,7 +97,7 @@ rust_library(
         "//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json",
         "//third_party/rust_crates/vendor/sha2-0.10.8:sha2",
         "//third_party/rust_crates/vendor/signature-1.6.4:signature",
-        "//third_party/rust_crates/vendor/thiserror-2.0.11:thiserror",
+        "//third_party/rust_crates/vendor/thiserror-2.0.12:thiserror",
         "//third_party/rust_crates/vendor/tracing-0.1.40:tracing",
         "//third_party/rust_crates/vendor/uuid-1.1.2:uuid",
     ],

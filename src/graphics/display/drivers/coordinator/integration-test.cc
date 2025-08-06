@@ -32,9 +32,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client-proxy.h"
-#include "src/graphics/display/drivers/coordinator/client.h"
-#include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/client-vsync-queue.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/coordinator/testing/mock-coordinator-listener.h"
@@ -48,6 +46,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 #include "src/graphics/display/lib/driver-utils/post-task.h"
@@ -258,8 +257,6 @@ class TestFidlClient {
       const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
       ClientPriority client_priority, async_dispatcher_t* coordinator_listener_dispatcher);
 
-  zx::result<> EnableVsyncEventDelivery();
-
   zx::result<> SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   zx::result<display::LayerId> CreateLayer();
   zx::result<> ImportBufferCollection(
@@ -432,10 +429,10 @@ zx::result<> TestFidlClient::SetVirtconMode(
     fuchsia_hardware_display::wire::VirtconMode virtcon_mode) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetVirtconMode(virtcon_mode);
-  if (!fidl_status.ok()) {
-    fdf::error("SetVirtconMode() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetVirtconMode(virtcon_mode);
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetVirtconMode() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -445,11 +442,11 @@ zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event
 
   const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->ImportEvent(std::move(event), fidl_event_id);
-  if (!fidl_status.ok()) {
-    fdf::error("ImportEvent() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("ImportEvent() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -457,21 +454,22 @@ zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event
 zx::result<display::LayerId> TestFidlClient::CreateLayer() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CreateLayer> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CreateLayer> fidl_transport_result =
       coordinator_fidl_client_->CreateLayer();
-  if (!fidl_status.ok()) {
-    fdf::error("CreateLayer() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("CreateLayer() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
   const fit::result<zx_status_t, fuchsia_hardware_display::wire::CoordinatorCreateLayerResponse*>&
-      fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("CreateLayer() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+      fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("CreateLayer() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
 
-  return zx::ok(display::LayerId(fidl_value.value()->layer_id));
+  return zx::ok(display::LayerId(fidl_domain_result.value()->layer_id));
 }
 
 zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_metadata,
@@ -483,18 +481,19 @@ zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_met
       buffer_collection_id.ToFidl();
   const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_transport_result =
       coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_buffer_collection_id,
                                             buffer_index, fidl_image_id);
-  if (!fidl_status.ok()) {
-    fdf::error("ImportImage() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("ImportImage() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("ImportImage() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("ImportImage() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -513,12 +512,12 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
     fidl_layer_ids.push_back(fidl_layer_id);
   }
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetDisplayLayers(
+  const fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetDisplayLayers(
       display_id.ToFidl(),
       fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layer_ids));
-  if (!fidl_status.ok()) {
-    fdf::error("SetDisplayLayers() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetDisplayLayers() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -531,11 +530,11 @@ zx::result<> TestFidlClient::SetLayerPrimaryConfig(display::LayerId layer_id,
   const fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
       image_metadata.ToFidl();
 
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->SetLayerPrimaryConfig(fidl_layer_id, fidl_image_metadata);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -548,11 +547,11 @@ zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::I
   const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
   const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_event_id);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerImage2() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerImage2() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -571,11 +570,11 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
       .height = static_cast<uint32_t>(fullscreen_metadata.height()),
   };
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerColorConfig(
+  const fidl::OneWayStatus fidl_transport_status = coordinator_fidl_client_->SetLayerColorConfig(
       fidl_layer_id, fidl_fallback_color, display_destination);
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerColorConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("SetLayerColorConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -583,22 +582,23 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
 zx::result<display::ConfigCheckResult> TestFidlClient::CheckConfig() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_status =
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_transport_result =
       coordinator_fidl_client_->CheckConfig();
-  if (!fidl_status.ok()) {
-    fdf::error("CheckConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("CheckConfig() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
-  const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_result =
-      fidl_status.value();
-  fuchsia_hardware_display_types::wire::ConfigResult fidl_config_check_result = fidl_result.res;
+  const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_domain_result =
+      fidl_transport_result.value();
+  fuchsia_hardware_display_types::wire::ConfigResult fidl_config_check_result =
+      fidl_domain_result.res;
   if (!display::ConfigCheckResult::IsValid(fidl_config_check_result)) {
     fdf::error("CheckConfig() returned unrecognized code: {}",
                static_cast<uint32_t>(fidl_config_check_result));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  return zx::ok(display::ConfigCheckResult(fidl_result.res));
+  return zx::ok(display::ConfigCheckResult(fidl_domain_result.res));
 }
 
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
@@ -611,10 +611,11 @@ zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
           .stamp(fidl_config_stamp)
           .Build();
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->ApplyConfig3(std::move(request));
-  if (!fidl_status.ok()) {
-    fdf::error("ApplyConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  const fidl::OneWayStatus fidl_transport_status =
+      coordinator_fidl_client_->ApplyConfig3(std::move(request));
+  if (!fidl_transport_status.ok()) {
+    fdf::error("ApplyConfig() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -624,11 +625,11 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
 
   const fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie =
       vsync_ack_cookie.ToFidl();
-  const fidl::OneWayStatus fidl_status =
+  const fidl::OneWayStatus fidl_transport_status =
       coordinator_fidl_client_->AcknowledgeVsync(fidl_vsync_ack_cookie.value);
-  if (!fidl_status.ok()) {
-    fdf::error("AcknowledgeVsync() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("AcknowledgeVsync() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -636,17 +637,18 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
 zx::result<> TestFidlClient::SetMinimumRgb(uint8_t minimum_rgb) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::WireResult<fuchsia_hardware_display::Coordinator::SetMinimumRgb> fidl_status =
-      coordinator_fidl_client_->SetMinimumRgb(minimum_rgb);
-  if (!fidl_status.ok()) {
-    fdf::error("SetMinimumRgb() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  const fidl::WireResult<fuchsia_hardware_display::Coordinator::SetMinimumRgb>
+      fidl_transport_result = coordinator_fidl_client_->SetMinimumRgb(minimum_rgb);
+  if (!fidl_transport_result.ok()) {
+    fdf::error("SetMinimumRgb() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_value = fidl_status.value();
-  if (fidl_value.is_error()) {
-    fdf::error("SetMinimumRgb() returned error: {}", zx::make_result(fidl_value.error_value()));
-    return zx::error(fidl_value.error_value());
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("SetMinimumRgb() returned error: {}",
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -728,10 +730,6 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   });
 }
 
-zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
-  return zx::make_result(coordinator_fidl_client_->SetVsyncEventDelivery(true).status());
-}
-
 zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
                                          const std::vector<LayerConfig>& layer_configs) {
   ZX_ASSERT_MSG(!layer_configs.empty(), "Empty configurations are not supported");
@@ -789,15 +787,15 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
 
 zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
   EXPECT_TRUE(coordinator_fidl_client_);
-  fidl::WireResult<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp> fidl_status =
-      coordinator_fidl_client_->GetLatestAppliedConfigStamp();
-  if (!fidl_status.ok()) {
-    fdf::error("GetLatestAppliedConfigStamp() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>
+      fidl_transport_result = coordinator_fidl_client_->GetLatestAppliedConfigStamp();
+  if (!fidl_transport_result.ok()) {
+    fdf::error("GetLatestAppliedConfigStamp() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>&
-      fidl_value = fidl_status.value();
-  return zx::ok(display::ConfigStamp(fidl_value.stamp));
+      fidl_domain_result = fidl_transport_result.value();
+  return zx::ok(display::ConfigStamp(fidl_domain_result.stamp));
 }
 
 std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerConfig() {
@@ -819,19 +817,19 @@ zx::result<> TestFidlClient::ImportBufferCollection(
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
       buffer_collection_id.ToFidl();
 
-  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection> fidl_status =
-      coordinator_fidl_client_->ImportBufferCollection(fidl_buffer_collection_id,
-                                                       std::move(buffer_token));
-  if (!fidl_status.ok()) {
-    fdf::error("ImportBufferCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection>
+      fidl_transport_result = coordinator_fidl_client_->ImportBufferCollection(
+          fidl_buffer_collection_id, std::move(buffer_token));
+  if (!fidl_transport_result.ok()) {
+    fdf::error("ImportBufferCollection() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
-  if (fidl_result.is_error()) {
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
     fdf::error("ImportBufferCollection() returned error: {}",
-               zx::make_result(fidl_result.error_value()));
-    return zx::error(fidl_result.error_value());
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -845,18 +843,19 @@ zx::result<> TestFidlClient::SetBufferCollectionConstraints(
       image_buffer_usage.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::SetBufferCollectionConstraints>
-      fidl_status = coordinator_fidl_client_->SetBufferCollectionConstraints(
+      fidl_transport_result = coordinator_fidl_client_->SetBufferCollectionConstraints(
           fidl_buffer_collection_id, fidl_image_buffer_usage);
-  if (!fidl_status.ok()) {
-    fdf::error("SetBufferCollectionConstraints() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("SetBufferCollectionConstraints() failed: {}",
+               fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
-  if (fidl_result.is_error()) {
+  const fit::result<zx_status_t>& fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
     fdf::error("SetBufferCollectionConstraints() failed: {}",
-               zx::make_result(fidl_result.error_value()));
-    return zx::error(fidl_result.error_value());
+               zx::make_result(fidl_domain_result.error_value()));
+    return zx::error(fidl_domain_result.error_value());
   }
   return zx::ok();
 }
@@ -866,13 +865,13 @@ TestFidlClient::SysmemAllocateSharedCollection() {
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   fidl::Arena arena;
-  fidl::OneWayStatus fidl_status = sysmem_->AllocateSharedCollection(
+  fidl::OneWayStatus fidl_transport_status = sysmem_->AllocateSharedCollection(
       fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
           .token_request(std::move(token_server))
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("AllocateSharedCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("AllocateSharedCollection() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok(std::move(token_client));
 }
@@ -885,22 +884,23 @@ TestFidlClient::SysmemTokenDuplicateSync(
 
   fidl::Arena arena;
   static constexpr zx_rights_t kRightAttenunationMasks[] = {ZX_RIGHT_SAME_RIGHTS};
-  fidl::WireResult<fuchsia_sysmem2::BufferCollectionToken::DuplicateSync> fidl_status =
+  fidl::WireResult<fuchsia_sysmem2::BufferCollectionToken::DuplicateSync> fidl_transport_result =
       token->DuplicateSync(
           fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncRequest::Builder(arena)
               .rights_attenuation_masks(kRightAttenunationMasks)
               .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollectionToken.Duplicate() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_result.ok()) {
+    fdf::error("BufferCollectionToken.Duplicate() failed: {}",
+               fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_result =
-      fidl_status.value();
-  ZX_ASSERT(fidl_result.has_tokens());
-  ZX_ASSERT(fidl_result.tokens().size() == 1);
+  fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_domain_result =
+      fidl_transport_result.value();
+  ZX_ASSERT(fidl_domain_result.has_tokens());
+  ZX_ASSERT(fidl_domain_result.tokens().size() == 1);
 
-  return zx::ok(std::move(fidl_result.tokens()[0]));
+  return zx::ok(std::move(fidl_domain_result.tokens()[0]));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> TestFidlClient::SysmemTokenBind(
@@ -909,14 +909,14 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> TestFidlClient::S
       fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
   fidl::Arena arena;
-  fidl::OneWayStatus fidl_status = sysmem_->BindSharedCollection(
+  fidl::OneWayStatus fidl_transport_status = sysmem_->BindSharedCollection(
       fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
           .token(std::move(token))
           .buffer_collection_request(std::move(buffer_collection_server))
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BindSharedCollection() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BindSharedCollection() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok(std::move(buffer_collection_client));
 }
@@ -926,44 +926,50 @@ zx::result<> TestFidlClient::SysmemBufferCollectionRelease(
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> buffer_collection_client(
       std::move(buffer_collection));
 
-  fidl::OneWayStatus fidl_status = buffer_collection_client->Release();
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollection.Release() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::OneWayStatus fidl_transport_status = buffer_collection_client->Release();
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BufferCollection.Release() failed: {}", fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
 
 zx::result<size_t> TestFidlClient::SysmemWaitForAllBuffersAllocated(
     const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
-  fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated> fidl_status =
-      buffer_collection->WaitForAllBuffersAllocated();
-  if (!fidl_status.ok()) {
-    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated>
+      fidl_transport_result = buffer_collection->WaitForAllBuffersAllocated();
+  if (!fidl_transport_result.ok()) {
+    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl_transport_result.status_string());
+    return zx::error(fidl_transport_result.status());
   }
 
-  fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse* fidl_result =
-      fidl_status->value();
-  ZX_DEBUG_ASSERT_MSG(fidl_result->has_buffer_collection_info(),
+  fit::result<fuchsia_sysmem2::wire::Error,
+              fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse*>&
+      fidl_domain_result = fidl_transport_result.value();
+  if (fidl_domain_result.is_error()) {
+    fdf::error("WaitForAllBufferAllocated() returned sysmem error code: {}",
+               static_cast<uint32_t>(fidl_domain_result.error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  ZX_DEBUG_ASSERT_MSG(fidl_domain_result.value()->has_buffer_collection_info(),
                       "Sysmem deviated from its contract");
-  ZX_DEBUG_ASSERT_MSG(fidl_result->buffer_collection_info().has_buffers(),
+  ZX_DEBUG_ASSERT_MSG(fidl_domain_result.value()->buffer_collection_info().has_buffers(),
                       "Sysmem deviated from its contract");
-  return zx::ok(fidl_result->buffer_collection_info().buffers().size());
+  return zx::ok(fidl_domain_result.value()->buffer_collection_info().buffers().size());
 }
 
 zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
     const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
   {
     fidl::Arena arena;
-    fidl::OneWayStatus fidl_status =
+    fidl::OneWayStatus fidl_transport_status =
         buffer_collection->SetName(fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena)
                                        .priority(10000u)
                                        .name("display-coordintator-tests")
                                        .Build());
-    if (!fidl_status.ok()) {
-      fdf::error("BufferCollection.SetName() failed: {}", fidl_status.status_string());
-      return zx::error(fidl_status.status());
+    if (!fidl_transport_status.ok()) {
+      fdf::error("BufferCollection.SetName() failed: {}", fidl_transport_status.status_string());
+      return zx::error(fidl_transport_status.status());
     }
   }
 
@@ -982,13 +988,14 @@ zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
                                      .ram_domain_supported(true)
                                      .Build());
 
-  fidl::OneWayStatus fidl_status = buffer_collection->SetConstraints(
+  fidl::OneWayStatus fidl_transport_status = buffer_collection->SetConstraints(
       fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
           .constraints(constraints_builder.Build())
           .Build());
-  if (!fidl_status.ok()) {
-    fdf::error("BufferCollection.SetConstraints() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  if (!fidl_transport_status.ok()) {
+    fdf::error("BufferCollection.SetConstraints() failed: {}",
+               fidl_transport_status.status_string());
+    return zx::error(fidl_transport_status.status());
   }
   return zx::ok();
 }
@@ -1083,65 +1090,8 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   return zx::ok(image_id);
 }
 
-}  // namespace
-
 class IntegrationTest : public TestBase {
  public:
-  // Returns null if there is no client connected at `client_priority`.
-  static ClientProxy* GetClientProxy(Controller& coordinator_controller,
-                                     ClientPriority client_priority)
-      __TA_REQUIRES(coordinator_controller.mtx()) {
-    switch (client_priority) {
-      case ClientPriority::kPrimary:
-        return coordinator_controller.primary_client_;
-      case ClientPriority::kVirtcon:
-        return coordinator_controller.virtcon_client_;
-    }
-    ZX_DEBUG_ASSERT_MSG(false, "Unimplemtened client priority: %d",
-                        static_cast<int>(client_priority));
-    return nullptr;
-  }
-
-  display::VsyncAckCookie LastAckedCookie(ClientPriority client_priority) {
-    Controller& coordinator_controller = *CoordinatorController();
-    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
-    ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
-    ZX_ASSERT(client_proxy != nullptr);
-
-    return client_proxy->LastVsyncAckCookieForTesting();
-  }
-
-  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
-    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
-
-    // Resetting the client will *start* client tear down.
-    //
-    // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
-    // threading model of its fidl server binding), but that doesn't sync with the client end
-    // (intentionally).
-    client.reset();
-    ZX_ASSERT_MSG(CoordinatorController()->client_owning_displays_ == client_proxy,
-                  "The display owner changed while holding the controller mutex");
-    EXPECT_OK(
-        sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
-    // SetVsyncEventDelivery(false) has not completed here, because we are still
-    // holding controller()->mtx()
-    client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
-  }
-
-  bool IsClientConnected(ClientPriority client_priority) {
-    Controller& coordinator_controller = *CoordinatorController();
-    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
-    return GetClientProxy(coordinator_controller, client_priority) != nullptr;
-  }
-
-  void SendVsyncFromCoordinatorClientProxy() {
-    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    CoordinatorController()->client_owning_displays_->OnDisplayVsync(
-        display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
-  }
-
   void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
 
   display::DriverConfigStamp DisplayEngineAppliedConfigStamp() {
@@ -1171,10 +1121,6 @@ class IntegrationTest : public TestBase {
     ZX_ASSERT_MSG(open_coordinator_result.is_ok(), "Failed to open coordinator: %s",
                   open_coordinator_result.status_string());
 
-    zx::result<> enable_vsync_result = coordinator_client->EnableVsyncEventDelivery();
-    ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync delivery for client: %s",
-                  enable_vsync_result.status_string());
-
     bool poll_success =
         PollUntilOnLoop([&]() { return coordinator_client->state().HasConnectedDisplay(); });
     ZX_ASSERT_MSG(poll_success, "Loop shut down while waiting for display info");
@@ -1198,15 +1144,6 @@ class IntegrationTest : public TestBase {
             .id(koid)
             .Build());
     EXPECT_TRUE(set_debug_status.ok()) << set_debug_status.status_string();
-  }
-
-  // |TestBase|
-  void TearDown() override {
-    // Wait until the display core has processed all client disconnections.
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kVirtcon); }));
-
-    TestBase::TearDown();
   }
 
  protected:
@@ -1573,99 +1510,6 @@ TEST_F(IntegrationTest, VsyncEventsAfterClientChange) {
   EXPECT_EQ(0u, virtcon_client->state().vsync_count());
 }
 
-TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
-  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
-  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-  const display::DriverConfigStamp virtcon_initial_driver_config_stamp =
-      DisplayEngineAppliedConfigStamp();
-
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  // Present an image
-  static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
-  ASSERT_EQ(virtcon_initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
-                                        primary_client->CreateFullscreenLayerConfig()));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_initial_driver_config_stamp; }));
-
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  TriggerDisplayEngineVsync();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
-  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
-  EXPECT_EQ(1u, primary_client->state().vsync_count());
-
-  // Send the controller a vsync for an image / a config it won't recognize anymore.
-  //
-  // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
-  // of a misbehaving display engine driver. Consider whether it's suitable to
-  // disconnect the driver, rather than working around the error.
-  const config_stamp_t invalid_banjo_config_stamp = virtcon_initial_driver_config_stamp.ToBanjo();
-  CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      primary_client->state().display_id().ToBanjo(), 0u, &invalid_banjo_config_stamp);
-
-  // Send a second vsync, using the config the client applied.
-  ASSERT_EQ(1u, primary_client->state().vsync_count());
-  TriggerDisplayEngineVsync();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
-  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
-  EXPECT_EQ(2u, primary_client->state().vsync_count());
-}
-
-TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-  display::DisplayId display_id = primary_client->state().display_id();
-  SendVsyncAfterUnbind(std::move(primary_client), display_id);
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsync) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs up to watermark level
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return primary_client->state().last_vsync_ack_cookie() != display::kInvalidVsyncAckCookie;
-  }));
-  EXPECT_EQ(ClientProxy::kVsyncMessagesWatermark, primary_client->state().vsync_count());
-
-  // acknowledge
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-}
-
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1676,310 +1520,43 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   ASSERT_OK(create_color_layer_result);
   display::LayerId color_layer_id = create_color_layer_result.value();
 
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
+  // Generate VSync messages with unique configuration stamps.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  uint32_t vsync_count = ClientProxy::kMaxVsyncMessages;
-  while (vsync_count--) {
-    SendVsyncFromCoordinatorClientProxy();
+  int64_t generated_vsync_count =
+      ClientVsyncQueue::kThrottleWatermark + ClientVsyncQueue::kThrottleBufferSize;
+  for (int64_t index = 0; index < generated_vsync_count; ++index) {
+    const display::DriverConfigStamp old_driver_stamp = DisplayEngineAppliedConfigStamp();
+    const display::ConfigStamp config_stamp(1 + index);
+    ASSERT_OK(primary_client->ApplyLayers(config_stamp, {{.layer_id = color_layer_id}}));
+
+    // Wait until the engine driver receives the new configuration.
+    ASSERT_TRUE(
+        PollUntilOnLoop([&]() { return DisplayEngineAppliedConfigStamp() != old_driver_stamp; }));
+    TriggerDisplayEngineVsync();
   }
+
+  // Collect the throttled VSync messages and the ack cookie.
   {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
+    static constexpr uint64_t expected_vsync_count = ClientVsyncQueue::kThrottleWatermark;
     ASSERT_TRUE(PollUntilOnLoop(
         [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
     EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
+    EXPECT_EQ(display::ConfigStamp(expected_vsync_count),
+              primary_client->state().last_vsync_config_stamp());
   }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
+  ASSERT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
 
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
+  // Acknowledge VSync to unblock the throttled messages.
   ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
 
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsyncs
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return primary_client->state().vsync_count() >= ClientProxy::kMaxVsyncMessages; }));
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a lot
-  constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count =
-        ClientProxy::kMaxVsyncMessages + ClientProxy::kVsyncBufferSize + 1;
+        ClientVsyncQueue::kThrottleWatermark + ClientVsyncQueue::kThrottleBufferSize;
     ASSERT_TRUE(PollUntilOnLoop(
         [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
     EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return (primary_client->state().vsync_count() >= ClientProxy::kMaxVsyncMessages); }));
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the TestFidlClient processed all events coming from the Coordinator.
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync with invalid cookie
-  static constexpr display::VsyncAckCookie kInvalidCookie(0xdeadbeef);
-  ASSERT_NE(primary_client->state().last_vsync_ack_cookie(), kInvalidCookie);
-  ASSERT_OK(primary_client->AcknowledgeVsync(kInvalidCookie));
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return LastAckedCookie(ClientPriority::kPrimary) ==
-             primary_client->state().last_vsync_ack_cookie();
-    });
-  }
-  EXPECT_NE(LastAckedCookie(ClientPriority::kPrimary),
-            primary_client->state().last_vsync_ack_cookie());
-
-  // We should still not receive vsync events since acknowledge did not use valid cookie
-  SendVsyncFromCoordinatorClientProxy();
-  constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return primary_client->state().vsync_count() >= expected_vsync_count + 1;
-    });
-  }
-  EXPECT_LT(primary_client->state().vsync_count(), expected_vsync_count + 1);
-
-  EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the TestFidlClient processed all events coming from the Coordinator.
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
-
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-
-  // save old cookie
-  display::VsyncAckCookie old_vsync_ack_cookie = primary_client->state().last_vsync_ack_cookie();
-
-  // send vsyncs until max vsync
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages * 2;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages * 2, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync with old cookie
-  ASSERT_OK(primary_client->AcknowledgeVsync(old_vsync_ack_cookie));
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return LastAckedCookie(ClientPriority::kPrimary) ==
-             primary_client->state().last_vsync_ack_cookie();
-    });
-  }
-  EXPECT_NE(LastAckedCookie(ClientPriority::kPrimary),
-            primary_client->state().last_vsync_ack_cookie());
-
-  // Since we did not acknowledge with most recent cookie, we should not get any vsync events back
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages * 2;
-
-    // This check can have a false positive pass, due to using a hard-coded
-    // timeout.
-    {
-      zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-      PollUntilOnLoop([&]() {
-        if (zx::clock::get_monotonic() >= deadline)
-          return true;
-        return primary_client->state().vsync_count() >= expected_vsync_count + 1;
-      });
-    }
-    EXPECT_LT(primary_client->state().vsync_count(), expected_vsync_count + 1);
-
-    // count should still remain the same
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-
-  // now let's acknowledge with valid cookie
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count =
-        ClientProxy::kMaxVsyncMessages * 2 + ClientProxy::kVsyncBufferSize + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
+    EXPECT_EQ(display::ConfigStamp(expected_vsync_count),
+              primary_client->state().last_vsync_config_stamp());
   }
 }
 
@@ -2699,5 +2276,7 @@ TEST_F(IntegrationTest, CheckConfigTooManyLayers) {
   // configuration should be expressed in this test.
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, check_config_result.value());
 }
+
+}  // namespace
 
 }  // namespace display_coordinator

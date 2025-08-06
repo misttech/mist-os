@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/testing/host_test.gni")
+import("//build/go/go_test.gni")
 
 if (is_host) {
   # Add this to go_test()'s environments to disable a test in infra
@@ -232,12 +232,11 @@ template("system_test_upgrade_suite") {
 
   foreach(test, _tests) {
     _test_name = get_label_info(test, "name")
-    _test_binary = "$root_out_dir/$_test_name"
 
     _host_test_target_name = "${target_name}_${_test_name}"
     _deps += [ ":${_host_test_target_name}" ]
 
-    _args = [ "-test.v" ]  # Print test detailed case status
+    _args = []
 
     foreach(build, _builds) {
       if (defined(build.release_build_id)) {
@@ -272,10 +271,6 @@ template("system_test_upgrade_suite") {
     if (defined(invoker.timeout)) {
       assert(invoker.timeout != "",
              "'${_host_test_target_name}' cannot have an empty timeout")
-      _args += [
-        "-test.timeout",
-        invoker.timeout,
-      ]
     }
 
     if (defined(invoker.pave_timeout)) {
@@ -400,10 +395,10 @@ template("system_test_upgrade_suite") {
       _args += [ "--resolver-mode=constant" ]
     }
 
-    host_test(_host_test_target_name) {
-      binary_path = _test_binary
+    go_test(_host_test_target_name) {
+      library = "//src/sys/pkg/tests/system-tests/upgrade_test:gopkg"
       args = _args
-      deps = [ test ]
+      forward_variables_from(invoker, [ "timeout" ])
 
       environments = []
       foreach(env, invoker.environments) {
@@ -490,12 +485,11 @@ template("system_test_reboot_suite") {
 
   foreach(test, _tests) {
     _test_name = get_label_info(test, "name")
-    _test_binary = "$root_out_dir/$_test_name"
 
     _host_test_target_name = "${target_name}_${_test_name}"
     _deps += [ ":${_host_test_target_name}" ]
 
-    _args = [ "-test.v" ]  # Print test detailed case status
+    _args = []
 
     if (defined(invoker.release_builder)) {
       _args += [
@@ -521,10 +515,6 @@ template("system_test_reboot_suite") {
     if (defined(invoker.timeout)) {
       assert(invoker.timeout != "",
              "'${_host_test_target_name}' cannot have an empty timeout")
-      _args += [
-        "-test.timeout",
-        invoker.timeout,
-      ]
     }
 
     if (defined(invoker.cycle_timeout)) {
@@ -570,10 +560,10 @@ template("system_test_reboot_suite") {
       _args += [ "--check-abr=false" ]
     }
 
-    host_test(_host_test_target_name) {
-      binary_path = _test_binary
+    go_test(_host_test_target_name) {
+      library = "//src/sys/pkg/tests/system-tests/reboot_test:gopkg"
       args = _args
-      deps = [ test ]
+      forward_variables_from(invoker, [ "timeout" ])
 
       environments = []
       foreach(env, invoker.environments) {
@@ -655,12 +645,11 @@ template("system_test_recovery_suite") {
 
   foreach(test, _tests) {
     _test_name = get_label_info(test, "name")
-    _test_binary = "$root_out_dir/$_test_name"
 
     _host_test_target_name = "${target_name}_${_test_name}"
     _deps += [ ":${_host_test_target_name}" ]
 
-    _args = [ "-test.v" ]  # Print test detailed case status
+    _args = []
 
     if (defined(invoker.release_builder)) {
       _args += [
@@ -686,10 +675,6 @@ template("system_test_recovery_suite") {
     if (defined(invoker.timeout)) {
       assert(invoker.timeout != "",
              "'${_host_test_target_name}' cannot have an empty timeout")
-      _args += [
-        "-test.timeout",
-        invoker.timeout,
-      ]
     }
 
     if (defined(invoker.cycle_timeout)) {
@@ -726,10 +711,10 @@ template("system_test_recovery_suite") {
       _args += [ "--check-abr=false" ]
     }
 
-    host_test(_host_test_target_name) {
-      binary_path = _test_binary
+    go_test(_host_test_target_name) {
+      library = "//src/sys/pkg/tests/system-tests/recovery_test:gopkg"
       args = _args
-      deps = [ test ]
+      forward_variables_from(invoker, [ "timeout" ])
 
       environments = []
       foreach(env, invoker.environments) {

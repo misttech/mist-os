@@ -110,7 +110,7 @@ impl BitSetMap {
         }
     }
 
-    fn record(&self, node: &Node) {
+    pub fn record(&self, node: &Node) {
         node.record_child("index", |node| {
             for (index, label) in self
                 .labels()

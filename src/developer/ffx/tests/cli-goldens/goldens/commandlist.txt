@@ -16,6 +16,7 @@ package
 platform
 process
 product
+product-bundle
 profile
 repository
 scrutiny

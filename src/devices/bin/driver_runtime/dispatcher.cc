@@ -43,7 +43,7 @@ namespace driver_runtime {
 
 namespace {
 
-constexpr uint64_t kStallTimeMs = 100;
+constexpr uint64_t kStallTimeMs = 350;
 constexpr uint64_t kStaleTimeMs = kStallTimeMs * 5;
 
 const async_ops_t g_dispatcher_ops = {
@@ -316,6 +316,8 @@ Dispatcher::Dispatcher(uint32_t options, std::string_view name, bool unsynchroni
   name_.Append(name);
 }
 
+bool g_dynamic_thread_spawning = false;
+
 // static
 zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
                                         std::string_view scheduler_role, const void* owner,
@@ -334,7 +336,7 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (allow_sync_calls) {
+  if (allow_sync_calls && !g_dynamic_thread_spawning) {
     zx_status_t status = adder();
     if (status != ZX_OK) {
       return status;
@@ -1431,12 +1433,12 @@ void Dispatcher::EventWaiter::HandleEvent(std::unique_ptr<EventWaiter> event_wai
                                           async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                           zx_status_t status, const zx_packet_signal_t* signal) {
   if (status == ZX_ERR_CANCELED) {
-    LOGF(TRACE, "Dispatcher: event waiter shutting down\n");
+    LOGF(TRACE, "Dispatcher: event waiter shutting down");
     event_waiter->dispatcher_ref_->SetEventWaiter(nullptr);
     event_waiter->dispatcher_ref_ = nullptr;
     return;
   } else if (status != ZX_OK) {
-    LOGF(ERROR, "Dispatcher: event waiter error: %d\n", status);
+    LOGF(ERROR, "Dispatcher: event waiter error: %d", status);
     event_waiter->dispatcher_ref_->SetEventWaiter(nullptr);
     event_waiter->dispatcher_ref_ = nullptr;
     return;
@@ -1447,7 +1449,7 @@ void Dispatcher::EventWaiter::HandleEvent(std::unique_ptr<EventWaiter> event_wai
     fbl::RefPtr<Dispatcher> dispatcher_ref = std::move(event_waiter->dispatcher_ref_);
     event_waiter->InvokeCallback(std::move(event_waiter), dispatcher_ref);
   } else {
-    LOGF(ERROR, "Dispatcher: event waiter got unexpected signals: %x\n", signal->observed);
+    LOGF(ERROR, "Dispatcher: event waiter got unexpected signals: %x", signal->observed);
   }
 }
 
@@ -1741,7 +1743,7 @@ zx_status_t DispatcherCoordinator::SetThreadLimit(std::string_view scheduler_rol
   return thread_pool->set_max_threads(max_threads);
 }
 
-void DispatcherCoordinator::ScanThreadsForStalls() {
+zx_duration_mono_t DispatcherCoordinator::ScanThreadsForStalls() {
   fbl::AutoLock lock(&lock_);
   default_thread_pool_.ScanThreadsForStalls();
   // Thread safety note: It is important that thread pools be removed from this list before
@@ -1751,6 +1753,9 @@ void DispatcherCoordinator::ScanThreadsForStalls() {
   for (auto& thread_pool : role_to_thread_pool_) {
     thread_pool.ScanThreadsForStalls();
   }
+  // tell the caller to check again in half the stall time, so we worst-case to finding stalled
+  // threads in (stalltime*1.5).
+  return zx::msec(kStallTimeMs / 2).get();
 }
 
 void DispatcherCoordinator::NotifyDispatcherShutdown(
@@ -1852,6 +1857,7 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
 
 zx_status_t DispatcherCoordinator::Start(uint32_t options) {
   g_enforce_allowed_scheduler_roles = options & FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES;
+  g_dynamic_thread_spawning = options & FDF_ENV_DYNAMIC_THREAD_SPAWNING;
   DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
   fbl::AutoLock lock(&coordinator.lock_);
   auto thread_pool = coordinator.default_thread_pool();
@@ -1947,7 +1953,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
     zx_status_t status = SetRoleProfile();
     if (status != ZX_OK) {
       // Failing to set the role profile is not a fatal error.
-      LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
+      LOGF(WARNING, "Failed to set scheduler role: %d", status);
     }
     thread_context::SetRoleProfileStatus(status);
   }
@@ -1967,7 +1973,7 @@ void Dispatcher::ThreadPool::ScanThreadsForStalls() {
     zx::time timestamp(slot->load());
     if (timestamp != zx::time(0) && timestamp < stalled_time) {
       if (timestamp > stale_time) {
-        LOGF(WARNING, "Found a thread that has been stalled for %ld ms\n",
+        LOGF(WARNING, "Found a thread that has been stalled for %ld ms",
              (current_time - timestamp).to_msecs());
       }
       stalled_threads++;
@@ -2064,8 +2070,9 @@ zx_status_t Dispatcher::ThreadPool::RemoveThread() {
   }
 
   fbl::AutoLock lock(&lock_);
-  ZX_ASSERT(dispatcher_threads_needed_ > 0);
-  dispatcher_threads_needed_--;
+  if (dispatcher_threads_needed_ > 0) {
+    dispatcher_threads_needed_--;
+  }
   return ZX_OK;
 }
 
@@ -2078,9 +2085,8 @@ void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher) {
   fbl::AutoLock lock(&lock_);
 
   // We need to check the process shared dispatcher matches as tests inject their own.
-  if (!is_unmanaged_ && dispatcher.allow_sync_calls() &&
+  if (!is_unmanaged_ && dispatcher_threads_needed_ > 0 && dispatcher.allow_sync_calls() &&
       dispatcher.process_shared_dispatcher() == loop()->dispatcher()) {
-    ZX_ASSERT(dispatcher_threads_needed_ > 0);
     dispatcher_threads_needed_--;
   }
 

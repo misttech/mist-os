@@ -112,7 +112,7 @@ bool is_valid_interrupt(interrupt_vector_t vector, uint32_t flags);
 interrupt_vector_t remap_interrupt(interrupt_vector_t vector);
 
 // sends an inter-processor interrupt
-zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi);
+zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi ipi);
 
 void interrupt_init_percpu_early();
 

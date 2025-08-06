@@ -146,13 +146,13 @@ pub(crate) mod test {
         proxy
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_daemon_succeeds() {
         let proxy = setup_fake_daemon_server(true, daemon_info());
         assert_eq!(daemon_info(), get_daemon_version(proxy.into()).await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_daemon_fails() {
         let expected_output = "Failed to get daemon version info";
         let proxy = setup_fake_daemon_server(false, daemon_info());
@@ -162,7 +162,7 @@ pub(crate) mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_daemon_hangs() {
         let expected_output = "Timed out trying to get daemon version info";
         let (tx, rx) = oneshot::channel::<()>();

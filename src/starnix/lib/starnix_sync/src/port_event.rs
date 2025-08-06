@@ -205,8 +205,8 @@ impl PortEvent {
     }
 
     /// Cancels async port notifications on an object.
-    pub fn cancel(&self, handle: &zx::HandleRef<'_>, key: u64) {
-        let _: Result<(), zx::Status> = self.port.cancel(handle, key);
+    pub fn cancel(&self, key: u64) {
+        let _: Result<(), zx::Status> = self.port.cancel(key);
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
@@ -344,7 +344,7 @@ mod test {
             )
             .unwrap();
 
-        event.cancel(&object.as_handle_ref(), KEY);
+        event.cancel(KEY);
         assert_eq!(event.wait(zx::MonotonicInstant::INFINITE_PAST), PortWaitResult::TimedOut);
     }
 

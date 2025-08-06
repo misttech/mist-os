@@ -24,9 +24,7 @@ rustc_library("serve_processargs") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/process_builder",
     "//src/storage/lib/vfs/rust:vfs",
-    "//src/sys/component_manager/lib/processargs",
     "//src/sys/component_manager/lib/router_error",
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/lib/cm_types",
@@ -45,8 +43,6 @@ rustc_library("serve_processargs") {
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:async-channel",
-    "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:test-case",
   ]
 

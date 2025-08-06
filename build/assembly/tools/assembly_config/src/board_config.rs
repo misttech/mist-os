@@ -5,14 +5,14 @@
 use crate::{common, BoardArgs, HybridBoardArgs};
 
 use anyhow::{ensure, Context, Result};
-use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
+use assembly_config_schema::{BoardConfig, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use std::collections::BTreeMap;
 
 pub fn new(args: &BoardArgs) -> Result<()> {
-    let mut config = BoardInformation::from_config_path(&args.config)?;
+    let mut config = BoardConfig::from_config_path(&args.config)?;
     if let Some(partitions_config) = &args.partitions_config {
         config.partitions_config = Some(DirectoryPathBuf::new(partitions_config.clone()));
 
@@ -77,11 +77,11 @@ pub fn new(args: &BoardArgs) -> Result<()> {
 }
 
 pub fn hybrid(args: &HybridBoardArgs) -> Result<()> {
-    let mut config = BoardInformation::from_dir(&args.config)?;
+    let mut config = BoardConfig::from_dir(&args.config)?;
 
     // First, replace the bibs found in `replace_bibs_from_board`.
     if let Some(replace_bibs_from_board) = &args.replace_bibs_from_board {
-        let replace_config = BoardInformation::from_dir(replace_bibs_from_board)?;
+        let replace_config = BoardConfig::from_dir(replace_bibs_from_board)?;
         for (name, replacement) in replace_config.input_bundles.into_iter() {
             config.input_bundles.entry(name).and_modify(|bib| *bib = replacement);
         }
@@ -221,7 +221,7 @@ mod tests {
         new(&args).unwrap();
 
         // Ensure the BIB in the board contains the correct kernel_boot_args.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = vec!["my_bib_set::my_bib".to_string()];
         itertools::assert_equal(expected.iter(), board.input_bundles.keys());
         let bib_path = board.input_bundles.get("my_bib_set::my_bib").unwrap();
@@ -300,7 +300,7 @@ mod tests {
             new_board_with_version_repo_fields(tmp_path, None, None, None, None);
 
         // Ensure the Board config has the correct version string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "unversioned".to_string();
         assert_eq!(expected, board.release_info.info.version);
     }
@@ -318,7 +318,7 @@ mod tests {
         );
 
         // Ensure the Board config has the correct version string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
         assert_eq!(expected, board.release_info.info.version);
     }
@@ -336,7 +336,7 @@ mod tests {
             new_board_with_version_repo_fields(tmp_path, None, Some(version_file_path), None, None);
 
         // Ensure the Board config has the correct version string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
         assert_eq!(expected, board.release_info.info.version);
     }
@@ -349,7 +349,7 @@ mod tests {
             new_board_with_version_repo_fields(tmp_path, None, None, None, None);
 
         // Ensure the Board config has the correct repository string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "unknown".to_string();
         assert_eq!(expected, board.release_info.info.repository);
     }
@@ -367,7 +367,7 @@ mod tests {
         );
 
         // Ensure the Board config has the correct repository string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "fake_repository".to_string();
         assert_eq!(expected, board.release_info.info.repository);
     }
@@ -385,7 +385,7 @@ mod tests {
             new_board_with_version_repo_fields(tmp_path, None, None, None, Some(repo_file_path));
 
         // Ensure the Board config has the correct repository string.
-        let board = BoardInformation::from_dir(board_path).unwrap();
+        let board = BoardConfig::from_dir(board_path).unwrap();
         let expected = "fake_repository".to_string();
         assert_eq!(expected, board.release_info.info.repository);
     }
@@ -406,7 +406,7 @@ mod tests {
 
         // Create a board with the BIB already added.
         let board_path = tmp_path.join("my_board");
-        let board = BoardInformation {
+        let board = BoardConfig {
             name: "my_board".to_string(),
             release_info: BoardReleaseInfo::new_for_testing(),
             hardware_info: Default::default(),
@@ -468,7 +468,7 @@ mod tests {
         hybrid(&args).unwrap();
 
         // Ensure the BIB in the board contains the correct kernel_boot_args.
-        let board = BoardInformation::from_dir(hybrid_board_path).unwrap();
+        let board = BoardConfig::from_dir(hybrid_board_path).unwrap();
         let expected = vec!["my_bib_set::my_bib".to_string()];
         itertools::assert_equal(expected.iter(), board.input_bundles.keys());
         let bib_path = board.input_bundles.get("my_bib_set::my_bib").unwrap();

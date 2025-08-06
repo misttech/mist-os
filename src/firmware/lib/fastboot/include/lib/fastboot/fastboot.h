@@ -30,9 +30,11 @@ constexpr std::string_view kGptMetaDefault = "default";
 
 class __EXPORT Fastboot : public FastbootBase {
  public:
-  explicit Fastboot(size_t max_download_size);
-  // For test svc_root injection
-  Fastboot(size_t max_download_size, fidl::ClientEnd<fuchsia_io::Directory> svc_root);
+  // Creates a Fastboot with max download size as a portion of total system memory.
+  Fastboot();
+  // Creates a Fastboot with specified max download size and svc_root for testing.
+  Fastboot(size_t max_download_size, fidl::ClientEnd<fuchsia_io::Directory> svc_root =
+                                         fidl::ClientEnd<fuchsia_io::Directory>());
 
  private:
   size_t max_download_size_;

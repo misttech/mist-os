@@ -61,7 +61,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         let proxy = fake_proxy(move |req| match req {
             AudioRequest::Set { .. } => {
@@ -109,7 +109,7 @@ mod test {
         };
         "Test audio set() output with a different non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_audio_set_output(expected_audio: Audio) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             AudioRequest::Set { .. } => {
@@ -152,7 +152,7 @@ mod test {
         };
         "Test audio watch() output with non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_audio_watch_output(expected_audio: Audio) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             AudioRequest::Set { .. } => {

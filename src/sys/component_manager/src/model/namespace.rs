@@ -9,7 +9,6 @@ use ::routing::mapper::NoopRouteMapper;
 use ::routing::{route_to_storage_decl, verify_instance_in_component_id_index};
 use cm_rust::ComponentDecl;
 use errors::CreateNamespaceError;
-use fidl::endpoints::ClientEnd;
 use fidl::prelude::*;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
@@ -64,8 +63,7 @@ fn add_pkg_directory(
     namespace: &mut NamespaceBuilder,
     pkg_dir: fio::DirectoryProxy,
 ) -> Result<(), BuildNamespaceError> {
-    // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-    let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
+    let client_end = pkg_dir.into_client_end().unwrap();
     let directory: sandbox::Directory = client_end.into();
     let path = cm_types::NamespacePath::new(PKG_PATH.to_str().unwrap()).unwrap();
     namespace.add_entry(Capability::Directory(directory), &path)?;

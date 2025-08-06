@@ -29,7 +29,6 @@ rustc_library("ffx_triage_lib") {
   test_deps = [
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde_json",

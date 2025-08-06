@@ -26,6 +26,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
@@ -39,7 +40,7 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // Exposed for testing. Prefer obtaining instances from the `Create()` factory method.
   explicit DisplayInfo(display::DisplayId display_id,
                        fbl::Vector<display::PixelFormat> pixel_formats,
-                       fbl::Vector<display::DisplayTiming> preferred_modes,
+                       fbl::Vector<display::ModeAndId> preferred_modes,
                        std::optional<edid::Edid> edid_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
@@ -76,7 +77,12 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // nullopt if the display does not support EDID.
   const std::optional<edid::Edid> edid_info;
 
+  fbl::Vector<display::ModeAndId> preferred_modes;
+
   // Modified after construction if `edid_info` is not nullopt.
+  //
+  // Once fully initialized, `timings` and `preferred_modes` must not be both
+  // empty.
   fbl::Vector<display::DisplayTiming> timings;
 
   const fbl::Vector<display::PixelFormat> pixel_formats;

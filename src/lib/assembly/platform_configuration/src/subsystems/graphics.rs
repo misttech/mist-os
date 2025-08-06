@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::graphics_config::GraphicsConfig;
+use assembly_config_schema::platform_settings::graphics_config::GraphicsConfig;
 
 pub(crate) struct GraphicsSubsystemConfig;
 impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
@@ -48,7 +48,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             Config::new(ConfigValueType::Bool, (!enable_virtual_console).into()),
         )?;
 
-        if let Some(rotation) = context.board_info.platform.graphics.display.rotation {
+        if let Some(rotation) = context.board_config.platform.graphics.display.rotation {
             builder.set_config_capability(
                 "fuchsia.virtcon.DisplayRotation",
                 Config::new(ConfigValueType::Uint32, rotation.into()),
@@ -86,7 +86,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 
         builder.set_config_capability("fuchsia.virtcon.KeyRepeat", Config::new_void())?;
 
-        let rounded_corners = context.board_info.platform.graphics.display.rounded_corners;
+        let rounded_corners = context.board_config.platform.graphics.display.rounded_corners;
         builder.set_config_capability(
             "fuchsia.virtcon.RoundedCorners",
             Config::new(ConfigValueType::Bool, rounded_corners.into()),
@@ -102,7 +102,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
-    use assembly_config_schema::platform_config::graphics_config::VirtconConfig;
+    use assembly_config_schema::platform_settings::graphics_config::VirtconConfig;
 
     #[test]
     fn test_user_default() {

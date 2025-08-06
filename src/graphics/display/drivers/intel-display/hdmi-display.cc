@@ -80,17 +80,6 @@ cpp20::span<const DdiPhyConfigEntry> GetHdmiPhyConfigEntries(uint16_t device_id,
   return kPhyConfigHdmiSkylakeUhs;
 }
 
-// Must match `kPixelFormatTypes` defined in intel-display.cc.
-constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsArray[] = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
-
-constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
-    kBanjoSupportedPixelFormatsArray);
-
 }  // namespace
 
 // Modesetting functions
@@ -305,15 +294,17 @@ bool HdmiDisplay::CheckPixelRate(int64_t pixel_rate_hz) {
   return dco_config.frequency_khz != 0;
 }
 
-raw_display_info_t HdmiDisplay::CreateRawDisplayInfo() {
-  return raw_display_info_t{
-      .display_id = id().ToBanjo(),
-      .preferred_modes_list = nullptr,
-      .preferred_modes_count = 0,
-      .edid_bytes_list = edid_bytes_.data(),
-      .edid_bytes_count = edid_bytes_.size(),
-      .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
-      .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
+AddedDisplayInfo HdmiDisplay::CreateAddedDisplayInfo() {
+  fbl::Vector<uint8_t> edid;
+  fbl::AllocChecker alloc_checker;
+  edid.resize(edid_bytes_.size(), &alloc_checker);
+  ZX_ASSERT(alloc_checker.check());
+  std::ranges::copy(edid_bytes_, edid.begin());
+
+  return AddedDisplayInfo{
+      .display_id = id(),
+      .preferred_modes = {},
+      .edid = std::move(edid),
   };
 }
 

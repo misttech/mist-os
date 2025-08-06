@@ -5,9 +5,9 @@
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::development_support_config::StorageToolsConfig;
-use assembly_config_schema::platform_config::recovery_config::RecoveryConfig;
-use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::platform_settings::development_support_config::StorageToolsConfig;
+use assembly_config_schema::platform_settings::recovery_config::RecoveryConfig;
+use assembly_config_schema::platform_settings::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, FilesystemImageMode, FvmVolumeConfig, GptMode, VolumeConfig,
@@ -36,7 +36,7 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
         // Include legacy paver implementation in all feature sets above "embeddable" if the board
         // doesn't include it. Embeddable doesn't support paving.
         if *context.feature_set_level != FeatureSetLevel::Embeddable
-            && !context.board_info.provides_feature("fuchsia::paver")
+            && !context.board_config.provides_feature("fuchsia::paver")
         {
             builder.platform_bundle("paver_legacy");
         }
@@ -60,19 +60,20 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
         // Set the storage security policy/configuration for zxcrypt
         let zxcrypt_config_path = gendir.join("zxcrypt");
 
-        if context.board_info.provides_feature("fuchsia::keysafe_ta") {
+        if context.board_config.provides_feature("fuchsia::keysafe_ta") {
             std::fs::write(&zxcrypt_config_path, "tee")
         } else {
             std::fs::write(&zxcrypt_config_path, "null")
         }
         .context("Could not write zxcrypt configuration")?;
 
-        let inline_crypto =
-            Config::new_bool(context.board_info.provides_feature("fuchsia::storage_inline_crypto"));
+        let inline_crypto = Config::new_bool(
+            context.board_config.provides_feature("fuchsia::storage_inline_crypto"),
+        );
 
         let block_config_path = gendir.join("fshost_block_config.json");
         let block_config_json =
-            serde_json::to_string(&context.board_info.filesystems.block_devices)
+            serde_json::to_string(&context.board_config.filesystems.block_devices)
                 .context("Serializing devices config")?;
         std::fs::write(&block_config_path, &block_config_json)
             .context("Writing serialized devices config")?;
@@ -107,14 +108,15 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
         }
 
         // Collect the arguments from the board.
-        let blobfs_max_bytes = context.board_info.filesystems.fvm.blobfs.maximum_bytes.unwrap_or(0);
+        let blobfs_max_bytes =
+            context.board_config.filesystems.fvm.blobfs.maximum_bytes.unwrap_or(0);
         let blobfs_initial_inodes =
-            context.board_info.filesystems.fvm.blobfs.minimum_inodes.unwrap_or(0);
-        let data_max_bytes = context.board_info.filesystems.fvm.minfs.maximum_bytes.unwrap_or(0);
-        let fvm_slice_size = context.board_info.filesystems.fvm.slice_size.0;
-        let gpt = context.board_info.filesystems.gpt.enabled();
-        let gpt_all = context.board_info.filesystems.gpt_all
-            || context.board_info.filesystems.gpt == GptMode::AllowMultiple;
+            context.board_config.filesystems.fvm.blobfs.minimum_inodes.unwrap_or(0);
+        let data_max_bytes = context.board_config.filesystems.fvm.minfs.maximum_bytes.unwrap_or(0);
+        let fvm_slice_size = context.board_config.filesystems.fvm.slice_size.0;
+        let gpt = context.board_config.filesystems.gpt.enabled();
+        let gpt_all = context.board_config.filesystems.gpt_all
+            || context.board_config.filesystems.gpt == GptMode::AllowMultiple;
 
         // Collect the arguments from the product.
         let ramdisk_image = storage_config.filesystems.image_mode == FilesystemImageMode::Ramdisk;
@@ -146,8 +148,17 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
                             bail!("Fxfs-in-FVM isn't supported in storage-host");
                         }
                         DataFilesystemFormat::F2fs => {
-                            // TODO(https://fxbug.dev/339491886): Implement.
-                            bail!("f2fs isn't supported yet in storage-host");
+                            context
+                                .ensure_build_type(&[BuildType::Eng], "GPT with FVM and F2FS")?;
+                            data_filesystem_format_str = "f2fs";
+                            if gpt {
+                                builder.platform_bundle("fshost_storage_host_gpt_fvm_f2fs");
+                            } else {
+                                // NOTE: There is no technical reason that this can't be supported,
+                                // but there is no need for it at this time, as no products use f2fs
+                                // without GPT.
+                                bail!("f2fs without GPT is not supported with storage-host");
+                            }
                         }
                         DataFilesystemFormat::Minfs => {
                             data_filesystem_format_str = "minfs";
@@ -279,18 +290,20 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
             ("fuchsia.fshost.InlineCrypto", inline_crypto),
             ("fuchsia.blobfs.WriteCompressionAlgorithm", algorithm),
             ("fuchsia.blobfs.CacheEvictionPolicy", policy),
+            // TODO(https://fxbug.dev/411312604): determine the value here.
+            ("fuchsia.fshost.ProvisionFxfs", Config::new_bool(false)),
         ];
         for config in configs {
             builder.set_config_capability(config.0, config.1)?;
         }
 
         // Include SDHCI driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::sdhci") {
+        if context.board_config.provides_feature("fuchsia::sdhci") {
             builder.platform_bundle("sdhci_driver");
         }
 
         // Include UFS driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::ufs") {
+        if context.board_config.provides_feature("fuchsia::ufs") {
             builder.platform_bundle("ufs_driver");
         }
 

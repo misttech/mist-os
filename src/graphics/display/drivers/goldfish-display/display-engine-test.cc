@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -16,15 +15,19 @@
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <array>
-#include <cstdio>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
-#include <fbl/alloc_checker.h>
-#include <fbl/array.h>
-#include <fbl/vector.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace goldfish {
@@ -62,9 +65,7 @@ class GoldfishDisplayEngineTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher display_event_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
 
-  std::array<layer_t, kMaxLayerCount> layers_ = {};
-  display_config_t config_ = {};
-
+  display::DisplayEngineEventsFidl engine_events_fidl_;
   std::unique_ptr<DisplayEngine> display_engine_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
@@ -85,11 +86,8 @@ void GoldfishDisplayEngineTest::SetUp() {
 
   display_engine_ = std::make_unique<DisplayEngine>(
       std::move(control_client), std::move(pipe_client), std::move(sysmem_client),
-      std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher());
-
-  config_.display_id = 1;
-  config_.layers_list = layers_.data();
-  config_.layers_count = 1;
+      std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher(),
+      &engine_events_fidl_);
 
   // Call SetupPrimaryDisplayForTesting() so that we can set up the display
   // devices without any dependency on proper driver binding.
@@ -100,163 +98,229 @@ void GoldfishDisplayEngineTest::SetUp() {
 void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
-  // ensure we fail correctly if layers more than 1
-  config_.layers_count = kMaxLayerCount;
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
+  };
+  static_assert(std::size(kLayers) == kMaxLayerCount);
 
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = display::Rectangle({.x = 0, .y = 0, .width = 0, .height = 0}),
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata = display::ImageMetadata(
+              {.width = 0, .height = 0, .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
   };
-  layers_[0].image_handle = INVALID_DISPLAY_ID;
-  layers_[0].image_metadata = {.dimensions = {.width = 0, .height = 0},
-                               .tiling_type = IMAGE_TILING_TYPE_LINEAR};
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
-  layers_[0].alpha_mode = ALPHA_DISABLE;
-  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
-
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
   };
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = kDisplayArea;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  layers_[0].alpha_mode = ALPHA_DISABLE;
-  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
 
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kOk, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
-  static constexpr rect_u_t kDisplayDestination = {
-      .x = 0,
-      .y = 0,
-      .width = 768,
-      .height = 768,
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = display::Rectangle(
+              {.x = 0, .y = 0, .width = kDisplayHeightPx, .height = kDisplayHeightPx}),
+          .image_source = display::Rectangle(
+              {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}),
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
   };
-  static constexpr rect_u_t kImageSource = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
-  };
-  layers_[0].display_destination = kDisplayDestination;
-  layers_[0].image_source = kImageSource;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = display::Rectangle(
+              {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}),
+          .image_source = display::Rectangle(
+              {.x = 0, .y = 0, .width = kDisplayHeightPx, .height = kDisplayHeightPx}),
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
   };
-  static constexpr rect_u_t kImageSource = {
-      .x = 0,
-      .y = 0,
-      .width = 768,
-      .height = 768,
-  };
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = kImageSource;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kHwMultiply,
+          .image_source_transformation = display::CoordinateTransformation::kIdentity,
+      }},
   };
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = kDisplayArea;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  layers_[0].alpha_mode = ALPHA_HW_MULTIPLY;
 
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kReflectX,
+      }},
   };
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = kDisplayArea;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_REFLECT_X;
 
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), display::ColorConversion::kIdentity, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
 }
 
-TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
-  static constexpr rect_u_t kDisplayArea = {
-      .x = 0,
-      .y = 0,
-      .width = 1024,
-      .height = 768,
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorConversionSupported) {
+  static constexpr display::Rectangle kDisplayArea = {
+      {.x = 0, .y = 0, .width = kDisplayWidthPx, .height = kDisplayHeightPx}};
+  static constexpr display::DriverLayer kLayers[] = {
+      {{
+          .display_destination = kDisplayArea,
+          .image_source = kDisplayArea,
+          .image_id = display::kInvalidDriverImageId,
+          .image_metadata =
+              display::ImageMetadata({.width = kDisplayWidthPx,
+                                      .height = kDisplayHeightPx,
+                                      .tiling_type = display::ImageTilingType::kLinear}),
+          .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                            .bytes = {{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}}),
+          .alpha_mode = display::AlphaMode::kDisable,
+          .image_source_transformation = display::CoordinateTransformation::kReflectX,
+      }},
   };
-  layers_[0].display_destination = kDisplayArea;
-  layers_[0].image_source = kDisplayArea;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
+  const display::ColorConversion kColorConversion = {{
+      .preoffsets = {0.1f, 0.2f, 0.3f},
+      .coefficients =
+          {
+              std::array<float, 3>{1.0f, 2.0f, 3.0f},
+              std::array<float, 3>{4.0f, 5.0f, 6.0f},
+              std::array<float, 3>{7.0f, 8.0f, 9.0f},
+          },
+      .postoffsets = {0.4f, 0.5f, 0.6f},
+  }};
 
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
-  // TODO(payamm): For now, driver will pretend it supports color conversion.
-  // It should return LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION instead.
-}
-
-TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
-  static constexpr rect_u_t kDisplayDestination = {
-      .x = 0,
-      .y = 0,
-      .width = 768,
-      .height = 768,
-  };
-  static constexpr rect_u_t kImageSource = {
-      .x = 0,
-      .y = 0,
-      .width = 768,
-      .height = 768,
-  };
-  layers_[0].display_destination = kDisplayDestination;
-  layers_[0].image_source = kImageSource;
-  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  layers_[0].alpha_mode = ALPHA_HW_MULTIPLY;
-  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
-  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
-
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(&config_);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
+  display::ConfigCheckResult res = display_engine_->CheckConfiguration(
+      display::DisplayId(1), display::ModeId(1), kColorConversion, kLayers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, res);
+  // TODO(https://fxbug.dev/435550805): For now, driver will pretend it
+  // supports color conversion.
 }
 
 TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
@@ -266,22 +330,21 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
-  constexpr display::DriverBufferCollectionId kValidCollectionId(1);
-  constexpr uint64_t kBanjoValidCollectionId = kValidCollectionId.ToBanjo();
-  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
-      kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
+  static constexpr display::DriverBufferCollectionId kValidCollectionId(1);
+  EXPECT_OK(display_engine_->ImportBufferCollection(kValidCollectionId,
+                                                    std::move(token1_endpoints->client)));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display_engine_->DisplayEngineImportBufferCollection(
-                kBanjoValidCollectionId, token2_endpoints->client.TakeChannel()),
+  EXPECT_EQ(display_engine_
+                ->ImportBufferCollection(kValidCollectionId, std::move(token2_endpoints->client))
+                .status_value(),
             ZX_ERR_ALREADY_EXISTS);
 
   // Test ReleaseBufferCollection().
-  constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
-  constexpr uint64_t kBanjoInvalidCollectionId = kInvalidCollectionId.ToBanjo();
-  EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidCollectionId),
+  static constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
+  EXPECT_EQ(display_engine_->ReleaseBufferCollection(kInvalidCollectionId).status_value(),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidCollectionId));
+  EXPECT_OK(display_engine_->ReleaseBufferCollection(kValidCollectionId));
 
   loop_.Shutdown();
 }

@@ -40,7 +40,7 @@ mod test {
     use fidl_fuchsia_settings::{DisplayRequest, DisplaySettings};
     use target_holders::fake_proxy;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get() {
         let expected_display = SetArgs {
             brightness: None,
@@ -66,7 +66,7 @@ mod test {
     }
 
     #[should_panic]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_failure() {
         let expected_display = SetArgs {
             brightness: None,

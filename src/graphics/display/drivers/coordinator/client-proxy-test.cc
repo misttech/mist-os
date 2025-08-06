@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -25,7 +24,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -105,7 +104,7 @@ class ClientProxyTest : public ::testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 };
 
-TEST_F(ClientProxyTest, ClientVSyncOk) {
+TEST_F(ClientProxyTest, ClientVSyncDelivery) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr display::DriverConfigStamp kDriverStampValue(1);
@@ -118,7 +117,8 @@ TEST_F(ClientProxyTest, ClientVSyncOk) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -132,14 +132,13 @@ TEST_F(ClientProxyTest, ClientVSyncOk) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
       .driver_stamp = kDriverStampValue,
       .client_stamp = kClientStampValue,
   });
 
-  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kDriverStampValue));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kDriverStampValue);
 
   MockCoordinatorListener mock_coordinator_listener;
   fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener> listener_server_binding =
@@ -167,7 +166,8 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -181,11 +181,9 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
-  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                       display::kInvalidDriverConfigStamp));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   clientproxy.CloseForTesting();
 
   engine_listener_dispatcher.ShutdownAsync();
@@ -194,43 +192,7 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   driver_shutdown_completion->Wait();
 }
 
-TEST_F(ClientProxyTest, ClientVSyncNotSupported) {
-  fdf_testing::DriverRuntime driver_runtime;
-
-  auto [coordinator_client_end, coordinator_server_end] =
-      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
-  auto [listener_client_end, listener_server_end] =
-      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
-
-  auto [engine_client_end, engine_server_end] =
-      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
-
-  auto [driver_dispatcher, driver_shutdown_completion] =
-      CreateDispatcherAndShutdownCompletionForTesting();
-  auto [engine_listener_dispatcher, engine_listener_shutdown_completion] =
-      CreateDispatcherAndShutdownCompletionForTesting();
-  Controller controller(std::move(engine_driver_client), driver_dispatcher.borrow(),
-                        engine_listener_dispatcher.borrow());
-
-  ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
-                          /*on_client_disconnected=*/[] {});
-  ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
-                                       std::move(listener_client_end)));
-
-  fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                           display::kInvalidDriverConfigStamp));
-  clientproxy.CloseForTesting();
-
-  engine_listener_dispatcher.ShutdownAsync();
-  engine_listener_shutdown_completion->Wait();
-  driver_dispatcher.ShutdownAsync();
-  driver_shutdown_completion->Wait();
-}
-
-TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
+TEST_F(ClientProxyTest, ClientMustDrainUntilThrottledPendingStamps) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr size_t kNumPendingStamps = 5;
@@ -244,7 +206,8 @@ TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -258,7 +221,6 @@ TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
     clientproxy.UpdateConfigStampMapping({
@@ -267,12 +229,9 @@ TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
     });
   }
 
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                           display::DriverConfigStamp(kDriverStampValues.back())));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
+                             display::DriverConfigStamp(kDriverStampValues.back()));
 
-  // Even if Vsync is disabled, ClientProxy should always drain pending
-  // controller stamps.
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().size(), 1u);
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().driver_stamp,
             display::DriverConfigStamp(kDriverStampValues.back()));

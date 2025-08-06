@@ -26,6 +26,7 @@
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/client-vsync-queue.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -62,20 +63,18 @@ class ClientProxy {
   void TearDown();
 
   // Requires holding `controller_.mtx()` lock.
-  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
-                             display::DriverConfigStamp driver_config_stamp);
+  void OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
+                      display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
-  zx_status_t OnCaptureComplete();
+  void OnCaptureComplete();
 
   // See `Client::ReapplyConfig()`.
   void ReapplyConfig();
 
-  void SetVsyncEventDelivery(bool vsync_delivery_enabled) {
-    fbl::AutoLock lock(&mtx_);
-    vsync_delivery_enabled_ = vsync_delivery_enabled;
-  }
+  // Must be called on the driver dispatcher.
+  void AcknowledgeVsync(display::VsyncAckCookie ack_cookie);
 
   void EnableCapture(bool enable) {
     fbl::AutoLock lock(&mtx_);
@@ -108,23 +107,11 @@ class ClientProxy {
 
   void CloseForTesting();
 
-  display::VsyncAckCookie LastVsyncAckCookieForTesting();
-
   // Fired after the FIDL client is unbound.
   sync_completion_t* FidlUnboundCompletionForTesting();
 
-  size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
-
   // Define these constants here so we can access them in tests.
 
-  static constexpr uint32_t kVsyncBufferSize = 10;
-
-  // Maximum number of vsync messages sent before an acknowledgement is required.
-  // Half of this limit is provided to clients as part of display info. Assuming a
-  // frame rate of 60hz, clients will be required to acknowledge at least once a second
-  // and driver will stop sending messages after 2 seconds of no acknowledgement
-  static constexpr uint32_t kMaxVsyncMessages = 120;
-  static constexpr uint32_t kVsyncMessagesWatermark = (kMaxVsyncMessages / 2);
   // At the moment, maximum image handles returned by any driver is 4 which is
   // equal to number of hardware layers. 8 should be more than enough to allow for
   // a simple statically allocated array of image_ids for vsync events that are being
@@ -132,34 +119,18 @@ class ClientProxy {
   static constexpr uint32_t kMaxImageHandles = 8;
 
  private:
+  void DrainVsyncQueue() __TA_REQUIRES(&mtx_);
+
   fbl::Mutex mtx_;
   Controller& controller_;
 
   Client handler_;
-  bool vsync_delivery_enabled_ __TA_GUARDED(&mtx_) = false;
   bool enable_capture_ __TA_GUARDED(&mtx_) = false;
 
   fbl::Mutex task_mtx_;
   std::vector<std::unique_ptr<async::Task>> client_scheduled_tasks_ __TA_GUARDED(task_mtx_);
 
-  // This variable is used to limit the number of errors logged in case of channel OOM error.
-  static constexpr uint32_t kChannelOomPrintFreq = 600;  // 1 per 10 seconds (assuming 60fps)
-  uint32_t chn_oom_print_freq_ = 0;
-  uint64_t total_oom_errors_ = 0;
-
-  struct VsyncMessageData {
-    display::DisplayId display_id;
-    zx_instant_mono_t timestamp;
-    display::ConfigStamp config_stamp;
-  };
-
-  fbl::RingBuffer<VsyncMessageData, kVsyncBufferSize> buffered_vsync_messages_;
-  uint64_t vsync_cookie_salt_ = 0;
-  uint64_t vsync_cookie_sequence_ = 0;
-
-  uint64_t number_of_vsyncs_sent_ = 0;
-  display::VsyncAckCookie last_cookie_sent_ = display::kInvalidVsyncAckCookie;
-  bool acknowledge_request_sent_ = false;
+  ClientVsyncQueue vsync_queue_ __TA_GUARDED(mtx_);
 
   fit::function<void()> on_client_disconnected_;
 

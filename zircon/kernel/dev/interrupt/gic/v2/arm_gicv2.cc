@@ -318,10 +318,10 @@ void gic_handle_irq(iframe_t* frame) {
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 }
 
-zx_status_t gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
+zx_status_t gic_send_ipi(cpu_mask_t logical_target, mp_ipi ipi) {
   const cpu_mask_t target = mask_translator.LogicalMaskToGic(logical_target);
 
-  uint gic_ipi_num = ipi + ipi_base;
+  uint gic_ipi_num = static_cast<uint32_t>(ipi) + ipi_base;
 
   if (target != 0) {
     LTRACEF("target 0x%x, gic_ipi %u\n", target, gic_ipi_num);
@@ -342,10 +342,10 @@ void arm_ipi_halt_handler() {
 
 void gic_init_percpu() {
   mp_set_curr_cpu_online(true);
-  unmask_interrupt(MP_IPI_GENERIC + ipi_base);
-  unmask_interrupt(MP_IPI_RESCHEDULE + ipi_base);
-  unmask_interrupt(MP_IPI_INTERRUPT + ipi_base);
-  unmask_interrupt(MP_IPI_HALT + ipi_base);
+  unmask_interrupt(static_cast<uint32_t>(mp_ipi::GENERIC) + ipi_base);
+  unmask_interrupt(static_cast<uint32_t>(mp_ipi::RESCHEDULE) + ipi_base);
+  unmask_interrupt(static_cast<uint32_t>(mp_ipi::INTERRUPT) + ipi_base);
+  unmask_interrupt(static_cast<uint32_t>(mp_ipi::HALT) + ipi_base);
 
   const cpu_num_t logical_num = arch_curr_cpu_num();
 
@@ -507,13 +507,17 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   }
   pdev_register_interrupts(&gic_ops);
 
-  zx_status_t status = gic_register_sgi_handler(MP_IPI_GENERIC + ipi_base, &mp_mbx_generic_irq);
+  zx_status_t status = gic_register_sgi_handler(static_cast<uint32_t>(mp_ipi::GENERIC) + ipi_base,
+                                                &mp_mbx_generic_irq);
   DEBUG_ASSERT(status == ZX_OK);
-  status = gic_register_sgi_handler(MP_IPI_RESCHEDULE + ipi_base, &mp_mbx_reschedule_irq);
+  status = gic_register_sgi_handler(static_cast<uint32_t>(mp_ipi::RESCHEDULE) + ipi_base,
+                                    &mp_mbx_reschedule_irq);
   DEBUG_ASSERT(status == ZX_OK);
-  status = gic_register_sgi_handler(MP_IPI_INTERRUPT + ipi_base, &mp_mbx_interrupt_irq);
+  status = gic_register_sgi_handler(static_cast<uint32_t>(mp_ipi::INTERRUPT) + ipi_base,
+                                    &mp_mbx_interrupt_irq);
   DEBUG_ASSERT(status == ZX_OK);
-  status = gic_register_sgi_handler(MP_IPI_HALT + ipi_base, &arm_ipi_halt_handler);
+  status = gic_register_sgi_handler(static_cast<uint32_t>(mp_ipi::HALT) + ipi_base,
+                                    &arm_ipi_halt_handler);
   DEBUG_ASSERT(status == ZX_OK);
 
   gicv2_hw_interface_register();

@@ -7,7 +7,7 @@ use {fidl_next_test_benchmark as ftb_next, fidl_test_benchmark as ftb};
 
 impl_generate! {
     for ftb::GameType, ftb_next::GameType => rng {
-        match rng.gen_range(0..4) {
+        match rng.random_range(0..4) {
             0 => Self::Survival,
             1 => Self::Creative,
             2 => Self::Adventure,
@@ -23,9 +23,9 @@ const ITEM_IDS: [&str; 8] =
 impl_generate! {
     for ftb::Item, ftb_next::Item => rng {
         Self {
-            count: rng.gen(),
-            slot: rng.gen(),
-            id: ITEM_IDS[rng.gen_range(0..ITEM_IDS.len())].to_string(),
+            count: rng.random(),
+            slot: rng.random(),
+            id: ITEM_IDS[rng.random_range(0..ITEM_IDS.len())].to_string(),
         }
     }
 }
@@ -33,26 +33,26 @@ impl_generate! {
 impl_generate! {
     for ftb::Abilities, ftb_next::Abilities => rng {
         Self {
-            walk_speed: rng.gen(),
-            fly_speed: rng.gen(),
-            may_fly: rng.gen_bool(0.5),
-            flying: rng.gen_bool(0.5),
-            invulnerable: rng.gen_bool(0.5),
-            may_build: rng.gen_bool(0.5),
-            instabuild: rng.gen_bool(0.5),
+            walk_speed: rng.random(),
+            fly_speed: rng.random(),
+            may_fly: rng.random_bool(0.5),
+            flying: rng.random_bool(0.5),
+            invulnerable: rng.random_bool(0.5),
+            may_build: rng.random_bool(0.5),
+            instabuild: rng.random_bool(0.5),
         }
     }
 }
 
 impl_generate! {
     for ftb::Vector3d, ftb_next::Vector3d => rng {
-        Self { x: rng.gen(), y: rng.gen(), z: rng.gen() }
+        Self { x: rng.random(), y: rng.random(), z: rng.random() }
     }
 }
 
 impl_generate! {
     for ftb::Vector2, ftb_next::Vector2 => rng {
-        Self { x: rng.gen(), y: rng.gen() }
+        Self { x: rng.random(), y: rng.random() }
     }
 }
 
@@ -64,22 +64,22 @@ const CUSTOM_NAMES: [&str; 8] =
 impl_generate! {
     for ftb::Entity, ftb_next::Entity => rng {
         Self {
-            id: ENTITY_IDS[rng.gen_range(0..ENTITY_IDS.len())].to_string(),
+            id: ENTITY_IDS[rng.random_range(0..ENTITY_IDS.len())].to_string(),
             pos: Generate::generate(rng),
             motion: Generate::generate(rng),
             rotation: Generate::generate(rng),
-            fall_distance: rng.gen(),
-            fire: rng.gen(),
-            air: rng.gen(),
-            on_ground: rng.gen_bool(0.5),
-            no_gravity: rng.gen_bool(0.5),
-            invulnerable: rng.gen_bool(0.5),
-            portal_cooldown: rng.gen(),
+            fall_distance: rng.random(),
+            fire: rng.random(),
+            air: rng.random(),
+            on_ground: rng.random_bool(0.5),
+            no_gravity: rng.random_bool(0.5),
+            invulnerable: rng.random_bool(0.5),
+            portal_cooldown: rng.random(),
             uuid: Generate::generate(rng),
-            custom_name: rng.gen_bool(0.5).then(|| CUSTOM_NAMES[rng.gen_range(0..CUSTOM_NAMES.len())].to_string()),
-            custom_name_visible: rng.gen_bool(0.5),
-            silent: rng.gen_bool(0.5),
-            glowing: rng.gen_bool(0.5),
+            custom_name: rng.random_bool(0.5).then(|| CUSTOM_NAMES[rng.random_range(0..CUSTOM_NAMES.len())].to_string()),
+            custom_name_visible: rng.random_bool(0.5),
+            silent: rng.random_bool(0.5),
+            glowing: rng.random_bool(0.5),
         }
     }
 }
@@ -92,26 +92,26 @@ const MAX_DISPLAYED_RECIPES: usize = 10;
 impl_generate! {
     for ftb::RecipeBook, ftb_next::RecipeBook => rng {
         let mut recipes = Vec::new();
-        for _ in 0..rng.gen_range(0..MAX_RECIPES) {
-            recipes.push(RECIPES[rng.gen_range(0..RECIPES.len())].to_string());
+        for _ in 0..rng.random_range(0..MAX_RECIPES) {
+            recipes.push(RECIPES[rng.random_range(0..RECIPES.len())].to_string());
         }
 
         let mut to_be_displayed = Vec::new();
-        for _ in 0..rng.gen_range(0..MAX_DISPLAYED_RECIPES) {
-            to_be_displayed.push(RECIPES[rng.gen_range(0..RECIPES.len())].to_string());
+        for _ in 0..rng.random_range(0..MAX_DISPLAYED_RECIPES) {
+            to_be_displayed.push(RECIPES[rng.random_range(0..RECIPES.len())].to_string());
         }
 
         Self {
             recipes,
             to_be_displayed,
-            is_filtering_craftable: rng.gen_bool(0.5),
-            is_gui_open: rng.gen_bool(0.5),
-            is_furnace_filtering_craftable: rng.gen_bool(0.5),
-            is_furnace_gui_open: rng.gen_bool(0.5),
-            is_blasting_furnace_filtering_craftable: rng.gen_bool(0.5),
-            is_blasting_furnace_gui_open: rng.gen_bool(0.5),
-            is_smoker_filtering_craftable: rng.gen_bool(0.5),
-            is_smoker_gui_open: rng.gen_bool(0.5),
+            is_filtering_craftable: rng.random_bool(0.5),
+            is_gui_open: rng.random_bool(0.5),
+            is_furnace_filtering_craftable: rng.random_bool(0.5),
+            is_furnace_gui_open: rng.random_bool(0.5),
+            is_blasting_furnace_filtering_craftable: rng.random_bool(0.5),
+            is_blasting_furnace_gui_open: rng.random_bool(0.5),
+            is_smoker_filtering_craftable: rng.random_bool(0.5),
+            is_smoker_gui_open: rng.random_bool(0.5),
         }
     }
 }
@@ -131,29 +131,29 @@ const MAX_ENDER_ITEMS: usize = 27;
 
 impl_generate! {
     for ftb::Player, ftb_next::Player => rng {
-        let inventory_items = rng.gen_range(0..MAX_ITEMS);
-        let ender_items = rng.gen_range(0..MAX_ENDER_ITEMS);
+        let inventory_items = rng.random_range(0..MAX_ITEMS);
+        let ender_items = rng.random_range(0..MAX_ENDER_ITEMS);
 
         Self {
             game_type: Generate::generate(rng),
             previous_game_type: Generate::generate(rng),
-            score: rng.gen(),
-            dimension: DIMENSIONS[rng.gen_range(0..DIMENSIONS.len())].to_string(),
-            selected_item_slot: rng.gen(),
+            score: rng.random(),
+            dimension: DIMENSIONS[rng.random_range(0..DIMENSIONS.len())].to_string(),
+            selected_item_slot: rng.random(),
             selected_item: Generate::generate(rng),
-            spawn_dimension: rng.gen_bool(0.5).then(|| DIMENSIONS[rng.gen_range(0..DIMENSIONS.len())].to_string()),
-            spawn_x: rng.gen(),
-            spawn_y: rng.gen(),
-            spawn_z: rng.gen(),
+            spawn_dimension: rng.random_bool(0.5).then(|| DIMENSIONS[rng.random_range(0..DIMENSIONS.len())].to_string()),
+            spawn_x: rng.random(),
+            spawn_y: rng.random(),
+            spawn_z: rng.random(),
             spawn_forced: Generate::generate(rng),
-            sleep_timer: rng.gen(),
-            food_exhaustion_level: rng.gen(),
-            food_saturation_level: rng.gen(),
-            food_tick_timer: rng.gen(),
-            xp_level: rng.gen(),
-            xp_p: rng.gen(),
-            xp_total: rng.gen(),
-            xp_seed: rng.gen(),
+            sleep_timer: rng.random(),
+            food_exhaustion_level: rng.random(),
+            food_saturation_level: rng.random(),
+            food_tick_timer: rng.random(),
+            xp_level: rng.random(),
+            xp_p: rng.random(),
+            xp_total: rng.random(),
+            xp_seed: rng.random(),
             inventory: generate_vec(rng, inventory_items),
             ender_items: generate_vec(rng, ender_items),
             abilities: Generate::generate(rng),
@@ -161,7 +161,7 @@ impl_generate! {
             root_vehicle: Generate::generate(rng),
             shoulder_entity_left: Generate::generate(rng),
             shoulder_entity_right: Generate::generate(rng),
-            seen_credits: rng.gen_bool(0.5),
+            seen_credits: rng.random_bool(0.5),
             recipe_book: Generate::generate(rng),
         }
     }

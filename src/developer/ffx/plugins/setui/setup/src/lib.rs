@@ -66,7 +66,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const INTERFACE: ConfigurationInterfaces = ConfigurationInterfaces::ETHERNET;
 
@@ -97,7 +97,7 @@ mod test {
         ConfigurationInterfaces::WIFI;
         "Test setup set() output with wifi config."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_setup_output(expected_interface: ConfigurationInterfaces) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             SetupRequest::Set { settings, responder, .. } => {
@@ -129,7 +129,7 @@ mod test {
         Some(ConfigurationInterfaces::ETHERNET);
         "Test setup watch() output with non-empty config."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_setup_watch_output(
         expected_interface: Option<ConfigurationInterfaces>,
     ) -> Result<()> {

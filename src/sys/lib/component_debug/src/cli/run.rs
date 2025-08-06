@@ -105,7 +105,7 @@ impl Stdio {
         std::thread::spawn(move || {
             let mut term_in = std::io::stdin().lock();
             let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
-            let mut executor = fuchsia_async::LocalExecutor::new();
+            let mut executor = fuchsia_async::LocalExecutorBuilder::new().build();
             loop {
                 let bytes_read = term_in.read(&mut buf)?;
                 if bytes_read == 0 {
@@ -117,13 +117,13 @@ impl Stdio {
         });
 
         std::thread::spawn(move || {
-            let mut executor = fuchsia_async::LocalExecutor::new();
+            let mut executor = fuchsia_async::LocalExecutorBuilder::new().build();
             let _result: Result<()> = executor
                 .run_singlethreaded(async move { copy(local_err, std::io::stderr()).await });
         });
 
         std::thread::spawn(move || {
-            let mut executor = fuchsia_async::LocalExecutor::new();
+            let mut executor = fuchsia_async::LocalExecutorBuilder::new().build();
             let _result: Result<()> = executor
                 .run_singlethreaded(async move { copy(local_out, std::io::stdout().lock()).await });
             std::process::exit(0);

@@ -6,15 +6,15 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_HOST_H_
 
 #include <fidl/fuchsia.bluetooth.sys/cpp/fidl.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include "fidl/fuchsia.bluetooth.sys/cpp/markers.h"
 #include "fidl/fuchsia.bluetooth.sys/cpp/natural_types.h"
+#include "src/connectivity/bluetooth/testing/bt-affordances/ffi_c/bindings.h"
 #include "third_party/github.com/google/bt-test-interfaces/src/pandora/host.grpc.pb.h"
 
 class HostService : public pandora::Host::Service {
  public:
-  explicit HostService(async_dispatcher_t* dispatcher);
-
   ::grpc::Status FactoryReset(::grpc::ServerContext* context,
                               const ::google::protobuf::Empty* request,
                               ::google::protobuf::Empty* response) override;
@@ -33,6 +33,8 @@ class HostService : public pandora::Host::Service {
                                 const ::pandora::WaitConnectionRequest* request,
                                 ::pandora::WaitConnectionResponse* response) override;
 
+  // The public address field in `request` should hold a 6 byte BD_ADDR or an std::to_string
+  // encoding of the PeerId to connect.
   ::grpc::Status ConnectLE(::grpc::ServerContext* context,
                            const ::pandora::ConnectLERequest* request,
                            ::pandora::ConnectLEResponse* response) override;
@@ -64,14 +66,25 @@ class HostService : public pandora::Host::Service {
                                        ::google::protobuf::Empty* response) override;
 
  private:
-  class PairingDelegateImpl : public fidl::Server<fuchsia_bluetooth_sys::PairingDelegate> {
-    void OnPairingRequest(OnPairingRequestRequest& request,
-                          OnPairingRequestCompleter::Sync& completer) override;
-    void OnPairingComplete(OnPairingCompleteRequest& request,
-                           OnPairingCompleteCompleter::Sync& completer) override;
-    void OnRemoteKeypress(OnRemoteKeypressRequest& request,
-                          OnRemoteKeypressCompleter::Sync& completer) override {}
-  };
+  static void LeScanCb(void* context, const LePeer* peer) {
+    HostService* svc = static_cast<HostService*>(context);
+    std::lock_guard lock(svc->m_scan_scp_writer_);
+    if (svc->scan_rsp_writer) {
+      pandora::ScanningResponse scan_rsp;
+      scan_rsp.set_public_(std::to_string(peer->id));
+      scan_rsp.set_connectable(peer->connectable);
+      scan_rsp.mutable_data()->set_complete_local_name(peer->name);
+      if (!svc->scan_rsp_writer->Write(scan_rsp)) {
+        FX_LOGS(INFO) << "LE scan canceled by gRPC client.";
+        svc->scan_rsp_writer = nullptr;
+        stop_le_scan();
+      }
+    }
+  }
+
+  std::mutex m_scan_scp_writer_;
+  // If this Writer is non-null, there is an ongoing `Scan` response streaming RPC.
+  grpc::ServerWriter<::pandora::ScanningResponse>* scan_rsp_writer = nullptr;
 
   // Wait for a Peer with the given |addr| to become known. If |enforce_connected| is set, wait
   // until the Peer is also connected. Returns an iterator to the peer.
@@ -86,8 +99,6 @@ class HostService : public pandora::Host::Service {
   std::mutex m_access_;
   std::vector<fuchsia_bluetooth_sys::Peer> peers_;
   bool peer_watching_{false};
-
-  fidl::SyncClient<fuchsia_bluetooth_sys::Pairing> pairing_client_;
 };
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_HOST_H_

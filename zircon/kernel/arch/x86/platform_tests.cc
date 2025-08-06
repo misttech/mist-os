@@ -103,7 +103,7 @@ static bool test_x64_msrs() {
       uint32_t aux;
       cpu_mask_t mask = {};
       mask |= cpu_num_to_mask(i);
-      mp_sync_exec(MP_IPI_TARGET_MASK, mask, rdtscp_aux, reinterpret_cast<void*>(&aux));
+      mp_sync_exec(mp_ipi_target::MASK, mask, rdtscp_aux, reinterpret_cast<void*>(&aux));
       EXPECT_EQ(cpuid, aux);
     }
   }

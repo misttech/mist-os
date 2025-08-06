@@ -1,0 +1,21 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.fshost.fxfsprovisioner;
+
+using fuchsia.io;
+using fuchsia.storage.partitions;
+using zx;
+
+/// Protocol to provision Fxfs partition.
+@discoverable
+open protocol FxfsProvisioner {
+    /// Provisions an Fxfs partition using `partitions_admin`. `partitions_dir` connects to the
+    /// directory containing all the partitions.
+    @selector("fuchsia.fshost.fxfsprovisioner/FxfsProvisioner.Provision")
+    flexible Provision(resource struct {
+        partitions_admin client_end:fuchsia.storage.partitions.PartitionsAdmin;
+        partitions_dir client_end:fuchsia.io.Directory;
+    }) -> () error zx.Status;
+};

@@ -111,6 +111,7 @@ test_names = [
   "mprotect",
   "pipe",
   "procattr",
+  "ptrace",
   "selinuxfs",
   "socket",
   "syslog",
@@ -120,8 +121,8 @@ test_names = [
   # keep-sorted end
 ]
 
-# List of programs launched by "inherit" tests.
-inherit_test_executable_names = [
+# List of subprograms launched by tests.
+test_subprogram_names = [
   # keep-sorted start
   "has_blocked_signals",
   "has_ignored_signals",
@@ -129,6 +130,8 @@ inherit_test_executable_names = [
   "is_duplicated_fd",
   "is_itimer_real_reset",
   "is_selinux_null_inode",
+  "ptrace_traceme",
+  "stop",
   "true",
 
   # keep-sorted end
@@ -146,6 +149,7 @@ resource("policies") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/mprotect.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/pipe_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ptrace_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/syslog.pp",
@@ -154,17 +158,17 @@ resource("policies") {
   outputs = "data/policies/{{source_file_part}}"
 }
 
-inherit_test_executables = []
-inherit_test_resources = []
-foreach(executable_name, inherit_test_executable_names) {
-  inherit_test_executables += [ ":${executable_name}" ]
+test_subprograms = []
+test_resources = []
+foreach(executable_name, test_subprogram_names) {
+  test_subprograms += [ ":${executable_name}" ]
   executable("${executable_name}") {
     testonly = true
 
     # TODO: https://fxbug.dev/297293167 - enable ASan instrumentation for Linux binaries in Starnix
     exclude_toolchain_tags = [ "instrumented" ]
     sources = [
-      "tests/inherit_test_executables/${executable_name}.cc",
+      "tests/test_subprograms/${executable_name}.cc",
       "util.cc",
       "util.h",
     ]
@@ -179,7 +183,7 @@ foreach(executable_name, inherit_test_executable_names) {
     configs += [ ":rpath_config" ]
   }
 
-  inherit_test_resources += [ ":${executable_name}_bin" ]
+  test_resources += [ ":${executable_name}_bin" ]
 
   resource("${executable_name}_bin") {
     testonly = true
@@ -249,7 +253,7 @@ fuchsia_test_package("sestarnix_userspace_tests") {
   test_components = test_component_targets
   subpackages =
       starnix_test_subpackages + [ ":sestarnix_userspace_test_container" ]
-  deps = inherit_test_resources
+  deps = test_resources
 }
 
 group("tests") {

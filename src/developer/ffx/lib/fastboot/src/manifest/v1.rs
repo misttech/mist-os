@@ -185,7 +185,7 @@ mod test {
         }
     ]"#;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_deserializing_should_work() -> Result<()> {
         let v: FlashManifest = from_str(MANIFEST)?;
         let zedboot: &Product = &v.0[0];
@@ -227,7 +227,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_should_fail_if_product_missing() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -250,7 +250,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_should_succeed_if_product_found() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -316,7 +316,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_oem_file_should_be_staged_from_command() -> Result<()> {
         let test_oem_cmd = "test-oem-cmd";
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -374,7 +374,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_should_upload_conditional_partitions_that_match() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -420,7 +420,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_should_succeed_and_not_reboot_bootloader() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -489,7 +489,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_should_not_flash_if_target_is_locked_and_product_requires_unlock() -> Result<()> {
         let v: FlashManifest = from_str(LOCKED_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");

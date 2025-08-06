@@ -271,6 +271,7 @@ def _fuchsia_sdk_repository_ext(ctx):
                         visibility_templates,
                         p.visibility_templates,
                     ))
+                visibility_templates = p.visibility_templates
 
     fuchsia_sdk_repository(
         name = "fuchsia_sdk",

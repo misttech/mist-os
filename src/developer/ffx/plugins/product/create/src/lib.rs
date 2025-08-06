@@ -4,7 +4,7 @@
 
 mod assembly;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use assembly::Assembly;
 use assembly_artifact_cache::ArtifactCache;
 use assembly_tool::PlatformToolProvider;
@@ -19,17 +19,17 @@ use product_bundle::{ProductBundleBuilder, Slot};
 use tempfile::tempdir;
 
 #[derive(FfxTool)]
-pub struct ProductCreateTool {
+pub struct ProductBundleCreateTool {
     #[command]
     pub cmd: CreateCommand,
     ctx: EnvironmentContext,
 }
 
-fho::embedded_plugin!(ProductCreateTool);
+fho::embedded_plugin!(ProductBundleCreateTool);
 
 /// Create a fuchsia product bundle.
 #[async_trait::async_trait(?Send)]
-impl FfxMain for ProductCreateTool {
+impl FfxMain for ProductBundleCreateTool {
     type Writer = SimpleWriter;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let build_dir = self
@@ -41,19 +41,19 @@ impl FfxMain for ProductCreateTool {
                 })
             })
             .transpose()?;
-        product_create(self.cmd, build_dir, writer).await.map_err(flatten_error_sources)
+        product_bundle_create(self.cmd, build_dir, writer).await.map_err(flatten_error_sources)
     }
 }
 
 /// Create a fuchsia product bundle and return an anyhow result.
 /// This allows us to work with anyhow, and map to a fho result above.
-async fn product_create(
+async fn product_bundle_create(
     cmd: CreateCommand,
     build_dir: Option<Utf8PathBuf>,
     writer: SimpleWriter,
 ) -> Result<()> {
     let sanitized_cmd = cmd.try_into()?;
-    Box::pin(sanitized_product_create(sanitized_cmd, build_dir, writer)).await
+    Box::pin(sanitized_product_bundle_create(sanitized_cmd, build_dir, writer)).await
 }
 
 /// Convert the anyhow error into a pretty/stacked fho error.
@@ -74,18 +74,21 @@ fn flatten_error_sources(e: anyhow::Error) -> fho::Error {
     .into()
 }
 
-/// All the inputs necessary to run `ffx product create` after checking that
-/// the arguments were properly given.
+/// All the inputs necessary to run `ffx product-bundle create` after checking
+/// that the arguments were properly given.
 struct SanitizedCreateCommand {
     /// The platform artifacts to use.
     /// If None, then we use the default local artifacts.
     pub platform: Option<String>,
 
     /// The product config to use.
-    pub product: String,
+    pub product_config: String,
 
     /// The board config to use.
-    pub board: String,
+    pub board_config: String,
+
+    /// The name to give the product bundle.
+    pub name: Option<String>,
 
     /// The version of the product to use.
     pub version: Option<String>,
@@ -104,6 +107,9 @@ enum CreateResult {
 
     /// Run assembly and generate the outputs to this path.
     Out(Utf8PathBuf),
+
+    /// Run assembly and generates the outputs to the default location.
+    Default,
 }
 
 /// Parse the input command, and ensure that the user formatted it correctly,
@@ -114,33 +120,43 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
 
     fn try_from(cmd: CreateCommand) -> Result<Self> {
         let platform = cmd.platform;
+
+        // Determine what result we want from this command.
         let result = match (cmd.stage, cmd.out) {
             (true, _) => CreateResult::Stage,
             (false, Some(out)) => CreateResult::Out(out),
-            (false, None) => bail!("--stage or --out must be supplied"),
+            (false, None) => CreateResult::Default,
         };
 
-        // Choose between a product.board combo and --product --board flags.
-        let (product, board) = if let Some(combo) = cmd.product_board_combo {
-            let (p, b) = combo.split_once(".").context("product.board combo must have a period")?;
-            (p.to_string(), b.to_string())
-        } else {
-            let p = cmd
-                .product
-                .context("--product must be supplied when product.board combo is not")?;
-            let b =
-                cmd.board.context("--board must be supplied when product.board combo is not")?;
-            (p, b)
-        };
+        // Choose between a product_config.board_config combo and --product --board flags.
+        let (product_config, board_config) =
+            if let Some(combo) = cmd.product_config_board_config_combo {
+                let (p, b) = combo
+                    .split_once(".")
+                    .context("product_config.board_config combo must have a period")?;
+                (p.to_string(), b.to_string())
+            } else {
+                let p = cmd.product_config.context("--product-config is missing")?;
+                let b = cmd.board_config.context("--board-config is missing")?;
+                (p, b)
+            };
 
+        let name = cmd.name;
         let version = cmd.version;
         let tuf_keys = cmd.tuf_keys;
-        Ok(Self { platform, product, board, version, tuf_keys, result })
+        Ok(Self { platform, product_config, board_config, name, version, tuf_keys, result })
     }
 }
 
-/// Construct a product using sanitized inputs.
-async fn sanitized_product_create(
+fn default_path_for_product_bundle_name(name: impl AsRef<str>) -> Result<Utf8PathBuf> {
+    let home = std::env::home_dir().context("Getting the home dir")?;
+    let home = Utf8PathBuf::from_path_buf(home)
+        .map_err(|e| anyhow!("error converting path to utf8: {:?}", e))?;
+    Ok(home.join(".fuchsia").join("product_bundles").join(name.as_ref()))
+}
+
+/// Construct a product bundle using sanitized inputs.
+async fn sanitized_product_bundle_create(
     cmd: SanitizedCreateCommand,
     build_dir: Option<Utf8PathBuf>,
     mut writer: SimpleWriter,
@@ -149,27 +165,32 @@ async fn sanitized_product_create(
     let tmp_path = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
 
     let cache = ArtifactCache::new();
-    let assembly = Assembly::new(&cache, cmd.platform, cmd.product, cmd.board, build_dir)?;
+    let assembly =
+        Assembly::new(&cache, cmd.platform, cmd.product_config, cmd.board_config, build_dir)?;
     writer.line(format!("Staged the artifacts\n{}", assembly.version_string()))?;
+
+    let name = cmd.name.unwrap_or_else(|| {
+        let product_name = assembly.product_config.product.release_info.info.name.clone();
+        let board_name = assembly.board_config.release_info.info.name.clone();
+        format!("{}.{}", product_name, board_name)
+    });
 
     // Return early if we are only staging the inputs.
     let out = match cmd.result {
         CreateResult::Stage => return Ok(()),
-        CreateResult::Out(out) => out,
-    };
+        CreateResult::Out(out) => Ok(out),
+        CreateResult::Default => default_path_for_product_bundle_name(&name),
+    }?;
 
-    let product_name = assembly.product.product.release_info.info.name.clone();
-    let board_name = assembly.board.release_info.info.name.clone();
-    let name = format!("{}.{}", product_name, board_name);
-
-    let version =
-        cmd.version.unwrap_or_else(|| assembly.product.product.release_info.info.version.clone());
+    let version = cmd
+        .version
+        .unwrap_or_else(|| assembly.product_config.product.release_info.info.version.clone());
     let update_version_file = tmp_path.join("update_version.txt");
     std::fs::write(&update_version_file, &version)?;
 
     writer.line(format!("Assembling into {} ...", &out))?;
     let tools = PlatformToolProvider::new(assembly.platform_path.clone());
-    let system = Box::pin(assembly.create_system(&tmp_path)).await?;
+    let system = Box::pin(assembly.create_system(&tmp_path.join("system"))).await?;
     let mut builder = ProductBundleBuilder::new(name, version)
         .system(system, Slot::A)
         .update_package(update_version_file, 1);

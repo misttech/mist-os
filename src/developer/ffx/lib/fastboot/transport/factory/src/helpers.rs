@@ -30,7 +30,7 @@ where
     )
     .await?;
 
-    if let Some(Ok(event)) = device_stream.next().await {
+    if let Some(event) = device_stream.next().await {
         // This is the first event that matches our filter.
         // Mutate our internal understanding of the address
         // the target is at with the new address discovered

@@ -266,7 +266,7 @@ pub fn sys_bind(
                     .map_err(|errno| if errno == EEXIST { errno!(EADDRINUSE) } else { errno })?;
             }
         }
-        SocketAddress::Vsock(port) => {
+        SocketAddress::Vsock { port, .. } => {
             current_task.abstract_vsock_namespace.bind(locked, current_task, port, socket)?;
         }
         SocketAddress::Inet(_)
@@ -364,7 +364,7 @@ pub fn sys_connect(
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
-        SocketAddress::Vsock(_) => return error!(ENOSYS),
+        SocketAddress::Vsock { .. } => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
             log_trace!("connect to inet socket named {:?}", addr);
             SocketPeer::Address(address)
@@ -562,6 +562,7 @@ where
     message_header.flags = 0;
 
     let cmsg_buffer_size = message_header.control_len;
+
     let mut cmsg_bytes_written = 0;
     let header_size = CMsgHdrPtr::size_of_object_for(current_task);
 
@@ -763,6 +764,9 @@ where
 {
     if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);
+    }
+    if message_header.control_len > 20480 {
+        return error!(ENOBUFS);
     }
     let dest_address = maybe_parse_socket_address(
         current_task,

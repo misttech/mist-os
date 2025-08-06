@@ -105,10 +105,12 @@ async fn get_instance_by_query(
             } else {
                 None
             };
-            let incoming_capabilities =
-                manifest.uses.into_iter().filter_map(|u| u.path().map(|n| n.to_string())).collect();
-            let exposed_capabilities =
-                manifest.exposes.into_iter().map(|e| e.target_name().to_string()).collect();
+            let incoming_capabilities = IntoIterator::into_iter(manifest.uses)
+                .filter_map(|u| u.path().map(|n| n.to_string()))
+                .collect();
+            let exposed_capabilities = IntoIterator::into_iter(manifest.exposes)
+                .map(|e| e.target_name().to_string())
+                .collect();
 
             let execution_info = match execution_info {
                 Some(ExecutionInfo { start_reason }) => {
@@ -125,7 +127,7 @@ async fn get_instance_by_query(
             };
 
             let collections =
-                manifest.collections.into_iter().map(|c| c.name.to_string()).collect();
+                IntoIterator::into_iter(manifest.collections).map(|c| c.name.to_string()).collect();
 
             Some(ShowCmdResolvedInfo {
                 resolved_url,

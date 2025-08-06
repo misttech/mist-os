@@ -8,12 +8,12 @@ use crate::message::{Message, MessageResult, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::types::{NormPerfs, OperatingPoint, ThermalLoad, Watts};
-use anyhow::{bail, format_err, Error};
+use anyhow::{anyhow, bail, format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fuchsia_inspect::{self as inspect, ArrayProperty as _, Property as _};
 use serde_derive::Deserialize;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::convert::TryInto as _;
 use std::fmt::Debug;
@@ -30,6 +30,7 @@ use {fidl_fuchsia_thermal as fthermal, serde_json as json};
 ///
 /// Handles Messages:
 ///     - UpdateThermalLoad
+///     - SetBoost
 ///
 /// Sends Messages:
 ///     - GetCpuLoads
@@ -506,6 +507,7 @@ impl<'a> CpuManagerMainBuilder<'a> {
             clusters: Vec::new(),
             thermal_state_configs: Some(self.thermal_state_configs),
             thermal_states: Vec::new(),
+            boost_enabled: false,
         };
 
         Ok(Rc::new(CpuManagerMain {
@@ -526,6 +528,8 @@ impl<'a> CpuManagerMainBuilder<'a> {
         node
     }
 }
+
+const BOOST_OPP: usize = 0;
 
 pub struct CpuManagerMain {
     /// The available power when thermal load is 0.
@@ -647,33 +651,19 @@ impl CpuManagerMain {
             }
         }
 
-        let opp_indices = &inner.thermal_states[index].cluster_opps;
-        let cluster_update_futures: Vec<_> = inner
-            .clusters
-            .iter()
-            .map(|cluster| {
-                cluster.update_opp(&self.syscall_handler, opp_indices[cluster.cluster_index])
-            })
-            .collect();
-
-        // Aggregate any errors that may have occurred when setting opps.
-        let errors: Vec<_> = futures::future::join_all(cluster_update_futures)
-            .await
-            .into_iter()
-            .filter_map(|r| r.err())
-            .collect();
-
         // Update the thermal state index.
-        if errors.is_empty() {
-            inner.current_thermal_state = Some(index);
-            self.inspect.thermal_state_index.set(&index.to_string());
-            Ok(())
-        } else {
-            inner.current_thermal_state = None;
+        inner.current_thermal_state = Some(index);
+        match self.update_cluster_opps(&inner, index).await {
+            Ok(_) => {
+                self.inspect.thermal_state_index.set(&index.to_string());
+                Ok(())
+            }
+            Err(e) => {
+                inner.current_thermal_state = None;
 
-            let msg = format!("opp update(s) failed: {:?}", errors);
-            self.inspect.thermal_state_index.set(&format!("Unknown; {}", msg));
-            Err(format_err!(msg).into())
+                self.inspect.thermal_state_index.set(&format!("Unknown; {:?}", e));
+                Err(e)
+            }
         }
     }
 
@@ -812,6 +802,72 @@ impl CpuManagerMain {
         );
         self.inspect.projected_power.set(estimate.power.0);
     }
+
+    async fn handle_set_boost(&self, enable: bool) -> Result<MessageReturn, CpuManagerError> {
+        fuchsia_trace::duration!(
+            c"cpu_manager",
+            c"CpuManagerMain::handle_set_boost",
+            "enable" => enable
+        );
+        let mut inner = self.mutable_inner.borrow_mut();
+        inner.boost_enabled = enable;
+        fuchsia_trace::counter!(
+            c"cpu_manager",
+            c"CpuManagerMain boost_enabled",
+            0,
+            "value" => enable
+        );
+        self.inspect.boost_enabled.set(enable);
+        self.update_cluster_opps(&inner, 0).await?;
+        Ok(MessageReturn::SetBoost)
+    }
+
+    async fn update_cluster_opps(
+        &self,
+        inner: &RefMut<'_, MutableInner>,
+        thermal_state: usize,
+    ) -> Result<(), CpuManagerError> {
+        fuchsia_trace::duration!(
+            c"cpu_manager",
+            c"CpuManagerMain::update_cluster_opps",
+            "thermal_state" => thermal_state as u32,
+        );
+        // TODO(https://fxbug.dev/428719895): Add a new config field for a min available power of
+        // boosting.
+        let opp_indices = if inner.boost_enabled {
+            if !inner.throttling_active() {
+                vec![BOOST_OPP; inner.clusters.len()]
+            } else {
+                // Do nothing if boost failed
+                return Ok(());
+            }
+        } else {
+            inner.thermal_states[thermal_state].cluster_opps.clone()
+        };
+        let cluster_update_futures: Vec<_> = inner
+            .clusters
+            .iter()
+            .map(|cluster| {
+                cluster.update_opp(&self.syscall_handler, opp_indices[cluster.cluster_index])
+            })
+            .collect();
+
+        // Aggregate any errors that may have occurred when setting opps.
+        let errors: Vec<_> = futures::future::join_all(cluster_update_futures)
+            .await
+            .into_iter()
+            .filter_map(|r| r.err())
+            .collect();
+
+        if !errors.is_empty() {
+            return Err(CpuManagerError::GenericError(anyhow!(
+                "Failed to update opp(s) ({:?}): {:?}",
+                opp_indices,
+                errors
+            )));
+        }
+        Ok(())
+    }
 }
 
 struct MutableInner {
@@ -840,6 +896,16 @@ struct MutableInner {
     /// The current thermal state of the CPU subsystem. The CPU will be put into its highest-power
     /// state during `init()`.
     current_thermal_state: Option<usize>,
+
+    /// Whether cpu boost is enabled.
+    boost_enabled: bool,
+}
+
+impl MutableInner {
+    /// Throttling is active iff current_thermal_state > 0
+    fn throttling_active(&self) -> bool {
+        self.current_thermal_state.map_or_else(|| false, |state| state > 0)
+    }
 }
 
 #[async_trait(?Send)]
@@ -945,7 +1011,7 @@ impl Node for CpuManagerMain {
             inner.thermal_states = thermal_states;
         }
 
-        // Update cluster opps to match the highest power operating condition.
+        // Update cluster opps to match the normal power operating condition.
         self.update_thermal_state(0).await?;
 
         self.init_done.signal();
@@ -958,6 +1024,7 @@ impl Node for CpuManagerMain {
             Message::UpdateThermalLoad(thermal_load) => {
                 self.handle_update_thermal_load(*thermal_load).await
             }
+            Message::SetBoost(enable) => self.handle_set_boost(*enable).await,
             _ => Err(CpuManagerError::Unsupported),
         }
     }
@@ -976,6 +1043,7 @@ struct InspectData {
     projected_performance: inspect::DoubleProperty,
     projected_power: inspect::DoubleProperty,
     last_error: inspect::StringProperty,
+    boost_enabled: inspect::BoolProperty,
 }
 
 impl InspectData {
@@ -1001,6 +1069,8 @@ impl InspectData {
 
         let last_error = state_node.create_string("last_error", "<None>");
 
+        let boost_enabled = state_node.create_bool("boost_enabled", false);
+
         root_node.record(state_node);
 
         Self {
@@ -1012,6 +1082,7 @@ impl InspectData {
             projected_performance,
             projected_power,
             last_error,
+            boost_enabled,
         }
     }
 
@@ -1109,6 +1180,10 @@ mod tests {
 
     impl Handlers {
         fn new() -> Self {
+            Handlers::new_with_highest_opp([0, 0])
+        }
+
+        fn new_with_highest_opp(highest_opps: [u32; 2]) -> Self {
             let mut mock_maker = MockNodeMaker::new();
 
             // The big and little cluster handlers are initially queried for all operating points.
@@ -1139,10 +1214,10 @@ mod tests {
             let handlers =
                 Self { big_cluster, little_cluster, syscall, cpu_stats, _mock_maker: mock_maker };
 
-            // During initialization, CpuManagerMain configures the highest-power thermal state, with
-            // both clusters at their respective 0th opp.
-            handlers.expect_big_opp(0);
-            handlers.expect_little_opp(0);
+            // During initialization, CpuManagerMain configures the highest-power thermal state,
+            // with both clusters at their respective opp.
+            handlers.expect_big_opp(highest_opps[0]);
+            handlers.expect_little_opp(highest_opps[1]);
 
             handlers
         }
@@ -1648,6 +1723,7 @@ mod tests {
                     "state": {
                         "thermal_state_index": "1",
                         "last_performance (NormPerfs)": 5.0,
+                        "boost_enabled": false,
                         "big_cluster": {
                             "last_load (#cores)": 2.0,
                         },
@@ -1678,5 +1754,93 @@ mod tests {
                 }
             }
         );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_throttling_active() {
+        let mut inner = MutableInner {
+            num_cpus: 0,
+            cluster_configs: None,
+            cluster_handlers: None,
+            clusters: Vec::new(),
+            thermal_state_configs: None,
+            thermal_states: Vec::new(),
+            current_thermal_state: None,
+            boost_enabled: false,
+        };
+
+        // Initially None, so not throttling.
+        assert!(!inner.throttling_active());
+
+        // State 0, not throttling.
+        inner.current_thermal_state = Some(0);
+        assert!(!inner.throttling_active());
+
+        // State > 0, throttling.
+        inner.current_thermal_state = Some(1);
+        assert!(inner.throttling_active());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_set_boost() {
+        let handlers = Handlers::new_with_highest_opp([1, 1]);
+
+        let thermal_state_configs = vec![
+            ThermalStateConfig {
+                cluster_opps: vec![1, 1],
+                min_performance_normperfs: 0.0,
+                static_power_w: 1.5,
+                dynamic_power_per_normperf_w: 0.0,
+            },
+            ThermalStateConfig {
+                cluster_opps: vec![2, 2],
+                min_performance_normperfs: 0.0,
+                static_power_w: 1.0,
+                dynamic_power_per_normperf_w: 0.0,
+            },
+        ];
+
+        let node = CpuManagerMainBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
+            make_default_cluster_configs(),
+            vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
+            thermal_state_configs.clone(),
+            handlers.syscall.clone(),
+            handlers.cpu_stats.clone(),
+        )
+        .build_and_init()
+        .await;
+
+        // SetBoost should succeed when no active throttling
+        assert!(!node.mutable_inner.borrow().throttling_active());
+        handlers.expect_big_opp(0);
+        handlers.expect_little_opp(0);
+        let mut result = node.handle_message(&Message::SetBoost(true)).await;
+        result.unwrap();
+        handlers.expect_big_opp(1);
+        handlers.expect_little_opp(1);
+        result = node.handle_message(&Message::SetBoost(false)).await;
+        result.unwrap();
+
+        // Now activate throttling and SetBoost should do nothing on the opps
+        handlers.enqueue_cpu_loads(vec![0.1; 4]);
+        handlers.expect_big_opp(2);
+        handlers.expect_little_opp(2);
+        result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(85))).await;
+        result.unwrap();
+        // No incoming msgs of any cluster.
+        result = node.handle_message(&Message::SetBoost(true)).await;
+        result.unwrap();
+        // Deactivate the throttling to ensure the boost is picked up.
+        handlers.enqueue_cpu_loads(vec![1.0; 4]);
+        handlers.expect_big_opp(0);
+        handlers.expect_little_opp(0);
+        result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(13))).await;
+        result.unwrap();
+        handlers.expect_big_opp(1);
+        handlers.expect_little_opp(1);
+        result = node.handle_message(&Message::SetBoost(false)).await;
+        result.unwrap();
     }
 }

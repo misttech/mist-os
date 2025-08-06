@@ -34,7 +34,6 @@ rustc_test("factory_reset_handler_test") {
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_rust",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",

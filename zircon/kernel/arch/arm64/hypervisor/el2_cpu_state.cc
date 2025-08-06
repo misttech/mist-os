@@ -189,7 +189,7 @@ zx::result<ktl::unique_ptr<El2CpuState>> El2CpuState::Create() {
   return zx::ok(ktl::move(cpu_state));
 }
 
-El2CpuState::~El2CpuState() { mp_sync_exec(MP_IPI_TARGET_MASK, cpu_mask_, el2_off_task, nullptr); }
+El2CpuState::~El2CpuState() { mp_sync_exec(mp_ipi_target::MASK, cpu_mask_, el2_off_task, nullptr); }
 
 zx::result<uint16_t> El2CpuState::AllocVmid() { return vmid_allocator_.TryAlloc(); }
 

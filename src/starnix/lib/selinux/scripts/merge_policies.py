@@ -15,12 +15,10 @@
 #   statements that are exactly one line each; empty lines and comment lines are
 #   also allowed.
 
-import argparse
-import pathlib
 import re
 import subprocess
 import sys
-import tempfile
+from collections.abc import Collection, Sequence
 
 # Merged policy files must not attempt to declare new initial SIDs, which have a fixed set of
 # values and ordering that forms part of the ABI, defined by the Reference Policy.
@@ -29,7 +27,7 @@ _INITIAL_SID_PATTERN = re.compile(f"^{_INITIAL_SID_REGEX}$")
 
 # Lines in policy files that match these patterns must be grouped together in
 # the order the patterns appear.
-_ORDERED_POLICY_STATEMENT_REGEXS = [
+_ORDERED_POLICY_STATEMENT_REGEXS = (
     "class[ \t\v]+[^ \t\v]+",
     _INITIAL_SID_REGEX,
     "common[ \t\v]+[^ \t\v]+.*",
@@ -74,9 +72,9 @@ _ORDERED_POLICY_STATEMENT_REGEXS = [
     "fs_use_task[ \t\v]+[^ \t\v]+.*$",
     "genfscon[ \t\v]+[^ \t\v]+.*$",
     "portcon[ \t\v]+[^ \t\v]+.*$",
-]
+)
 
-_ORDERED_POLICY_STATEMENT_PATTERNS = list(
+_ORDERED_POLICY_STATEMENT_PATTERNS = tuple(
     (regex, re.compile(f"^{regex}$"))
     for regex in _ORDERED_POLICY_STATEMENT_REGEXS
 )
@@ -86,12 +84,14 @@ _ORDERED_POLICY_STATEMENT_PATTERNS = list(
 _WHITESPACE_OR_COMMENT_PATTERN = re.compile("^[ \t]*(#.*)?$")
 
 
-def _filter_lines(lines: list[str], pattern: re.Pattern) -> list[str]:
-    return list(line for line in lines if pattern.match(line) is not None)
+def _filter_lines(lines: Collection[str], pattern: re.Pattern) -> Sequence[str]:
+    return tuple(line for line in lines if pattern.match(line) is not None)
 
 
-def _negative_filter_lines(lines: list[str], pattern: re.Pattern) -> list[str]:
-    return list(line for line in lines if pattern.match(line) is None)
+def _negative_filter_lines(
+    lines: Collection[str], pattern: re.Pattern
+) -> Sequence[str]:
+    return tuple(line for line in lines if pattern.match(line) is None)
 
 
 def compile_text_policy_to_binary_policy(
@@ -103,9 +103,9 @@ def compile_text_policy_to_binary_policy(
     subprocess.run(
         [
             checkpolicy_executable_path,
-            "-M",  # Enable Multi-Level Security.
-            "-S",  # Sort ocontexts consistent with semanage behaviour.
-            "-O",  # Optimize out redundant rules.
+            "--mls",  # Enable Multi-Level Security.
+            "--sort",  # Sort ocontexts consistent with semanage behaviour.
+            "--optimize",  # Optimize out redundant rules.
             "-c",
             "33",
             "--output",
@@ -188,41 +188,3 @@ def merge_text_policies(
 
         for line in policy_lines_from_input_files:
             output_file.write(f"{line}\n")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--initial-sids",
-        required=True,
-        type=pathlib.Path,
-        help="Path to the initial SID definitions",
-    )
-    parser.add_argument(
-        "--checkpolicy-executable",
-        required=True,
-        type=pathlib.Path,
-        help="Path to the SELinux checkpolicy utility executable",
-    )
-    parser.add_argument(
-        "--output",
-        required=True,
-        type=pathlib.Path,
-        help="Path to use for output binary policy file",
-    )
-    parser.add_argument(
-        "text_partial_policy",
-        nargs="+",
-        type=pathlib.Path,
-        help="Paths to partial policy files to be merged into combined policy",
-    )
-    args = parser.parse_args()
-
-    with tempfile.TemporaryDirectory() as temporary_directory_name:
-        text_policy_file_path = f"{temporary_directory_name}/policy.conf"
-        merge_text_policies(
-            args.initial_sids, args.text_partial_policy, text_policy_file_path
-        )
-        compile_text_policy_to_binary_policy(
-            args.checkpolicy_executable, text_policy_file_path, args.output
-        )

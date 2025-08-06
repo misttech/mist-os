@@ -17,14 +17,25 @@ read -r ARGS_JSON
 # Use a case statement to handle different tools.
 # This makes the script easily extensible for future tools.
 case "$TOOL_NAME" in
-  "search_file_content")
+  "git_ls_files")
+    # Extract parameters using jq
+    SEARCH_PATH=$(echo "$ARGS_JSON" | jq -r '.path // "."') # Default to current dir if null
+
+    # Run the `git ls-files` command.
+    # The `( ... )` subshell ensures that `cd` doesn't affect the script's working directory.
+    OUTPUT=$( (cd "$SEARCH_PATH" && git ls-files 2>&1) )
+
+    # Return the exact output in the required JSON format.
+    jq -n --arg output "$OUTPUT" '{"output": $output}'
+    ;;
+
+  "jiri_grep")
     # Extract parameters using jq
     PATTERN=$(echo "$ARGS_JSON" | jq -r '.pattern')
     SEARCH_PATH=$(echo "$ARGS_JSON" | jq -r '.path // "."') # Default to current dir if null
 
-    # Run the git grep command.
-    # The `( ... )` subshell ensures that `cd` doesn't affect the script's working directory.
-    OUTPUT=$( (cd "$SEARCH_PATH" && git grep -n "$PATTERN") 2>&1 )
+    # Run the `jiri grep` command.
+    OUTPUT=$( jiri grep -n "$PATTERN" -- "$SEARCH_PATH" 2>&1 )
 
     # Return the exact output in the required JSON format.
     jq -n --arg output "$OUTPUT" '{"output": $output}'

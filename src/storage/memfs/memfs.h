@@ -7,7 +7,6 @@
 
 #include <lib/async/dispatcher.h>
 #include <lib/zx/event.h>
-#include <lib/zx/pager.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -47,10 +46,6 @@ class Memfs : public fs::PagedVfs {
 
   // fs::FuchsiaVfs override:
   zx::result<fs::FilesystemInfo> GetFilesystemInfo() override;
-
-  const zx::pager& pager_for_next_vdso_syscalls() const {
-    return PagedVfs::pager_for_next_vdso_syscalls();
-  }
 
  private:
   explicit Memfs(async_dispatcher_t* dispatcher);

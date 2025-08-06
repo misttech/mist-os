@@ -233,21 +233,6 @@ void ImagePipeSurfaceDisplay::ControllerOnVsync(
       events_to_signal.push_back(std::move(pending_release_fences_.front().release_fence));
       pending_release_fences_.pop();
     }
-
-    const bool should_disable_vsyncs = pending_release_fences_.empty() ||
-                                       last_applied_config_stamp_ == applied_config_stamp.value();
-    if (should_disable_vsyncs) {
-      receiving_vsyncs_ = false;
-
-      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(false);
-      if (result.is_error()) {
-        // We're probably irrevocably broken at this point, but this can't hurt.
-        receiving_vsyncs_ = true;
-
-        fprintf(stderr, "%s: SetVsyncEventDelivery(false) failed: %s\n", kTag,
-                result.error_value().FormatDescription().c_str());
-      }
-    }
   }
 
   // Signal the events accumulated above.
@@ -792,27 +777,13 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
 
     // If there are unsignaled release fences, we want them to be released when the just-applied
-    // config is latched, so we need to start receiving vsync events if we aren't already.
-    const bool should_enable_vsyncs = !pending_release_fences_.empty() && !receiving_vsyncs_;
-
+    // config is latched.
     if (!release_fences.empty()) {
       // We only handle 1 fence, so if more are provided then we wouldn't behave as expected.
       zx::event release_fence = static_cast<FuchsiaEvent*>(release_fences[0].get())->Take();
       ZX_ASSERT(release_fences.size() == 1);
       pending_release_fences_.push(
           {.config_stamp = new_config_stamp, .release_fence = std::move(release_fence)});
-    }
-
-    if (should_enable_vsyncs) {
-      receiving_vsyncs_ = true;
-      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(true);
-      if (result.is_error()) {
-        // We're probably irrevocably broken at this point, but this can't hurt.
-        receiving_vsyncs_ = false;
-
-        fprintf(stderr, "%s: SetVsyncEventDelivery(true) failed: %s\n", kTag,
-                result.error_value().FormatDescription().c_str());
-      }
     }
   }
 

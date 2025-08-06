@@ -114,7 +114,7 @@ mod test {
         use serde_json::json;
         use serial_test::serial;
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         #[serial]
         async fn test_get_manual_targets() {
             let _env = ffx_config::test_init().await.unwrap();
@@ -131,7 +131,7 @@ mod test {
             assert!(targets.contains_key("127.0.0.1:8023"));
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         #[serial]
         async fn test_add_manual_target() {
             let _env = ffx_config::test_init().await.unwrap();
@@ -146,7 +146,7 @@ mod test {
             assert!(targets.contains_key("127.0.0.1:8022"));
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         #[serial]
         async fn test_remove_manual_target() {
             let _env = ffx_config::test_init().await.unwrap();
@@ -173,7 +173,7 @@ mod test {
     mod mock_impl {
         use super::*;
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_new() {
             let mut map = Map::new();
             map.insert("127.0.0.1:8022".to_string(), json!(0));
@@ -183,13 +183,13 @@ mod test {
             assert!(targets.contains_key("127.0.0.1:8022"));
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_default() {
             let mt = Mock::default();
             assert_eq!(mt.get_or_default().await, Map::<String, Value>::new());
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_get_manual_targets() {
             let mut map = Map::new();
             map.insert("127.0.0.1:8022".to_string(), json!(0));
@@ -201,7 +201,7 @@ mod test {
             assert!(targets.contains_key("127.0.0.1:8023"));
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_add_manual_target() {
             let mt = Mock::default();
             mt.add("127.0.0.1:8022".to_string()).await.unwrap();
@@ -213,7 +213,7 @@ mod test {
             assert!(targets.contains_key("127.0.0.1:8022"));
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_remove_manual_target() {
             let mut map = Map::new();
             map.insert("127.0.0.1:8022".to_string(), json!(0));
@@ -229,7 +229,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     #[serial]
     async fn test_repeated_adds_do_not_rewrite_storage() {
         let mt = Mock::new(Map::new());

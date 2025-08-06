@@ -9,6 +9,10 @@
 
 #include <gtest/gtest.h>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace display {
 
 namespace {
@@ -71,6 +75,20 @@ TEST(AlphaModeTest, FidlConversionRoundtrip) {
   EXPECT_EQ(AlphaMode::kPremultiplied, AlphaMode(AlphaMode::kPremultiplied.ToFidl()));
   EXPECT_EQ(AlphaMode::kDisable, AlphaMode(AlphaMode::kDisable.ToFidl()));
 }
+
+TEST(AlphaMode, ToString) {
+  EXPECT_EQ(AlphaMode::kDisable.ToString(), "Disable");
+  EXPECT_EQ(AlphaMode::kPremultiplied.ToString(), "Premultiplied");
+  EXPECT_EQ(AlphaMode::kHwMultiply.ToString(), "HwMultiply");
+}
+
+#if __cplusplus >= 202002L
+TEST(AlphaMode, Format) {
+  EXPECT_EQ(std::format("{}", AlphaMode::kDisable), "Disable");
+  EXPECT_EQ(std::format("{}", AlphaMode::kPremultiplied), "Premultiplied");
+  EXPECT_EQ(std::format("{:>10}", AlphaMode::kDisable), "   Disable");
+}
+#endif  // __cplusplus >= 202002L
 
 }  // namespace
 

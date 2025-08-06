@@ -19,7 +19,7 @@ rustc_library("ffx_daemon_protocol_echo") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:log",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [ "src/lib.rs" ]
 }

@@ -158,7 +158,7 @@ impl RunnerRegistry {
         Self { runners }
     }
 
-    pub fn from_decl(regs: &Vec<RunnerRegistration>) -> Self {
+    pub fn from_decl(regs: &[RunnerRegistration]) -> Self {
         let mut runners = HashMap::new();
         for reg in regs {
             runners.insert(reg.target_name.clone(), reg.clone());
@@ -197,8 +197,8 @@ impl RegistrationDeclCommon for DebugRegistration {
     }
 }
 
-impl From<Vec<cm_rust::DebugRegistration>> for DebugRegistry {
-    fn from(regs: Vec<cm_rust::DebugRegistration>) -> Self {
+impl From<Box<[cm_rust::DebugRegistration]>> for DebugRegistry {
+    fn from(regs: Box<[cm_rust::DebugRegistration]>) -> Self {
         let mut debug_capabilities = HashMap::new();
         for reg in regs {
             match reg {

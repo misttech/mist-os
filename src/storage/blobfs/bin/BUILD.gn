@@ -62,6 +62,7 @@ group("blobfs-component") {
     "//src/recovery/system:*",
     "//src/security/tests/pkg_test/fshost:*",
     "//src/storage/fshost:*",
+    "//src/storage/fvm:*",
     "//src/storage/lib/fs_management/rust:*",
     "//src/sys/pkg/testing/blobfs-ramdisk:*",
   ]

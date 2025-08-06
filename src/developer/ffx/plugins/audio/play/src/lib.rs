@@ -113,7 +113,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     pub async fn test_play() -> Result<(), fho::Error> {
         let controller = ffx_audio_common::tests::fake_audio_player();
         let test_buffers = TestBuffers::default();

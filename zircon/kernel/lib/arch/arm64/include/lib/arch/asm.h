@@ -59,8 +59,11 @@ shadow_call_sp .req x18
   .cfi_adjust_cfa_offset -(\imm)
 .endm
 
-// Standard prologue sequence for FP setup, with CFI.
-.macro .prologue.fp frame_extra_size=0
+// Standard prologue sequence for FP setup, with CFI.  This emits .stack_sizes
+// metadata unless the optional second argument prevents it, in which case a
+// separate .llvm.stack_size invocation should be used.
+.macro .prologue.fp frame_extra_size=0, no_metadata=
+  .llvm.stack_size (\frame_extra_size + 16), \no_metadata
   stp x29, x30, [sp, #-(16 + \frame_extra_size)]!
   // The CFA is still computed relative to the SP so code will
   // continue to use .cfi_adjust_cfa_offset for pushes and pops.

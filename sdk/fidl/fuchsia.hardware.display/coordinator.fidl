@@ -466,15 +466,6 @@ closed protocol Coordinator {
         1: stamp ConfigStamp;
     });
 
-    /// Configures the client's preferences for VSync event delivery.
-    ///
-    /// VSync event delivery is disabled by default. Clients interested in
-    /// receiving VSync events must explicitly enable their delivery.
-    strict SetVsyncEventDelivery(struct {
-        /// If false, the client will not receive `OnVsync` messages.
-        vsync_delivery_enabled bool;
-    });
-
     /// Acknowledges the receipt of one `OnVsync` message.
     strict AcknowledgeVsync(struct {
         /// The cookie received in the most recent `OnVsync` message.

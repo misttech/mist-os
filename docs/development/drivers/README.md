@@ -122,7 +122,6 @@ section.
 -  Board drivers
    - [GPIO initialization][gpio-init]
 -  Display drivers
-   -  [How to write a display driver][how-to-write-a-display-driver]
    -  [Modifying board drivers][modifying-board-drivers]
    -  [What does a display controller do?][what-does-a-display-controller-do]
 -  PCI drivers
@@ -159,7 +158,6 @@ section.
 [composite-nodes]: developer_guide/create-a-composite-node.md
 [driver-runtime-api-guidelines]: developer_guide/driver-runtime-api-guidelines.md
 [drivers-rubric]: developer_guide/rubric.md
-[how-to-write-a-display-driver]: driver_guides/display/how_to_write.md
 [modifying-board-drivers]: driver_guides/display/board_driver_changes.md
 [what-does-a-display-controller-do]: driver_guides/display/hardware_concepts.md
 [registers-overview]: driver_guides/registers/overview.md

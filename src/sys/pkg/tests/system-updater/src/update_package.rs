@@ -59,6 +59,17 @@ async fn fails_if_package_unavailable() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn fails_if_manifest_unavailable_packageless() {
+    let env = TestEnv::builder().build().await;
+
+    let result =
+        env.run_update_with_options("http://fuchsia.com/unavailable", default_options()).await;
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    env.assert_interactions(initial_interactions());
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn uses_custom_update_package() {
     let env = TestEnv::builder().build().await;
 
@@ -140,6 +151,27 @@ async fn fails_on_malformed_images_manifest_update_package() {
         crate::initial_interactions()
             .chain([PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".into())]),
     );
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_on_malformed_ota_manifest_packageless() {
+    let env_with_bad_manifest_json =
+        TestEnv::builder().ota_manifest_json("fake manifest").build().await;
+
+    assert!(
+        env_with_bad_manifest_json.run_packageless_update().await.is_err(),
+        "system updater succeeded when it should fail"
+    );
+
+    let env_no_manifest_json = TestEnv::builder().ota_manifest_json("").build().await;
+
+    assert!(
+        env_no_manifest_json.run_packageless_update().await.is_err(),
+        "system updater succeeded when it should fail"
+    );
+
+    env_with_bad_manifest_json.assert_interactions(initial_interactions());
+    env_no_manifest_json.assert_interactions(initial_interactions());
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -467,4 +499,190 @@ async fn fully_populated_images_manifest() {
         .contains(&PackageResolve(image_package_url_to_string("update-images-firmware", 5))));
     assert!(all_events_middle
         .contains(&PackageResolve(image_package_url_to_string("update-images-fuchsia", 9))));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fully_populated_images_manifest_packageless() {
+    let zbi_content = b"zbi contents";
+    let zbi_hash = fuchsia_merkle::from_slice(zbi_content).root();
+    let vbmeta_content = b"vbmeta contents";
+    let vbmeta_hash = fuchsia_merkle::from_slice(vbmeta_content).root();
+    let recovery_zbi_content = b"rzbi contents";
+    let recovery_zbi_hash = fuchsia_merkle::from_slice(recovery_zbi_content).root();
+    let recovery_vbmeta_content = b"rvbmeta contents";
+    let recovery_vbmeta_hash = fuchsia_merkle::from_slice(recovery_vbmeta_content).root();
+    let firmware_content = b"afirmware";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+    let firmware_bl2_content = b"bl2bl2";
+    let firmware_bl2_hash = fuchsia_merkle::from_slice(firmware_bl2_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: recovery_zbi_hash,
+                sha256: sha256(1),
+                size: recovery_zbi_content.len() as u64,
+                slot: manifest::Slot::R,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: recovery_vbmeta_hash,
+                sha256: sha256(2),
+                size: recovery_vbmeta_content.len() as u64,
+                slot: manifest::Slot::R,
+                image_type: manifest::ImageType::Asset(AssetType::Vbmeta),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: zbi_hash,
+                sha256: sha256(3),
+                size: zbi_content.len() as u64,
+
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: vbmeta_hash,
+                sha256: sha256(4),
+                size: vbmeta_content.len() as u64,
+
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Vbmeta),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: sha256(5),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_bl2_hash,
+                sha256: sha256(6),
+                size: firmware_bl2_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("bl2".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .ota_manifest(manifest)
+        .blob(zbi_hash, zbi_content.to_vec())
+        .blob(vbmeta_hash, vbmeta_content.to_vec())
+        .blob(recovery_zbi_hash, recovery_zbi_content.to_vec())
+        .blob(recovery_vbmeta_hash, recovery_vbmeta_content.to_vec())
+        .blob(firmware_hash, firmware_content.to_vec())
+        .blob(firmware_bl2_hash, firmware_bl2_content.to_vec())
+        .build()
+        .await;
+
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions().chain([
+            ReplaceRetainedBlobs(vec![
+                recovery_zbi_hash.into(),
+                recovery_vbmeta_hash.into(),
+                zbi_hash.into(),
+                vbmeta_hash.into(),
+                firmware_hash.into(),
+                firmware_bl2_hash.into(),
+            ]),
+            Gc,
+        ]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::VerifiedBootMetadata,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::VerifiedBootMetadata,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::Recovery,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::Recovery,
+                asset: paver::Asset::VerifiedBootMetadata,
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "bl2".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "bl2".to_string(),
+            }),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(recovery_zbi_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(recovery_vbmeta_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(zbi_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(vbmeta_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_bl2_hash.into())),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+                payload: b"afirmware".to_vec(),
+            }),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "bl2".to_string(),
+                payload: b"bl2bl2".to_vec(),
+            }),
+            Paver(PaverEvent::WriteAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+                payload: b"zbi contents".to_vec(),
+            }),
+            Paver(PaverEvent::WriteAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::VerifiedBootMetadata,
+                payload: b"vbmeta contents".to_vec(),
+            }),
+            Paver(PaverEvent::WriteAsset {
+                configuration: paver::Configuration::Recovery,
+                asset: paver::Asset::Kernel,
+                payload: b"rzbi contents".to_vec(),
+            }),
+            Paver(PaverEvent::WriteAsset {
+                configuration: paver::Configuration::Recovery,
+                asset: paver::Asset::VerifiedBootMetadata,
+                payload: b"rvbmeta contents".to_vec(),
+            }),
+        ],
+        [
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
 }

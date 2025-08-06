@@ -59,6 +59,12 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
         closure
     }
 
+    /// Adds an edgeless node to the graph. Used by shutdown to ensure every node gets visited,
+    /// even if there are no paths to the node.
+    pub fn add_node(&mut self, source: T) {
+        self.0.entry(source).or_insert_with(DirectedNode::new);
+    }
+
     /// Returns the nodes of the graph in reverse topological order, or an error if the graph
     /// contains a cycle.
     pub fn topological_sort(&self) -> Result<Vec<T>, Error<T>> {

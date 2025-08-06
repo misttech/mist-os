@@ -60,6 +60,14 @@ class TestConsole(unittest.IsolatedAsyncioTestCase):
                 ],
                 sleep_length=1,
             ),
+            ConsoleTestArgs(
+                "background task status is not printed",
+                ["--status"],
+                expected_present=[],
+                expected_absent=[
+                    "background_task",
+                ],
+            ),
         ]
     )
     @mock.patch("console.termout.is_valid", return_value=True)
@@ -106,6 +114,12 @@ class TestConsole(unittest.IsolatedAsyncioTestCase):
                     "baz", hermetic=False, parent=test_group_id
                 )
             )
+            background_task_ids = []
+            background_task_ids.append(
+                recorder.emit_program_start(
+                    "background_task", [], quiet_mode=True
+                )
+            )
 
             before = output.getvalue()
             while output.getvalue() == before:
@@ -120,7 +134,15 @@ class TestConsole(unittest.IsolatedAsyncioTestCase):
                     event.ProgramOutputStream.STDOUT,
                 )
                 recorder.emit_program_termination(pid, return_code=0)
+            for id in background_task_ids:
+                recorder.emit_program_output(
+                    id,
+                    f"This is output from bg task {id}",
+                    event.ProgramOutputStream.STDOUT,
+                )
+                recorder.emit_program_termination(id, return_code=0)
 
+            before = output.getvalue()
             while output.getvalue() == before:
                 # Wait until the output refreshes.
                 await asyncio.sleep(0.1)

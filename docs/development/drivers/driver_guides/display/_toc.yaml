@@ -6,8 +6,6 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "How to write a display driver"
-  path: /docs/development/drivers/driver_guides/display/how_to_write.md
 - title: "Modifying board drivers"
   path: /docs/development/drivers/driver_guides/display/board_driver_changes.md
 - title: "What does a display controller do?"

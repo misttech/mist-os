@@ -4,12 +4,16 @@
 
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <zircon/assert.h>
+#include <zircon/availability.h>
 
 #include <utility>
 
 #include "src/storage/lib/vfs/cpp/debug.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fio = fuchsia_io;
 

@@ -18,7 +18,7 @@ struct ServiceRenameRouter {
     router: Router<DirEntry>,
     // This field is not read on host
     #[allow(dead_code)]
-    renames: Vec<NameMapping>,
+    renames: Box<[NameMapping]>,
     offer_service_decl: OfferServiceDecl,
 }
 
@@ -46,7 +46,7 @@ impl ServiceRenameRouter {
                 {
                     let target_services_dict = Dict::new();
                     let dir_ent_ref = std::sync::Arc::new(_source_services_directory);
-                    for rename in self.renames.iter() {
+                    for rename in &self.renames {
                         let path =
                             vfs::path::Path::validate_and_split(format!("{}", &rename.source_name))
                                 .expect("path from component manifest is invalid");
@@ -165,13 +165,15 @@ impl WithServiceRenamesAndFilter for Router<DirEntry> {
     }
 }
 
-pub fn process_offer_renames(service_offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
-    match (&service_offer_decl.renamed_instances, &service_offer_decl.source_instance_filter) {
+pub fn process_offer_renames(service_offer_decl: &OfferServiceDecl) -> Box<[NameMapping]> {
+    match (
+        service_offer_decl.renamed_instances.as_ref(),
+        service_offer_decl.source_instance_filter.as_ref(),
+    ) {
         (Some(renames), Some(filter)) if !renames.is_empty() && !filter.is_empty() => {
             // If rename mappings and a filter are set, we ignore mappings that aren't included
             // in the filter.
-            renames
-                .into_iter()
+            IntoIterator::into_iter(renames)
                 .filter(|mapping| filter.contains(&mapping.target_name))
                 .cloned()
                 .collect()
@@ -180,11 +182,10 @@ pub fn process_offer_renames(service_offer_decl: &OfferServiceDecl) -> Vec<NameM
         (_, Some(filter)) if !filter.is_empty() => {
             // If a filter is set and no renames, we can implement the filter as a set of
             // renames. This helps reduce code duplication.
-            filter
-                .into_iter()
+            IntoIterator::into_iter(filter)
                 .map(|name| NameMapping { source_name: name.clone(), target_name: name.clone() })
                 .collect()
         }
-        _ => vec![],
+        _ => Box::from([]),
     }
 }

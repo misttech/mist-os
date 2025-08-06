@@ -31,16 +31,22 @@ class UsbPowerHub(abc.ABC):
 
     # List all the public methods
     @abc.abstractmethod
-    def power_off(self) -> None:
+    def power_off(sel, port: int | None = None) -> None:
         """Turns off the usb power hub.
+
+        Args:
+            port: port on which we need to perform this operation.
 
         Raises:
             UsbPowerError: In case of failure.
         """
 
     @abc.abstractmethod
-    def power_on(self) -> None:
+    def power_on(self, port: int | None = None) -> None:
         """Turns on the usb power hub.
+
+        Args:
+            port: port on which we need to perform this operation.
 
         Raises:
             UsbPowerError: In case of failure.

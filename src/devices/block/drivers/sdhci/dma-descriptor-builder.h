@@ -262,6 +262,15 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
 
   pmt_count_++;
 
+  // TODO(427293779): Remove this after the eMMC issue has been fixed.
+  if (request_.blocksize == 512 && request_.cmd_flags & SDMMC_CMD_READ) {
+    const uint8_t zero_block[512] = {0};
+    for (uint64_t write_size, offset = 0; offset < buffer.size; offset += write_size) {
+      write_size = std::min(buffer.size - offset, sizeof(zero_block));
+      vmo->write(zero_block, buffer.offset + offset, write_size);
+    }
+  }
+
   // We don't own this VMO, and therefore cannot make any assumptions about the state of the
   // cache. The cache must be clean and invalidated for reads so that the final clean + invalidate
   // doesn't overwrite main memory with stale data from the cache, and must be clean for writes so

@@ -11,12 +11,12 @@
 
 #ifndef __ASSEMBLER__
 
+#include <align.h>
 #include <lib/arch/riscv64/sbi.h>
 #include <zircon/compiler.h>
 
 #include <arch/defines.h>
 #include <arch/riscv64.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <ktl/atomic.h>
 

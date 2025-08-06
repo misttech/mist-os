@@ -176,4 +176,23 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::CompatFrom<crate::Foo>
+        for ::fidl_test_structdefaultvalueenumlibraryreference::Foo
+    {
+        #[inline]
+        fn compat_from(value: crate::Foo) -> Self {
+            Self { field: ::fidl_next::CompatFrom::compat_from(value.field) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_structdefaultvalueenumlibraryreference::Foo>
+        for crate::Foo
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_structdefaultvalueenumlibraryreference::Foo) -> Self {
+            Self { field: ::fidl_next::CompatFrom::compat_from(value.field) }
+        }
+    }
+}

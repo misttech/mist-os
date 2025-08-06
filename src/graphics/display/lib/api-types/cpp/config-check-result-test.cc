@@ -9,6 +9,10 @@
 
 #include <gtest/gtest.h>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace display {
 
 namespace {
@@ -77,6 +81,23 @@ TEST(ConfigCheckResultTest, FidlConversionRoundtrip) {
   EXPECT_EQ(ConfigCheckResult::kInvalidConfig,
             ConfigCheckResult(ConfigCheckResult::kInvalidConfig.ToFidl()));
 }
+
+TEST(ConfigCheckResult, ToString) {
+  EXPECT_EQ(ConfigCheckResult::kOk.ToString(), "Ok");
+  EXPECT_EQ(ConfigCheckResult::kEmptyConfig.ToString(), "EmptyConfig");
+  EXPECT_EQ(ConfigCheckResult::kInvalidConfig.ToString(), "InvalidConfig");
+  EXPECT_EQ(ConfigCheckResult::kUnsupportedConfig.ToString(), "UnsupportedConfig");
+  EXPECT_EQ(ConfigCheckResult::kTooManyDisplays.ToString(), "TooManyDisplays");
+  EXPECT_EQ(ConfigCheckResult::kUnsupportedDisplayModes.ToString(), "UnsupportedDisplayModes");
+}
+
+#if __cplusplus >= 202002L
+TEST(ConfigCheckResult, Format) {
+  EXPECT_EQ(std::format("{}", ConfigCheckResult::kOk), "Ok");
+  EXPECT_EQ(std::format("{}", ConfigCheckResult::kEmptyConfig), "EmptyConfig");
+  EXPECT_EQ(std::format("{:>8}", ConfigCheckResult::kOk), "      Ok");
+}
+#endif  // __cplusplus >= 202002L
 
 }  // namespace
 

@@ -17,7 +17,8 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdNumber,
     FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
-use starnix_logging::set_zx_name;
+use bitflags::bitflags;
+use starnix_logging::{set_zx_name, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffers;
@@ -40,7 +41,7 @@ use starnix_uapi::{
     io_uring_op_IORING_OP_TIMEOUT, io_uring_op_IORING_OP_TIMEOUT_REMOVE,
     io_uring_op_IORING_OP_WRITE, io_uring_op_IORING_OP_WRITEV, io_uring_op_IORING_OP_WRITE_FIXED,
     io_uring_params, io_uring_sqe, off_t, socklen_t, uapi, IORING_FEAT_SINGLE_MMAP,
-    IORING_OFF_CQ_RING, IORING_OFF_SQES, IORING_OFF_SQ_RING, IORING_SETUP_CQSIZE,
+    IORING_OFF_CQ_RING, IORING_OFF_SQES, IORING_OFF_SQ_RING,
 };
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -48,6 +49,77 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 // See https://github.com/google/gvisor/blob/master/pkg/abi/linux/iouring.go#L47
 pub const IORING_MAX_ENTRIES: u32 = 1 << 15; // 32768
 const IORING_MAX_CQ_ENTRIES: u32 = 2 * IORING_MAX_ENTRIES;
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct IoRingSetupFlags: u32 {
+        const IoPoll = starnix_uapi::IORING_SETUP_IOPOLL;
+        const SqPoll = starnix_uapi::IORING_SETUP_SQPOLL;
+        const SqAff = starnix_uapi::IORING_SETUP_SQ_AFF;
+        const CqSize = starnix_uapi::IORING_SETUP_CQSIZE;
+        const Clamp = starnix_uapi::IORING_SETUP_CLAMP;
+        const AttachWq = starnix_uapi::IORING_SETUP_ATTACH_WQ;
+        const RDisabled = starnix_uapi::IORING_SETUP_R_DISABLED;
+        const SubmitAll = starnix_uapi::IORING_SETUP_SUBMIT_ALL;
+        const CoopTaskRun = starnix_uapi::IORING_SETUP_COOP_TASKRUN;
+        const TaskRunFlag = starnix_uapi::IORING_SETUP_TASKRUN_FLAG;
+        const SqE128 = starnix_uapi::IORING_SETUP_SQE128;
+        const CqE32 = starnix_uapi::IORING_SETUP_CQE32;
+        const SingleIssuer = starnix_uapi::IORING_SETUP_SINGLE_ISSUER;
+        const DeferTaskRun = starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
+        const NoMmap = starnix_uapi::IORING_SETUP_NO_MMAP;
+        const RegisteredFdOnly = starnix_uapi::IORING_SETUP_REGISTERED_FD_ONLY;
+        const NoSqArray = starnix_uapi::IORING_SETUP_NO_SQARRAY;
+
+        /// The flags that we support. Specifying a flag outside of this set will generate an
+        /// error.
+        const SupportedFlags = starnix_uapi::IORING_SETUP_CQSIZE | starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER | starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
+        /// The flags that we ignore. Specifying a flags in this set will not generate an error but
+        /// will have no effect.
+        // TODO(https://fxbug.dev/297431387): Implement these flags.
+        const IgnoredFlags = starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER | starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
+    }
+}
+
+impl IoRingSetupFlags {
+    fn build_and_validate_from(value: u32) -> Result<Self, Errno> {
+        let Some(flags) = IoRingSetupFlags::from_bits(value) else {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup undefined flag(s)",
+                value
+            );
+            return error!(EINVAL);
+        };
+
+        let unsupported_flags = flags.difference(IoRingSetupFlags::SupportedFlags);
+        if !unsupported_flags.is_empty() {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup unsupported flags",
+                unsupported_flags.bits()
+            );
+            return error!(EINVAL);
+        }
+        let ignored_flags = flags.intersection(IoRingSetupFlags::IgnoredFlags);
+        if !ignored_flags.is_empty() {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup ignored flags",
+                ignored_flags.bits()
+            );
+        }
+
+        // IORING_SETUP_COOP_TASKRUN requires IORING_SETUP_SINGLE_ISSUER
+        if flags.contains(IoRingSetupFlags::DeferTaskRun)
+            && !flags.contains(IoRingSetupFlags::SingleIssuer)
+        {
+            return error!(EINVAL);
+        }
+
+        return Ok(flags);
+    }
+}
 
 type RingIndex = u32;
 
@@ -526,6 +598,7 @@ impl IoUringQueue {
 pub struct IoUringFileObject {
     queue: IoUringQueue,
     registered_buffers: Mutex<UserBuffers>,
+    _flags: IoRingSetupFlags,
 }
 
 impl IoUringFileObject {
@@ -538,8 +611,10 @@ impl IoUringFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        let flags = IoRingSetupFlags::build_and_validate_from(params.flags)?;
+
         let sq_entries = entries.next_power_of_two();
-        let cq_entries = if params.flags & IORING_SETUP_CQSIZE != 0 {
+        let cq_entries = if flags.contains(IoRingSetupFlags::CqSize) {
             UserValue::from_raw(params.cq_entries)
                 .validate(sq_entries..IORING_MAX_CQ_ENTRIES)
                 .ok_or_else(|| errno!(EINVAL))?
@@ -585,7 +660,11 @@ impl IoUringFileObject {
             ..Default::default()
         };
 
-        let object = Box::new(IoUringFileObject { queue, registered_buffers: Default::default() });
+        let object = Box::new(IoUringFileObject {
+            queue,
+            registered_buffers: Default::default(),
+            _flags: flags,
+        });
         Ok(Anon::new_file(locked, current_task, object, OpenFlags::RDWR, "[io_uring]"))
     }
 

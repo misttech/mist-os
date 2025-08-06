@@ -18,6 +18,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
@@ -63,28 +64,12 @@ type EmulatorConfig struct {
 	// Target is the target to emulate.
 	Target Target `json:"target"`
 
-	// VirtualDeviceSpec is the name of the virtual device spec to pass to
-	// `ffx emu start --device`. If empty, ffx emu will use the default
-	// recommended spec or the first spec in its device list.
-	VirtualDeviceSpec string `json:"virtual_device"`
-
-	// KVM specifies whether to enable hardware virtualization acceleration.
-	KVM bool `json:"kvm"`
+	// Emulator describes flags to pass to `ffx emu start`.
+	Emulator build.EmulatorInfo `json:"emulator"`
 
 	// Serial gives whether to create a 'serial device' for the emulator instance.
 	// This option should be used judiciously, as it can slow the process down.
 	Serial bool `json:"serial"`
-
-	// Uefi specifies whether the emulator creates and boots into a full disk GPT
-	// image instead of booting the kernel directly. If this is set to true,
-	// paths to the vbmeta signing key and its metadata must be provided as well.
-	Uefi bool `json:"uefi,omitempty"`
-
-	// Path to the vbmeta signing key. Required if 'uefi' is true.
-	VbmetaKey string `json:"vbmeta_key,omitempty"`
-
-	// Path to the vbmeta signing key metadata. Required if 'uefi' is true.
-	VbmetaMetadata string `json:"vbmeta_metadata,omitempty"`
 
 	// EDK2Dir is a path to a directory of EDK II (UEFI) prebuilts.
 	EDK2Dir string `json:"edk2_dir"`
@@ -237,7 +222,10 @@ func (t *Emulator) Start(ctx context.Context, args []string, pbPath string, isBo
 		// Necessary to redirect to stdout.
 		allKernelArgs = append(allKernelArgs, "kernel.serial=legacy")
 	}
+	// Add kernel args specified by the builder.
 	allKernelArgs = append(allKernelArgs, args...)
+	// Add kernel args specified by the shard environment.
+	allKernelArgs = append(allKernelArgs, t.config.Emulator.KernelArgs...)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -255,15 +243,16 @@ func (t *Emulator) Start(ctx context.Context, args []string, pbPath string, isBo
 		Engine:        strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
 		ProductBundle: filepath.Join(cwd, pbPath),
 		KernelArgs:    allKernelArgs,
-		Device:        t.config.VirtualDeviceSpec,
+		Device:        t.config.Emulator.Device,
+		Accel:         t.config.Emulator.Accel,
 	}
-	if t.config.Uefi {
+	if t.config.Emulator.Uefi {
 		startArgs.ExtraEmuArgs = []string{
 			"--uefi",
 			"--vbmeta-key",
-			t.config.VbmetaKey,
+			t.config.Emulator.VbmetaKey,
 			"--vbmeta-key-metadata",
-			t.config.VbmetaMetadata,
+			t.config.Emulator.VbmetaKeyMetadata,
 		}
 		// TODO(https://fxbug.dev/369416059): ffx emu --uefi calls mkfs-msdosfs which
 		// looks for the FUCHSIA_BUILD_DIR env var. Remove once this dependency is no
@@ -271,11 +260,6 @@ func (t *Emulator) Start(ctx context.Context, args []string, pbPath string, isBo
 		if err := os.Setenv("FUCHSIA_BUILD_DIR", cwd); err != nil {
 			return err
 		}
-	}
-	if t.config.KVM {
-		startArgs.Accel = "hyper"
-	} else {
-		startArgs.Accel = "none"
 	}
 
 	cmd, err := t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, tools, startArgs)

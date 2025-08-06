@@ -42,38 +42,29 @@ struct UsbTargetHandler {
 }
 
 impl FastbootEventHandler for UsbTargetHandler {
-    async fn handle_event(&mut self, event: Result<FastbootEvent>) {
+    async fn handle_event(&mut self, event: FastbootEvent) {
         if self.tx.is_none() {
             log::warn!("Handling event: {:?} but our sender is none. Returning early.", event);
             return;
         }
         match event {
-            Ok(ev) => match ev {
-                FastbootEvent::Discovered(s) if s == self.target_serial => {
-                    log::debug!(
-                        "Discovered target with serial: {} we were looking for!",
-                        self.target_serial
-                    );
-                    let _ = self.tx.take().unwrap().send(());
-                }
-                FastbootEvent::Discovered(s) => log::debug!(
-                    "Attempting to rediscover target with serial: {}. Found target: {}",
-                    self.target_serial,
-                    s,
-                ),
-                FastbootEvent::Lost(l) => log::debug!(
-                    "Attempting to rediscover target with serial: {}. Lost target: {}",
-                    self.target_serial,
-                    l,
-                ),
-            },
-            Err(e) => {
-                log::error!(
-                    "Attempting to rediscover target with serial: {}. Got an error: {}. Continuing",
-                    self.target_serial,
-                    e
-                )
+            FastbootEvent::Discovered(s) if s == self.target_serial => {
+                log::debug!(
+                    "Discovered target with serial: {} we were looking for!",
+                    self.target_serial
+                );
+                let _ = self.tx.take().unwrap().send(());
             }
+            FastbootEvent::Discovered(s) => log::debug!(
+                "Attempting to rediscover target with serial: {}. Found target: {}",
+                self.target_serial,
+                s,
+            ),
+            FastbootEvent::Lost(l) => log::debug!(
+                "Attempting to rediscover target with serial: {}. Lost target: {}",
+                self.target_serial,
+                l,
+            ),
         }
     }
 }
@@ -177,7 +168,6 @@ impl InterfaceFactory<AsyncInterface> for UsbFactory {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::anyhow;
 
     ///////////////////////////////////////////////////////////////////////////////
     // UsbTargetHandler
@@ -191,19 +181,16 @@ mod test {
         let mut handler = UsbTargetHandler { tx: Some(tx), target_serial: target_serial.clone() };
 
         //Lost our serial
-        handler.handle_event(Ok(FastbootEvent::Lost(target_serial.clone()))).await;
+        handler.handle_event(FastbootEvent::Lost(target_serial.clone())).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Lost a different serial
-        handler.handle_event(Ok(FastbootEvent::Lost("1234asdf".to_string()))).await;
+        handler.handle_event(FastbootEvent::Lost("1234asdf".to_string())).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Found a new serial
-        handler.handle_event(Ok(FastbootEvent::Discovered("1234asdf".to_string()))).await;
-        assert!(rx.try_recv().unwrap().is_none());
-        // Error
-        handler.handle_event(Err(anyhow!("Hello there friends"))).await;
+        handler.handle_event(FastbootEvent::Discovered("1234asdf".to_string())).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Found our serial
-        handler.handle_event(Ok(FastbootEvent::Discovered(target_serial.clone()))).await;
+        handler.handle_event(FastbootEvent::Discovered(target_serial.clone())).await;
         assert!(rx.try_recv().unwrap().is_some());
 
         Ok(())

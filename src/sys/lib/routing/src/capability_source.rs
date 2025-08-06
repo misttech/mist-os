@@ -415,7 +415,7 @@ impl TryFrom<CapabilitySource> for Data {
     type Error = fidl::Error;
 
     fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
-        Ok(Data::Bytes(persist(&capability_source.native_into_fidl())?))
+        Ok(Data::Bytes(persist(&capability_source.native_into_fidl())?.into()))
     }
 }
 

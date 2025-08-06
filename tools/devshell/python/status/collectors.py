@@ -162,6 +162,7 @@ async def args_gn_collector() -> list[data.Result]:
     ] = OrderedDict(
         boards=("Board", None),
         products=("Product", None),
+        main_pb_label=("Product bundle", "set with `fx set-main-pb`"),
         universe_package_labels=(
             "Universe packages",
             "--with argument of `fx set`",
@@ -185,7 +186,8 @@ async def args_gn_collector() -> list[data.Result]:
     # provides a JSON abstract syntax tree (AST) of the parsed file
     # which we can then process to find the current values of the
     # variables assigned in the user's settings.
-    args_gn_path = build_dir.get_build_directory() / "args.gn"
+    build_dir_path = build_dir.get_build_directory()
+    args_gn_path = build_dir_path / "args.gn"
     if not args_gn_path.exists():
         return []
     command = await fx_cmd.FxCmd().start(
@@ -210,7 +212,8 @@ async def args_gn_collector() -> list[data.Result]:
             target_type (str): Type we are looking for. "LITERAL" or "IDENTIFIER".
 
         Returns:
-            str | list[str] | None: Extracted value from the tree, or None if not found.
+            str | list[str] | None: Extracted value from the tree, or None if not
+            found.
         """
         if isinstance(value, list):
             # Find the first matching element of incoming lists.
@@ -295,6 +298,24 @@ async def args_gn_collector() -> list[data.Result]:
                     assigned_variables[identifier] = [
                         val for val in source_list if val not in subtraction_set
                     ]
+
+    # If a product bundle is set, we want to show its name instead of its label.
+    product_bundles_path = build_dir_path / "product_bundles.json"
+    if product_bundles_path.exists():
+        try:
+            with open(product_bundles_path, "r") as f:
+                product_bundles = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            product_bundles = []
+
+        main_pb_label_val = assigned_variables.get("main_pb_label")
+        if main_pb_label_val and isinstance(main_pb_label_val, str):
+            for pb in product_bundles:
+                # The label in product_bundles.json might have a toolchain.
+                label = pb.get("label", "")
+                if label.startswith(main_pb_label_val):
+                    assigned_variables["main_pb_label"] = pb.get("name")
+                    break
 
     # Parse the import names into pairs of (type, value).
     # For instance, `import("//boards/x64.gni")` would be parsed into

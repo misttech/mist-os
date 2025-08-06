@@ -6,19 +6,24 @@
 
 //! FFX plugin for the product version of a Product Bundle.
 
+mod load_config;
 mod unique_release_info;
 
-use crate::unique_release_info::{from_release_info, UniqueReleaseInfo};
+use crate::load_config::{
+    load_bib_set, load_board, load_pibs, load_platform, load_product, load_product_bundle_v2,
+};
+use crate::unique_release_info::UniqueReleaseInfoVector;
 
-use anyhow::{Context, Result};
-use assembly_partitions_config::Slot;
-use assembly_release_info::SystemReleaseInfo;
+use anyhow::{anyhow, Result};
+use assembly_config_schema::{BoardConfig, BoardInputBundleSet, ProductConfig};
+use assembly_container::AssemblyContainer;
+use assembly_platform_artifacts::PlatformArtifacts;
 use async_trait::async_trait;
 use ffx_product_get_version_args::GetVersionCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{FfxContext, FfxMain, FfxTool};
-use product_bundle::{ProductBundle, ProductBundleV2};
-use std::collections::BTreeMap;
+use product_bundle::ProductBundle;
+use product_input_bundle::ProductInputBundle;
 
 /// This plugin will get the the product version of a Product Bundle.
 #[derive(FfxTool)]
@@ -31,79 +36,60 @@ fho::embedded_plugin!(PbGetVersionTool);
 
 #[async_trait(?Send)]
 impl FfxMain for PbGetVersionTool {
-    type Writer = MachineWriter<Vec<UniqueReleaseInfo>>;
+    type Writer = MachineWriter<UniqueReleaseInfoVector>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let product_bundle = ProductBundle::try_load_from(self.cmd.product_bundle)
-            .context("Failed to load product bundle")?;
-
-        let (version, release_info) = match product_bundle {
-            ProductBundle::V2(pb) => extract_release_info_v2(&pb),
+        let artifact_path = &self.cmd.artifact;
+        let info = if let Ok(product_bundle) = ProductBundle::try_load_from(artifact_path) {
+            match product_bundle {
+                ProductBundle::V2(pb) => load_product_bundle_v2(&pb),
+            }
+        } else if let Ok(platform) = PlatformArtifacts::from_dir(artifact_path) {
+            load_platform(&platform).into_version_with_deps()
+        } else if let Ok(product) = ProductConfig::from_dir(artifact_path) {
+            load_product(&product).into_version_with_deps()
+        } else if let Ok(pibs) = ProductInputBundle::from_dir(artifact_path) {
+            load_pibs(&pibs).into_version_with_deps()
+        } else if let Ok(board_info) = BoardConfig::from_dir(artifact_path) {
+            load_board(&board_info)
+        } else if let Ok(bib_set) = BoardInputBundleSet::from_dir(artifact_path) {
+            load_bib_set(&bib_set).into_version_with_deps()
+        } else {
+            return Err(fho::Error::User(anyhow!("error parsing the artifact type")));
         };
 
-        writer.machine(&release_info).bug()?;
-        writer.line(&version).bug()?;
+        if self.cmd.include_dependencies {
+            writer.machine(&UniqueReleaseInfoVector(info.version_with_deps.machine)).bug()?;
+            writer.line(&info.version_with_deps.human).bug()?;
+        } else {
+            writer.machine(&UniqueReleaseInfoVector(info.version.machine)).bug()?;
+            writer.line(&info.version.human).bug()?;
+        }
 
         Ok(())
     }
-}
-
-fn extract_release_info_v2(pb: &ProductBundleV2) -> (String, Vec<UniqueReleaseInfo>) {
-    let pb_info = pb.release_info.clone().unwrap();
-    let mut btree: BTreeMap<UniqueReleaseInfo, Vec<Slot>> = BTreeMap::new();
-
-    // If an existing UniqueReleaseInfo exists in the BTreeMap with the same
-    // fields (excluding the Slot list), merge the two slot vectors into the
-    // "value" for that entry in the BTreeMap.
-    //
-    // The Slot field in each UniqueReleaseInfo entry will be overwritten with
-    // the contents of the BTreeMap values down below.
-    let mut push_or_merge = |new_info: UniqueReleaseInfo| {
-        let new_info_slot = new_info.slot.clone();
-        btree
-            .entry(new_info)
-            .and_modify(|slot_vec| slot_vec.extend(&new_info_slot))
-            .or_insert(new_info_slot);
-    };
-
-    let mut add_flat_system_info = |info: SystemReleaseInfo, slot: Slot| {
-        push_or_merge(from_release_info(&info.platform, &slot));
-
-        let product = info.product;
-        push_or_merge(from_release_info(&product.info, &slot));
-        product.pibs.iter().for_each(|pib| push_or_merge(from_release_info(pib, &slot)));
-
-        let board = info.board;
-        push_or_merge(from_release_info(&board.info, &slot));
-        board.bib_sets.iter().for_each(|bib_set| push_or_merge(from_release_info(bib_set, &slot)));
-    };
-
-    // Push release information for the systems inside the PB.
-    pb_info.system_a.map(|system| add_flat_system_info(system, Slot::A));
-    pb_info.system_b.map(|system| add_flat_system_info(system, Slot::B));
-    pb_info.system_r.map(|system| add_flat_system_info(system, Slot::R));
-
-    // Convert the btreemap to a vector of keys, and set each UniqueReleaseInfo
-    // slot field equal to the corresponding "value" in the BTreeMap.
-    let mut flat: Vec<UniqueReleaseInfo> = btree.clone().into_keys().collect();
-    for info in flat.iter_mut() {
-        info.slot = btree[info].clone();
-    }
-
-    (pb.product_version.clone(), flat)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::unique_release_info::UniqueReleaseInfo;
+    use crate::load_config::VersionInfo;
 
+    use assembly_config_schema::product_settings::ProductSettings;
+    use assembly_config_schema::{BoardConfig, BoardInputBundleSet, ProductConfig};
     use assembly_partitions_config::{PartitionsConfig, Slot};
+    use assembly_platform_artifacts::PlatformArtifacts;
     use assembly_release_info::{
         BoardReleaseInfo, ProductBundleReleaseInfo, ProductReleaseInfo, ReleaseInfo,
         SystemReleaseInfo,
     };
+    use camino::Utf8PathBuf;
     use ffx_writer::{Format, MachineWriter, TestBuffers};
+    use product_bundle::ProductBundleV2;
+    use product_input_bundle::ProductInputBundle;
+    use unique_release_info::UniqueReleaseInfo;
+
+    use std::collections::BTreeMap;
 
     fn generate_test_product_bundle() -> ProductBundleV2 {
         ProductBundleV2 {
@@ -261,19 +247,18 @@ mod tests {
     #[test]
     fn test_version_string_writer() {
         let pb = generate_test_product_bundle();
-        let (version, release_info) = extract_release_info_v2(&pb);
-        assert_eq!("fake_version", version);
+        let version_info = load_product_bundle_v2(&pb);
+        assert_eq!("fake_version", version_info.version.human);
 
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: MachineWriter<VersionInfo> = MachineWriter::new_test(None, &test_buffers);
 
         // Write the version string.
-        let res = writer.line(version);
+        let res = writer.line(version_info.version);
         assert!(res.is_ok());
 
         // Write the json structure. This should be suppressed.
-        let machine = serde_json::to_string(&release_info).unwrap();
-        let res = writer.machine(&&machine.as_str());
+        let res = writer.machine(&version_info.version_with_deps);
         assert!(res.is_ok());
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -285,33 +270,179 @@ mod tests {
     fn test_machine_json_writer() {
         let mut expected = generate_test_pb_flat_unique_release_info_vector();
         let pb = generate_test_product_bundle();
-        let (version, mut release_info) = extract_release_info_v2(&pb);
+        let version_info = load_product_bundle_v2(&pb);
 
         expected.sort();
-        release_info.sort();
-        assert_eq!(expected, release_info);
+        let mut release_info = version_info.version_with_deps;
+        release_info.machine.sort();
+        assert_eq!(expected, release_info.machine);
 
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
+        let mut writer: MachineWriter<VersionInfo> =
             MachineWriter::new_test(Some(Format::Json), &test_buffers);
 
         // Write the version string. This should be suppressed.
-        let res = writer.line(version);
+        let res = writer.line(version_info.version);
         assert!(res.is_ok());
 
         // Write the json structure.
-        let machine = serde_json::to_string(&release_info).unwrap();
-        let res = writer.machine(&&machine.as_str());
+        let res = writer.machine(&release_info);
         assert!(res.is_ok());
 
         let (stdout, stderr) = test_buffers.into_strings();
 
         // The stdout string needs to be un-escaped, which can be done using serde.
-        let stdout: String = serde_json::from_str(&stdout).unwrap();
-        let mut actual: Vec<UniqueReleaseInfo> = serde_json::from_str(&stdout).unwrap();
+        let mut actual: VersionInfo = serde_json::from_str(&stdout).unwrap();
 
-        actual.sort();
-        assert_eq!(expected, actual);
+        actual.machine.sort();
+        assert_eq!(expected, actual.machine);
         assert_eq!(stderr, "");
+    }
+
+    #[test]
+    fn test_load_platform() {
+        let platform = PlatformArtifacts {
+            platform_input_bundle_dir: Utf8PathBuf::new(),
+            release_info: ReleaseInfo {
+                name: "fake_platform".to_string(),
+                repository: "fake_repository_for_platform".to_string(),
+                version: "fake_version_for_platform".to_string(),
+            },
+        };
+        let info = load_platform(&platform);
+        assert_eq!(info.human, "fake_version_for_platform");
+        assert_eq!(
+            info.machine[0],
+            UniqueReleaseInfo {
+                name: "fake_platform".to_string(),
+                version: "fake_version_for_platform".to_string(),
+                repository: "fake_repository_for_platform".to_string(),
+                slot: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_product() {
+        let assembly_config = ProductConfig {
+            product: ProductSettings {
+                release_info: ProductReleaseInfo {
+                    info: ReleaseInfo {
+                        name: "fake_product".to_string(),
+                        repository: "fake_repository_for_product".to_string(),
+                        version: "fake_version_for_product".to_string(),
+                    },
+                    pibs: vec![
+                        ReleaseInfo {
+                            name: "fake_example_pib_1".to_string(),
+                            repository: "fake_repository_for_product".to_string(),
+                            version: "fake_version_for_product".to_string(),
+                        },
+                        ReleaseInfo {
+                            name: "fake_example_pib_2".to_string(),
+                            repository: "fake_repository_for_product".to_string(),
+                            version: "fake_version_for_product".to_string(),
+                        },
+                    ],
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = load_product(&assembly_config);
+        assert_eq!(info.human, "fake_version_for_product");
+        assert_eq!(
+            info.machine[0],
+            UniqueReleaseInfo {
+                name: "fake_product".to_string(),
+                version: "fake_version_for_product".to_string(),
+                repository: "fake_repository_for_product".to_string(),
+                slot: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_pibs() {
+        let pibs = ProductInputBundle {
+            release_info: ReleaseInfo {
+                name: "fake_pib".to_string(),
+                repository: "fake_repository_for_pib".to_string(),
+                version: "fake_version_for_pib".to_string(),
+            },
+            ..Default::default()
+        };
+        let info = load_pibs(&pibs);
+        assert_eq!(info.human, "fake_version_for_pib");
+        assert_eq!(
+            info.machine[0],
+            UniqueReleaseInfo {
+                name: "fake_pib".to_string(),
+                version: "fake_version_for_pib".to_string(),
+                repository: "fake_repository_for_pib".to_string(),
+                slot: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_board() {
+        let board = BoardConfig {
+            release_info: BoardReleaseInfo {
+                info: ReleaseInfo {
+                    name: "fake_board".to_string(),
+                    repository: "fake_repository_for_board".to_string(),
+                    version: "fake_version_for_board".to_string(),
+                },
+                bib_sets: vec![
+                    ReleaseInfo {
+                        name: "fake_example_bib_set_1".to_string(),
+                        repository: "fake_repository_for_board".to_string(),
+                        version: "fake_version_for_board".to_string(),
+                    },
+                    ReleaseInfo {
+                        name: "fake_example_bib_set_2".to_string(),
+                        repository: "fake_repository_for_board".to_string(),
+                        version: "fake_version_for_board".to_string(),
+                    },
+                ],
+            },
+            ..Default::default()
+        };
+        let info = load_board(&board);
+        assert_eq!(info.version.human, "fake_version_for_board");
+        assert_eq!(
+            info.version.machine[0],
+            UniqueReleaseInfo {
+                name: "fake_board".to_string(),
+                version: "fake_version_for_board".to_string(),
+                repository: "fake_repository_for_board".to_string(),
+                slot: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_bib_set() {
+        let bib_set = BoardInputBundleSet {
+            name: "fake_bib_set".to_string(),
+            board_input_bundles: BTreeMap::new(),
+            release_info: ReleaseInfo {
+                name: "fake_bib_set".to_string(),
+                repository: "fake_repository_for_bib_set".to_string(),
+                version: "fake_version_for_bib_set".to_string(),
+            },
+        };
+        let info = load_bib_set(&bib_set);
+        assert_eq!(info.human, "fake_version_for_bib_set");
+        assert_eq!(
+            info.machine[0],
+            UniqueReleaseInfo {
+                name: "fake_bib_set".to_string(),
+                version: "fake_version_for_bib_set".to_string(),
+                repository: "fake_repository_for_bib_set".to_string(),
+                slot: vec![],
+            }
+        );
     }
 }

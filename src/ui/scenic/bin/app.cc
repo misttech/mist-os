@@ -232,6 +232,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
             FX_DCHECK(flatland_compositor_);
             return flatland_compositor_->SetMinimumRgb(minimum_rgb);
           })),
+      focus_manager_(inspect_node_.CreateChild("FocusManager")),
       geometry_provider_(),
       observer_registry_(geometry_provider_),
       scoped_observer_registry_(geometry_provider_) {

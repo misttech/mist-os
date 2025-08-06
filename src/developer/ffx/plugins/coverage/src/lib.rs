@@ -313,7 +313,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_coverage() {
         let _env = ffx_config::test_init().await.unwrap();
 

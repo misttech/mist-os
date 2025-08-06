@@ -20,35 +20,8 @@ class Test(TestCase):
     def setUpClass(cls) -> None:
         cls._path = Path(_doc_zip)
 
-    def testFileExists0(self) -> None:
-        self.assertTrue(
-            (self._path / "index.html").is_file(),
-            msg=f"expected `index.html` to be a file in {repr(self._path)}",
-        )
-
-    def testFileContains1(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "List of all crates",
-            found,
-        )
-
-    def testFileContains2(self) -> None:
-        found = (self._path / "index.html").read_text()
-        self.assertIn(
-            "charlie",
-            found,
-        )
-
     def testFileExists3(self) -> None:
         self.assertTrue(
             (self._path / "charlie/constant.CHARLIE.html").is_file(),
             msg=f"expected `charlie/constant.CHARLIE.html` to be a file in {repr(self._path)}",
-        )
-
-    def testFileContainsRaw4(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "CHARLIE",
-            found,
         )

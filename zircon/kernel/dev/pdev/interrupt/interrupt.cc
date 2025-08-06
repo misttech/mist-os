@@ -63,7 +63,7 @@ const struct pdev_interrupt_ops default_ops = {
     .get_base_vector = []() -> interrupt_vector_t { return 0; },
     .get_max_vector = []() -> interrupt_vector_t { return 0; },
     .remap = [](interrupt_vector_t) -> interrupt_vector_t { return 0; },
-    .send_ipi = [](cpu_mask_t, mp_ipi_t) { return ZX_ERR_NOT_SUPPORTED; },
+    .send_ipi = [](cpu_mask_t, mp_ipi) { return ZX_ERR_NOT_SUPPORTED; },
     .init_percpu_early = []() {},
     .init_percpu = []() {},
     .handle_irq = [](iframe_t*) {},
@@ -142,7 +142,7 @@ bool is_valid_interrupt(interrupt_vector_t vector, uint32_t flags) {
 
 interrupt_vector_t remap_interrupt(interrupt_vector_t vector) { return intr_ops->remap(vector); }
 
-zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
+zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi ipi) {
   return intr_ops->send_ipi(target, ipi);
 }
 

@@ -4,11 +4,11 @@
 
 use super::parser::PolicyCursor;
 use super::{
-    array_type, array_type_validate_deref_both, Array, Counted, Parse, Validate, ValidateArray,
+    array_type, array_type_validate_deref_both, Array, Counted, Parse, PolicyValidationContext,
+    Validate, ValidateArray,
 };
 use crate::policy::error::{ParseError, ValidateError};
 
-use std::fmt::Debug;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
 pub(super) const SELINUX_MAGIC: u32 = 0xf97cff8c;
@@ -32,7 +32,7 @@ pub(super) struct Magic(le::U32);
 impl Validate for Magic {
     type Error = ValidateError;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         let found_magic = self.0.get();
         if found_magic != SELINUX_MAGIC {
             Err(ValidateError::InvalidMagic { found_magic })
@@ -49,12 +49,13 @@ array_type_validate_deref_both!(Signature);
 impl ValidateArray<SignatureMetadata, u8> for Signature {
     type Error = ValidateError;
 
-    fn validate_array<'a>(
-        _metadata: &'a SignatureMetadata,
-        data: &'a [u8],
+    fn validate_array(
+        _context: &mut PolicyValidationContext,
+        _metadata: &SignatureMetadata,
+        items: &[u8],
     ) -> Result<(), Self::Error> {
-        if data != POLICYDB_SIGNATURE {
-            Err(ValidateError::InvalidSignature { found_signature: data.to_owned() })
+        if items != POLICYDB_SIGNATURE {
+            Err(ValidateError::InvalidSignature { found_signature: items.to_owned() })
         } else {
             Ok(())
         }
@@ -69,7 +70,7 @@ impl Validate for SignatureMetadata {
     type Error = ValidateError;
 
     /// [`SignatureMetadata`] has no constraints.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         let found_length = self.0.get();
         if found_length > POLICYDB_STRING_MAX_LENGTH {
             Err(ValidateError::InvalidSignatureLength { found_length })
@@ -98,7 +99,7 @@ impl PolicyVersion {
 impl Validate for PolicyVersion {
     type Error = ValidateError;
 
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         let found_policy_version = self.0.get();
         if found_policy_version < POLICYDB_VERSION_MIN
             || found_policy_version > POLICYDB_VERSION_MAX
@@ -151,7 +152,7 @@ impl Validate for Config {
 
     /// All validation for [`Config`] is necessary to parse it correctly. No additional validation
     /// required.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -185,7 +186,7 @@ impl Validate for Counts {
     type Error = anyhow::Error;
 
     /// [`Counts`] have no internal consistency requirements.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate(&self, _context: &mut PolicyValidationContext) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -196,19 +197,21 @@ mod tests {
 
     use crate::policy::parser::PolicyCursor;
     use crate::policy::testing::{as_parse_error, as_validate_error};
+    use std::sync::Arc;
 
     macro_rules! validate_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
-            let data = $data;
+            let data = Arc::new($data);
+            let mut context = crate::policy::PolicyValidationContext { data: data.clone() };
             fn check_by_value(
                 $result: Result<(), <$parse_output as crate::policy::Validate>::Error>,
             ) {
                 $check_impl
             }
 
-            let (by_value_parsed, _) = $parse_output::parse(PolicyCursor::new(data))
+            let (by_value_parsed, _tail) = $parse_output::parse(PolicyCursor::new(data.clone()))
                 .expect("successful parse for validate test");
-            let by_value_result = by_value_parsed.validate();
+            let by_value_result = by_value_parsed.validate(&mut context);
             check_by_value(by_value_result);
         }};
     }
@@ -219,8 +222,8 @@ mod tests {
         let mut bytes = [SELINUX_MAGIC.to_le_bytes().as_slice()].concat();
         // One byte short of magic.
         bytes.pop();
-        let bytes = bytes;
-        assert_eq!(None, PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)),);
+        let data = Arc::new(bytes);
+        assert_eq!(None, PolicyCursor::parse::<Magic>(PolicyCursor::new(data)),);
     }
 
     #[test]
@@ -232,11 +235,14 @@ mod tests {
         let expected_invalid_magic =
             u32::from_le_bytes(bytes.clone().as_slice().try_into().unwrap());
 
-        let (magic, tail) = PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)).expect("magic");
+        let data = Arc::new(bytes);
+        let mut context = crate::policy::PolicyValidationContext { data: data.clone() };
+        let (magic, tail) =
+            PolicyCursor::parse::<Magic>(PolicyCursor::new(data.clone())).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
-            magic.validate()
+            magic.validate(&mut context)
         );
     }
 
@@ -262,7 +268,7 @@ mod tests {
     #[test]
     fn missing_signature() {
         let bytes = [(1 as u32).to_le_bytes().as_slice()].concat();
-        match Signature::parse(PolicyCursor::new(bytes)).err().map(as_parse_error) {
+        match Signature::parse(PolicyCursor::new(Arc::new(bytes))).err().map(as_parse_error) {
             Some(ParseError::MissingData { type_name: "u8", type_size: 1, num_bytes: 0 }) => {}
             parse_err => {
                 assert!(false, "Expected Some(MissingData...), but got {:?}", parse_err);
@@ -291,32 +297,36 @@ mod tests {
     #[test]
     fn invalid_policy_version() {
         let bytes = [(POLICYDB_VERSION_MIN - 1).to_le_bytes().as_slice()].concat();
+        let data = Arc::new(bytes);
+        let mut context = crate::policy::PolicyValidationContext { data: data.clone() };
         let (policy_version, tail) =
-            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(data.clone())).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
                 found_policy_version: POLICYDB_VERSION_MIN - 1
             }),
-            policy_version.validate()
+            policy_version.validate(&mut context)
         );
 
         let bytes = [(POLICYDB_VERSION_MAX + 1).to_le_bytes().as_slice()].concat();
+        let data = Arc::new(bytes);
+        let mut context = crate::policy::PolicyValidationContext { data: data.clone() };
         let (policy_version, tail) =
-            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(data.clone())).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
                 found_policy_version: POLICYDB_VERSION_MAX + 1
             }),
-            policy_version.validate()
+            policy_version.validate(&mut context)
         );
     }
 
     #[test]
     fn config_missing_mls_flag() {
         let bytes = [(!CONFIG_MLS_FLAG).to_le_bytes().as_slice()].concat();
-        match Config::parse(PolicyCursor::new(bytes)).err() {
+        match Config::parse(PolicyCursor::new(Arc::new(bytes))).err() {
             Some(ParseError::ConfigMissingMlsFlag { .. }) => {}
             parse_err => {
                 assert!(false, "Expected Some(ConfigMissingMlsFlag...), but got {:?}", parse_err);
@@ -336,7 +346,7 @@ mod tests {
             Some(ParseError::InvalidHandleUnknownConfigurationBits {
                 masked_bits: CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG | CONFIG_HANDLE_UNKNOWN_REJECT_FLAG
             }),
-            Config::parse(PolicyCursor::new(bytes)).err()
+            Config::parse(PolicyCursor::new(Arc::new(bytes))).err()
         );
     }
 }

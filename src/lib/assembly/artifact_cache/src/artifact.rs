@@ -67,48 +67,50 @@ impl Artifact {
         bail!("Artifact must be either a CIPD package or a local path: {}", s.as_ref());
     }
 
-    /// Construct an artifact from a local board name.
+    /// Construct an artifact from a local board config name.
     pub fn from_local_board_name(
         name: impl AsRef<str>,
         build_dir: Option<&Utf8PathBuf>,
     ) -> Result<Self> {
-        let build_dir = build_dir
-            .context("identifying boards by their name can only be done in a fuchsia checkout")?;
+        let build_dir = build_dir.context(
+            "identifying board configs by their name can only be done in a fuchsia checkout",
+        )?;
         let build_api = build_dir.join("boards.json");
         let build_api_file =
             std::fs::File::open(&build_api).with_context(|| format!("Opening: {}", &build_api))?;
-        let boards: Vec<BuildApiEntry> = serde_json::from_reader(build_api_file)
+        let board_configs: Vec<BuildApiEntry> = serde_json::from_reader(build_api_file)
             .with_context(|| format!("Parsing: {}", &build_api))?;
-        let board = boards
+        let board_config = board_configs
             .iter()
             .find(|b| b.name == name.as_ref())
-            .with_context(|| format!("searching for board: {}", name.as_ref()))
+            .with_context(|| format!("searching for board config: {}", name.as_ref()))
             .with_context(|| format!("searching build api: {}", &build_api))?;
-        let board_path = build_dir.join(&board.outdir);
-        Ok(Artifact::Local(board_path))
+        let board_config_path = build_dir.join(&board_config.outdir);
+        Ok(Artifact::Local(board_config_path))
     }
 
-    /// Construct an artifact from a local product name.
+    /// Construct an artifact from a local product config name.
     pub fn from_local_product_name(
         name: impl AsRef<str>,
         build_dir: Option<&Utf8PathBuf>,
     ) -> Result<Self> {
         // TODO: provide nice error when local artifact is not found that
         // indicates how to build it.
-        let build_dir = build_dir
-            .context("identifying products by their name can only be done in a fuchsia checkout")?;
+        let build_dir = build_dir.context(
+            "identifying product configs by their name can only be done in a fuchsia checkout",
+        )?;
         let build_api = build_dir.join("products.json");
         let build_api_file =
             std::fs::File::open(&build_api).with_context(|| format!("Opening: {}", &build_api))?;
-        let products: Vec<BuildApiEntry> = serde_json::from_reader(build_api_file)
+        let product_configs: Vec<BuildApiEntry> = serde_json::from_reader(build_api_file)
             .with_context(|| format!("Parsing: {}", &build_api))?;
-        let product = products
+        let product_config = product_configs
             .iter()
             .find(|p| p.name == name.as_ref())
-            .with_context(|| format!("searching for product: {}", name.as_ref()))
+            .with_context(|| format!("searching for product config: {}", name.as_ref()))
             .with_context(|| format!("searching build api: {}", &build_api))?;
-        let product_path = build_dir.join(&product.outdir);
-        Ok(Artifact::Local(product_path))
+        let product_config_path = build_dir.join(&product_config.outdir);
+        Ok(Artifact::Local(product_config_path))
     }
 
     /// Construct an artifact from an optionally-specified platform.

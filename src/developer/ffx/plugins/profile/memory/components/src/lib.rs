@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod detailed;
 mod json;
 mod output;
+mod statistics;
 
 #[macro_use]
 extern crate prettytable;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
+use attribution_processing::summary::{ComponentSummaryProfileResult, MemorySummary};
 use attribution_processing::{
     digest, AttributionData, AttributionDataProvider, Principal, Resource, ResourcesVisitor, ZXName,
 };
@@ -23,8 +25,13 @@ use json::JsonConvertible;
 use regex::bytes::Regex;
 use serde::Serialize;
 use std::io::Write;
+use std::thread::sleep;
+use std::time::Duration;
 use target_holders::moniker;
 use zerocopy::transmute_ref;
+
+use crate::detailed::process_snapshot_detailed;
+use crate::statistics::CommandMemoryStatistics;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
@@ -48,6 +55,12 @@ where
     fn machine(&mut self, output: T) -> Result<()>;
     fn stderr(&mut self) -> &mut dyn Write;
     fn stdout(&mut self) -> &mut dyn Write;
+}
+
+#[derive(Serialize)]
+pub enum ComponentProfileResult {
+    Summary(ComponentSummaryProfileResult),
+    Detailed(detailed::ComponentDetailedProfileResult),
 }
 
 impl PluginOutput<ComponentProfileResult> for MachineWriter<ComponentProfileResult> {
@@ -81,12 +94,49 @@ impl FfxMain for MemoryComponentsTool {
 }
 
 impl MemoryComponentsTool {
-    pub async fn run(
+    pub async fn run(&self, writer: impl PluginOutput<ComponentProfileResult>) -> fho::Result<()> {
+        match self.cmd.stats_only {
+            Some(interval) => self.process_statistics(writer, interval).await,
+            None => self.process_snapshot(writer).await,
+        }
+    }
+
+    async fn process_statistics(
         &self,
         mut writer: impl PluginOutput<ComponentProfileResult>,
-    ) -> fho::Result<()> {
+        interval: u64,
+    ) -> std::result::Result<(), fho::Error> {
+        if self.cmd.stdin_input {
+            return Err(fho::Error::User(anyhow!(
+                "--stdin-input is not compatible with --stats-only"
+            )));
+        }
+        if !self.cmd.csv {
+            return Err(fho::Error::User(anyhow!("only --csv is supported with --stats-only")));
+        }
+        let mut w = csv::WriterBuilder::new().has_headers(true).from_writer(writer.stdout());
+        loop {
+            let statistics: CommandMemoryStatistics = self
+                .monitor_proxy
+                .get_system_statistics()
+                .await
+                .map_err(|err| ffx_error!("Failed to get statistics: {err}"))?
+                .try_into()
+                .map_err(|err| ffx_error!("Failed to convert statistics: {err}"))?;
+
+            w.serialize(statistics)
+                .map_err(|err| ffx_error!("Failed to write statistics: {err}"))?;
+            w.flush().map_err(|err| ffx_error!("Failed to flush stdout: {err}"))?;
+            sleep(Duration::from_secs(interval));
+        }
+    }
+
+    async fn process_snapshot(
+        &self,
+        mut writer: impl PluginOutput<ComponentProfileResult>,
+    ) -> std::result::Result<(), fho::Error> {
         let snapshot = match self.cmd.stdin_input {
-            false => self.load_from_device().await?,
+            false => self.load_snapshot_from_device().await?,
             true => {
                 fplugin::Snapshot::from_json(&serde_json::from_reader(std::io::stdin()).unwrap())
                     .unwrap()
@@ -98,9 +148,20 @@ impl MemoryComponentsTool {
             return Ok(());
         }
 
-        let profile_result = process_snapshot(snapshot);
+        if self.cmd.detailed {
+            if !writer.is_machine() {
+                return Err(fho::Error::User(anyhow::anyhow!(
+                    "--detailed requires machine output"
+                )));
+            }
+            let output = process_snapshot_detailed(snapshot)?;
+            writer.machine(ComponentProfileResult::Detailed(output))?;
+            return Ok(());
+        }
+
+        let profile_result = process_snapshot_summary(snapshot);
         if writer.is_machine() {
-            writer.machine(profile_result)?;
+            writer.machine(ComponentProfileResult::Summary(profile_result))?;
         } else {
             output::write_summary(&mut writer.stdout(), self.cmd.csv, &profile_result)
                 .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
@@ -109,7 +170,7 @@ impl MemoryComponentsTool {
         Ok(())
     }
 
-    async fn load_from_device(&self) -> fho::Result<fplugin::Snapshot> {
+    async fn load_snapshot_from_device(&self) -> fho::Result<fplugin::Snapshot> {
         let (client_end, server_end) = fidl::Socket::create_stream();
         let mut client_socket = fidl::AsyncSocket::from_socket(client_end);
 
@@ -172,7 +233,7 @@ impl<'a> AttributionDataProvider for SnapshotAttributionDataProvider<'a> {
     }
 }
 
-fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
+fn process_snapshot_summary(snapshot: fplugin::Snapshot) -> ComponentSummaryProfileResult {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -218,7 +279,7 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
             attributions,
         })
         .summary();
-    ComponentProfileResult {
+    ComponentSummaryProfileResult {
         kernel: snapshot.kernel_statistics.unwrap().into(),
         principals,
         unclaimed,
@@ -596,8 +657,8 @@ mod tests {
             ..Default::default()
         };
 
-        let ComponentProfileResult { principals, unclaimed, performance, digest, .. } =
-            process_snapshot(snapshot);
+        let ComponentSummaryProfileResult { principals, unclaimed, performance, digest, .. } =
+            process_snapshot_summary(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
         // unclaimed.
@@ -983,7 +1044,8 @@ mod tests {
             ..Default::default()
         };
 
-        let ComponentProfileResult { principals, unclaimed, .. } = process_snapshot(snapshot);
+        let ComponentSummaryProfileResult { principals, unclaimed, .. } =
+            process_snapshot_summary(snapshot);
 
         assert_eq!(unclaimed, 0);
         assert_eq!(principals.len(), 3);

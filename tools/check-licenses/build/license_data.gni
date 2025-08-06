@@ -125,7 +125,7 @@ template("license_data") {
 
     # output JSON names the build output directory
     # TODO(https://fxbug.dev/42076225): fix tool to not leak the output directory
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 
   # Step 3: Generate target data file.
@@ -161,7 +161,7 @@ template("license_data") {
 
     # output JSON names the build output directory
     # TODO(https://fxbug.dev/42076225): fix tool to not leak the output directory
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 
   compiled_action(check_licenses_target) {

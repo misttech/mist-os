@@ -661,10 +661,25 @@ func runTestOnce(
 
 	// Record the test details in the summary.
 	result.Stdio = stdio.buf.Bytes()
-	// Only the FFXTester handles cases and output files on its own. Otherwise,
+	// Only the FFXTester handles output files on its own. It also handles cases
+	// so only parse the stdout for test cases if both are missing.
 	// parse the stdout for test cases and check the outdir for output files.
 	if len(result.Cases) == 0 && len(result.OutputFiles) == 0 {
 		result.Cases = testparser.Parse(stdoutForParsing.Bytes())
+	} else {
+		// TODO(b/311443213): Some tests rely on testparser to add tags to test case results.
+		// Remove this hack once tags are properly handled by `ffx test`.
+		cases := testparser.Parse(stdoutForParsing.Bytes())
+		caseToTags := make(map[string][]build.TestTag)
+		for _, tc := range cases {
+			caseToTags[tc.DisplayName] = tc.Tags
+		}
+		for i, tc := range result.Cases {
+			result.Cases[i].Tags = append(result.Cases[i].Tags, caseToTags[tc.DisplayName]...)
+		}
+	}
+	// Check the outdir for output files if not handled by the tester.
+	if len(result.OutputFiles) == 0 {
 		caseOutputFiles := []string{}
 		for _, tc := range result.Cases {
 			for _, of := range tc.OutputFiles {
@@ -693,17 +708,6 @@ func runTestOnce(
 		}
 		if len(result.OutputFiles) > 0 {
 			result.OutputDir = outDir
-		}
-	} else {
-		// TODO(b/311443213): Some tests rely on testparser to add tags to test case results.
-		// Remove this hack once tags are properly handled by `ffx test`.
-		cases := testparser.Parse(stdoutForParsing.Bytes())
-		caseToTags := make(map[string][]build.TestTag)
-		for _, tc := range cases {
-			caseToTags[tc.DisplayName] = tc.Tags
-		}
-		for i, tc := range result.Cases {
-			result.Cases[i].Tags = append(result.Cases[i].Tags, caseToTags[tc.DisplayName]...)
 		}
 	}
 

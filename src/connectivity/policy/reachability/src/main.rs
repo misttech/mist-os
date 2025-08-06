@@ -23,7 +23,7 @@ pub fn main() {
     // TODO(dpradilla): use a `StructOpt` to pass in a log level option where the user can control
     // how verbose logs should be.
     info!("Starting reachability monitor!");
-    let mut executor = fuchsia_async::LocalExecutor::new();
+    let mut executor = fuchsia_async::LocalExecutorBuilder::new().build();
 
     let mut fs = ServiceFs::new_local();
 

@@ -11,6 +11,7 @@
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/layout.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

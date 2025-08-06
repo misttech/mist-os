@@ -89,7 +89,7 @@ template("verify_assembled_structured_config") {
          "verify_assembled_structured_config() must specify a policy file")
 
   ffx_action(target_name) {
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
 
     forward_variables_from(invoker,
                            [

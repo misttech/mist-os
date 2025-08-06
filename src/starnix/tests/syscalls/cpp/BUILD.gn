@@ -40,6 +40,7 @@ syscall_tests = [
   "fuse_test",
   "futex_test",
   "getrandom_test",
+  "io_uring_test",
   "loop_test",
   "memfd_test",
   "mmap_test",
@@ -208,6 +209,8 @@ if (is_host) {
                      "root_out_dir") + "/suid_test_exec_child",
       get_label_info("test_programs:print_helper($_host_linux_toolchain)",
                      "root_out_dir") + "/print_helper",
+      get_label_info("test_programs:clone_exec_helper($_host_linux_toolchain)",
+                     "root_out_dir") + "/clone_exec_helper",
     ]
     deps = [
       ":extended_pstate_initial_state_child($_host_linux_toolchain)",
@@ -215,6 +218,7 @@ if (is_host) {
       ":signal_handling_test_exec_child($_host_linux_toolchain)",
       ":suid_test_exec_child($_host_linux_toolchain)",
       ":syscall_test_exec_child($_host_linux_toolchain)",
+      "test_programs:clone_exec_helper($_host_linux_toolchain)",
       "test_programs:print_helper($_host_linux_toolchain)",
     ]
   }
@@ -251,7 +255,7 @@ if (current_cpu == "x64" || current_cpu == "arm64") {
     if (current_cpu == "arm64") {
       sources += [ "//prebuilt/starnix/fuse-overlayfs-arm64/fuse-overlayfs" ]
     }
-    outputs = [ "data/fuse-overlayfs" ]
+    outputs = [ "data/tests/deps/fuse-overlayfs" ]
   }
 } else {
   group("fuse_overlayfs") {
@@ -263,7 +267,7 @@ resource("simple_ext4_image") {
     "data/hello_world.txt",
     "data/simple_ext4.img",
   ]
-  outputs = [ "data/{{source_file_part}}" ]
+  outputs = [ "data/tests/deps/{{source_file_part}}" ]
 }
 
 config("march") {
@@ -410,6 +414,7 @@ template("syscall_test") {
       ":simple_ext4_image",
       ":suid_test_exec_child_resource($target_linux_toolchain)",
       ":syscall_test_exec_child_resource($target_linux_toolchain)",
+      "test_programs:clone_exec_helper_resource($target_linux_toolchain)",
       "test_programs:print_helper_resource($target_linux_toolchain)",
     ]
     uses_expectations = true
@@ -431,6 +436,7 @@ template("syscall_test") {
         ":simple_ext4_image",
         ":suid_test_exec_child_resource($target_linux_arch32_toolchain)",
         ":syscall_test_exec_child_resource($target_linux_arch32_toolchain)",
+        "test_programs:clone_exec_helper_resource($target_linux_arch32_toolchain)",
         "test_programs:print_helper_resource($target_linux_arch32_toolchain)",
       ]
       uses_expectations = true
@@ -505,7 +511,7 @@ if (is_linux) {
   resource("ptrace_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/ptrace_test_exec_child" ]
-    outputs = [ "data/tests/ptrace_test_exec_child" ]
+    outputs = [ "data/tests/deps/ptrace_test_exec_child" ]
     deps = [ ":ptrace_test_exec_child" ]
   }
 
@@ -525,7 +531,7 @@ if (is_linux) {
   resource("signal_handling_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/signal_handling_test_exec_child" ]
-    outputs = [ "data/tests/signal_handling_test_exec_child" ]
+    outputs = [ "data/tests/deps/signal_handling_test_exec_child" ]
     deps = [ ":signal_handling_test_exec_child" ]
   }
 
@@ -545,7 +551,7 @@ if (is_linux) {
   resource("syscall_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/syscall_test_exec_child" ]
-    outputs = [ "data/tests/syscall_test_exec_child" ]
+    outputs = [ "data/tests/deps/syscall_test_exec_child" ]
     deps = [ ":syscall_test_exec_child" ]
   }
 
@@ -565,7 +571,7 @@ if (is_linux) {
   resource("suid_test_exec_child_resource") {
     testonly = true
     sources = [ "$root_out_dir/suid_test_exec_child" ]
-    outputs = [ "data/tests/suid_test_exec_child" ]
+    outputs = [ "data/tests/deps/suid_test_exec_child" ]
     deps = [ ":suid_test_exec_child" ]
   }
 }
@@ -576,7 +582,7 @@ resource("extended_pstate_initial_state_child_resource") {
   exe_label = ":${binary_name}"
   out_dir = get_label_info(exe_label, "root_out_dir")
   sources = [ "${out_dir}/${binary_name}" ]
-  outputs = [ "data/tests/${binary_name}" ]
+  outputs = [ "data/tests/deps/${binary_name}" ]
   deps = [ exe_label ]
 }
 

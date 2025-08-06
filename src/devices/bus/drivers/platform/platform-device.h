@@ -167,8 +167,7 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
 
   fdf_metadata::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>
       serial_number_metadata_server_;
-  fdf_metadata::MetadataServer<fuchsia_boot_metadata::PartitionMapMetadata>
-      partition_map_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::PartitionMap> partition_map_metadata_server_;
   fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
       mac_address_metadata_server_;
 };

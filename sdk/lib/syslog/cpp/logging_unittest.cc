@@ -29,6 +29,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/async/wait.h>
 #include <lib/fpromise/promise.h>
+#include <lib/syslog/structured_backend/cpp/log_connection.h>
 #include <lib/zx/socket.h>
 
 #include <cinttypes>
@@ -58,27 +59,26 @@ class LoggingFixture : public ::testing::Test {
   }
 
  private:
-  fuchsia_logging::RawLogSeverity old_severity_;
+  RawLogSeverity old_severity_;
   int old_stderr_;
 };
 
 using LoggingFixtureDeathTest = LoggingFixture;
 #ifdef __Fuchsia__
 std::string SeverityToString(const int32_t severity) {
-  if (severity == fuchsia_logging::LogSeverity::Trace) {
+  if (severity == LogSeverity::Trace) {
     return "TRACE";
-  } else if (severity == fuchsia_logging::LogSeverity::Debug) {
+  } else if (severity == LogSeverity::Debug) {
     return "DEBUG";
-  } else if (severity > fuchsia_logging::LogSeverity::Debug &&
-             severity < fuchsia_logging::LogSeverity::Info) {
-    return fxl::StringPrintf("VLOG(%d)", fuchsia_logging::LogSeverity::Info - severity);
-  } else if (severity == fuchsia_logging::LogSeverity::Info) {
+  } else if (severity > LogSeverity::Debug && severity < LogSeverity::Info) {
+    return fxl::StringPrintf("VLOG(%d)", LogSeverity::Info - severity);
+  } else if (severity == LogSeverity::Info) {
     return "INFO";
-  } else if (severity == fuchsia_logging::LogSeverity::Warn) {
+  } else if (severity == LogSeverity::Warn) {
     return "WARN";
-  } else if (severity == fuchsia_logging::LogSeverity::Error) {
+  } else if (severity == LogSeverity::Error) {
     return "ERROR";
-  } else if (severity == fuchsia_logging::LogSeverity::Fatal) {
+  } else if (severity == LogSeverity::Fatal) {
     return "FATAL";
   }
   return "INVALID";
@@ -280,13 +280,13 @@ TEST_F(LoggingFixture, BackendDirect) {
   LogState state = SetupLogs(false);
 
   {
-    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Error);
+    syslog_runtime::LogBufferBuilder builder(LogSeverity::Error);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithMsg("Log message").WithCondition("condition").Build();
     buffer.WriteKeyValue("tag", "fake tag");
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Error);
+  syslog_runtime::LogBufferBuilder builder(LogSeverity::Error);
   auto buffer =
       builder.WithMsg("fake message").WithCondition("condition").WithFile("foo.cc", 42).Build();
   buffer.WriteKeyValue("tag", "fake tag");
@@ -328,9 +328,9 @@ TEST(StructuredLogging, Remaining) {
   ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
   builder.WithLogFile(log_file);
   builder.BuildAndInitialize();
-  syslog_runtime::LogBufferBuilder builder2(fuchsia_logging::LogSeverity::Info);
+  syslog_runtime::LogBufferBuilder builder2(LogSeverity::Info);
   auto buffer = builder2.WithFile("test", 5).WithMsg("test_msg").Build();
-  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
+  auto header = internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteChar('t');
   ASSERT_EQ(header->RemainingSpace(), initial - 1);
@@ -339,9 +339,9 @@ TEST(StructuredLogging, Remaining) {
 }
 
 TEST(StructuredLogging, FlushAndReset) {
-  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Info);
+  syslog_runtime::LogBufferBuilder builder(LogSeverity::Info);
   auto buffer = builder.WithFile("test", 5).WithMsg("test_msg").Build();
-  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
+  auto header = internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteString("test");
   ASSERT_EQ(header->RemainingSpace(), initial - 4);
@@ -349,6 +349,135 @@ TEST(StructuredLogging, FlushAndReset) {
   ASSERT_EQ(header->RemainingSpace(),
             syslog_runtime::LogBuffer::data_size() - 2);  // last byte reserved for NULL terminator
 }
+#endif
+
+#ifdef __Fuchsia__
+
+class TestLogSink : public fidl::Server<fuchsia_logger::LogSink> {
+ public:
+  zx::socket& socket() {
+    std::unique_lock lock(mutex_);
+    condition_.wait(lock, [this] { return socket_.is_valid(); });
+    return socket_;
+  }
+
+ private:
+  void ConnectStructured(ConnectStructuredRequest& request,
+                         ConnectStructuredCompleter::Sync& completer) override {
+    std::unique_lock lock(mutex_);
+    socket_ = std::move(request.socket());
+    condition_.notify_all();
+  }
+
+  void WaitForInterestChange(WaitForInterestChangeCompleter::Sync& completer) override { FAIL(); }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_logger::LogSink> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL();
+  }
+
+  std::mutex mutex_;
+  std::condition_variable condition_;
+  zx::socket socket_;
+};
+
+TEST(LogConnection, Basic) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread();
+  zx::channel client, server;
+  ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
+
+  TestLogSink log_sink;
+  auto binding = fidl::BindServer(
+      loop.dispatcher(), fidl::ServerEnd<fuchsia_logger::LogSink>(std::move(server)), &log_sink);
+
+  auto connection =
+      LogConnection::Create(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(client)));
+  ASSERT_EQ(connection.status_value(), ZX_OK);
+
+  ASSERT_TRUE(connection->is_valid());
+
+  LogBuffer buffer;
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, {}, "foo", 1, 2, 3);
+  ASSERT_EQ(connection->FlushBuffer(buffer).status_value(), ZX_OK);
+
+  uint8_t buf[256];
+  size_t actual;
+  ASSERT_EQ(log_sink.socket().read(0, buf, std::size(buf), &actual), ZX_OK);
+
+  std::span<const uint8_t> span = buffer.EndRecord();
+  ASSERT_EQ(actual, span.size());
+  EXPECT_EQ(memcmp(buf, span.data(), actual), 0);
+}
+
+TEST(LogConnection, BlockIfFull) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread();
+
+  zx::channel client, server;
+  ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
+
+  TestLogSink log_sink;
+  auto binding = fidl::BindServer(
+      loop.dispatcher(), fidl::ServerEnd<fuchsia_logger::LogSink>(std::move(server)), &log_sink);
+
+  auto connection =
+      LogConnection::Create(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(client)));
+  ASSERT_EQ(connection.status_value(), ZX_OK);
+
+  ASSERT_TRUE(connection->is_valid());
+
+  // Keep logging and we should eventually get ZX_ERR_SHOULD_WAIT.
+  LogBuffer buffer;
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, {}, "foo", 1, 2, 3);
+
+  int count = 0;
+  for (;;) {
+    auto result = connection->FlushBuffer(buffer);
+    if (result.is_error()) {
+      ASSERT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
+      break;
+    }
+    ++count;
+  }
+
+  zx::socket socket;
+  ASSERT_EQ(connection->socket().duplicate(ZX_RIGHT_SAME_RIGHTS, &socket), ZX_OK);
+  LogConnection connection2(std::move(socket), {.block_if_full = true});
+
+  std::thread thread([&] {
+    // Delay reading the socket to make it more likely that we block when flushing the buffer.
+    usleep(10000);
+
+    uint8_t buf[256];
+    size_t actual;
+    for (int i = 0; i < count; ++i) {
+      ASSERT_EQ(log_sink.socket().read(0, buf, std::size(buf), &actual), ZX_OK);
+    }
+  });
+
+  for (int i = 0; i < count; ++i) {
+    ASSERT_EQ(connection2.FlushBuffer(buffer).status_value(), ZX_OK);
+  }
+
+  thread.join();
+}
+
+TEST(LogConnection, EncodingError) {
+  zx::socket client, server;
+  ASSERT_EQ(zx::socket::create(0, &client, &server), ZX_OK);
+
+  LogConnection connection(std::move(client), {});
+  LogBuffer buffer;
+  std::string message;
+  message.resize(sizeof internal::LogBufferData::data, 'a');
+
+  // This should result in an invalid message because it's too big.
+  buffer.BeginRecord(FUCHSIA_LOG_INFO, {}, 0, message, 0, 1, 2);
+
+  EXPECT_EQ(connection.FlushBuffer(buffer).status_value(), ZX_ERR_INVALID_ARGS);
+}
+
 #endif
 
 }  // namespace

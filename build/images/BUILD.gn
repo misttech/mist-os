@@ -173,7 +173,7 @@ if (build_uefi_disk && !product_skip_uefi_disk) {
   }
 
   compiled_action("uefi-disk") {
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
 
     deps = [
       "//:product_bundles",

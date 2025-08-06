@@ -12,7 +12,7 @@ dependency management and setup using requirements.txt.
 
 2. File a Infra bug to request the import of the package and dependencies source
     code from its upstream repository into the Fuchsia source code.
-    See [example bug](https://fxbug.dev/42084613) for reference
+    See [example bug](https://fxbug.dev/432504093) for reference
 
 3. Add the package to the `requirements.txt` file, including the specific
     version and the path within the Fuchsia repository. Example:

@@ -70,6 +70,14 @@ class PowerState {
   // Domain the PowerState is being modeled after.
   const fbl::RefPtr<PowerDomain>& domain() const { return domain_; }
 
+  // Returns the id of the domain this power state belongs to.
+  std::optional<uint32_t> domain_id() const {
+    if (domain()) {
+      return domain()->id();
+    }
+    return std::nullopt;
+  }
+
   // Returns whether the domain's controller is serving requests. Returns false if there is no
   // domain.
   bool is_serving() const { return domain() && domain()->controller()->is_serving(); }
@@ -117,8 +125,42 @@ class PowerState {
     return std::nullopt;
   }
 
+  // Returns true if the given power level is valid active power level.
+  bool IsValidActivePowerLevel(uint8_t power_level) const {
+    if (domain()) {
+      return power_level >= domain()->model().idle_levels().size() &&
+             power_level < domain()->model().levels().size();
+    }
+    return false;
+  }
+
+  // Returns the processing rate of the fastest power level in this domain.
+  uint64_t max_processing_rate() const {
+    if (domain()) {
+      return domain()->model().max_processing_rate();
+    }
+    return 0;
+  }
+
+  // Returns the processing rate of the current active power level. Returns zero if there is no
+  // active power level or no domain is set.
+  uint64_t active_processing_rate() const {
+    if (domain() && active_power_level_.has_value()) {
+      return domain()->model().levels()[*active_power_level_].processing_rate();
+    }
+    return 0;
+  }
+
   // Returns the current utilization of the processor.
-  uint64_t normalized_utilization() const { return normalized_utilization_; }
+  int64_t normalized_utilization() const { return normalized_utilization_; }
+
+  // Returns the total normalized utilization of the domain this processor belongs to.
+  int64_t total_normalized_utilization() const {
+    if (domain()) {
+      return domain()->total_normalized_utilization();
+    }
+    return 0;
+  }
 
   // Sets the `PowerDomain` and related models that this `PowerState` references. This means,
   // that any `power_level` or `desired_power_level` is only meaningful for that specific
@@ -141,12 +183,12 @@ class PowerState {
   zx::result<> UpdateActivePowerLevel(uint8_t active_power_level);
 
   // Update the utilization of this processor and the total utilization of its domain.
-  void UpdateUtilization(int64_t utilization_delta) {
-    normalized_utilization_ += utilization_delta;
+  int64_t UpdateUtilization(int64_t utilization_delta) {
     if (domain()) {
       domain()->total_normalized_utilization_.fetch_add(utilization_delta,
-                                                        std::memory_order_acq_rel);
+                                                        std::memory_order_relaxed);
     }
+    return normalized_utilization_ += utilization_delta;
   }
 
  private:
@@ -160,7 +202,7 @@ class PowerState {
   std::optional<uint8_t> desired_active_power_level_;
 
   // The current normalized utilization of the processor.
-  uint64_t normalized_utilization_{0};
+  int64_t normalized_utilization_{0};
 };
 
 }  // namespace power_management

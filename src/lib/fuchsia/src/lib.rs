@@ -203,7 +203,7 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = R> + 'static,
 {
-    fuchsia_async::LocalExecutor::new().run_singlethreaded(f())
+    fuchsia_async::LocalExecutorBuilder::new().build().run_singlethreaded(f())
 }
 
 /// Run an async main function with a single threaded executor, applying `role_name`.
@@ -215,7 +215,7 @@ where
 {
     #[cfg(target_os = "fuchsia")]
     set_thread_role(_role_name);
-    fuchsia_async::LocalExecutor::new().run_singlethreaded(f())
+    fuchsia_async::LocalExecutorBuilder::new().build().run_singlethreaded(f())
 }
 
 /// Run an async main function with a multi threaded executor (containing `num_threads`).
@@ -226,7 +226,7 @@ where
     Fut: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    fuchsia_async::SendExecutor::new(num_threads).run(f())
+    fuchsia_async::SendExecutorBuilder::new().num_threads(num_threads).build().run(f())
 }
 
 /// Run an async main function with a multi threaded executor (containing `num_threads`) and apply
@@ -238,13 +238,15 @@ where
     Fut: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    let mut exec = fuchsia_async::SendExecutor::new(num_threads);
     #[cfg(target_os = "fuchsia")]
-    {
-        set_thread_role(_role_name);
-        exec.set_worker_init(move || set_thread_role(_role_name));
-    }
-    exec.run(f())
+    set_thread_role(_role_name);
+
+    let builder = fuchsia_async::SendExecutorBuilder::new().num_threads(num_threads);
+
+    #[cfg(target_os = "fuchsia")]
+    let builder = builder.worker_init(move || set_thread_role(_role_name));
+
+    builder.build().run(f())
 }
 
 //

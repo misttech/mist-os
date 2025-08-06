@@ -587,7 +587,7 @@ mod tests {
     fn test_policy() -> TestPolicy {
         const TEST_POLICY: &[u8] =
             include_bytes!("../../testdata/micro_policies/security_context_tests_policy.pp");
-        parse_policy_by_value(TEST_POLICY.to_vec()).unwrap().0.validate().unwrap()
+        parse_policy_by_value(TEST_POLICY.to_vec()).unwrap().validate().unwrap()
     }
 
     // Represents a `CategorySpan`.

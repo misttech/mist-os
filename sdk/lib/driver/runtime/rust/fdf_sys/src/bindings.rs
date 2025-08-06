@@ -809,6 +809,9 @@ unsafe extern "C" {
     pub fn fdf_env_scan_threads_for_stalls();
 }
 unsafe extern "C" {
+    pub fn fdf_env_scan_threads_for_stalls_wait_time() -> zx_duration_mono_t;
+}
+unsafe extern "C" {
     pub fn fdf_testing_create_unmanaged_dispatcher(
         driver: *const ::core::ffi::c_void,
         options: u32,

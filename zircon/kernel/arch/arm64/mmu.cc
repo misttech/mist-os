@@ -172,7 +172,7 @@ void InitializePageCache(uint32_t level) {
 }
 
 // Initialize the cache after the percpu data structures are initialized.
-LK_INIT_HOOK(arm64_mmu_page_cache_init, InitializePageCache, LK_INIT_LEVEL_KERNEL + 1)
+LK_INIT_HOOK(arm64_mmu_page_cache_init, InitializePageCache, LK_INIT_LEVEL_KERNEL)
 
 void enable_bbm(uint32_t level) {
   dprintf(INFO, "ARM: enabling break-before-make\n");

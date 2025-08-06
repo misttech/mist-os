@@ -49,7 +49,7 @@ idk_cc_source_library(
     api_area = "Developer",
     category = "partner",
     hdrs_for_internal_use = ["another_header.h"],
-    idk_name = "source_set_dependency",
+    idk_name = "source_dependency_1",
     include_base = ".",
     stable = True,
 )
@@ -61,7 +61,7 @@ idk_cc_source_library(
     api_area = "Developer",
     category = "partner",
     hdrs_for_internal_use = ["another_header.h"],
-    idk_name = "source_set_dependency",
+    idk_name = "source_dependency_2",
     include_base = ".",
     stable = True,
 )
@@ -76,7 +76,7 @@ idk_cc_source_library(
     api_area = "Developer",
     category = "partner",
     hdrs_for_internal_use = ["another_header.h"],
-    idk_name = "source_set_dependency",
+    idk_name = "tests_dependency",
     include_base = ".",
     stable = True,
 

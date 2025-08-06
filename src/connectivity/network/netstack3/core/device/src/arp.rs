@@ -518,7 +518,10 @@ fn handle_packet<
             //   ARP cache. This requirement in the ARP protocol applies even
             //   for ARP Request packets, and for ARP Reply packets that do not
             //   match any ARP Request transmitted by the receiving node [16].
-            (DynamicNeighborUpdateSource::Probe, PacketKind::Gratuitous)
+            (
+                DynamicNeighborUpdateSource::Probe { link_address: sender_hw_addr },
+                PacketKind::Gratuitous,
+            )
         }
         (false, true) => {
             // Consider ARP replies as solicited if they were unicast directly to us, and
@@ -528,15 +531,20 @@ fn handle_packet<
                 FrameDestination::Broadcast | FrameDestination::Multicast => false,
             };
             let source = match op {
-                ValidArpOp::Request => DynamicNeighborUpdateSource::Probe,
+                ValidArpOp::Request => {
+                    DynamicNeighborUpdateSource::Probe { link_address: sender_hw_addr }
+                }
                 ValidArpOp::Response => {
-                    DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
-                        solicited_flag: solicited,
-                        // ARP does not have the concept of an override flag in a neighbor
-                        // confirmation; if the link address that's received does not match the one
-                        // in the neighbor cache, the entry should always go to STALE.
-                        override_flag: false,
-                    })
+                    DynamicNeighborUpdateSource::Confirmation {
+                        link_address: Some(sender_hw_addr),
+                        flags: ConfirmationFlags {
+                            solicited_flag: solicited,
+                            // ARP does not have the concept of an override flag in a neighbor
+                            // confirmation; if the link address that's received does not match the
+                            // one in the neighbor cache, the entry should always go to STALE.
+                            override_flag: false,
+                        },
+                    }
                 }
             };
             (source, PacketKind::AddressedToMe)
@@ -565,7 +573,6 @@ fn handle_packet<
             bindings_ctx,
             &device_id,
             addr,
-            sender_hw_addr,
             source,
         )
     };
@@ -573,7 +580,7 @@ fn handle_packet<
     match kind {
         PacketKind::Gratuitous => return,
         PacketKind::AddressedToMe => match source {
-            DynamicNeighborUpdateSource::Probe => {
+            DynamicNeighborUpdateSource::Probe { .. } => {
                 let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, &device_id);
 
                 core_ctx.counters().tx_responses.increment();
@@ -599,7 +606,7 @@ fn handle_packet<
                     )
                 });
             }
-            DynamicNeighborUpdateSource::Confirmation(_flags) => {}
+            DynamicNeighborUpdateSource::Confirmation { .. } => {}
         },
     }
 }

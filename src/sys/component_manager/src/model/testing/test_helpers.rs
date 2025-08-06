@@ -571,16 +571,18 @@ pub fn new_config_decl() -> (ConfigDecl, ConfigValuesData, ConfigChecksum) {
         0x2E, 0x64,
     ]);
     let config = ConfigDecl {
-        fields: vec![ConfigField {
+        fields: Box::from([ConfigField {
             key: "my_field".to_string(),
             type_: ConfigValueType::Bool,
             mutability: Default::default(),
-        }],
+        }]),
         checksum: checksum.clone(),
         value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
     };
     let config_values = ConfigValuesData {
-        values: vec![ConfigValueSpec { value: ConfigValue::Single(ConfigSingleValue::Bool(true)) }],
+        values: Box::from([ConfigValueSpec {
+            value: ConfigValue::Single(ConfigSingleValue::Bool(true)),
+        }]),
         checksum: checksum.clone(),
     };
     (config, config_values, checksum)

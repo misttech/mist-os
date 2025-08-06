@@ -136,7 +136,7 @@
 ///
 .macro .function name, scope=local, cfi=abi, align=, nosection=, retain=
   // Validate the \cfi argument.  The valid values correspond to
-  // the `_.function.cfi.{start,end}.\cfi` subroutine macros.
+  // the `_.function.{start,end}.\cfi` subroutine macros.
   .ifnc \cfi, abi
     .ifnc \cfi, custom
       .ifnc \cfi, none
@@ -147,6 +147,10 @@
 
   _.entity \name, \scope, \align, \nosection, \retain, function, function, _.function.end.\cfi
   _.function.start.\cfi
+
+  // This is a local name, reset inside each `.function`..`.end_function`.
+  // It can be used by other macros like .llvm.stack_size, below.
+  .L._.function.entry = .
 .endm  // .function
 
 /// Define a data object that extends until `.end_object`.
@@ -202,6 +206,49 @@
   .endif
   _.entity \name, \scope, \align, \nosection, \retain, object, \type
 .endm  // .start_object
+
+/// Emit `.stack_sizes` metadata compatible with what LLVM compilers emit.
+///
+/// This uses the format that Clang's -fstack-size-section emits (the Rust
+/// compiler can also emit it with the right switches).  This macro can
+/// only be used inside a `.function` definition before `.end_function`.
+///
+/// Parameters
+///
+///   * frame_size_bytes
+///     - Required: An assembly-time constant expression (without relocations).
+///     This gives the size in bytes of the machine stack frame.  Consistent
+///     with the compiler, this is defined as the maximum net (absolute value)
+///     SP adjustment between the current `.function` entry point and any PC
+///     inside the function.  Note that on x86, the return address pushed by
+///     `call` instructions is not accounted either in a callee (which uses
+///     frame_size_bytes=0 if it's a leaf that doesn't push anything) nor in a
+///     caller (which doesn't count the word pushed by its own `call`
+///     instructions, only the pushes done _before_ any such call).
+///
+///   * no_metadata
+///     - Optional: If given, must be exactly the string `no-metadata`.
+///     This makes the macro do nothing at all.  This is a convenience for
+///     users like machine-specific .prologue.fp macros to pass through.
+///     - Default: none
+///
+.macro .llvm.stack_size frame_size_bytes:req, no_metadata=
+  .ifnb \no_metadata
+    .ifnc no-metadata,\no_metadata
+      .error "optional `no_metadata=no-metadata` argument syntax must be exact"
+    .endif
+  .else
+#ifdef __ELF__
+    // Non-allocated section with SHF_LINK_ORDER and the entry point section
+    // as linked-to.  That section link matters to GC behavior when ? doesn't
+    // become implied G because a group contains that (current) section.
+    .pushsection .stack_sizes, "?o", %progbits, .L._.function.entry
+      .dc.a .L._.function.entry
+      .uleb128 \frame_size_bytes
+    .popsection
+#endif
+  .endif
+.endm
 
 /// Dispatch to the appropriate macro for one-byte or two-byte SLEB128 encoding.
 ///

@@ -158,7 +158,8 @@ uint8_t PowerStateToSuspendReason(fss::SystemPowerState power_state) {
 
 }  // anonymous namespace
 
-zx::result<zx::bti> PlatformBus::GetBti(uint32_t iommu_index, uint32_t bti_id) {
+zx::result<zx::bti> PlatformBus::GetBti(uint32_t iommu_index, uint32_t bti_id,
+                                        std::string_view dev_name) {
   if (iommu_index != 0) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
@@ -173,7 +174,8 @@ zx::result<zx::bti> PlatformBus::GetBti(uint32_t iommu_index, uint32_t bti_id) {
     }
 
     char name[ZX_MAX_NAME_LEN]{};
-    std::format_to_n(name, sizeof(name) - 1, "pbus bti {:02x}:{:02x}", iommu_index, bti_id);
+    std::format_to_n(name, sizeof(name) - 1, "{}.pbus[{:02x}:{:02x}]", dev_name, iommu_index,
+                     bti_id);
     status = new_bti.set_property(ZX_PROP_NAME, name, std::size(name));
     if (status != ZX_OK) {
       fdf::warn("Couldn't set name for BTI '{}': {}", std::string_view(name),
@@ -451,7 +453,7 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
 
 void PlatformBus::GetBti(GetBtiRequestView request, fdf::Arena& arena,
                          GetBtiCompleter::Sync& completer) {
-  zx::result bti = GetBti(request->iommu_index, request->bti_id);
+  zx::result bti = GetBti(request->iommu_index, request->bti_id, "");
 
   if (bti.is_error()) {
     completer.buffer(arena).ReplyError(bti.status_value());

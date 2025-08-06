@@ -32,12 +32,23 @@ if use_lxml:
 class FileExists:
     path: Path
     fail: bool
+    cci: bool
+    """Whether this assertion depends on Cross Crate Information (information aggregated from
+    multiple crates). Checking for the presence of a search index would be an example."""
 
     def run(self, root: Path) -> None:
         cont = root / self.path
         assert cont.is_file(), f"{cont} does not exist, or is not a file"
 
     def render_as_gn_test(self, count: int) -> str:
+        if self.cci:
+            # We should not render GN tests that check for the presence of
+            # cross-crate information. The way that cross-crate information is
+            # encoded before it's rendered is an implementation detail of
+            # rustdoc. Instead, the //build/rust/tests/rusdoc-link tests should
+            # assert for the presence and content of rendered cross-crate
+            # files.
+            return ""
         assertionKind = "assertFalse" if self.fail else "assertTrue"
         negation = "not " if self.fail else ""
         return (
@@ -58,6 +69,9 @@ class HasRaw:
     file: Path
     content: str
     fail: bool
+    cci: bool
+    """Whether this assertion depends on Cross Crate Information (information aggregated from
+    multiple crates). Checking for the presence of a search index would be an example."""
 
     def run(self, root: Path) -> None:
         cont = root / self.file
@@ -68,6 +82,14 @@ class HasRaw:
         ), f"found `{cont}`, to contain `{self.content}` in {root / self.file}"
 
     def render_as_gn_test(self, count: int) -> str:
+        if self.cci:
+            # We should not render GN tests that check for the presence of
+            # cross-crate information. The way that cross-crate information is
+            # encoded before it's rendered is an implementation detail of
+            # rustdoc. Instead, the //build/rust/tests/rusdoc-link tests should
+            # assert for the presence and content of rendered cross-crate
+            # files.
+            return ""
         assertionKind = "assertNotIn" if self.fail else "assertIn"
         return (
             f"  def testFileContainsRaw{count}(self) -> None:\n"
@@ -90,6 +112,9 @@ class Has:
     content: str
     full: bool
     fail: bool
+    cci: bool
+    """Whether this assertion depends on Cross Crate Information (information aggregated from
+    multiple crates). Checking for the presence of a search index would be an example."""
 
     def run(self, root: Path):
         cont = root / self.file
@@ -114,6 +139,14 @@ class Has:
             ), f"found `{cont}`, to contain `{self.content}` in {root / self.file}"
 
     def render_as_gn_test(self, count: int) -> str:
+        if self.cci:
+            # We should not render GN tests that check for the presence of
+            # cross-crate information. The way that cross-crate information is
+            # encoded before it's rendered is an implementation detail of
+            # rustdoc. Instead, the //build/rust/tests/rusdoc-link tests should
+            # assert for the presence and content of rendered cross-crate
+            # files.
+            return ""
         assertionKind = "assertNotIn" if self.fail else "assertIn"
         "not " if self.fail else ""
         # TODO: better xpath support
@@ -376,8 +409,8 @@ document-{self.name}: {self.name}/lib.rs {dep_meta} {dep_touch}
 
 def target_name(c: "Crate") -> str:
     if c.crate_type == "proc-macro":
-        return f":{c.name}_proc_macro.actual.rustdoc"
-    return f":{c.name}.actual.rustdoc"
+        return f":{c.name}_proc_macro.rustdoc"
+    return f":{c.name}.rustdoc"
 
 
 @dataclass
@@ -618,6 +651,7 @@ t_i_header = Has(
     content="List of all crates",
     full=True,
     fail=False,
+    cci=True,
 )
 
 
@@ -626,6 +660,7 @@ def index_but_crate_absent(c, i) -> list:
         FileExists(
             path="index.html",
             fail=False,
+            cci=True,
         ),
         Has(
             file="index.html",
@@ -633,6 +668,7 @@ def index_but_crate_absent(c, i) -> list:
             content="List of all crates",
             full=True,
             fail=False,
+            cci=True,
         ),
         Has(
             file="index.html",
@@ -640,6 +676,7 @@ def index_but_crate_absent(c, i) -> list:
             content=c.name,
             full=True,
             fail=True,
+            cci=True,
         ),
     ]
 
@@ -656,12 +693,14 @@ def test_index_has_crate(c, i, fail: bool) -> list:
             FileExists(
                 path="index.html",
                 fail=True,
+                cci=True,
             )
         ]
     return [
         FileExists(
             path="index.html",
             fail=False,
+            cci=True,
         ),
         Has(
             file="index.html",
@@ -669,6 +708,7 @@ def test_index_has_crate(c, i, fail: bool) -> list:
             content="List of all crates",
             full=True,
             fail=False,
+            cci=True,
         ),
         Has(
             file="index.html",
@@ -676,6 +716,7 @@ def test_index_has_crate(c, i, fail: bool) -> list:
             content=c.name,
             full=True,
             fail=False,
+            cci=True,
         ),
     ]
 
@@ -689,6 +730,7 @@ def test_root_has_item(c, kind, name, fail: bool):
     return FileExists(
         path=f"{c.name}/{kind}.{name}.html",
         fail=fail,
+        cci=False,
     )
 
 
@@ -698,11 +740,13 @@ def test_fixed_crate_impl(c, kind, trait, implr, implr_alias):
         FileExists(
             path=f"{c.name}/{kind}.{implr_alias}.html",
             fail=False,
+            cci=False,
         ),
         HasRaw(
             file=f"{c.name}/{kind}.{implr_alias}.html",
             content=f"{trait}",
             fail=False,
+            cci=False,
         ),
     ]
 
@@ -712,6 +756,7 @@ def test_cross_crate_impl_not_exist(c, name):
     return FileExists(
         path=f"trait.impl/{c.name}/trait.{name}.js",
         fail=True,
+        cci=True,
     )
 
 
@@ -721,6 +766,7 @@ def test_cross_crate_impl(c, name, implr, kind: str):
         file=f"trait.impl/{c.name}/trait.{name}.js",
         content=f"{kind}.{implr}.html",
         fail=False,
+        cci=True,
     )
 
 
@@ -730,6 +776,7 @@ def test_search_index(name: str, fail: bool):
         file=f"search-index.js",
         content=f"{name}",
         fail=fail,
+        cci=True,
     )
 
 
@@ -739,6 +786,7 @@ def test_type_impl_not_exists(
     return FileExists(
         path=f"type.impl/{original_crate.name}/{kind}.{original}.js",
         fail=True,
+        cci=True,
     )
 
 
@@ -753,16 +801,19 @@ def test_type_impl(
         FileExists(
             path=f"type.impl/{original_crate.name}/{kind}.{original}.js",
             fail=False,
+            cci=True,
         ),
         HasRaw(
             file=f"type.impl/{original_crate.name}/{kind}.{original}.js",
             content=f"{trait_name}",
             fail=False,
+            cci=True,
         ),
         HasRaw(
             file=f"type.impl/{original_crate.name}/{kind}.{original}.js",
             content=f"{alias_name}",
             fail=False,
+            cci=True,
         ),
     ]
 
@@ -854,7 +905,7 @@ def main(args: Namespace):
             configs={
                 quebec: CrateConfig(merge=None, examples=(quebec, "examples")),
             },
-            assertions=[FileExists(path="examples", fail=False)],
+            assertions=[FileExists(path="examples", fail=False, cci=False)],
             no_mergeable_rustdoc=True,
         )
     )
@@ -1423,7 +1474,7 @@ def main(args: Namespace):
                     sierra, "struct", item_T, item_S, item_S
                 ),
                 test_cross_crate_impl_not_exist(tango, item_T),
-                FileExists(path="search-index.js", fail=True),
+                FileExists(path="search-index.js", fail=True, cci=True),
             ],
             no_mergeable_rustdoc=False,
         )
@@ -1464,7 +1515,7 @@ def main(args: Namespace):
                     sierra, "struct", item_T, item_S, item_S
                 ),
                 test_cross_crate_impl_not_exist(tango, item_T),
-                FileExists(path="search-index.js", fail=True),
+                FileExists(path="search-index.js", fail=True, cci=True),
             ],
             no_mergeable_rustdoc=False,
         )
@@ -1504,7 +1555,7 @@ def main(args: Namespace):
                     sierra, "struct", item_T, item_S, item_S
                 ),
                 test_cross_crate_impl_not_exist(tango, item_T),
-                FileExists(path="search-index.js", fail=True),
+                FileExists(path="search-index.js", fail=True, cci=True),
             ],
             no_mergeable_rustdoc=False,
         )
@@ -1732,7 +1783,7 @@ def main(args: Namespace):
             assertions=[
                 *test_index_has_crate(quebec, 0, True),
                 test_root_has_item(quebec, "struct", item_Q, False),
-                FileExists(path="search-index.js", fail=True),
+                FileExists(path="search-index.js", fail=True, cci=True),
             ],
             no_mergeable_rustdoc=False,
         )
@@ -1838,6 +1889,13 @@ def main(args: Namespace):
             f'group("rustdoc") {{\n'
             f"  testonly = true\n"
             f"  deps = [{gn_test_build}]\n"
+            f"metadata = {{\n"
+            f"    # Exclude the test universe crates from the global\n"
+            f"    # rust_target_mapping.json. These crates aren't meaningful to\n"
+            f"    # consumers of the Fuchsia rustdoc index, who are looking for\n"
+            f"    # API documentation.\n"
+            f"    rust_test_barrier = []\n"
+            f"}}\n"
             f"}}\n"
         )
 

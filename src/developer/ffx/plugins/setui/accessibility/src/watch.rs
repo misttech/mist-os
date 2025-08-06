@@ -23,7 +23,7 @@ mod test {
     use fidl_fuchsia_settings::{AccessibilityRequest, AccessibilitySettings};
     use target_holders::fake_proxy;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_accessibility_watch() -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             AccessibilityRequest::Set { .. } => {

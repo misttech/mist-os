@@ -46,26 +46,6 @@ fuchsia_component("reference-graphical-presenter") {
   deps = [ ":reference-graphical-presenter-bin" ]
 }
 
-executable("reference-scenic-bin") {
-  output_name = "reference-scenic"
-  testonly = true
-
-  sources = [ "reference_scenic.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/sys/cpp",
-  ]
-}
-
-fuchsia_component("reference-scenic") {
-  manifest = "meta/reference-scenic.cml"
-  testonly = true
-  deps = [ ":reference-scenic-bin" ]
-}
-
 executable("reference-session-bin") {
   output_name = "reference-session"
   testonly = true
@@ -75,7 +55,6 @@ executable("reference-session-bin") {
   deps = [
     ":reference-element",
     ":reference-graphical-presenter",
-    ":reference-scenic",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//src/session/bin/element_manager:element_manager_comp",

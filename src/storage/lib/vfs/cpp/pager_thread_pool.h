@@ -9,8 +9,6 @@
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 
-#include <map>
-#include <memory>
 #include <thread>
 #include <vector>
 

@@ -55,11 +55,11 @@ impl RouteValidatorCapabilityProvider {
             let resolved =
                 state.get_resolved_state().ok_or(fcomponent::Error::InstanceCannotResolve)?;
 
-            let mut uses = resolved.decl().uses.clone();
+            let mut uses = resolved.decl().uses.to_vec();
             if let Some(runner) = resolved.decl().program.as_ref().and_then(|d| d.runner.as_ref()) {
                 uses.push(Self::use_for_runner(runner));
             }
-            let exposes = resolved.decl().exposes.clone();
+            let exposes = resolved.decl().exposes.to_vec();
 
             (uses, exposes)
         };

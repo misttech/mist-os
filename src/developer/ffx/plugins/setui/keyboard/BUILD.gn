@@ -31,7 +31,7 @@ ffx_plugin("ffx_setui_keyboard") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:test-case",
   ]
 

@@ -6,8 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DISPLAY_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/mmio/mmio.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
@@ -18,13 +18,23 @@
 #include "src/graphics/display/drivers/intel-display/dpll.h"
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 
 namespace intel_display {
 
 class Controller;
+
+struct AddedDisplayInfo {
+  display::DisplayId display_id;
+  fbl::Vector<display::ModeAndId> preferred_modes;
+  fbl::Vector<uint8_t> edid;
+};
+
 class DisplayDevice {
  public:
   enum class Type {
@@ -44,7 +54,9 @@ class DisplayDevice {
 
   virtual ~DisplayDevice();
 
-  void ApplyConfiguration(const display_config_t* banjo_display_config,
+  void ApplyConfiguration(const display::DisplayTiming& display_timing,
+                          const display::ColorConversion& color_conversion,
+                          cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp);
 
   // TODO(https://fxbug.dev/42167004): Initialization-related interactions between the Controller
@@ -100,7 +112,7 @@ class DisplayDevice {
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
 
-  virtual raw_display_info_t CreateRawDisplayInfo() = 0;
+  virtual AddedDisplayInfo CreateAddedDisplayInfo() = 0;
 
  protected:
   // Attempts to initialize the ddi.

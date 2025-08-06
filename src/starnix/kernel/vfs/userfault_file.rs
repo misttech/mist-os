@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{FaultRegisterMode, MemoryAccessorExt, UserFault, UserFaultFeatures};
+use crate::mm::{
+    FaultCopyMode, FaultRegisterMode, FaultZeroMode, MemoryAccessorExt, UserFault,
+    UserFaultFeatures,
+};
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject,
     FileObjectState, FileOps, InputBuffer, OutputBuffer,
 };
-use linux_uapi::{UFFDIO_CONTINUE, UFFDIO_COPY, UFFDIO_WAKE, UFFDIO_WRITEPROTECT, UFFDIO_ZEROPAGE};
+use linux_uapi::{
+    uffdio_copy, uffdio_zeropage, UFFDIO_CONTINUE, UFFDIO_COPY, UFFDIO_WAKE, UFFDIO_WRITEPROTECT,
+    UFFDIO_ZEROPAGE,
+};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked, UserFaultInner};
 use starnix_uapi::errors::Errno;
@@ -238,7 +244,59 @@ impl FileOps for UserFaultFile {
                 Ok(0.into())
             }
 
-            UFFDIO_COPY | UFFDIO_ZEROPAGE | UFFDIO_MOVE => {
+            UFFDIO_ZEROPAGE => {
+                let arg: UserRef<uffdio_zeropage> = arg.into();
+                let mut request = current_task.read_object(arg)?;
+                let ioctl_res = self.inner.op_zero(
+                    locked,
+                    request.range.start.into(),
+                    request.range.len,
+                    FaultZeroMode::from_bits_truncate(
+                        request.mode.try_into().map_err(|_| errno!(EINVAL))?,
+                    ),
+                );
+                request.zeropage = match ioctl_res {
+                    Ok(bytes) => bytes as i64,
+                    Err(ref e) => -1 * (e.code.error_code() as i64),
+                };
+                current_task.write_object(arg, &request)?;
+                // EAGAIN is returned if the number of bytes zeroed is not equal to the requested
+                // length
+                match ioctl_res {
+                    Ok(bytes) if bytes == request.range.len as usize => Ok(0.into()),
+                    Err(e) => Err(e),
+                    _ => error!(EAGAIN),
+                }
+            }
+
+            UFFDIO_COPY => {
+                let arg: UserRef<uffdio_copy> = arg.into();
+                let mut request = current_task.read_object(arg)?;
+                let ioctl_res = self.inner.op_copy(
+                    locked,
+                    current_task.mm().unwrap(),
+                    request.src.into(),
+                    request.dst.into(),
+                    request.len,
+                    FaultCopyMode::from_bits_truncate(
+                        request.mode.try_into().map_err(|_| errno!(EINVAL))?,
+                    ),
+                );
+                request.copy = match ioctl_res {
+                    Ok(bytes) => bytes as i64,
+                    Err(ref e) => -1 * (e.code.error_code() as i64),
+                };
+                current_task.write_object(arg, &request)?;
+                // EAGAIN is returned if the number of bytes copied is not equal to the requested
+                // length
+                match ioctl_res {
+                    Ok(bytes) if bytes == request.len as usize => Ok(0.into()),
+                    Err(e) => Err(e),
+                    _ => error!(EAGAIN),
+                }
+            }
+
+            UFFDIO_MOVE => {
                 track_stub!(TODO("https://fxbug.dev/297375964"), "basic uffd ioctls", request);
                 error!(ENOSYS)
             }
@@ -259,10 +317,10 @@ impl FileOps for UserFaultFile {
     // On closing, clear all the registrations pointing to this userfault object.
     fn close(
         self: Box<Self>,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
-        self.inner.cleanup();
+        self.inner.cleanup(locked);
     }
 }

@@ -76,7 +76,7 @@ void *setup_sigaltstack(size_t size) {
 }
 
 std::string GetBinaryPath(std::string_view binary_name) {
-  std::string test_binary = "/data/tests/" + std::string(binary_name);
+  std::string test_binary = "data/tests/deps/" + std::string(binary_name);
   if (!files::IsFile(test_binary)) {
     // We're running on host
     char self_path[PATH_MAX];

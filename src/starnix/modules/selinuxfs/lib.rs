@@ -46,6 +46,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::num::{NonZeroU32, NonZeroU64};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use zerocopy::{Immutable, IntoBytes};
@@ -277,13 +278,41 @@ struct PolicyFile {
 
 impl PolicyFile {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { security_server })
+        SimpleFileNode::new(move || Ok(Self { security_server: security_server.clone() }))
     }
 }
 
-impl BytesFileOps for PolicyFile {
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        self.security_server.get_binary_policy().map(Into::into).ok_or_else(|| errno!(EINVAL))
+impl FileOps for PolicyFile {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let policy = self.security_server.get_binary_policy().ok_or_else(|| errno!(EINVAL))?;
+        let policy_bytes: &[u8] = policy.deref();
+
+        if offset >= policy_bytes.len() {
+            return Ok(0);
+        }
+
+        data.write(&policy_bytes[offset..])
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EACCES)
     }
 }
 

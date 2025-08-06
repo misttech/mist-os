@@ -8,6 +8,7 @@
 #include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/testing/interp.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <unistd.h>

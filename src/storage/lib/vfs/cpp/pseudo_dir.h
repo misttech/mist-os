@@ -5,21 +5,27 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_PSEUDO_DIR_H_
 #define SRC_STORAGE_LIB_VFS_CPP_PSEUDO_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <string_view>
 
+#include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/macros.h>
-#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 
-#include "vnode.h"
-#include "watcher.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
 
 namespace fs {
 
@@ -69,7 +75,6 @@ class PseudoDir : public Vnode {
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   fuchsia_io::Abilities GetAbilities() const final;
-  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override;
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;
   zx_status_t WatchDir(fs::FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,

@@ -139,9 +139,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_variant;
     use crate::mac::{self, data};
     use crate::test_utils::fake_frames::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn msdu_iter_non_aggregated() {
@@ -190,7 +190,7 @@ mod tests {
     fn parse_llc_frame_with_addr4_ht_ctrl() {
         let bytes =
             make_data_frame_single_llc(Some(MacAddr::from([1, 2, 3, 4, 5, 6])), Some([4, 3, 2, 1]));
-        assert_variant!(
+        assert_matches!(
             mac::DataFrame::parse(bytes.as_slice(), false),
             Some(mac::DataFrame { body, .. }) => {
                 let llc_frame = LlcFrame::parse(body).expect("failed to parse LLC frame");
@@ -202,7 +202,6 @@ mod tests {
                 assert_eq!(0x090A, llc_frame.hdr.protocol_id.to_native());
                 assert_eq!(&[11, 11, 11], llc_frame.body);
             },
-            "failed to parse data frame",
-        );
+            "failed to parse data frame");
     }
 }

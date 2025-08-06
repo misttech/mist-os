@@ -983,12 +983,12 @@ fn report_roam_finished(connect_txn_sink: &mut ConnectTransactionSink, result: R
 mod tests {
     use super::*;
     use crate::Config as SmeConfig;
+    use assert_matches::assert_matches;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
     use std::collections::HashSet;
     use test_case::test_case;
     use wlan_common::{
-        assert_variant,
         channel::{Cbw, Channel},
         fake_bss_description, fake_fidl_bss_description,
         ie::{fake_ht_cap_bytes, fake_vht_cap_bytes, /*rsn::akm,*/ IeType},
@@ -1601,7 +1601,7 @@ mod tests {
 
         // We should still be connecting to "foo", but the status should now come from the state
         // machine and not from the scanner.
-        let ssid = assert_variant!(sme.state.as_ref().unwrap().status(), ClientSmeStatus::Connecting(ssid) => ssid);
+        let ssid = assert_matches!(sme.state.as_ref().unwrap().status(), ClientSmeStatus::Connecting(ssid) => ssid);
         assert_eq!(Ssid::try_from("foo").unwrap(), ssid);
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("foo").unwrap()), sme.status());
 
@@ -1641,7 +1641,7 @@ mod tests {
         let _recv = sme.on_connect_command(req);
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("foo").unwrap()), sme.status());
 
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1673,7 +1673,7 @@ mod tests {
         let _recv = sme.on_connect_command(req);
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("foo").unwrap()), sme.status());
 
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1692,7 +1692,7 @@ mod tests {
         let _recv = sme.on_connect_command(req);
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("IEEE").unwrap()), sme.status());
 
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1711,7 +1711,7 @@ mod tests {
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
         // User should get a message that connection failed
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1735,7 +1735,7 @@ mod tests {
         assert_eq!(ClientSmeStatus::Idle, sme.state.as_ref().unwrap().status());
 
         // User should get a message that connection failed
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1759,7 +1759,7 @@ mod tests {
         assert_no_connect(&mut mlme_stream);
 
         // User should get a message that connection failed
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1779,9 +1779,9 @@ mod tests {
         let mut connect_txn_stream = sme.on_connect_command(req);
 
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("bssname").unwrap()), sme.status());
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
         // There should be no message in the connect_txn_stream
-        assert_variant!(connect_txn_stream.try_next(), Err(_));
+        assert_matches!(connect_txn_stream.try_next(), Err(_));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1799,9 +1799,9 @@ mod tests {
         let mut connect_txn_stream = sme.on_connect_command(req);
 
         assert_eq!(ClientSmeStatus::Connecting(Ssid::try_from("bssname").unwrap()), sme.status());
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(..))));
         // There should be no message in the connect_txn_stream
-        assert_variant!(connect_txn_stream.try_next(), Err(_));
+        assert_matches!(connect_txn_stream.try_next(), Err(_));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1819,7 +1819,7 @@ mod tests {
         assert_no_connect(&mut mlme_stream);
 
         // User should get a message that connection failed
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1845,7 +1845,7 @@ mod tests {
         assert_no_connect(&mut mlme_stream);
 
         // User should get a message that connection failed
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1875,7 +1875,7 @@ mod tests {
             authentication_wpa2_personal_passphrase(),
         ));
 
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1894,7 +1894,7 @@ mod tests {
             bss_description,
             authentication_wep40(),
         ));
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1908,7 +1908,7 @@ mod tests {
             bss_description,
             authentication_wpa1_passphrase(),
         ));
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1922,7 +1922,7 @@ mod tests {
             bss_description,
             authentication_wpa2_personal_passphrase(),
         ));
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1953,7 +1953,7 @@ mod tests {
             bss_description,
         );
 
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
                 assert_eq!(result, SelectNetworkFailure::IncompatibleConnectRequest.into());
@@ -1983,7 +1983,7 @@ mod tests {
         let mut connect_txn_stream2 = sme.on_connect_command(req2);
 
         // User should get a message that first connection attempt is canceled
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream1.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult {
                 result: ConnectResult::Canceled,
@@ -2007,7 +2007,7 @@ mod tests {
         let mut _connect_fut3 = sme.on_connect_command(req3);
 
         // Verify that second connection attempt is canceled as new connect request comes in
-        assert_variant!(
+        assert_matches!(
             connect_txn_stream2.try_next(),
             Ok(Some(ConnectTransactionEvent::OnConnectResult {
                 result: ConnectResult::Canceled,
@@ -2086,7 +2086,7 @@ mod tests {
             bss_description,
             authentication_open(),
         ));
-        assert_variant!(sme.status(), ClientSmeStatus::Connecting(_));
+        assert_matches!(sme.status(), ClientSmeStatus::Connecting(_));
 
         // Send a scan command and verify a ShouldWait response is returned
         let mut recv =
@@ -2099,7 +2099,7 @@ mod tests {
         let (mut sme, mut mlme_stream, _time_stream) = create_sme().await;
         let mut receiver = sme.wmm_status();
 
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::WmmStatusReq)));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::WmmStatusReq)));
 
         let resp = fake_wmm_status_resp();
         #[allow(
@@ -2119,7 +2119,7 @@ mod tests {
         let (mut sme, mut mlme_stream, _time_stream) = create_sme().await;
         let mut receiver = sme.wmm_status();
 
-        assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::WmmStatusReq)));
+        assert_matches!(mlme_stream.try_next(), Ok(Some(MlmeRequest::WmmStatusReq)));
         sme.on_mlme_event(create_on_wmm_status_resp(zx::sys::ZX_ERR_IO));
         assert_eq!(receiver.try_recv(), Ok(Some(Err(zx::sys::ZX_ERR_IO))));
     }
@@ -2143,7 +2143,7 @@ mod tests {
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
         // Verify we request persistence on startup
-        assert_variant!(persistence_receiver.try_next(), Ok(Some(tag)) => {
+        assert_matches!(persistence_receiver.try_next(), Ok(Some(tag)) => {
             assert_eq!(&tag, "wlanstack-last-pulse");
         });
 
@@ -2158,7 +2158,7 @@ mod tests {
         sme.on_timeout(persist_event.unwrap());
 
         // Verify we request persistence again on timeout
-        assert_variant!(persistence_receiver.try_next(), Ok(Some(tag)) => {
+        assert_matches!(persistence_receiver.try_next(), Ok(Some(tag)) => {
             assert_eq!(&tag, "wlanstack-last-pulse");
         });
     }

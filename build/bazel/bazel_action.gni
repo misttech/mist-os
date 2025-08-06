@@ -220,7 +220,7 @@ declare_args() {
 #
 #   deps:
 #   metadata:
-#   no_output_dir_leaks:
+#   check_for_output_dir_leaks:
 #   testonly:
 #   visibility:
 #     Usual GN meaning.
@@ -659,7 +659,7 @@ template("bazel_action") {
     forward_variables_from(invoker,
                            [
                              "deps",
-                             "no_output_dir_leaks",
+                             "check_for_output_dir_leaks",
                              "testonly",
                              "visibility",
                            ])
@@ -1003,6 +1003,6 @@ template("bazel_action") {
     hermetic_deps = false
 
     # The build events log contains absolute paths written by Bazel!
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 }

@@ -4,11 +4,12 @@
 
 #include "src/storage/lib/vfs/cpp/service.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/zx/channel.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <utility>
-
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fs {
 
@@ -18,13 +19,6 @@ Service::~Service() = default;
 
 fuchsia_io::NodeProtocolKinds Service::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kConnector;
-}
-
-zx::result<fs::VnodeAttributes> Service::GetAttributes() const {
-  // TODO(https://fxbug.dev/42106031): V_TYPE_FILE isn't right, we should use a type for services
-  return zx::ok(VnodeAttributes{
-      .mode = V_TYPE_FILE,
-  });
 }
 
 zx_status_t Service::ConnectService(zx::channel channel) {

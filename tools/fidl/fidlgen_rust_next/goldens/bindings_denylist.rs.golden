@@ -8094,43 +8094,362 @@ pub mod compat {
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Allowed`
     /// protocol.
-    pub type AllowedProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Allowed>;
+    pub type AllowedProxy = ::fidl_next::ClientSender<crate::Allowed>;
 
-    impl ::core::convert::From<crate::Allowed> for ::fidl_test_bindingsdenylist::AllowedMarker {
-        #[inline]
-        fn from(_: crate::Allowed) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Allowed> for ::fidl_test_bindingsdenylist::AllowedMarker {
+        fn compat_from(_: crate::Allowed) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::AllowedMarker> for crate::Allowed {
+        fn compat_from(_: ::fidl_test_bindingsdenylist::AllowedMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_bindingsdenylist::AllowedProxy> for crate::Allowed {
+        fn client_compat_from(
+            proxy: ::fidl_test_bindingsdenylist::AllowedProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyCppRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyCppRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppRequest>
+        for crate::DenyEachBindingOnlyDenyCppRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyCppResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyCppResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppResponse>
+        for crate::DenyEachBindingOnlyDenyCppResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppResponse,
+        ) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyDartRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyDartRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest>
+        for crate::DenyEachBindingOnlyDenyDartRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyDartResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyDartResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse>
+        for crate::DenyEachBindingOnlyDenyDartResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse,
+        ) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyGoRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyGoRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest>
+        for crate::DenyEachBindingOnlyDenyGoRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyGoResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyGoResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse>
+        for crate::DenyEachBindingOnlyDenyGoResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse,
+        ) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyPythonRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyPythonRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest>
+        for crate::DenyEachBindingOnlyDenyPythonRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenyPythonResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenyPythonResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse>
+        for crate::DenyEachBindingOnlyDenyPythonResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse,
+        ) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenySyzkallerRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenySyzkallerRequest) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest,
+        > for crate::DenyEachBindingOnlyDenySyzkallerRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::DenyEachBindingOnlyDenySyzkallerResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse
+    {
+        #[inline]
+        fn compat_from(value: crate::DenyEachBindingOnlyDenySyzkallerResponse) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
+        }
+    }
+
+    impl
+        ::fidl_next::CompatFrom<
+            ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse,
+        > for crate::DenyEachBindingOnlyDenySyzkallerResponse
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse,
+        ) -> Self {
+            Self { b: ::fidl_next::CompatFrom::compat_from(value.b) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `DenyEachBinding`
     /// protocol.
-    pub type DenyEachBindingProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DenyEachBinding>;
+    pub type DenyEachBindingProxy = ::fidl_next::ClientSender<crate::DenyEachBinding>;
 
-    impl ::core::convert::From<crate::DenyEachBinding>
+    impl ::fidl_next::CompatFrom<crate::DenyEachBinding>
         for ::fidl_test_bindingsdenylist::DenyEachBindingMarker
     {
-        #[inline]
-        fn from(_: crate::DenyEachBinding) -> Self {
+        fn compat_from(_: crate::DenyEachBinding) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingMarker>
+        for crate::DenyEachBinding
+    {
+        fn compat_from(_: ::fidl_test_bindingsdenylist::DenyEachBindingMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_bindingsdenylist::DenyEachBindingProxy>
+        for crate::DenyEachBinding
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_bindingsdenylist::DenyEachBindingProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ImportsSameNameContext`
     /// protocol.
-    pub type ImportsSameNameContextProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ImportsSameNameContext>;
+    pub type ImportsSameNameContextProxy = ::fidl_next::ClientSender<crate::ImportsSameNameContext>;
 
-    impl ::core::convert::From<crate::ImportsSameNameContext>
+    impl ::fidl_next::CompatFrom<crate::ImportsSameNameContext>
         for ::fidl_test_bindingsdenylist::ImportsSameNameContextMarker
     {
-        #[inline]
-        fn from(_: crate::ImportsSameNameContext) -> Self {
+        fn compat_from(_: crate::ImportsSameNameContext) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::ImportsSameNameContextMarker>
+        for crate::ImportsSameNameContext
+    {
+        fn compat_from(_: ::fidl_test_bindingsdenylist::ImportsSameNameContextMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_bindingsdenylist::ImportsSameNameContextProxy>
+        for crate::ImportsSameNameContext
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_bindingsdenylist::ImportsSameNameContextProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::MemberOnlyAppearsInImportingLibrary>
+        for ::fidl_test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn compat_from(value: crate::MemberOnlyAppearsInImportingLibrary) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary>
+        for crate::MemberOnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary,
+        ) -> Self {
+            Self { a: ::fidl_next::CompatFrom::compat_from(value.a) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::OnlyAppearsInImportingLibrary>
+        for ::fidl_test_bindingsdenylist::OnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn compat_from(value: crate::OnlyAppearsInImportingLibrary) -> Self {
+            Self {
+                member_only_appears_in_importing_library: ::fidl_next::CompatFrom::compat_from(
+                    value.member_only_appears_in_importing_library,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::OnlyAppearsInImportingLibrary>
+        for crate::OnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn compat_from(value: ::fidl_test_bindingsdenylist::OnlyAppearsInImportingLibrary) -> Self {
+            Self {
+                member_only_appears_in_importing_library: ::fidl_next::CompatFrom::compat_from(
+                    value.member_only_appears_in_importing_library,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::OnlyRust> for ::fidl_test_bindingsdenylist::OnlyRust {
+        fn compat_from(value: crate::OnlyRust) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_bindingsdenylist::OnlyRust> for crate::OnlyRust {
+        fn compat_from(value: ::fidl_test_bindingsdenylist::OnlyRust) -> Self {
+            Self {}
         }
     }
 }

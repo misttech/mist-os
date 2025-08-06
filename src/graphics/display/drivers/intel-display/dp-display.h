@@ -43,7 +43,7 @@ class DpDisplay final : public DisplayDevice {
   bool Query() final;
   bool InitWithDdiPllConfig(const DdiPllConfig& pll_config) final;
 
-  raw_display_info_t CreateRawDisplayInfo() override;
+  AddedDisplayInfo CreateAddedDisplayInfo() override;
 
   uint8_t lane_count() const { return dp_lane_count_; }
   uint32_t link_rate_mhz() const { return dp_link_rate_mhz_; }

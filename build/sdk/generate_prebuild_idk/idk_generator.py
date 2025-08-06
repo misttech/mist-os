@@ -157,19 +157,20 @@ class DebugManifest(object):
 
 class PrebuildMap(object):
     def __init__(self, prebuild_manifest: T.Sequence[AtomInfo]):
-        self._labels_map: dict[str, AtomInfo] = {
-            atom["atom_label"]: atom
-            for atom in prebuild_manifest
-            if atom["atom_type"] != "alias"
-        }
-        self._alias_map: dict[str, str] = {
-            atom["atom_label"]: atom["atom_actual"]
-            for atom in prebuild_manifest
-            if atom["atom_type"] == "alias"
-        }
-        assert (len(self._labels_map) + len(self._alias_map)) == len(
-            prebuild_manifest
-        ), "Multiple atoms have the same `atom_label`."
+        # Separate the prebuild info into aliases and normal atoms.
+        self._alias_map: dict[str, str] = {}
+        self._labels_map: dict[str, AtomInfo] = {}
+        for atom in prebuild_manifest:
+            atom_label = atom["atom_label"]
+            assert (
+                atom_label not in self._alias_map
+                and atom_label not in self._labels_map
+            ), f"Multiple atoms have the same label '{atom_label}'."
+            if atom["atom_type"] == "alias":
+                self._alias_map[atom_label] = atom["atom_actual"]
+            else:
+                self._labels_map[atom_label] = atom
+
         self._build_dir: T.Optional[Path] = None
         self._fuchsia_source_dir: T.Optional[Path] = None
         self._relative_source_prefix_from_build_dir = "../../"
@@ -418,7 +419,6 @@ class PrebuildMap(object):
         prebuild = info["prebuild_info"]
         all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
 
-        fidl_deps = []
         fidl_layers = collections.defaultdict(list)
         for dep_label in get_unique_sequence(prebuild.get("deps", {})):
             dep_atom = self._labels_map[self.resolve_label(dep_label)]
@@ -431,10 +431,6 @@ class PrebuildMap(object):
                 fidl_layers["cpp"].append(name)
             elif "_hlcpp" in dep_label:
                 fidl_layers["hlcpp"].append(name)
-
-                # TODO(https://fxbug.dev/427748486): Determine whether this
-                # should always occur or the key should be removed.
-                fidl_deps.append(name)
             else:
                 assert f"Unexpected dependency label: {dep_label}"
 
@@ -444,7 +440,6 @@ class PrebuildMap(object):
                 "root": prebuild["file_base"],
                 "deps": self.labels_to_cc_library_names(all_deps),
                 "bind_deps": self.labels_to_bind_library_names(all_deps),
-                "fidl_deps": fidl_deps,
                 "fidl_binding_deps": [
                     {"binding_type": layer, "deps": sorted(set(dep))}
                     for layer, dep in fidl_layers.items()

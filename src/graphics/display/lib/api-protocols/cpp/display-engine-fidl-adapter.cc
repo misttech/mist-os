@@ -9,9 +9,14 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 
+#include <algorithm>
+#include <array>
+#include <variant>
+
 #include <sdk/lib/driver/logging/cpp/logger.h>
 
 #include "src/graphics/display/lib/api-protocols/cpp/inplace-vector.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
@@ -23,6 +28,21 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace display {
+
+namespace {
+
+std::variant<display::ModeId, display::DisplayTiming> GetDisplayMode(
+    const fuchsia_hardware_display_engine::wire::DisplayConfig& display_config) {
+  display::ModeId mode_id(display_config.mode_id);
+  if (mode_id == display::kInvalidModeId) {
+    ZX_DEBUG_ASSERT_MSG(display::IsFidlDisplayTimingValid(display_config.timing),
+                        "Display coordinator applied rejected invalid timing");
+    return display::ToDisplayTiming(display_config.timing);
+  }
+  return mode_id;
+}
+
+}  // namespace
 
 DisplayEngineFidlAdapter::DisplayEngineFidlAdapter(DisplayEngineInterface* engine,
                                                    DisplayEngineEventsFidl* engine_events)
@@ -44,6 +64,11 @@ void DisplayEngineFidlAdapter::CompleteCoordinatorConnection(
   engine_events_.SetListener(std::move(request->engine_listener));
   display::EngineInfo engine_info = engine_.CompleteCoordinatorConnection();
   completer.buffer(arena).Reply(engine_info.ToFidl());
+}
+
+void DisplayEngineFidlAdapter::UnsetListener(fdf::Arena& arena,
+                                             UnsetListenerCompleter::Sync& completer) {
+  engine_events_.SetListener({});
 }
 
 void DisplayEngineFidlAdapter::ImportBufferCollection(
@@ -127,11 +152,27 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
     return;
   }
 
-  // This adapter does not currently support color correction.
-  if (display_config.cc_flags != 0) {
-    completer.buffer(arena).ReplyError(display::ConfigCheckResult::kUnsupportedConfig.ToFidl());
+  if (!display::ColorConversion::IsValid(display_config.color_conversion)) {
+    completer.buffer(arena).ReplyError(display::ConfigCheckResult::kInvalidConfig.ToFidl());
     return;
   }
+
+  display::ColorConversion color_conversion(display_config.color_conversion);
+
+  std::variant<display::ModeId, display::DisplayTiming> display_mode;
+  display::ModeId mode_id(display_config.mode_id);
+  if (mode_id == display::kInvalidModeId) {
+    // Fall back to timing.
+    if (!display::IsFidlDisplayTimingValid(display_config.timing)) {
+      completer.buffer(arena).ReplyError(display::ConfigCheckResult::kInvalidConfig.ToFidl());
+      return;
+    }
+    display_mode = display::ToDisplayTiming(display_config.timing);
+  } else {
+    display_mode = mode_id;
+  }
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::ModeId>(display_mode) ||
+                  std::holds_alternative<display::DisplayTiming>(display_mode));
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -140,8 +181,9 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
     layers.emplace_back(fidl_layer);
   }
 
-  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::DisplayId(display_config.display_id), display::ModeId(1), layers);
+  display::ConfigCheckResult config_check_result =
+      engine_.CheckConfiguration(display::DisplayId(display_config.display_id),
+                                 std::move(display_mode), color_conversion, layers);
 
   if (config_check_result != display::ConfigCheckResult::kOk) {
     completer.buffer(arena).ReplyError(config_check_result.ToFidl());
@@ -165,9 +207,15 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
   ZX_DEBUG_ASSERT_MSG(display_config.layers.size() <= display::EngineInfo::kMaxAllowedMaxLayerCount,
                       "Display coordinator applied rejected config with too many layers");
 
-  // This adapter does not currently support color correction.
-  ZX_DEBUG_ASSERT_MSG(display_config.cc_flags == 0,
-                      "Display coordinator applied rejected color-correction config");
+  // This adapter does not currently support non-identity color correction.
+  ZX_DEBUG_ASSERT_MSG(display::ColorConversion::IsValid(display_config.color_conversion),
+                      "Display coordinator applied rejected invalid color-correction config");
+
+  display::ColorConversion color_conversion(display_config.color_conversion);
+
+  auto display_mode = GetDisplayMode(display_config);
+  ZX_DEBUG_ASSERT(std::holds_alternative<display::ModeId>(display_mode) ||
+                  std::holds_alternative<display::DisplayTiming>(display_mode));
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;
@@ -176,8 +224,9 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
     layers.emplace_back(fidl_layer);
   }
 
-  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), display::ModeId(1),
-                             layers, display::DriverConfigStamp(request->config_stamp));
+  engine_.ApplyConfiguration(display::DisplayId(display_config.display_id), std::move(display_mode),
+                             color_conversion, layers,
+                             display::DriverConfigStamp(request->config_stamp));
   completer.buffer(arena).Reply();
 }
 
@@ -254,7 +303,7 @@ void DisplayEngineFidlAdapter::IsAvailable(fdf::Arena& arena,
 void DisplayEngineFidlAdapter::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  fdf::warn("Dropping unknown FIDL method: {}", metadata.method_ordinal);
+  FDF_LOG(WARNING, "Dropping unknown FIDL method: %" PRIu64, metadata.method_ordinal);
 }
 
 }  // namespace display

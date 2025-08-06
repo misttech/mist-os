@@ -784,31 +784,113 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::CompatFrom<crate::ParentFirstRequest>
+        for ::fidl_test_inheritancewithrecursivedecl::ParentFirstRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ParentFirstRequest) -> Self {
+            Self { request: ::fidl_next::CompatFrom::compat_from(value.request) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritancewithrecursivedecl::ParentFirstRequest>
+        for crate::ParentFirstRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_inheritancewithrecursivedecl::ParentFirstRequest,
+        ) -> Self {
+            Self { request: ::fidl_next::CompatFrom::compat_from(value.request) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Parent`
     /// protocol.
-    pub type ParentProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Parent>;
+    pub type ParentProxy = ::fidl_next::ClientSender<crate::Parent>;
 
-    impl ::core::convert::From<crate::Parent>
+    impl ::fidl_next::CompatFrom<crate::Parent>
         for ::fidl_test_inheritancewithrecursivedecl::ParentMarker
     {
-        #[inline]
-        fn from(_: crate::Parent) -> Self {
+        fn compat_from(_: crate::Parent) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritancewithrecursivedecl::ParentMarker>
+        for crate::Parent
+    {
+        fn compat_from(_: ::fidl_test_inheritancewithrecursivedecl::ParentMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_inheritancewithrecursivedecl::ParentProxy>
+        for crate::Parent
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_inheritancewithrecursivedecl::ParentProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<crate::ChildSecondRequest>
+        for ::fidl_test_inheritancewithrecursivedecl::ChildSecondRequest
+    {
+        #[inline]
+        fn compat_from(value: crate::ChildSecondRequest) -> Self {
+            Self { request: ::fidl_next::CompatFrom::compat_from(value.request) }
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritancewithrecursivedecl::ChildSecondRequest>
+        for crate::ChildSecondRequest
+    {
+        #[inline]
+        fn compat_from(
+            value: ::fidl_test_inheritancewithrecursivedecl::ChildSecondRequest,
+        ) -> Self {
+            Self { request: ::fidl_next::CompatFrom::compat_from(value.request) }
         }
     }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Child`
     /// protocol.
-    pub type ChildProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Child>;
+    pub type ChildProxy = ::fidl_next::ClientSender<crate::Child>;
 
-    impl ::core::convert::From<crate::Child> for ::fidl_test_inheritancewithrecursivedecl::ChildMarker {
-        #[inline]
-        fn from(_: crate::Child) -> Self {
+    impl ::fidl_next::CompatFrom<crate::Child>
+        for ::fidl_test_inheritancewithrecursivedecl::ChildMarker
+    {
+        fn compat_from(_: crate::Child) -> Self {
             Self
+        }
+    }
+
+    impl ::fidl_next::CompatFrom<::fidl_test_inheritancewithrecursivedecl::ChildMarker>
+        for crate::Child
+    {
+        fn compat_from(_: ::fidl_test_inheritancewithrecursivedecl::ChildMarker) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+
+    impl ::fidl_next::ClientCompatFrom<::fidl_test_inheritancewithrecursivedecl::ChildProxy>
+        for crate::Child
+    {
+        fn client_compat_from(
+            proxy: ::fidl_test_inheritancewithrecursivedecl::ChildProxy,
+        ) -> ::fidl_next::Client<Self, ::fidl_next::fuchsia::zx::Channel> {
+            let channel = ::fidl::endpoints::Proxy::into_channel(proxy).unwrap().into_zx_channel();
+            let client_end = ::fidl_next::ClientEnd::from_untyped(channel);
+            ::fidl_next::Client::new(client_end)
         }
     }
 }

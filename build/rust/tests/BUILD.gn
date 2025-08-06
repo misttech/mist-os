@@ -15,9 +15,12 @@ group("tests") {
   testonly = true
   deps = [
     ":clippy_test($host_toolchain)",
-    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-    # ":rustdoc-link-assertions($host_toolchain)",
-    # "//build/rust/tests/rustdoc($host_toolchain)",
+
+    # This tests fx rustdoc-link
+    "//build/rust/tests/rustdoc-link($host_toolchain)",
+
+    # This tests the .rustdoc subtargets
+    "//build/rust/tests/rustdoc($host_toolchain)",
   ]
 }
 
@@ -40,9 +43,6 @@ rustc_library("b") {
   edition = "2021"
   name = "b"
   deps = [ ":c" ]
-
-  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-  #define_rustdoc_test_override = true
   source_root = "b/lib.rs"
   sources = [ "b/lib.rs" ]
   quiet_clippy = true
@@ -51,9 +51,6 @@ rustc_library("b") {
 rustc_library("c") {
   edition = "2021"
   name = "c"
-
-  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-  #define_rustdoc_test_override = true
   source_root = "c/lib.rs"
   sources = [ "c/lib.rs" ]
   quiet_clippy = true
@@ -63,9 +60,6 @@ if (is_host) {
   rustc_library("d") {
     edition = "2021"
     name = "d"
-
-    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
-    #define_rustdoc_test_override = true
     source_root = "d/lib.rs"
     sources = [ "d/lib.rs" ]
     quiet_clippy = true
@@ -161,151 +155,6 @@ if (is_host) {
     deps = [
       ":copy_clippy",
       ":copy_other_toolchain",
-    ]
-  }
-
-  # These rustdoc-link tests have the goal of making sure that fx rustdoc-link
-  # runs, generates separate directories for the host and fuchisa toolchains,
-  # and contains basic things from the docs (index.html, item docs, source
-  # files). The files checked should be stable across rustdoc versions.
-
-  _rustdoc_link_output = "$target_gen_dir/rustdoc-link.doc"
-  action("rustdoc-link") {
-    hermetic_deps = false
-
-    testonly = true
-    public_deps = [
-      ":b.actual($default_toolchain)",
-      ":b.actual.rustdoc($default_toolchain)",
-      ":c.actual($default_toolchain)",
-      ":c.actual.rustdoc($default_toolchain)",
-      ":d.actual($host_toolchain)",
-      ":d.actual.rustdoc($host_toolchain)",
-      ":gen_rust_target_mapping",
-    ]
-    script = "//tools/devshell/contrib/lib/rust/rustdoc-link.py"
-    outputs = [ _rustdoc_link_output ]
-    _rebased_fuchsia_dir = rebase_path("//", root_build_dir)
-    _rebased_build_dir = rebase_path(root_build_dir, root_build_dir)
-    args = [
-      "--fuchsia-dir=$_rebased_fuchsia_dir",
-      "--build-dir=$_rebased_build_dir",
-      "--quiet",
-      "--no-build",
-      "--destination",
-      rebase_path("$_rustdoc_link_output", root_build_dir),
-      "--touch",
-      rebase_path("$target_gen_dir/touch", root_build_dir),
-      "--rust-target-mapping",
-      rebase_path("$_rust_target_mapping", root_build_dir),
-      "--rustdoc-executable",
-      "$rebased_rustc_prefix/bin/rustdoc",
-    ]
-  }
-
-  action("rustdoc-link-has-b-src") {
-    # asserts that the rustdoc-link.py script contains the source files.
-    # goal: making sure basic properties of the docs are present
-
-    testonly = true
-    public_deps = [ ":rustdoc-link($host_toolchain)" ]
-    script = "//build/rust/tests/assert_directory_contains.py"
-    _output = "$target_gen_dir/$target_name.pass"
-    outputs = [ _output ]
-    args = [
-      "--directory",
-      rebase_path("$_rustdoc_link_output/src/b", root_build_dir),
-      "--contains=lib.rs.html",
-      "--touch",
-      rebase_path(_output, root_build_dir),
-    ]
-  }
-
-  action("rustdoc-link-has-d-src") {
-    # asserts that the rustdoc-link.py script contains the source files.
-    # goal: making sure basic properties of the docs are present
-
-    testonly = true
-    public_deps = [ ":rustdoc-link($host_toolchain)" ]
-    script = "//build/rust/tests/assert_directory_contains.py"
-    _output = "$target_gen_dir/$target_name.pass"
-    outputs = [ _output ]
-    args = [
-      "--directory",
-      rebase_path("$_rustdoc_link_output", root_build_dir),
-      "--glob-pattern=src/d",
-      "--contains=lib.rs.html",
-      "--touch",
-      rebase_path(_output, root_build_dir),
-    ]
-  }
-
-  action("rustdoc-link-host-separate-from-fuchsia") {
-    # asserts that the rustdoc-link.py script creates a separate directory
-    # for the fuchsia toolchain
-
-    testonly = true
-    public_deps = [ ":rustdoc-link($host_toolchain)" ]
-    script = "//build/rust/tests/assert_directory_contains.py"
-    _output = "$target_gen_dir/$target_name.pass"
-    outputs = [ _output ]
-    args = [
-      "--directory",
-      rebase_path("$_rustdoc_link_output", root_build_dir),
-      "--absent=d",
-      "--contains=b",
-      "--contains=c",
-      "--touch",
-      rebase_path(_output, root_build_dir),
-    ]
-  }
-
-  action("rustdoc-link-has-fuchsia-item") {
-    # make sure the generated docs have the item from b (fuchsia)
-
-    testonly = true
-    public_deps = [ ":rustdoc-link($host_toolchain)" ]
-    script = "//build/rust/tests/assert_directory_contains.py"
-    _output = "$target_gen_dir/$target_name.pass"
-    outputs = [ _output ]
-    args = [
-      "--directory",
-      rebase_path("$_rustdoc_link_output/b", root_build_dir),
-      "--contains=index.html",
-      "--contains=struct.RequiredB.html",
-      "--absent=fn.blah.html",
-      "--touch",
-      rebase_path(_output, root_build_dir),
-    ]
-  }
-
-  action("rustdoc-link-has-host-item") {
-    # make sure the generated docs have the item from d (host)
-
-    testonly = true
-    public_deps = [ ":rustdoc-link($host_toolchain)" ]
-    script = "//build/rust/tests/assert_directory_contains.py"
-    _output = "$target_gen_dir/$target_name.pass"
-    outputs = [ _output ]
-    args = [
-      "--directory",
-      rebase_path("$_rustdoc_link_output/host/d", root_build_dir),
-      "--contains=index.html",
-      "--absent=struct.RequiredB.html",
-      "--contains=fn.blah.html",
-      "--touch",
-      rebase_path(_output, root_build_dir),
-    ]
-  }
-
-  group("rustdoc-link-assertions") {
-    testonly = true
-    public_deps = [
-      ":rustdoc-link-has-b-src",
-      #":rustdoc-link-has-d-src",
-      #":rustdoc-link-has-fuchsia-item",
-      #":rustdoc-link-has-host-item",
-      #":rustdoc-link-host-separate-from-fuchsia",
     ]
   }
 }

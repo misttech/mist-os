@@ -62,6 +62,7 @@ ffx_plugin("ffx_profile_memory") {
 
   test_deps = [
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pretty_assertions",

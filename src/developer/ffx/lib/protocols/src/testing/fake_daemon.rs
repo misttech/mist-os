@@ -357,7 +357,7 @@ mod tests {
     use super::*;
     use fidl_fuchsia_ffx_test as ffx_test;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_err_double_shutdown() {
         let f = FakeDaemonBuilder::new()
             .register_instanced_protocol_closure::<ffx_test::NoopMarker, _>(|_, req| match req {

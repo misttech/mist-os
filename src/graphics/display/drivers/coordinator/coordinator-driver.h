@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_COORDINATOR_DRIVER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <lib/driver/compat/cpp/banjo_client.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/zx/result.h>

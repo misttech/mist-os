@@ -437,9 +437,10 @@ impl<T: Sensor<T>> SensorLogger<T> {
         let mut sensor_names = Vec::new();
         for driver in self.drivers.iter() {
             let sensor_name = &driver.sensor_name;
-            let name = driver.alias.as_ref().map_or(sensor_name.to_string(), |alias| {
-                format!("{}(alias:{})", sensor_name, alias)
-            });
+            let name = driver.alias.as_ref().map_or_else(
+                || sensor_name.to_string(),
+                |alias| format!("{}(alias:{})", sensor_name, alias),
+            );
             sensor_names.push(name);
         }
 

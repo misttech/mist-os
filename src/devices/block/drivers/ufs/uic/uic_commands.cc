@@ -92,7 +92,7 @@ zx::result<> UicCommand::UicPostProcess() {
 std::tuple<uint32_t, uint32_t, uint32_t> DmeGetUicCommand::Arguments() const {
   return std::make_tuple(UicCommandArgument1Reg::Get()
                              .FromValue(0)
-                             .set_mib_attribute(GetMbiAttribute())
+                             .set_mib_attribute(GetMibAttribute())
                              .set_gen_selector_index(GetGenSelectorIndex())
                              .reg_value(),
                          0, 0);
@@ -103,18 +103,20 @@ std::optional<uint32_t> DmeGetUicCommand::ReturnValue() {
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> DmeSetUicCommand::Arguments() const {
-  return std::make_tuple(UicCommandArgument1Reg::Get()
-                             .FromValue(0)
-                             .set_mib_attribute(GetMbiAttribute())
-                             .set_gen_selector_index(GetGenSelectorIndex())
-                             .reg_value(),
-                         0, value_);
+  return std::make_tuple(
+      UicCommandArgument1Reg::Get()
+          .FromValue(0)
+          .set_mib_attribute(GetMibAttribute())
+          .set_gen_selector_index(GetGenSelectorIndex())
+          .reg_value(),
+      UicCommandArgument2Reg::Get().FromValue(0).set_attr_set_type(attr_set_type_).reg_value(),
+      value_);
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> DmePeerGetUicCommand::Arguments() const {
   return std::make_tuple(UicCommandArgument1Reg::Get()
                              .FromValue(0)
-                             .set_mib_attribute(GetMbiAttribute())
+                             .set_mib_attribute(GetMibAttribute())
                              .set_gen_selector_index(GetGenSelectorIndex())
                              .reg_value(),
                          0, 0);
@@ -125,12 +127,14 @@ std::optional<uint32_t> DmePeerGetUicCommand::ReturnValue() {
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> DmePeerSetUicCommand::Arguments() const {
-  return std::make_tuple(UicCommandArgument1Reg::Get()
-                             .FromValue(0)
-                             .set_mib_attribute(GetMbiAttribute())
-                             .set_gen_selector_index(GetGenSelectorIndex())
-                             .reg_value(),
-                         0, value_);
+  return std::make_tuple(
+      UicCommandArgument1Reg::Get()
+          .FromValue(0)
+          .set_mib_attribute(GetMibAttribute())
+          .set_gen_selector_index(GetGenSelectorIndex())
+          .reg_value(),
+      UicCommandArgument2Reg::Get().FromValue(0).set_attr_set_type(attr_set_type_).reg_value(),
+      value_);
 }
 
 zx::result<> DmeLinkStartUpUicCommand::UicPreProcess() {

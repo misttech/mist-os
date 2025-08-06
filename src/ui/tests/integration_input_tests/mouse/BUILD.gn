@@ -43,7 +43,6 @@ cc_test_executable("mouse-input-test-bin") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_cpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
     "//sdk/fidl/fuchsia.web:fuchsia.web_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",

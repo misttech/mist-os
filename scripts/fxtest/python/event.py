@@ -102,6 +102,9 @@ class ProgramExecutionPayload:
     # The environment passed to the command.
     environment: dict[str, str]
 
+    # If set, instruct viewers to hide this command.
+    quiet_mode: bool = False
+
     def to_formatted_command_line(self) -> str:
         """Format this program execution to an approximation of the command line.
 
@@ -848,6 +851,7 @@ class EventRecorder:
         args: list[str],
         environment: dict[str, str] | None = None,
         parent: Id | None = None,
+        quiet_mode: bool = False,
     ) -> Id:
         """A program is starting execution.
 
@@ -861,6 +865,9 @@ class EventRecorder:
                 The environment passed to the command.  Defaults to None.
             parent (Id, | None): Parent for this event. Defaults
                 to the global run.
+            quiet_mode (bool): If set, instruct viewers to not display this command in output.
+                Defaults to False.
+
 
         Returns:
             Id: New Id for the program event, which must be ended explicitly.
@@ -874,7 +881,10 @@ class EventRecorder:
                 starting=True,
                 payload=EventPayloadUnion(
                     program_execution=ProgramExecutionPayload(
-                        command, args, environment or dict()
+                        command,
+                        args,
+                        environment or dict(),
+                        quiet_mode,
                     )
                 ),
             )

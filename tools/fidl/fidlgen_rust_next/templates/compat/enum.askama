@@ -1,15 +1,30 @@
 {{ denylist }}
-impl ::core::convert::From<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
-    #[inline]
-    fn from(from: crate::{{ name }}) -> Self {
-        match crate::{{ name }}::from(from) {
+impl ::fidl_next::CompatFrom<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    fn compat_from(value: crate::{{ name }}) -> Self {
+        match value {
             {% for member in enm.members %}
                 crate::{{ name }}::{{ member.name|camel }} =>
                     Self::{{ member.name|compat_camel }},
             {% endfor %}
             {% if !enm.is_strict %}
-                crate::{{ name }}::UnknownOrdinal_(value) =>
-                    Self::__SourceBreaking { unknown_ordinal: value },
+                crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) =>
+                    Self::__SourceBreaking { unknown_ordinal },
+            {% endif %}
+        }
+    }
+}
+
+{{ denylist }}
+impl ::fidl_next::CompatFrom<::{{ compat.crate_name }}::{{ compat_name }}> for crate::{{ name }} {
+    fn compat_from(value: ::{{ compat.crate_name }}::{{ compat_name }}) -> Self {
+        match value {
+            {% for member in enm.members %}
+                ::{{ compat.crate_name }}::{{ compat_name }}::{{ member.name|compat_camel }} =>
+                    Self::{{ member.name|camel }},
+            {% endfor %}
+            {% if !enm.is_strict %}
+                ::{{ compat.crate_name }}::{{ compat_name }}::__SourceBreaking { unknown_ordinal: value } =>
+                    Self::UnknownOrdinal_(value),
             {% endif %}
         }
     }

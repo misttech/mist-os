@@ -608,4 +608,15 @@ TEST(SeccompTest, UserNotifClose) {
   });
 }
 
+TEST(SeccompTest, FilterClockGetTimeWithEPERM) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    SAFE_SYSCALL(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+    struct timespec ts;
+    install_filter_block(__NR_clock_gettime, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA));
+    EXPECT_THAT(syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts), SyscallFailsWithErrno(EPERM));
+  });
+}
+
 }  // anonymous namespace

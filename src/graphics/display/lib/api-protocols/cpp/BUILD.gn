@@ -5,49 +5,59 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+library_sources = [
+  "backlight-fidl-adapter.cc",
+  "backlight-fidl-adapter.h",
+  "backlight-interface.h",
+  "display-engine-events-fidl.cc",
+  "display-engine-events-fidl.h",
+  "display-engine-events-interface.cc",
+  "display-engine-events-interface.h",
+  "display-engine-fidl-adapter.cc",
+  "display-engine-fidl-adapter.h",
+  "display-engine-interface.cc",
+  "display-engine-interface.h",
+  "inplace-vector.cc",
+  "inplace-vector.h",
+]
+
+library_deps = [
+  "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+  "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
+  "//sdk/lib/driver/logging/cpp",
+]
+
+library_public_deps = [
+  "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
+  "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
+  "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+  "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/stdcompat",
+  "//src/graphics/display/lib/api-types/cpp",
+  "//zircon/system/ulib/zx",
+]
+
 source_set("cpp") {
-  sources = [
-    "backlight-fidl-adapter.cc",
-    "backlight-fidl-adapter.h",
-    "backlight-interface.h",
-    "display-engine-banjo-adapter.cc",
-    "display-engine-banjo-adapter.h",
-    "display-engine-events-banjo.cc",
-    "display-engine-events-banjo.h",
-    "display-engine-events-fidl.cc",
-    "display-engine-events-fidl.h",
-    "display-engine-events-interface.cc",
-    "display-engine-events-interface.h",
-    "display-engine-fidl-adapter.cc",
-    "display-engine-fidl-adapter.h",
-    "display-engine-interface.cc",
-    "display-engine-interface.h",
-    "inplace-vector.cc",
-    "inplace-vector.h",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
-    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
-    "//sdk/lib/driver/logging/cpp",
-  ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
-    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
-    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/stdcompat",
-    "//src/graphics/display/lib/api-types/cpp",
-    "//zircon/system/ulib/zx",
-  ]
+  sources = library_sources
+  deps = library_deps
+  public_deps = library_public_deps
+}
+
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
+source_set("cpp-cxx17") {
+  sources = library_sources
+  deps = library_deps
+  public_deps = library_public_deps
+
+  # Remove the C++ language specifier.
+  configs -= [ "//build/config:language" ]
+  configs += [ ":cxx17" ]
 }
 
 test_sources = [
   "backlight-fidl-adapter-test.cc",
   "backlight-interface-test.cc",
-  "display-engine-banjo-adapter-test.cc",
-  "display-engine-events-banjo-test.cc",
   "display-engine-events-fidl-test.cc",
   "display-engine-events-interface-test.cc",
   "display-engine-fidl-adapter-test.cc",
@@ -55,8 +65,6 @@ test_sources = [
   "inplace-vector-test.cc",
   "mock-backlight.cc",
   "mock-backlight.h",
-  "mock-banjo-display-engine-listener.cc",
-  "mock-banjo-display-engine-listener.h",
   "mock-display-engine.cc",
   "mock-display-engine.h",
   "mock-fidl-display-engine-listener.cc",
@@ -67,7 +75,6 @@ group("test-deps") {
   testonly = true
   visibility = [ ":*" ]
   public_deps = [
-    ":cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
@@ -87,7 +94,10 @@ group("test-deps") {
 test("unittests") {
   sources = test_sources
   output_name = "display-api-protocols-cpp-tests"
-  deps = [ ":test-deps" ]
+  deps = [
+    ":cpp",
+    ":test-deps",
+  ]
   visibility = [ ":*" ]
 }
 
@@ -95,7 +105,10 @@ test("unittests") {
 test("unittests-cxx17") {
   sources = test_sources
   output_name = "display-api-protocols-cpp17-tests"
-  deps = [ ":test-deps" ]
+  deps = [
+    ":cpp-cxx17",
+    ":test-deps",
+  ]
   visibility = [ ":*" ]
 
   # Remove the C++ language specifier.

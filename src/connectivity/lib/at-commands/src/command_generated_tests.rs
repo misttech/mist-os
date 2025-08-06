@@ -266,7 +266,7 @@ fn exec_no_delimiter() {
 #[test]
 fn exec_one_kv_arg() {
     let mut map = HashMap::new();
-    map.insert(1, String::from("abc"));
+    let _old = map.insert(1, String::from("abc"));
 
     test_roundtrips(
         highlevel::Command::Testm { field: map },
@@ -512,7 +512,7 @@ fn multiple_paren_args() {
 #[test]
 fn multiple_paren_kv_args() {
     let mut map = HashMap::new();
-    map.insert(1, String::from("abc"));
+    let _old = map.insert(1, String::from("abc"));
 
     test_roundtrips(
         highlevel::Command::Testpmpil { field1: map, field2: 2, field3: vec![3, 4] },

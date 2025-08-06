@@ -5,10 +5,6 @@
 #ifndef LIB_IMAGE_FORMAT_IMAGE_FORMAT_H_
 #define LIB_IMAGE_FORMAT_IMAGE_FORMAT_H_
 
-#ifndef _LIBCPP_ENABLE_HARDENED_MODE
-#define _LIBCPP_ENABLE_HARDENED_MODE 1
-#endif
-
 #include <zircon/availability.h>
 
 // Most of the functions in this file are only available at HEAD because they

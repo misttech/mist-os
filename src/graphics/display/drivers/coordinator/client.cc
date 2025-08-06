@@ -47,6 +47,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -57,6 +58,8 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -71,16 +74,17 @@ constexpr uint32_t kFallbackVerticalSizeMm = 90;
 //
 // `outer` must be positioned at the coordinate system's origin. Both `inner` and `outer` must be
 // non-empty.
-constexpr bool OriginRectangleContains(const rect_u_t& outer, const rect_u_t& inner) {
-  ZX_DEBUG_ASSERT(outer.x == 0);
-  ZX_DEBUG_ASSERT(outer.y == 0);
-  ZX_DEBUG_ASSERT(outer.width > 0);
-  ZX_DEBUG_ASSERT(outer.height > 0);
-  ZX_DEBUG_ASSERT(inner.width > 0);
-  ZX_DEBUG_ASSERT(inner.height > 0);
+constexpr bool OriginRectangleContains(const display::Rectangle& outer,
+                                       const display::Rectangle& inner) {
+  ZX_DEBUG_ASSERT(outer.x() == 0);
+  ZX_DEBUG_ASSERT(outer.y() == 0);
+  ZX_DEBUG_ASSERT(outer.width() > 0);
+  ZX_DEBUG_ASSERT(outer.height() > 0);
+  ZX_DEBUG_ASSERT(inner.width() > 0);
+  ZX_DEBUG_ASSERT(inner.height() > 0);
 
-  return inner.x < outer.width && inner.y < outer.height && inner.x + inner.width <= outer.width &&
-         inner.y + inner.height <= outer.height;
+  return inner.x() < outer.width() && inner.y() < outer.height() &&
+         inner.x() + inner.width() <= outer.width() && inner.y() + inner.height() <= outer.height();
 }
 
 // We allocate some variable sized stack allocations based on the number of
@@ -354,6 +358,89 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
   layers_.erase(layers_it);
 }
 
+namespace {
+
+// Returns `ModeId` that corresponds to the provided `target_mode` in
+// `display_preferred_modes`.
+//
+// Returns `kInvalidModeId` if the `target_mode` cannot be found.
+display::ModeId GetPreferredModeIdForMode(
+    std::span<const display::ModeAndId> display_preferred_modes, const display::Mode& target_mode) {
+  auto mode_it = std::ranges::find_if(
+      display_preferred_modes,
+      [&](const display::ModeAndId& mode_and_id) { return mode_and_id.mode() == target_mode; });
+  if (mode_it != display_preferred_modes.end()) {
+    return mode_it->id();
+  }
+  return display::kInvalidModeId;
+}
+
+// Converts `mode` to a "placeholder" `DisplayTiming` struct.
+//
+// The returned `DisplayTiming` may not represent the actual display timing
+// information, as the detailed timing parameters cannot be deduced by `mode`.
+// It should be only used as a placeholder.
+//
+// TODO(https://fxbug.dev/314126494): Replace all placeholder `DisplayTiming`
+// values with `Mode`.
+display::DisplayTiming ToPlaceholderDisplayTiming(const display::Mode& mode) {
+  const int32_t horizontal_active_px = mode.active_area().width();
+  const int32_t vertical_active_lines = mode.active_area().height();
+  const int64_t pixel_clock_frequency_hz = int64_t{horizontal_active_px} * vertical_active_lines *
+                                           mode.refresh_rate_millihertz() / 1'000;
+  return display::DisplayTiming{
+      .horizontal_active_px = horizontal_active_px,
+      .vertical_active_lines = vertical_active_lines,
+      .pixel_clock_frequency_hz = pixel_clock_frequency_hz,
+  };
+}
+
+// Returns `DisplayTiming` that corresponds to the provided `target_mode`
+// using the following rule:
+//
+// 1. If `target_mode` matches a mode listed in `display_preferred_modes`,
+//    return the placeholder `DisplayTiming` struct that matches the mode.
+// 2. Otherwise, if `target_mode` matches a `DisplayTiming` listed in
+//    `display_timings`, return that `DisplayTiming` value.
+// 3. Otherwise, return nullopt.
+std::optional<display::DisplayTiming> GetDisplayTimingForMode(
+    std::span<const display::ModeAndId> display_preferred_modes,
+    std::span<const display::DisplayTiming> display_timings, const display::Mode& target_mode) {
+  auto display_preferred_mode_it = std::ranges::find_if(
+      display_preferred_modes,
+      [&](const display::ModeAndId& mode_and_id) { return mode_and_id.mode() == target_mode; });
+  if (display_preferred_mode_it != display_preferred_modes.end()) {
+    fdf::info("Found supported display preferred mode for {}", target_mode);
+    return ToPlaceholderDisplayTiming(target_mode);
+  }
+
+  fdf::info(
+      "Failed to find {} in display preferred mode list. "
+      "Fall back to display timings list.",
+      target_mode);
+  auto display_timing_it =
+      std::ranges::find_if(display_timings, [target_mode](const display::DisplayTiming& timing) {
+        if (timing.horizontal_active_px != target_mode.active_area().width()) {
+          return false;
+        }
+        if (timing.vertical_active_lines != target_mode.active_area().height()) {
+          return false;
+        }
+        if (timing.vertical_field_refresh_rate_millihertz() !=
+            target_mode.refresh_rate_millihertz()) {
+          return false;
+        }
+        return true;
+      });
+
+  if (display_timing_it == display_timings.end()) {
+    return std::nullopt;
+  }
+  return *display_timing_it;
+}
+
+}  // namespace
+
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
                             SetDisplayModeCompleter::Sync& /*_completer*/) {
   TRACE_DURATION("gfx", "Display::Client::SetDisplayMode");
@@ -366,54 +453,62 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   }
   DisplayConfig& display_config = *display_configs_it;
 
-  fbl::AutoLock lock(controller_.mtx());
-  zx::result<std::span<const display::DisplayTiming>> display_timings_result =
-      controller_.GetDisplayTimings(display_id);
-  if (display_timings_result.is_error()) {
-    fdf::error("SetDisplayMode failed to get display timings for display ID {}: {}",
-               display_id.value(), display_timings_result);
-    TearDown(display_timings_result.status_value());
-    return;
-  }
-
-  std::span<const display::DisplayTiming> display_timings =
-      std::move(display_timings_result).value();
-  auto display_timing_it = std::find_if(
-      display_timings.begin(), display_timings.end(),
-      [&mode = request->mode](const display::DisplayTiming& timing) {
-        if (timing.horizontal_active_px != static_cast<int32_t>(mode.active_area.width)) {
-          return false;
-        }
-        if (timing.vertical_active_lines != static_cast<int32_t>(mode.active_area.height)) {
-          return false;
-        }
-        if (timing.vertical_field_refresh_rate_millihertz() !=
-            static_cast<int32_t>(mode.refresh_rate_millihertz)) {
-          return false;
-        }
-        return true;
-      });
-
-  if (display_timing_it == display_timings.end()) {
-    fdf::error("SetDisplayMode failed to find timings compatible with mode: {}x{} @ {}.{:03} Hz",
+  if (!display::Mode::IsValid(request->mode)) {
+    fdf::error("SetDisplayMode called with invalid mode: {}x{} @ {}.{:03} Hz",
                request->mode.active_area.width, request->mode.active_area.height,
                request->mode.refresh_rate_millihertz / 1000,
                request->mode.refresh_rate_millihertz % 1000);
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
+  display::Mode target_mode = display::Mode::From(request->mode);
 
-  fdf::info("SetDisplayMode found supported display timing for {}x{} @ {}.{:03} Hz",
-            display_timing_it->horizontal_active_px, display_timing_it->vertical_active_lines,
-            display_timing_it->vertical_field_refresh_rate_millihertz() / 1000,
-            display_timing_it->vertical_field_refresh_rate_millihertz() % 1000);
+  fbl::AutoLock lock(controller_.mtx());
+  zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
+      controller_.GetDisplayPreferredModes(display_id);
+  if (display_preferred_modes_result.is_error()) {
+    fdf::error("Failed to get display preferred modes for display ID {}: {}", display_id.value(),
+               display_preferred_modes_result);
+    TearDown(display_preferred_modes_result.status_value());
+    return;
+  }
+  std::span<const display::ModeAndId> display_preferred_modes =
+      std::move(display_preferred_modes_result).value();
 
-  if (display_timings.size() == 1) {
-    fdf::info("SetDisplayMode skipping modeset, because the display only supports one timing.");
+  zx::result<std::span<const display::DisplayTiming>> display_timings_result =
+      controller_.GetDisplayTimings(display_id);
+  if (display_timings_result.is_error()) {
+    fdf::error("Failed to get display timings for display ID {}: {}", display_id.value(),
+               display_timings_result);
+    TearDown(display_timings_result.status_value());
+    return;
+  }
+  std::span<const display::DisplayTiming> display_timings =
+      std::move(display_timings_result).value();
+
+  const size_t display_total_modes_count = display_timings.size() + display_preferred_modes.size();
+
+  display::ModeId mode_id = GetPreferredModeIdForMode(display_preferred_modes, target_mode);
+  std::optional<display::DisplayTiming> display_timing =
+      GetDisplayTimingForMode(display_preferred_modes, display_timings, target_mode);
+
+  if (!display_timing.has_value()) {
+    fdf::error("Failed to find display timing compatible with mode: {}", target_mode);
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  display_config.draft_.mode = display::ToBanjoDisplayMode(*display_timing_it);
+  fdf::info("Found supported display timing for mode: {}", target_mode);
+
+  if (display_total_modes_count == 1) {
+    // If there is only one mode, the coordinator doesn't need to set
+    // the display mode on engine.
+    fdf::info("The display has only one mode. Skip setting display mode.");
+    return;
+  }
+
+  display_config.draft_.mode_id = mode_id.ToBanjo();
+  display_config.draft_.timing = display::ToBanjoDisplayTiming(*display_timing);
   display_config.has_draft_nonlayer_config_change_ = true;
   draft_display_config_was_validated_ = false;
 }
@@ -430,26 +525,26 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   }
   DisplayConfig& display_config = *display_configs_it;
 
-  display_config.draft_.cc_flags = 0;
-  if (!std::isnan(request->preoffsets[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_PREOFFSET;
-    std::memcpy(display_config.draft_.cc_preoffsets, request->preoffsets.data(),
+  display_config.draft_.color_conversion = display::ColorConversion::kIdentity.ToBanjo();
+  if (std::isfinite(request->preoffsets[0])) {
+    std::memcpy(display_config.draft_.color_conversion.preoffsets, request->preoffsets.data(),
                 sizeof(request->preoffsets.data_));
-    static_assert(sizeof(request->preoffsets) == sizeof(display_config.draft_.cc_preoffsets));
+    static_assert(sizeof(request->preoffsets) ==
+                  sizeof(display_config.draft_.color_conversion.preoffsets));
   }
 
-  if (!std::isnan(request->coefficients[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_COEFFICIENTS;
-    std::memcpy(display_config.draft_.cc_coefficients, request->coefficients.data(),
+  if (std::isfinite(request->coefficients[0])) {
+    std::memcpy(display_config.draft_.color_conversion.coefficients, request->coefficients.data(),
                 sizeof(request->coefficients.data_));
-    static_assert(sizeof(request->coefficients) == sizeof(display_config.draft_.cc_coefficients));
+    static_assert(sizeof(request->coefficients) ==
+                  sizeof(display_config.draft_.color_conversion.coefficients));
   }
 
-  if (!std::isnan(request->postoffsets[0])) {
-    display_config.draft_.cc_flags |= COLOR_CONVERSION_POSTOFFSET;
-    std::memcpy(display_config.draft_.cc_postoffsets, request->postoffsets.data(),
+  if (std::isfinite(request->postoffsets[0])) {
+    std::memcpy(display_config.draft_.color_conversion.postoffsets, request->postoffsets.data(),
                 sizeof(request->postoffsets.data_));
-    static_assert(sizeof(request->postoffsets) == sizeof(display_config.draft_.cc_postoffsets));
+    static_assert(sizeof(request->postoffsets) ==
+                  sizeof(display_config.draft_.color_conversion.postoffsets));
   }
 
   display_config.has_draft_nonlayer_config_change_ = true;
@@ -517,7 +612,13 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
   }
   Layer& layer = *layers_it;
 
-  layer.SetPrimaryConfig(request->image_metadata);
+  if (!display::ImageMetadata::IsValid(request->image_metadata)) {
+    fdf::error("SetLayerPrimaryConfig called with invalid image metadata");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::ImageMetadata image_metadata(request->image_metadata);
+  layer.SetPrimaryConfig(image_metadata);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -540,15 +641,29 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   }
   Layer& layer = *layers_it;
 
-  if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
-    fdf::error("Invalid transform %" PRIu8,
-               static_cast<uint8_t>(request->image_source_transformation));
+  if (!display::CoordinateTransformation::IsValid(request->image_source_transformation)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid image_source_transformation");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
+  display::CoordinateTransformation image_source_transformation(
+      request->image_source_transformation);
 
-  layer.SetPrimaryPosition(request->image_source_transformation, request->image_source,
-                           request->display_destination);
+  if (!display::Rectangle::IsValid(request->image_source)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid image_source");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle image_source = display::Rectangle::From(request->image_source);
+
+  if (!display::Rectangle::IsValid(request->display_destination)) {
+    fdf::error("SetLayerPrimaryPosition called with invalid display_destination");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle display_destination = display::Rectangle::From(request->display_destination);
+
+  layer.SetPrimaryPosition(image_source_transformation, image_source, display_destination);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -571,13 +686,19 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   }
   Layer& layer = *layers_it;
 
-  if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
-      (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
-    fdf::error("Invalid args {} {}", static_cast<uint8_t>(request->mode), request->val);
+  if (!display::AlphaMode::IsValid(request->mode)) {
+    fdf::error("Invalid alpha mode {}", static_cast<uint8_t>(request->mode));
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
-  layer.SetPrimaryAlpha(request->mode, request->val);
+  display::AlphaMode alpha_mode(request->mode);
+
+  if ((!isnan(request->val) && (request->val < 0 || request->val > 1))) {
+    fdf::error("Invalid alpha value {}", request->val);
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  layer.SetPrimaryAlpha(alpha_mode, /*alpha_coefficient=*/request->val);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -599,16 +720,21 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   }
   Layer& layer = *layers_it;
 
-  uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(
-      request->color.format,
-      /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
-  if (request->color.bytes.size() < bytes_per_pixel) {
+  if (!display::Color::IsValid(request->color)) {
     fdf::error("SetLayerColorConfig with invalid pixel format");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
+  display::Color color = display::Color::From(request->color);
 
-  layer.SetColorConfig(request->color, request->display_destination);
+  if (!display::Rectangle::IsValid(request->display_destination)) {
+    fdf::error("SetLayerColorConfig called with invalid display_destination");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  display::Rectangle display_destination = display::Rectangle::From(request->display_destination);
+
+  layer.SetColorConfig(color, display_destination);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -798,13 +924,6 @@ void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::S
   completer.Reply(latest_config_stamp_.ToFidl());
 }
 
-void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
-                                   SetVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
-  TRACE_DURATION("gfx", "Display::Client::SetVsyncEventDelivery");
-  proxy_->SetVsyncEventDelivery(request->vsync_delivery_enabled);
-  // No reply defined.
-}
-
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
   TRACE_DURATION("gfx", "Display::Client::SetVirtconMode");
@@ -968,7 +1087,18 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
       continue;
     }
 
-    return CheckConfigForDisplay(display_config);
+    // Required to get display preferred modes.
+    fbl::AutoLock lock(controller_.mtx());
+    zx::result<std::span<const display::ModeAndId>> preferred_modes_result =
+        controller_.GetDisplayPreferredModes(display_config.id());
+    if (preferred_modes_result.is_error()) {
+      fdf::error("Failed to get display preferred modes for display ID {}: {}",
+                 display_config.id().value(), preferred_modes_result);
+      return display::ConfigCheckResult::kUnsupportedConfig;
+    }
+
+    std::span<const display::ModeAndId> preferred_modes = preferred_modes_result.value();
+    return CheckConfigForDisplay(display_config, preferred_modes);
   }
 
   // The client needs to process display changes and prepare a configuration
@@ -976,7 +1106,8 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
   return display::ConfigCheckResult::kEmptyConfig;
 }
 
-display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& display_config) {
+display::ConfigCheckResult Client::CheckConfigForDisplay(
+    const DisplayConfig& display_config, std::span<const display::ModeAndId> preferred_modes) {
   ZX_DEBUG_ASSERT(!display_config.draft_layers_.is_empty());
 
   // The cast will not result in UB because the maximum layer count is
@@ -995,12 +1126,34 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
 
   // Frame used for checking that each layer's `display_destination` lies
   // entirely within the display output.
-  const rect_u_t display_area = {
-      .x = 0,
-      .y = 0,
-      .width = display_config.draft_.mode.h_addressable,
-      .height = display_config.draft_.mode.v_addressable,
-  };
+
+  const display::ModeId draft_mode_id(display_config.draft_.mode_id);
+  display::Rectangle display_area({});
+  if (draft_mode_id != display::kInvalidModeId) {
+    auto mode_it = std::ranges::find_if(
+        preferred_modes,
+        [&](const display::ModeAndId& mode_and_id) { return mode_and_id.id() == draft_mode_id; });
+    if (mode_it == preferred_modes.end()) {
+      fdf::error("SetDisplayMode called with unknown mode ID: {}", draft_mode_id.value());
+      return display::ConfigCheckResult::kUnsupportedDisplayModes;
+    }
+    display_area = {{
+        .x = 0,
+        .y = 0,
+        .width = mode_it->mode().active_area().width(),
+        .height = mode_it->mode().active_area().height(),
+    }};
+  } else {
+    // If no mode is set, use the display's current timing information.
+    display_area = {{
+        .x = 0,
+        .y = 0,
+        // The cast will not result in UB because the maximum value of
+        // `h_addressable` and `v_addressable` is `2^16 - 1`.
+        .width = static_cast<int32_t>(display_config.draft_.timing.h_addressable),
+        .height = static_cast<int32_t>(display_config.draft_.timing.v_addressable),
+    }};
+  }
 
   // Normalize the display configuration, and perform Coordinator-level
   // checks. The engine drivers API contract does not allow passing
@@ -1010,21 +1163,17 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
       return display::ConfigCheckResult::kUnsupportedConfig;
     }
 
-    layer_t& banjo_layer = banjo_layers[banjo_layers_index];
-    ++banjo_layers_index;
-
-    banjo_layer = draft_layer_node.layer->draft_layer_config_;
-
-    if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
+    const display::DriverLayer& driver_layer = draft_layer_node.layer->draft_layer_config_;
+    if (driver_layer.image_source().width() != 0 && driver_layer.image_source().height() != 0) {
       // Frame for checking that the layer's `image_source` lies entirely within
       // the source image.
-      const rect_u_t image_area = {
+      const display::Rectangle image_area({
           .x = 0,
           .y = 0,
-          .width = banjo_layer.image_metadata.dimensions.width,
-          .height = banjo_layer.image_metadata.dimensions.height,
-      };
-      if (!OriginRectangleContains(image_area, banjo_layer.image_source)) {
+          .width = driver_layer.image_metadata().dimensions().width(),
+          .height = driver_layer.image_metadata().dimensions().height(),
+      });
+      if (!OriginRectangleContains(image_area, driver_layer.image_source())) {
         return display::ConfigCheckResult::kInvalidConfig;
       }
 
@@ -1032,9 +1181,13 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
       // and display engine drivers when being imported, so they are always
       // accepted by the display coordinator.
     }
-    if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
+    if (!OriginRectangleContains(display_area, driver_layer.display_destination())) {
       return display::ConfigCheckResult::kInvalidConfig;
     }
+
+    layer_t& banjo_layer = banjo_layers[banjo_layers_index];
+    ++banjo_layers_index;
+    banjo_layer = driver_layer.ToBanjo();
   }
 
   ZX_DEBUG_ASSERT_MSG(display_config.draft_.layers_count == banjo_layers_index,
@@ -1115,11 +1268,11 @@ void Client::ApplyConfigImpl() {
       }
 
       display_config.applied_.layers_count++;
-      layers[layers_index] = applied_layer->applied_layer_config_;
+      layers[layers_index] = applied_layer->applied_layer_config_.ToBanjo();
       ++layers_index;
 
-      bool is_solid_color_fill = applied_layer->applied_layer_config_.image_source.width == 0 ||
-                                 applied_layer->applied_layer_config_.image_source.height == 0;
+      bool is_solid_color_fill = applied_layer->applied_layer_config_.image_source().width() == 0 ||
+                                 applied_layer->applied_layer_config_.image_source().height() == 0;
       if (!is_solid_color_fill) {
         if (applied_layer->applied_image() == nullptr) {
           config_missing_image = true;
@@ -1146,20 +1299,17 @@ void Client::SetOwnership(bool is_owner) {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   is_owner_ = is_owner;
 
-  fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
-  if (!result.ok()) {
-    fdf::error("Error writing remove message: {}", result.FormatDescription());
-  }
+  NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
 
   // Only apply the current config if the client has previously applied a config.
   ReapplyConfig();
 }
 
-fidl::Status Client::NotifyDisplayChanges(
+void Client::NotifyDisplayChanges(
     std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
     std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
   // TODO(https://fxbug.dev/42052765): `OnDisplayChanged()` takes `VectorView`s
@@ -1172,34 +1322,40 @@ fidl::Status Client::NotifyDisplayChanges(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
-  fidl::OneWayStatus call_result = coordinator_listener_->OnDisplaysChanged(
+  fidl::OneWayStatus fidl_transport_status = coordinator_listener_->OnDisplaysChanged(
       fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
           non_const_added_display_infos.data(), non_const_added_display_infos.size()),
       fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
           non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
-  return call_result;
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnDisplaysChanged dispatch failed: {}", fidl_transport_status.error());
+  }
 }
 
-fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
+void Client::NotifyOwnershipChange(bool client_has_ownership) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
-  fidl::OneWayStatus call_result =
+  fidl::OneWayStatus fidl_transport_status =
       coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
-  return call_result;
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnClientOwnershipChange dispatch failed: {}", fidl_transport_status.error());
+  }
 }
 
-fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
-                                 display::ConfigStamp config_stamp,
-                                 display::VsyncAckCookie vsync_ack_cookie) {
+void Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                         display::ConfigStamp config_stamp,
+                         display::VsyncAckCookie vsync_ack_cookie) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
-  fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
+  fidl::OneWayStatus fidl_transport_status = coordinator_listener_->OnVsync(
       display_id.ToFidl(), timestamp, config_stamp.ToFidl(), vsync_ack_cookie.ToFidl());
-  return send_call_result;
+  if (!fidl_transport_status.ok()) {
+    fdf::error("OnNotifyVsync dispatch failed: {}", fidl_transport_status.error());
+  }
 }
 
 void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
@@ -1225,6 +1381,13 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       continue;
     }
 
+    zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
+        controller_.GetDisplayPreferredModes(display_config->id());
+    if (display_preferred_modes_result.is_error()) {
+      fdf::warn("Failed to get display preferred modes when processing hotplug: {}",
+                display_preferred_modes_result);
+      continue;
+    }
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_.GetDisplayTimings(display_config->id());
     if (display_timings_result.is_error()) {
@@ -1237,12 +1400,22 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     display_config->applied_.layers_list = nullptr;
     display_config->applied_.layers_count = 0;
 
+    std::span<const display::ModeAndId> display_preferred_modes =
+        std::move(display_preferred_modes_result).value();
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
-    ZX_DEBUG_ASSERT(!display_timings.empty());
-    display_config->applied_.mode = display::ToBanjoDisplayMode(display_timings[0]);
-
-    display_config->applied_.cc_flags = 0;
+    if (!display_preferred_modes.empty()) {
+      const display::ModeAndId preferred_mode_and_id = display_preferred_modes[0];
+      display_config->applied_.mode_id = preferred_mode_and_id.id().ToBanjo();
+      const display::DisplayTiming placeholder_timing =
+          ToPlaceholderDisplayTiming(preferred_mode_and_id.mode());
+      display_config->applied_.timing = display::ToBanjoDisplayTiming(placeholder_timing);
+    } else {
+      ZX_DEBUG_ASSERT(!display_timings.empty());
+      display_config->applied_.mode_id = INVALID_MODE_ID;
+      display_config->applied_.timing = display::ToBanjoDisplayTiming(display_timings[0]);
+    }
+    display_config->applied_.color_conversion = display::ColorConversion::kIdentity.ToBanjo();
 
     display_config->draft_ = display_config->applied_;
 
@@ -1272,16 +1445,26 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     fhd::wire::Info fidl_display_info;
     fidl_display_info.id = display_config.id().ToFidl();
 
+    zx::result<std::span<const display::ModeAndId>> display_preferred_modes_result =
+        controller_.GetDisplayPreferredModes(display_config.id());
+    ZX_DEBUG_ASSERT(display_preferred_modes_result.is_ok());
+
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_.GetDisplayTimings(display_config.id());
     ZX_DEBUG_ASSERT(display_timings_result.is_ok());
 
-    std::span<const display::DisplayTiming> display_timings = display_timings_result.value();
-    ZX_DEBUG_ASSERT(!display_timings.empty());
+    std::span<const display::ModeAndId> display_preferred_modes =
+        std::move(display_preferred_modes_result).value();
+    std::span<const display::DisplayTiming> display_timings =
+        std::move(display_timings_result).value();
+    ZX_DEBUG_ASSERT(!display_preferred_modes.empty() || !display_timings.empty());
 
     std::vector<fuchsia_hardware_display_types::wire::Mode> modes;
 
-    modes.reserve(display_timings.size());
+    modes.reserve(display_preferred_modes.size() + display_timings.size());
+    for (const display::ModeAndId& mode_and_id : display_preferred_modes) {
+      modes.emplace_back(mode_and_id.mode().ToFidl());
+    }
     for (const display::DisplayTiming& timing : display_timings) {
       modes.emplace_back(fuchsia_hardware_display_types::wire::Mode{
           .active_area =
@@ -1352,10 +1535,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
   }
 
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
-    fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
-    if (!result.ok()) {
-      fdf::error("Error writing remove message: {}", result.FormatDescription());
-    }
+    NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
   }
 }
 
@@ -1414,9 +1594,7 @@ void Client::TearDown(zx_status_t epitaph) {
   }
   valid_ = false;
 
-  // Break FIDL connections. First stop Vsync messages from the controller since there will be no
-  // FIDL connections to forward the messages over.
-  proxy_->SetVsyncEventDelivery(false);
+  // Break FIDL connections.
   binding_->Close(epitaph);
   binding_.reset();
   coordinator_listener_.AsyncTeardown();
@@ -1532,7 +1710,13 @@ void Client::DiscardConfig() {
 void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                               AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
   display::VsyncAckCookie ack_cookie = display::VsyncAckCookie(request->cookie);
-  acked_cookie_ = ack_cookie;
+  if (ack_cookie == display::kInvalidVsyncAckCookie) {
+    fdf::error("AcknowledgeVsync() called with invalid cookie");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  proxy_->AcknowledgeVsync(ack_cookie);
   fdf::trace("Cookie {} Acked\n", ack_cookie.value());
 }
 

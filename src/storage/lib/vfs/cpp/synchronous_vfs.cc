@@ -4,12 +4,18 @@
 
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
-#include <lib/async/cpp/task.h>
+#include <lib/async/dispatcher.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
 
 #include <memory>
 #include <mutex>
+#include <utility>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

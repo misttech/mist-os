@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use cm_rust::push_box;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy};
 use fidl_fuchsia_bluetooth_host::{ReceiverMarker, ReceiverProxy};
@@ -218,14 +219,17 @@ async fn bt_init_component_topology() {
 
     // Create bt-host collection
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.collections.push(cm_rust::CollectionDecl {
-        name: BT_HOST_COLLECTION.parse().unwrap(),
-        durability: Durability::SingleRun,
-        environment: None,
-        allowed_offers: cm_types::AllowedOffers::StaticOnly,
-        allow_long_names: false,
-        persistent_storage: None,
-    });
+    push_box(
+        &mut realm_decl.collections,
+        cm_rust::CollectionDecl {
+            name: BT_HOST_COLLECTION.parse().unwrap(),
+            durability: Durability::SingleRun,
+            environment: None,
+            allowed_offers: cm_types::AllowedOffers::StaticOnly,
+            allow_long_names: false,
+            persistent_storage: None,
+        },
+    );
     builder.replace_realm_decl(realm_decl).await.unwrap();
 
     // Implementation of the Secure Store service for use by bt-gap.

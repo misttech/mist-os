@@ -107,6 +107,8 @@ fn codegen_enum<W: io::Write>(
     name: &str,
     variants: &[Variant],
 ) -> Result {
+    // Not every test enum is used in commands and responses in this crate.
+    write_indented!(sink, indent, "#[cfg_attr(test, allow(unused))]\n")?;
     write_indented!(sink, indent, "#[derive(Copy, Clone, Debug, FromPrimitive, PartialEq, Eq)]\n")?;
     codegen_block(
         sink,

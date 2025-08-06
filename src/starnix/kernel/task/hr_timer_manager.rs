@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::power::{create_proxy_for_wake_events_counter_zero, OnWakeOps};
-use crate::task::{CurrentTask, HandleWaitCanceler, LockedAndTask, TargetTime, WaitCanceler};
+use crate::task::{CurrentTask, LockedAndTask, PortWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 use anyhow::{Context, Result};
 use fuchsia_inspect::ArrayProperty;
@@ -600,7 +600,7 @@ impl HrTimerManager {
                         wake_alarm_id
                     );
                     ftrace::duration!(c"alarms", c"starnix:hrtimer:start", "timer_id" => timer_id);
-                    ftrace::flow_step!(c"alarms", c"hrtimer_lifecycle", trace_id);
+                    ftrace::flow_begin!(c"alarms", c"hrtimer_lifecycle", trace_id);
 
                     let maybe_cancel = self.lock().pending_timers.remove(&timer_id);
                     cancel_by_id(
@@ -941,7 +941,7 @@ impl TimerOps for HrTimerHandle {
         Ok(current_task.kernel().hrtimer_manager.remove_timer(self)?)
     }
 
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
+    fn wait_canceler(&self, canceler: PortWaitCanceler) -> WaitCanceler {
         WaitCanceler::new_event(Arc::downgrade(&self.event), canceler)
     }
 

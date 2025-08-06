@@ -158,13 +158,11 @@ impl Coordinator {
         self.inner.read().proxy.clone()
     }
 
-    /// Tell the driver to enable vsync notifications and register a channel to listen to vsync events.
+    /// Registers a channel to listen to vsync events.
     pub fn add_vsync_listener(
         &self,
         id: Option<DisplayId>,
     ) -> Result<mpsc::UnboundedReceiver<VsyncEvent>> {
-        self.inner.read().proxy.set_vsync_event_delivery(true)?;
-
         // TODO(armansito): Switch to a bounded channel instead.
         let (sender, receiver) = mpsc::unbounded::<VsyncEvent>();
         self.inner.write().vsync_listeners.push((sender, id));
@@ -371,7 +369,9 @@ impl CoordinatorInner {
         applied_config_stamp: display::ConfigStamp,
         cookie: display::VsyncAckCookie,
     ) -> Result<()> {
-        self.proxy.acknowledge_vsync(cookie.value)?;
+        if cookie.value != 0 {
+            self.proxy.acknowledge_vsync(cookie.value)?;
+        }
 
         let mut listeners_to_remove = Vec::new();
         for (pos, (sender, filter)) in self.vsync_listeners.iter().enumerate() {

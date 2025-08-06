@@ -30,7 +30,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set() {
         let proxy = fake_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {
@@ -79,7 +79,7 @@ mod test {
         };
         "Test display set() output with a different non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_display_set_output(expected_display: SetArgs) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {

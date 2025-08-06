@@ -9,7 +9,7 @@ use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
 
 /**
-Construct a product bundle using a platform, product, and board.
+Construct a product bundle using a platform, product config, and board config.
 The inputs can be local paths or CIPD references.
 
 Artifact formats:
@@ -24,9 +24,10 @@ Additional formats for the platform:
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
-    /// product.board combination to build when inside a fuchsia checkout.
+    /// product_config.board_config combination to build when inside a fuchsia
+    /// checkout.
     #[argh(positional)]
-    pub product_board_combo: Option<String>,
+    pub product_config_board_config_combo: Option<String>,
 
     /// the platform artifacts to use.
     #[argh(option)]
@@ -34,11 +35,16 @@ pub struct CreateCommand {
 
     /// the product config to use.
     #[argh(option)]
-    pub product: Option<String>,
+    pub product_config: Option<String>,
 
     /// the board config to use.
     #[argh(option)]
-    pub board: Option<String>,
+    pub board_config: Option<String>,
+
+    /// the name to give the product bundle.
+    /// Defaults to product_config.board_config.
+    #[argh(option)]
+    pub name: Option<String>,
 
     /// the version of the product to use.
     #[argh(option)]

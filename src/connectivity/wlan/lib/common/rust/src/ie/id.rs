@@ -38,6 +38,7 @@ impl Id {
     pub const TRANSMIT_POWER_ENVELOPE: Self = Self(195);
     pub const CHANNEL_SWITCH_WRAPPER: Self = Self(196);
     pub const VENDOR_SPECIFIC: Self = Self(221);
+    pub const RSNXE: Self = Self(244);
     pub const EXTENSION: Self = Self(255);
 }
 
@@ -87,6 +88,7 @@ impl IeType {
     ie_type_basic_const!(WIDE_BANDWIDTH_CHANNEL_SWITCH);
     ie_type_basic_const!(TRANSMIT_POWER_ENVELOPE);
     ie_type_basic_const!(CHANNEL_SWITCH_WRAPPER);
+    ie_type_basic_const!(RSNXE);
 
     pub const WMM_INFO: Self = Self::new_vendor([0x00, 0x50, 0xf2, 0x02, 0x00, 0x01]);
     pub const WMM_PARAM: Self = Self::new_vendor([0x00, 0x50, 0xf2, 0x02, 0x01, 0x01]);

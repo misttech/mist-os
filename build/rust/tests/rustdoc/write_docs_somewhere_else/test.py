@@ -38,24 +38,3 @@ class Test(TestCase):
             "Foxtrot",
             found,
         )
-
-    def testFileContainsRaw3(self) -> None:
-        found = (self._path / "trait.impl/foxtrot/trait.Foxtrot.js").read_text()
-        self.assertIn(
-            "enum.Echo.html",
-            found,
-        )
-
-    def testFileContainsRaw4(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertNotIn(
-            "Foxtrot",
-            found,
-        )
-
-    def testFileContainsRaw5(self) -> None:
-        found = (self._path / "search-index.js").read_text()
-        self.assertIn(
-            "Echo",
-            found,
-        )

@@ -112,7 +112,7 @@ void PagerProxy::QueuePacketLocked(PageRequest* request) {
   // We can treat ZX_ERR_BAD_HANDLE as if the packet was queued
   // but the pager service never responds.
   // TODO: Bypass the port's max queued packet count to prevent ZX_ERR_SHOULD_WAIT
-  ASSERT(port_->Queue(&packet_, ZX_SIGNAL_NONE) != ZX_ERR_SHOULD_WAIT);
+  ASSERT(port_->Queue(&packet_) != ZX_ERR_SHOULD_WAIT);
 }
 
 void PagerProxy::ClearAsyncRequest(PageRequest* request) {

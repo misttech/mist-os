@@ -46,33 +46,20 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
 
   zx::vmo GetLibVmo(std::string_view name) { return mock_.GetVmo(name); }
 
-  static zx::vmo GetExecutableVmo(std::string_view executable) {
-    const std::string executable_path =
-        std::filesystem::path("test") / executable / "bin" / executable;
-    return elfldltl::testing::GetTestLibVmo(executable_path);
-  }
-
   static std::string FindInterp(zx::unowned_vmo vmo);
 
   void VerifyAndClearNeeded() { mock_.VerifyAndClearExpectations(); }
 
   void LdsvcPathPrefix(std::string_view executable,
-                       std::optional<std::string_view> libprefix = std::nullopt) {
-    std::filesystem::path prefix{"test"};
-    prefix /= executable;
-    prefix /= "lib";
-    if (libprefix) {
-      prefix /= *libprefix;
-    }
-    mock_.set_path_prefix(std::move(prefix));
-  }
+                       std::optional<std::string_view> libprefix = std::nullopt);
 
   // Use the PT_INTERP string to update LdsvcPathPrefix() and then return the
   // config found, which can be passed to LdsvcExpectConfig().  The optional
   // argument makes it a failure if the extract Config() string doesn't match,
   // and doesn't change LdsvcPathPrefix().
   std::optional<std::string> ConfigFromInterp(
-      std::filesystem::path interp, std::optional<std::string_view> expected_config = std::nullopt);
+      const std::filesystem::path& interp,
+      std::optional<std::string_view> expected_config = std::nullopt);
 
   // The same, but extract the PT_INTERP string from the executable file VMO.
   std::optional<std::string> ConfigFromInterp(

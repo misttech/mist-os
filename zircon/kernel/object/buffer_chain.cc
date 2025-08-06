@@ -43,4 +43,4 @@ void BufferChain::InitializePageCache(uint32_t /*level*/) {
 }
 
 // Initialize the cache after the percpu data structures are initialized.
-LK_INIT_HOOK(buffer_chain_cache_init, BufferChain::InitializePageCache, LK_INIT_LEVEL_KERNEL + 1)
+LK_INIT_HOOK(buffer_chain_cache_init, BufferChain::InitializePageCache, LK_INIT_LEVEL_KERNEL)

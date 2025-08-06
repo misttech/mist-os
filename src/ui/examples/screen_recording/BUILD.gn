@@ -20,7 +20,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",

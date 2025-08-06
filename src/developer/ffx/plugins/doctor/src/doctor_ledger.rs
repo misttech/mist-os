@@ -400,7 +400,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_outcome() -> Result<()> {
         let ledger_view = Box::new(FakeLedgerView::new());
         let mut ledger = doctorledger_test_new(ledger_view, LedgerViewMode::Verbose);
@@ -444,7 +444,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mode_verbose() -> Result<()> {
         let ledger_view = Box::new(FakeLedgerView::new());
         let mut ledger = doctorledger_test_new(ledger_view, LedgerViewMode::Verbose);
@@ -464,7 +464,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mode_normal() -> Result<()> {
         let ledger_view = Box::new(FakeLedgerView::new());
         let mut ledger = doctorledger_test_new(ledger_view, LedgerViewMode::Normal);
@@ -481,7 +481,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_group_outcome() -> Result<()> {
         let ledger_view = Box::new(FakeLedgerView::new());
         let mut ledger = doctorledger_test_new(ledger_view, LedgerViewMode::Normal);
@@ -540,7 +540,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_group_outcome_custom() -> Result<()> {
         let ledger_view = Box::new(FakeLedgerView::new());
         let mut ledger = doctorledger_test_new(ledger_view, LedgerViewMode::Normal);

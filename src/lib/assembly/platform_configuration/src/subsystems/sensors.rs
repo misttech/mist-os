@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
+use assembly_config_schema::platform_settings::starnix_config::PlatformStarnixConfig;
 
 use crate::subsystems::prelude::*;
 

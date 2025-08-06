@@ -161,7 +161,7 @@ impl Component {
             config_values,
             abi_revision,
         }: ResolvedComponent,
-        config_parent_overrides: Option<&Vec<cm_rust::ConfigOverride>>,
+        config_parent_overrides: Option<&[cm_rust::ConfigOverride]>,
     ) -> Result<Self, ResolveActionError> {
         let config = if let Some(config_decl) = decl.config.as_ref() {
             match config_decl.value_source {
@@ -302,7 +302,7 @@ pub struct ComponentInstance {
     incarnation_id: IncarnationId,
 
     /// Configuration overrides provided by the parent component.
-    config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
+    config_parent_overrides: Option<Box<[cm_rust::ConfigOverride]>>,
 
     /// The context shared across the model.
     pub context: Arc<ModelContext>,
@@ -363,7 +363,7 @@ impl ComponentInstance {
         component_url: Url,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
-        config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
+        config_parent_overrides: Option<Box<[cm_rust::ConfigOverride]>>,
         context: Arc<ModelContext>,
         parent: WeakExtendedInstance,
         hooks: Arc<Hooks>,
@@ -1472,8 +1472,8 @@ impl ComponentInstanceInterface for ComponentInstance {
         self.context.component_id_index()
     }
 
-    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
-        self.config_parent_overrides.as_ref()
+    fn config_parent_overrides(&self) -> Option<&[cm_rust::ConfigOverride]> {
+        self.config_parent_overrides.as_ref().map(|c| &**c)
     }
 
     fn try_get_parent(&self) -> Result<ExtendedInstance, ComponentInstanceError> {
@@ -1545,7 +1545,7 @@ pub mod testing {
 pub mod tests {
     use super::*;
     use crate::model::actions::test_utils::is_discovered;
-    use crate::model::actions::{shutdown, StopAction};
+    use crate::model::actions::StopAction;
     use crate::model::testing::mocks::ControllerActionResponse;
     use crate::model::testing::out_dir::OutDir;
     use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
@@ -1805,31 +1805,25 @@ pub mod tests {
 
         let root_resolved = root_component.lock_resolved_state().await.expect("resolve failed");
 
-        assert_eq!(vec![example_capability], shutdown::Component::capabilities(&*root_resolved));
-        assert_eq!(vec![example_use], shutdown::Component::uses(&*root_resolved));
-        assert_eq!(vec![example_offer], shutdown::Component::offers(&*root_resolved));
-        assert_eq!(vec![example_expose], shutdown::Component::exposes(&*root_resolved));
-        assert_eq!(
-            vec![root_decl.collections[0].clone()],
-            shutdown::Component::collections(&*root_resolved)
-        );
-        assert_eq!(vec![env_a, env_b], shutdown::Component::environments(&*root_resolved));
+        assert_eq!(&[example_capability], &*root_resolved.capabilities());
+        assert_eq!(&[example_use], &*root_resolved.uses());
+        assert_eq!(&[example_offer], &*root_resolved.offers());
+        assert_eq!(&[example_expose], &*root_resolved.exposes());
+        assert_eq!(&[root_decl.collections[0].clone()], &*root_resolved.collections());
+        assert_eq!(&[env_a, env_b], &*root_resolved.resolved_component.decl.environments);
 
-        let mut children = shutdown::Component::children(&*root_resolved);
+        let mut children = root_resolved
+            .children()
+            .map(|(moniker, _instance)| moniker.clone())
+            .collect::<Vec<ChildName>>();
         children.sort();
         assert_eq!(
-            vec![
-                shutdown::Child {
-                    moniker: "a".try_into().unwrap(),
-                    environment_name: Some("env_a".parse().unwrap()),
-                },
-                shutdown::Child {
-                    moniker: "b".try_into().unwrap(),
-                    environment_name: Some("env_b".parse().unwrap()),
-                },
-                shutdown::Child { moniker: "c".try_into().unwrap(), environment_name: None },
+            &[
+                ChildName::parse("a").unwrap(),
+                ChildName::parse("b").unwrap(),
+                ChildName::parse("c").unwrap(),
             ],
-            children
+            &*children
         );
     }
 
@@ -1912,33 +1906,24 @@ pub mod tests {
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
 
-            let mut children = shutdown::Component::children(&*root_resolved);
+            let mut children = root_resolved
+                .children()
+                .map(|(moniker, _instance)| moniker.clone())
+                .collect::<Vec<ChildName>>();
             children.sort();
             pretty_assertions::assert_eq!(
-                vec![
-                    shutdown::Child {
-                        moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".parse().unwrap()),
-                    },
-                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
-                    shutdown::Child {
-                        moniker: "coll_1:a".try_into().unwrap(),
-                        environment_name: None
-                    },
-                    shutdown::Child {
-                        moniker: "coll_1:b".try_into().unwrap(),
-                        environment_name: None
-                    },
-                    shutdown::Child {
-                        moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".parse().unwrap()),
-                    },
+                &[
+                    ChildName::parse("a").unwrap(),
+                    ChildName::parse("b").unwrap(),
+                    ChildName::parse("coll_1:a").unwrap(),
+                    ChildName::parse("coll_1:b").unwrap(),
+                    ChildName::parse("coll_2:a").unwrap(),
                 ],
-                children
+                &*children
             );
             pretty_assertions::assert_eq!(
-                vec![example_offer.clone(), example_dynamic_offer.clone()],
-                shutdown::Component::offers(&*root_resolved)
+                &[example_offer.clone(), example_dynamic_offer.clone()],
+                &*root_resolved.offers()
             )
         }
 
@@ -1951,31 +1936,22 @@ pub mod tests {
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
 
-            let mut children = shutdown::Component::children(&*root_resolved);
+            let mut children = root_resolved
+                .children()
+                .map(|(moniker, _instance)| moniker.clone())
+                .collect::<Vec<ChildName>>();
             children.sort();
             pretty_assertions::assert_eq!(
-                vec![
-                    shutdown::Child {
-                        moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".parse().unwrap()),
-                    },
-                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
-                    shutdown::Child {
-                        moniker: "coll_1:a".try_into().unwrap(),
-                        environment_name: None
-                    },
-                    shutdown::Child {
-                        moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".parse().unwrap()),
-                    },
+                &[
+                    ChildName::parse("a").unwrap(),
+                    ChildName::parse("b").unwrap(),
+                    ChildName::parse("coll_1:a").unwrap(),
+                    ChildName::parse("coll_2:a").unwrap(),
                 ],
-                children
+                &*children
             );
 
-            pretty_assertions::assert_eq!(
-                vec![example_offer.clone()],
-                shutdown::Component::offers(&*root_resolved)
-            )
+            pretty_assertions::assert_eq!(&[example_offer.clone()], &*root_resolved.offers())
         }
 
         // Recreate `coll_1:b`, this time with a dynamic offer from `a` in the other
@@ -2019,34 +1995,25 @@ pub mod tests {
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
 
-            let mut children = shutdown::Component::children(&*root_resolved);
+            let mut children = root_resolved
+                .children()
+                .map(|(moniker, _instance)| moniker.clone())
+                .collect::<Vec<ChildName>>();
             children.sort();
             pretty_assertions::assert_eq!(
-                vec![
-                    shutdown::Child {
-                        moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".parse().unwrap()),
-                    },
-                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
-                    shutdown::Child {
-                        moniker: "coll_1:a".try_into().unwrap(),
-                        environment_name: None
-                    },
-                    shutdown::Child {
-                        moniker: "coll_1:b".try_into().unwrap(),
-                        environment_name: None
-                    },
-                    shutdown::Child {
-                        moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".parse().unwrap()),
-                    },
+                &[
+                    ChildName::parse("a").unwrap(),
+                    ChildName::parse("b").unwrap(),
+                    ChildName::parse("coll_1:a").unwrap(),
+                    ChildName::parse("coll_1:b").unwrap(),
+                    ChildName::parse("coll_2:a").unwrap(),
                 ],
-                children
+                &*children
             );
 
             pretty_assertions::assert_eq!(
-                vec![example_offer.clone(), example_dynamic_offer2.clone()],
-                shutdown::Component::offers(&*root_resolved)
+                &[example_offer.clone(), example_dynamic_offer2.clone()],
+                &*root_resolved.offers()
             )
         }
     }

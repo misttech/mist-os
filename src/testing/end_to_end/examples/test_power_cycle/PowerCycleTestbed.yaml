@@ -16,16 +16,18 @@ TestBeds:
             username: "admin"
             # power switch password
             password: "admin"
-            # port# on power switch where this Fuchsia device is connected
-            port: 2
+
+          # The outlet that the fuchsia device is connected to. This can be omitted
+          # if the implementation doesn't use the outlet in power_on()/power_off().
+          power_switch_outlet: 2
 
           # Where to find the PowerSwitch ABC implementation information.
           power_switch_impl:
             # module inside honeydew package pointing to PowerSwitch implementation.
-            module: "honeydew.auxiliary_devices.web_power_switch"
+            module: "honeydew.auxiliary_devices.power_switch.web_power_switch"
             # Class name that implements PowerSwitch.
             class: "WebPowerSwitch"
             # Based on this example,
             #   WebPowerSwitch is the class located in
-            #   honeydew.auxiliary_devices.web_power_switch module
+            #   honeydew.auxiliary_devices.power_switch.web_power_switch module
 

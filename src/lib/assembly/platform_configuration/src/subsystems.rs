@@ -4,9 +4,9 @@
 
 use anyhow::{bail, Context};
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
-use assembly_config_schema::platform_config::PlatformConfig;
-use assembly_config_schema::product_config::ProductConfig;
-use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
+use assembly_config_schema::platform_settings::PlatformSettings;
+use assembly_config_schema::product_settings::ProductSettings;
+use assembly_config_schema::{BoardConfig, BuildType, ExampleConfig};
 use camino::Utf8Path;
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl, ConfigurationContextBase};
@@ -15,7 +15,7 @@ pub(crate) mod prelude {
 
     #[allow(unused)]
     pub(crate) use crate::common::{
-        BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
+        BoardConfigExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
         DefaultByBuildType, DefineSubsystemConfiguration, FeatureSetLevel,
         OptionDefaultByBuildTypeExt,
     };
@@ -72,9 +72,9 @@ mod virtualization;
 ///
 /// Returns a map from package names to configuration updates.
 pub fn define_configuration(
-    platform: &PlatformConfig,
-    product: &ProductConfig,
-    board_info: &BoardInformation,
+    platform: &PlatformSettings,
+    product: &ProductSettings,
+    board_config: &BoardConfig,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
     developer_only_options: Option<&DeveloperOnlyOptions>,
@@ -97,7 +97,7 @@ pub fn define_configuration(
             base_context: ConfigurationContext {
                 feature_set_level,
                 build_type,
-                board_info,
+                board_config,
                 gendir,
                 resource_dir,
                 developer_only_options,
@@ -238,8 +238,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
 
 fn configure_subsystems(
     context_base: &ConfigurationContextBase<'_>,
-    platform: &PlatformConfig,
-    product: &ProductConfig,
+    platform: &PlatformSettings,
+    product: &ProductSettings,
     builder: &mut dyn ConfigurationBuilder,
     include_example_aib_for_tests: bool,
 ) -> anyhow::Result<()> {
@@ -538,7 +538,7 @@ fn configure_subsystems(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_config_schema::AssemblyConfig;
+    use assembly_config_schema::ProductConfig;
     use assembly_util as util;
 
     #[test]
@@ -556,16 +556,9 @@ mod tests {
         "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(
-            &platform,
-            &product,
-            &BoardInformation::default(),
-            "",
-            "",
-            None,
-            true,
-        );
+        let ProductConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
+        let result =
+            define_configuration(&platform, &product, &BoardConfig::default(), "", "", None, true);
 
         assert!(result.is_err());
     }

@@ -276,7 +276,7 @@ template("dart_tool") {
     }
 
     # snapshot file contains output dir name
-    no_output_dir_leaks = false
+    check_for_output_dir_leaks = false
   }
 
   # Builds a convenience script to invoke the app.

@@ -35,7 +35,7 @@ static void percpu_task(void* arg) {
 
 cpu_mask_t percpu_exec(percpu_task_t task, void* context) {
   percpu_state state(task, context);
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, percpu_task, &state);
+  mp_sync_exec(mp_ipi_target::ALL, 0, percpu_task, &state);
   return state.cpu_mask.load();
 }
 

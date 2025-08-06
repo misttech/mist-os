@@ -25,6 +25,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 
 mod client;
+#[cfg(feature = "compat")]
+mod compat;
 mod decoded;
 mod endpoint;
 mod error;
@@ -35,6 +37,10 @@ mod server;
 mod service;
 
 pub use self::client::*;
+#[cfg(feature = "compat")]
+// This module only has one item exported when the "fuchsia" feature is also on.
+#[allow(unused)]
+pub use self::compat::*;
 pub use self::decoded::*;
 pub use self::endpoint::*;
 pub use self::error::*;

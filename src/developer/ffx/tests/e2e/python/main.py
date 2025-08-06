@@ -292,6 +292,14 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(stderr, "")
         asserts.assert_equal(code, 0)
 
+    def test_daemon_start_background_works_with_autostart_false(self) -> None:
+        """Test that `ffx daemon start --background` works even if daemon.autostart=false"""
+        self.dut.ffx.run(["daemon", "stop"])
+        # We're validating that this command doesn't throw an exception
+        self.dut.ffx.run(
+            ["-c", "daemon.autostart=false", "daemon", "start", "--background"]
+        )
+
 
 if __name__ == "__main__":
     test_runner.main()

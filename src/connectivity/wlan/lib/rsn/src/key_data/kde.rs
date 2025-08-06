@@ -301,7 +301,7 @@ impl<A: TrackedAppend> Writer<A> {
 mod tests {
     use super::*;
     use crate::key_data::extract_elements;
-    use wlan_common::assert_variant;
+    use assert_matches::assert_matches;
     use wlan_common::test_utils::FixedSizedTestBuffer;
 
     fn write_and_extract_padding(gtk_len: usize) -> Vec<u8> {
@@ -384,11 +384,11 @@ mod tests {
         let mut elements = result.unwrap();
         assert_eq!(elements.len(), 2);
 
-        assert_variant!(elements.remove(0), Element::Gtk(hdr, kde) => {
+        assert_matches!(elements.remove(0), Element::Gtk(hdr, kde) => {
             assert_eq!(hdr, Header { type_: 0xDD, len: 11, oui: Oui::DOT11, data_type: 1 });
             assert_eq!(kde, Gtk { info: GtkInfo(6), gtk: Box::new([24; 5]) });
         });
-        assert_variant!(elements.remove(0), Element::Padding);
+        assert_matches!(elements.remove(0), Element::Padding);
     }
 
     #[test]
@@ -409,7 +409,7 @@ mod tests {
         let mut elements = result.unwrap();
         assert_eq!(elements.len(), 1);
 
-        assert_variant!(elements.remove(0), Element::Igtk(hdr, kde) => {
+        assert_matches!(elements.remove(0), Element::Igtk(hdr, kde) => {
             assert_eq!(hdr, Header {
                 type_: 0xDD, len: 14, oui: Oui::DOT11, data_type: IGTK_DATA_TYPE
             });

@@ -5,77 +5,97 @@
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_artifact_cache::{Artifact, ArtifactCache};
-use assembly_config_schema::{AssemblyConfig, BoardInformation};
+use assembly_cli_args::ProductArgs;
+use assembly_config_schema::{BoardConfig, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_platform_artifacts::PlatformArtifacts;
-use assembly_tool::PlatformToolProvider;
 use camino::Utf8PathBuf;
-use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 
 pub struct Assembly {
     pub platform_path: Utf8PathBuf,
     pub platform: PlatformArtifacts,
-    pub product: AssemblyConfig,
-    pub board: BoardInformation,
+    pub product_config_path: Utf8PathBuf,
+    pub product_config: ProductConfig,
+    pub board_config_path: Utf8PathBuf,
+    pub board_config: BoardConfig,
 }
 
 impl Assembly {
     pub fn new(
         cache: &ArtifactCache,
         platform: Option<String>,
-        product: String,
-        board: String,
+        product_config: String,
+        board_config: String,
         build_dir: Option<Utf8PathBuf>,
     ) -> Result<Self> {
-        let product_artifact =
-            Artifact::from_product_or_board_string(&product).context("Parsing product input");
-        let product_artifact = product_artifact
-            .or_else(|_| Artifact::from_local_product_name(&product, build_dir.as_ref()))
-            .context("Parsing product as local build api")?;
-        let product_path = cache.resolve(&product_artifact).context("Resolving product")?;
-        let product = AssemblyConfig::from_dir(&product_path).context("Reading product")?;
+        let product_config_artifact = Artifact::from_product_or_board_string(&product_config)
+            .context("Parsing product config");
+        let product_config_artifact = product_config_artifact
+            .or_else(|_| Artifact::from_local_product_name(&product_config, build_dir.as_ref()))
+            .context("Parsing product config as local build api")?;
+        let product_config_path =
+            cache.resolve(&product_config_artifact).context("Resolving product config")?;
+        let product_config =
+            ProductConfig::from_dir(&product_config_path).context("Reading product config")?;
 
-        let board_artifact =
-            Artifact::from_product_or_board_string(&board).context("Parsing board input");
-        let board_artifact = board_artifact
-            .or_else(|_| Artifact::from_local_board_name(&board, build_dir.as_ref()))
-            .context("Parsing board as local build api")?;
-        let board_path = cache.resolve(&board_artifact).context("Resolving board")?;
-        let board = BoardInformation::from_dir(&board_path).context("Reading board")?;
+        let board_config_artifact =
+            Artifact::from_product_or_board_string(&board_config).context("Parsing board config");
+        let board_config_artifact = board_config_artifact
+            .or_else(|_| Artifact::from_local_board_name(&board_config, build_dir.as_ref()))
+            .context("Parsing board config as local build api")?;
+        let board_config_path =
+            cache.resolve(&board_config_artifact).context("Resolving board config")?;
+        let board_config =
+            BoardConfig::from_dir(&board_config_path).context("Reading board config")?;
 
-        let platform_artifact = Artifact::from_platform(platform, &board.arch, build_dir.as_ref())?;
+        let platform_artifact =
+            Artifact::from_platform(platform, &board_config.arch, build_dir.as_ref())?;
         let platform_path = cache.resolve(&platform_artifact).context("Resolving platform")?;
         let platform =
             PlatformArtifacts::from_dir_with_path(&platform_path).context("Reading platform")?;
 
-        Ok(Self { platform_path, platform, product, board })
+        Ok(Self {
+            platform_path,
+            platform,
+            product_config_path,
+            product_config,
+            board_config_path,
+            board_config,
+        })
     }
 
     pub fn version_string(&self) -> String {
         format!(
-            "\tplatform: {}@{}\n\tproduct: {}@{}\n\tboard: {}@{}",
+            "\tplatform: {}@{}\n\tproduct_config: {}@{}\n\tboard_config: {}@{}",
             self.platform.release_info.name,
             self.platform.release_info.version,
-            self.product.product.release_info.info.name,
-            self.product.product.release_info.info.version,
-            self.board.release_info.info.name,
-            self.board.release_info.info.version,
+            self.product_config.product.release_info.info.name,
+            self.product_config.product.release_info.info.version,
+            self.board_config.release_info.info.name,
+            self.board_config.release_info.info.version,
         )
     }
 
     pub async fn create_system(self, outdir: &Utf8PathBuf) -> Result<AssembledSystem> {
         let should_configure_example =
             ffx_config::get::<bool, _>("assembly_example_enabled").unwrap_or_default();
+        let gendir = tempfile::TempDir::new().unwrap();
+        let gendir = Utf8PathBuf::from_path_buf(gendir.path().to_path_buf()).unwrap();
 
-        let tools = PlatformToolProvider::new(self.platform_path.clone());
-        let mut product_assembly = ProductAssembly::new(
-            self.platform,
-            self.product,
-            self.board,
-            should_configure_example,
-        )?;
-        product_assembly.set_validation_mode(ValidationMode::Off);
-        let iac = product_assembly.build(&tools, outdir)?;
-        AssembledSystem::new(iac, false, outdir, &tools, None).await
+        let args = ProductArgs {
+            product: self.product_config_path,
+            board_config: self.board_config_path,
+            outdir: outdir.clone(),
+            gendir,
+            input_bundles_dir: self.platform_path,
+            package_validation: None,
+            custom_kernel_aib: None,
+            custom_boot_shim_aib: None,
+            suppress_overrides_warning: false,
+            developer_overrides: None,
+            include_example_aib_for_tests: Some(should_configure_example),
+        };
+        let create_system_outputs = assembly_api::assemble(args)?;
+        AssembledSystem::from_dir(create_system_outputs.outdir)
     }
 }

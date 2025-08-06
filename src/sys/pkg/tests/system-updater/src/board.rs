@@ -4,10 +4,16 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
+use test_case::test_case;
 
+#[test_case(UPDATE_PKG_URL, vec![UPDATE_PKG_URL])]
+#[test_case(MANIFEST_URL, vec![])]
 #[fasync::run_singlethreaded(test)]
-async fn validates_board() {
-    let env = TestEnv::builder().build().await;
+async fn validates_board(update_url: &str, expected_resolved_urls: Vec<&str>) {
+    let env = TestEnv::builder()
+        .ota_manifest(OtaManifestV1 { board: "x64".into(), ..make_manifest([]) })
+        .build()
+        .await;
 
     env.set_board_name("x64");
 
@@ -18,14 +24,19 @@ async fn validates_board() {
         .add_file("images.json", make_images_json_zbi())
         .add_file("board", "x64");
 
-    env.run_update().await.expect("success");
+    env.run_update_with_options(update_url, default_options()).await.expect("success");
 
-    assert_eq!(resolved_urls(Arc::clone(&env.interactions)), vec![UPDATE_PKG_URL]);
+    assert_eq!(resolved_urls(Arc::clone(&env.interactions)), expected_resolved_urls);
 }
 
+#[test_case(UPDATE_PKG_URL, vec![UPDATE_PKG_URL])]
+#[test_case(MANIFEST_URL, vec![])]
 #[fasync::run_singlethreaded(test)]
-async fn rejects_mismatched_board() {
-    let env = TestEnv::builder().build().await;
+async fn rejects_mismatched_board(update_url: &str, expected_resolved_urls: Vec<&str>) {
+    let env = TestEnv::builder()
+        .ota_manifest(OtaManifestV1 { board: "arm".into(), ..make_manifest([]) })
+        .build()
+        .await;
 
     env.set_board_name("x64");
 
@@ -36,11 +47,11 @@ async fn rejects_mismatched_board() {
         .add_file("images.json", make_images_json_zbi())
         .add_file("version", "1.2.3.4");
 
-    let result = env.run_update().await;
+    let result = env.run_update_with_options(update_url, default_options()).await;
     assert!(result.is_err(), "system updater succeeded when it should fail");
 
     // Expect to have failed prior to downloading images.
-    assert_eq!(resolved_urls(Arc::clone(&env.interactions)), vec![UPDATE_PKG_URL]);
+    assert_eq!(resolved_urls(Arc::clone(&env.interactions)), expected_resolved_urls);
 
     assert_eq!(
         env.get_ota_metrics().await,

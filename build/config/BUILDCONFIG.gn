@@ -1011,11 +1011,11 @@ foreach(_target_type,
 #      to generate the file is smaller than the ones from the parent
 #      action.
 #
-#   no_output_dir_leaks:
+#   check_for_output_dir_leaks:
 #     Type: boolean
 #     Required: no
 #     Default: true
-#     Description: If 'no_output_dir_leaks' is true, then the action
+#     Description: If 'check_for_output_dir_leaks' is true, then the action
 #       will be checked for output dir leaks.
 #       Otherwise, the check will be skipped.
 #       This check is composable with all others in this section.
@@ -1182,7 +1182,7 @@ foreach(_target_type,
                                "hermetic_inputs_file",
                                "hermetic_inputs_script",
                                "hermetic_inputs_target",
-                               "no_output_dir_leaks",
+                               "check_for_output_dir_leaks",
                                "repeatable",
                                "response_file_contents",
                                "script",
@@ -1478,43 +1478,52 @@ foreach(_target_type,
                 ] + _args
       }
 
-      # To suppress checking for output dir leaks, in the invoker:
-      #   no_output_dir_leaks = false
-      no_output_dir_leaks = true
-      if (defined(invoker.no_output_dir_leaks)) {
-        no_output_dir_leaks = invoker.no_output_dir_leaks
+      # To suppress checking for output dir leaks, set
+      #   'check_for_output_dir_leaks = false'
+      #  in the invoker.
+      check_for_output_dir_leaks = true
+      if (defined(invoker.check_for_output_dir_leaks)) {
+        check_for_output_dir_leaks = invoker.check_for_output_dir_leaks
       } else if (string_replace("##${current_toolchain}",
                                 "##//third_party/",
                                 "") != "##${current_toolchain}") {
         # Disable build-time leak checks when running actions that belong to
         # toolchain() instances defined by //third_party/ build files.
-        no_output_dir_leaks = false
-      }
-
-      if (!no_output_dir_leaks) {
-        deps += [ "//build:output_dir_leaking_allowlist" ]
+        check_for_output_dir_leaks = false
       }
 
       # Prevent the build output dir path from leaking into the
       # command or its outputs, for cache-ability and consistency
       # across different build environments.
-      if (no_output_dir_leaks && check_output_dir_leaks &&
-          invoker.script != "//build/scripts/no_op.sh") {
-        _args = []
-        _args =
-            [
-              "-S",
-              rebase_path("//build/rbe/output_leak_scanner.py", root_build_dir),
-              "--label",
-              get_label_info(":$target_name", "label_with_toolchain"),
-            ] + rebase_path(outputs, root_build_dir) +
-            [
-              "--",
-              rebase_path(script, root_build_dir),
-            ] + args
-        args = []
-        args = _args
-        script = python_exe_src
+      if (check_for_output_dir_leaks && check_output_dir_leaks) {
+        scripts_safe_to_not_check = [
+          # Any no-op action won't have any outputs
+          "//build/scripts/no_op.sh",
+
+          # run_and_stamp writes an empty stamp file
+          "//build/scripts/run_and_stamp.sh",
+        ]
+
+        script_safe_to_not_check =
+            scripts_safe_to_not_check !=
+            scripts_safe_to_not_check + [ invoker.script ] - [ invoker.script ]
+        if (!script_safe_to_not_check) {
+          _args = []
+          _args = [
+                    "-S",
+                    rebase_path("//build/rbe/output_leak_scanner.py",
+                                root_build_dir),
+                    "--label",
+                    get_label_info(":$target_name", "label_with_toolchain"),
+                  ] + rebase_path(outputs, root_build_dir) +
+                  [
+                    "--",
+                    rebase_path(script, root_build_dir),
+                  ] + args
+          args = []
+          args = _args
+          script = python_exe_src
+        }
       }
 
       metadata = {
@@ -3065,8 +3074,36 @@ template("variant_target") {
 # This template takes the same arguments as the built-in shared_library, plus
 # the `install_name` argument.
 template("_fuchsia_shared_library") {
+  _is_rust_target = defined(invoker.crate_root)
+  if (_is_rust_target) {
+    generated_file(target_name + ".rust_compilation_deps") {
+      data_keys = [ "rust_compilation_deps" ]
+      walk_keys = [ "rust_compilation_deps_barrier" ]
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                             ])
+    }
+
+    generated_file(target_name + ".rust_sources") {
+      contents = rebase_path(invoker.sources, root_build_dir)
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
+    }
+  }
+
   _fuchsia_binary(target_name) {
     target_type = "shared_library"
+
+    deps = []
 
     # Explicitly forward applicable_licenses and visibility, implicitly
     # forward everything else.
@@ -3100,6 +3137,13 @@ template("_fuchsia_shared_library") {
     }
     if (!defined(output_name)) {
       output_name = target_name
+    }
+
+    if (_is_rust_target) {
+      deps += [
+        ":${target_name}.rust_compilation_deps",
+        ":${target_name}.rust_sources",
+      ]
     }
 
     # Remove any "lib" prefix - this matches GN's behavior.
@@ -3248,6 +3292,11 @@ template("_fuchsia_shared_library") {
       if (defined(invoker.crate_type)) {
         rust_rlib = [ "--extern=${crate_name}=${_link_output_path}" ]
         rust_searchdir = [ "-Ldependency=${_link_output_dir}" ]
+
+        rust_compilation_deps = [
+          rebased_output_file,
+          rebase_path("${output_dir}/lib${output_name}.rmeta", root_build_dir),
+        ]
       }
     }
   }
@@ -3426,11 +3475,39 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
 } else {
   # Wrap shared_library with the private impl that has applicable licenses.
   template("shared_library") {
+    _is_rust_target = defined(invoker.crate_root)
+    if (_is_rust_target) {
+      generated_file(target_name + ".rust_compilation_deps") {
+        data_keys = [ "rust_compilation_deps" ]
+        walk_keys = [ "rust_compilation_deps_barrier" ]
+        outputs = [ "${target_gen_dir}/${target_name}" ]
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "deps",
+                                 "public_deps",
+                                 "testonly",
+                               ])
+      }
+
+      generated_file(target_name + ".rust_sources") {
+        contents = rebase_path(invoker.sources, root_build_dir)
+        outputs = [ "${target_gen_dir}/${target_name}" ]
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
+      }
+    }
+
     _shared_library_internal_wrapper(target_name) {
+      deps = []
       forward_variables_from(invoker,
                              "*",
                              [
                                "applicable_licenses",
+                               "metadata",
                                "testonly",
                                "visibility",
                              ])
@@ -3440,6 +3517,19 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
                                "testonly",
                                "visibility",
                              ])
+
+      # if (_is_rust_target) {
+      #   deps += [
+      #     ":${target_name}.rust_compilation_deps",
+      #     ":${target_name}.rust_sources",
+      #   ]
+      # }
+      metadata = {
+        if (defined(invoker.metadata)) {
+          forward_variables_from(invoker.metadata, "*")
+        }
+        rust_compilation_deps_barrier = []
+      }
     }
   }
 }
@@ -3520,6 +3610,32 @@ template("executable") {
   _executable_name = target_name
   variant_shared_redirection = false
 
+  _is_rust_target = defined(invoker.crate_root)
+  if (_is_rust_target) {
+    generated_file(target_name + ".rust_compilation_deps") {
+      data_keys = [ "rust_compilation_deps" ]
+      walk_keys = [ "rust_compilation_deps_barrier" ]
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                             ])
+    }
+
+    generated_file(target_name + ".rust_sources") {
+      contents = rebase_path(invoker.sources, root_build_dir)
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
+    }
+  }
+
   variant_target("executable") {
     deps = []
     assert_no_deps = []
@@ -3558,6 +3674,16 @@ template("executable") {
 
     if (!defined(public_deps)) {
       public_deps = []
+    }
+
+    if (!defined(deps)) {
+      deps = []
+    }
+    if (_is_rust_target) {
+      deps += [
+        ":${target_name}.rust_compilation_deps",
+        ":${target_name}.rust_sources",
+      ]
     }
 
     if (!defined(output_dir)) {
@@ -3734,6 +3860,7 @@ template("executable") {
 
       # Don't collect rlibs from transitive deps
       rust_barrier = []
+      rust_compilation_deps_barrier = []
     }
   }
 }
@@ -3777,8 +3904,36 @@ template("loadable_module") {
   _is_rust_target = defined(invoker.crate_root)
   variant_shared_redirection = !_is_rust_target && toolchain_variant.with_shared
 
+  _is_rust_target = defined(invoker.crate_root)
+  if (_is_rust_target) {
+    generated_file(target_name + ".rust_compilation_deps") {
+      data_keys = [ "rust_compilation_deps" ]
+      walk_keys = [ "rust_compilation_deps_barrier" ]
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                             ])
+    }
+
+    generated_file(target_name + ".rust_sources") {
+      contents = rebase_path(invoker.sources, root_build_dir)
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
+    }
+  }
+
   variant_target("loadable_module") {
     target_name = _module_name
+
+    deps = []
 
     # Explicitly forward applicable_licenses and visibility,
     # implicitly forward everything else (except metadata, handled below).
@@ -3811,6 +3966,13 @@ template("loadable_module") {
       } else {
         output_extension = "so"
       }
+    }
+
+    if (_is_rust_target) {
+      deps += [
+        ":${target_name}.rust_compilation_deps",
+        ":${target_name}.rust_sources",
+      ]
     }
 
     output_file_name = output_name
@@ -3968,6 +4130,33 @@ template("source_set") {
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
 
 template("static_library") {
+  _is_rust_target = defined(invoker.crate_root)
+
+  if (_is_rust_target) {
+    generated_file(target_name + ".rust_compilation_deps") {
+      data_keys = [ "rust_compilation_deps" ]
+      walk_keys = [ "rust_compilation_deps_barrier" ]
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                             ])
+    }
+
+    generated_file(target_name + ".rust_sources") {
+      contents = rebase_path(invoker.sources, root_build_dir)
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
+    }
+  }
+
   _static_library_internal_wrapper(target_name) {
     deps = []
     public_deps = []
@@ -3989,6 +4178,14 @@ template("static_library") {
 
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
+
+    if (_is_rust_target) {
+      deps += [
+        ":${target_name}.rust_compilation_deps",
+        ":${target_name}.rust_sources",
+      ]
+    }
+
     foreach(
         config,
         toolchain_variant.configs + toolchain_variant.remove_common_configs -
@@ -4010,6 +4207,8 @@ template("static_library") {
           forward_variables_from(invoker.metadata, "*")
         }
       }
+    } else {
+      forward_variables_from(invoker, [ "metadata" ])
     }
   }
 }
@@ -4032,6 +4231,30 @@ template("rust_library") {
     }
   }
   _rlib_path = "${_searchdir_path}/lib${invoker.output_name}.rlib"
+  _rmeta_path = "${_searchdir_path}/lib${invoker.output_name}.rmeta"
+
+  generated_file(target_name + ".rust_compilation_deps") {
+    data_keys = [ "rust_compilation_deps" ]
+    walk_keys = [ "rust_compilation_deps_barrier" ]
+    outputs = [ "${target_gen_dir}/${target_name}" ]
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "deps",
+                             "public_deps",
+                             "testonly",
+                           ])
+  }
+
+  generated_file(target_name + ".rust_sources") {
+    contents = rebase_path(invoker.sources, root_build_dir)
+    outputs = [ "${target_gen_dir}/${target_name}" ]
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "testonly",
+                           ])
+  }
 
   _rust_library_internal_wrapper(target_name) {
     forward_variables_from(invoker,
@@ -4052,6 +4275,14 @@ template("rust_library") {
                              "visibility",
                            ])
 
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [
+      ":${target_name}.rust_compilation_deps",
+      ":${target_name}.rust_sources",
+    ]
+
     if (!defined(inputs)) {
       inputs = []
     }
@@ -4070,6 +4301,10 @@ template("rust_library") {
       rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
       rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
       rust_barrier = []
+      rust_compilation_deps = [
+        "${_rlib_path}",
+        rebase_path("${_rmeta_path}", root_build_dir),
+      ]
     }
   }
 }
@@ -4109,6 +4344,30 @@ template("rust_proc_macro") {
       _output_extension = "dylib"
     }
     _rlib_path = "$_searchdir_path/lib${invoker.output_name}.$_output_extension"
+    _rmeta_path = "${_searchdir_path}/lib${invoker.output_name}.rmeta"
+
+    generated_file(target_name + ".rust_compilation_deps") {
+      data_keys = [ "rust_compilation_deps" ]
+      walk_keys = [ "rust_compilation_deps_barrier" ]
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                             ])
+    }
+
+    generated_file(target_name + ".rust_sources") {
+      contents = rebase_path(invoker.sources, root_build_dir)
+      outputs = [ "${target_gen_dir}/${target_name}" ]
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
+    }
 
     _rust_proc_macro_internal_wrapper(target_name) {
       forward_variables_from(invoker,
@@ -4124,6 +4383,13 @@ template("rust_proc_macro") {
                                "applicable_licenses",
                                "crate_name",
                              ])
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [
+        ":${target_name}.rust_compilation_deps",
+        ":${target_name}.rust_sources",
+      ]
       if (!defined(inputs)) {
         inputs = []
       }
@@ -4145,6 +4411,11 @@ template("rust_proc_macro") {
         rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
         rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
         rust_barrier = []
+        rust_compilation_deps_barrier = []
+        rust_compilation_deps = [
+          "${_rlib_path}",
+          rebase_path("${_rmeta_path}", root_build_dir),
+        ]
       }
     }
   }

@@ -220,12 +220,10 @@ async fn list_targets_main(args: SubCommandListTargets) -> Result<(), FunnelErro
     let mut stdout = io::stdout().lock();
 
     if args.watch {
-        while let Some(s) = device_stream.next().await {
-            if let Ok(event) = s {
-                let now = Local::now();
-                write!(stdout, "{}\t", now.format("%Y-%m-%d %H:%M:%S"))?;
-                write_target_event(&mut stdout, event)?;
-            }
+        while let Some(event) = device_stream.next().await {
+            let now = Local::now();
+            write!(stdout, "{}\t", now.format("%Y-%m-%d %H:%M:%S"))?;
+            write_target_event(&mut stdout, event)?;
         }
     } else {
         let wait_duration = Duration::from_secs(2);
@@ -357,7 +355,7 @@ fn write_target_state<W: Write>(writer: &mut W, state: TargetState) -> Result<()
 
 async fn discover_target_events<W>(
     w: &mut W,
-    mut stream: impl Stream<Item = Result<TargetEvent>> + Unpin,
+    mut stream: impl Stream<Item = TargetEvent> + Unpin,
     wait_time: Duration,
 ) -> Result<Vec<TargetInfo>>
 where
@@ -365,53 +363,51 @@ where
 {
     let mut targets = HashMap::new();
     let task = async {
-        while let Some(s) = stream.next().await {
-            if let Ok(event) = s {
-                match event {
-                    TargetEvent::Removed(handle) => {
-                        targets.remove(&handle.node_name.unwrap_or_else(|| "".to_string()));
+        while let Some(event) = stream.next().await {
+            match event {
+                TargetEvent::Removed(handle) => {
+                    targets.remove(&handle.node_name.unwrap_or_else(|| "".to_string()));
+                }
+                TargetEvent::Added(handle) => match handle.state {
+                    TargetState::Product { addrs: addr, .. } => {
+                        targets.insert(
+                            handle.node_name.unwrap_or_else(|| "".to_string()),
+                            (addr, TargetMode::Product),
+                        );
                     }
-                    TargetEvent::Added(handle) => match handle.state {
-                        TargetState::Product { addrs: addr, .. } => {
-                            targets.insert(
-                                handle.node_name.unwrap_or_else(|| "".to_string()),
-                                (addr, TargetMode::Product),
-                            );
-                        }
-                        TargetState::Fastboot(fb_state) => {
-                            match fb_state.connection_state {
-                                FastbootConnectionState::Usb => {
-                                    log::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", fb_state.serial_number);
-                                    writeln!(w, "Discovered Target {} in Fastboot over USB mode, which funnel does not support.", fb_state.serial_number).context("writing to stdout")?;
-                                }
-                                FastbootConnectionState::Tcp(tcp_state) => {
-                                    // We support fastboot over tcp!
-                                    targets.insert(
-                                        handle.node_name.unwrap_or_else(|| "".to_string()),
-                                        (
-                                            tcp_state.iter().map(Into::into).collect(),
-                                            TargetMode::Fastboot,
-                                        ),
-                                    );
-                                }
-                                FastbootConnectionState::Udp(udp_state) => {
-                                    log::warn!("Discovered Target at address: {:?} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
-                                }
+                    TargetState::Fastboot(fb_state) => {
+                        match fb_state.connection_state {
+                            FastbootConnectionState::Usb => {
+                                log::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", fb_state.serial_number);
+                                writeln!(w, "Discovered Target {} in Fastboot over USB mode, which funnel does not support.", fb_state.serial_number).context("writing to stdout")?;
+                            }
+                            FastbootConnectionState::Tcp(tcp_state) => {
+                                // We support fastboot over tcp!
+                                targets.insert(
+                                    handle.node_name.unwrap_or_else(|| "".to_string()),
+                                    (
+                                        tcp_state.iter().map(Into::into).collect(),
+                                        TargetMode::Fastboot,
+                                    ),
+                                );
+                            }
+                            FastbootConnectionState::Udp(udp_state) => {
+                                log::warn!("Discovered Target at address: {:?} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
                             }
                         }
-                        TargetState::Zedboot => {
-                            log::warn!("Discovered Target in Zedboot mode. It cannot be used with `funnel`. Skipping.");
-                            writeln!(
-                                w,
-                                "Discovered Target in Zedboot mode, which funnel does not support."
-                            )?;
-                        }
-                        TargetState::Unknown => {
-                            log::warn!("Discovered a target in an unknown state. Skipping");
-                            writeln!(w, "Discovered a Target in an unknown state.")?;
-                        }
-                    },
-                }
+                    }
+                    TargetState::Zedboot => {
+                        log::warn!("Discovered Target in Zedboot mode. It cannot be used with `funnel`. Skipping.");
+                        writeln!(
+                            w,
+                            "Discovered Target in Zedboot mode, which funnel does not support."
+                        )?;
+                    }
+                    TargetState::Unknown => {
+                        log::warn!("Discovered a target in an unknown state. Skipping");
+                        writeln!(w, "Discovered a Target in an unknown state.")?;
+                    }
+                },
             }
         }
         Ok::<(), anyhow::Error>(())

@@ -8,6 +8,7 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/common.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

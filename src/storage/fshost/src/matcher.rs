@@ -510,14 +510,25 @@ impl Matcher for SystemGptMatcher {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<Option<DeviceTag>, Error> {
-        match self.gpt_type {
-            PartitionMapType::Driver(driver_path) => env.attach_driver(device, driver_path).await?,
+        let partitions = match self.gpt_type {
+            PartitionMapType::Driver(driver_path) => {
+                env.attach_driver(device, driver_path).await?;
+                None
+            }
             PartitionMapType::StorageHost => {
-                let (gpt, _) = env.launch_and_enumerate_gpt_component(device).await?;
+                let (gpt, partitions) = env.launch_and_enumerate_gpt_component(device).await?;
                 env.register_system_gpt(gpt)?;
+                Some(partitions)
             }
         };
+
         self.device_path = Some(device.topological_path().to_string());
+
+        if let Some(partitions) = partitions {
+            // TODO(https://fxbug.dev/411312604): update fshost of new partition information
+            env.try_provision_fxfs(device, partitions).await?;
+        }
+
         Ok(Some(DeviceTag::SystemPartitionTable))
     }
 }

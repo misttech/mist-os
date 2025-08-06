@@ -324,7 +324,7 @@ int RxQueue::WatchThread(
           return ZX_OK;
         case kSessionSwitchKey:
           if (observed_fifo && waiting_on_fifo) {
-            if (zx_status_t status = rx_watch_port_.cancel(observed_fifo->fifo, kFifoWatchKey);
+            if (zx_status_t status = rx_watch_port_.cancel_key(0u, kFifoWatchKey);
                 status != ZX_OK) {
               LOGF_ERROR("RxQueue::WatchThread port cancel failed %s",
                          zx_status_get_string(status));

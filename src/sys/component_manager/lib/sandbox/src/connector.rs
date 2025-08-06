@@ -5,7 +5,6 @@
 use crate::{CapabilityBound, Receiver};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::channel::mpsc;
-use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -36,12 +35,6 @@ impl Connectable for mpsc::UnboundedSender<crate::Message> {
 #[derive(Debug, Clone)]
 pub struct Connector {
     inner: Arc<dyn Connectable>,
-
-    // This exists to keep the receiver server task alive as long as any clone of this Connector is
-    // alive. This is set when creating a Connector through CapabilityStore. The inner type is
-    // `fuchsia_async::Task` but libsandbox can't depend on fuchsia-async so we type-erase it to
-    // Any.
-    _receiver_task: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl CapabilityBound for Connector {
@@ -59,14 +52,7 @@ impl Connector {
     }
 
     pub fn new_sendable(connector: impl Connectable + 'static) -> Self {
-        Self::new_internal(connector, None)
-    }
-
-    pub(crate) fn new_internal(
-        connector: impl Connectable + 'static,
-        receiver_task: Option<Arc<dyn Any + Send + Sync>>,
-    ) -> Self {
-        Self { inner: Arc::new(connector), _receiver_task: receiver_task }
+        Self { inner: Arc::new(connector) }
     }
 
     pub fn send(&self, msg: Message) -> Result<(), ()> {

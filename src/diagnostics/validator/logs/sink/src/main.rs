@@ -122,9 +122,6 @@ async fn demux_fidl(
 
     loop {
         match stream.next().await.unwrap()? {
-            LogSinkRequest::Connect { socket: _, control_handle: _ } => {
-                return Err(anyhow!("shouldn't ever receive legacy connections"));
-            }
             LogSinkRequest::WaitForInterestChange { responder } => {
                 if got_initial_interest_request || use_iob {
                     interest_listener = Some(responder);

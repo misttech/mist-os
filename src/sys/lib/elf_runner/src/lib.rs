@@ -719,9 +719,7 @@ mod tests {
     use anyhow::{Context, Error};
     use assert_matches::assert_matches;
     use cm_config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy};
-    use fidl::endpoints::{
-        create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy,
-    };
+    use fidl::endpoints::{create_endpoints, create_proxy, DiscoverableProtocolMarker, Proxy};
     use fidl_connector::Connect;
     use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
@@ -777,10 +775,7 @@ mod tests {
         // Get a handle to /pkg
         let ns_path = path.to_string();
         let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
-        // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-        let client_end = ClientEnd::new(
-            ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
-        );
+        let client_end = ns_dir.into_client_end().unwrap();
         fcrunner::ComponentNamespaceEntry {
             path: Some(ns_path),
             directory: Some(client_end),
@@ -1407,9 +1402,6 @@ mod tests {
                     async move {
                         while let Some(Ok(req)) = r.next().await {
                             match req {
-                                LogSinkRequest::Connect { .. } => {
-                                    panic!("Unexpected call to `Connect`");
-                                }
                                 LogSinkRequest::ConnectStructured { .. } => {
                                     let mut count = req_count.lock().await;
                                     *count += 1;

@@ -10,7 +10,6 @@
 
 #include <lib/ktrace.h>
 #include <limits.h>
-#include <stdint.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -21,16 +20,16 @@
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 
-typedef void (*mp_ipi_task_func_t)(void* context);
-typedef void (*mp_sync_task_t)(void* context);
+using mp_ipi_task_func_t = void (*)(void* context);
+using mp_sync_task_t = void (*)(void* context);
 
-typedef enum { MP_IPI_GENERIC, MP_IPI_RESCHEDULE, MP_IPI_INTERRUPT, MP_IPI_HALT } mp_ipi_t;
+enum class mp_ipi : uint8_t { GENERIC, RESCHEDULE, INTERRUPT, HALT };
 
 // When sending inter processor interrupts (IPIs), apis will take a combination of
-// this enum and a bitmask. If MP_IPI_TARGET_MASK is used, the mask argument will
+// this enum and a bitmask. If mp_ipi_target::MASK is used, the mask argument will
 // contain a bitmap of every cpu that should receive the IPI. The other targets
 // serve as shortcuts and potentially optimizations in the lower layers.
-typedef enum { MP_IPI_TARGET_MASK, MP_IPI_TARGET_ALL, MP_IPI_TARGET_ALL_BUT_LOCAL } mp_ipi_target_t;
+enum class mp_ipi_target : uint8_t { MASK, ALL, ALL_BUT_LOCAL };
 
 void mp_init();
 
@@ -40,11 +39,11 @@ void mp_reschedule(cpu_mask_t mask, uint flags);
 
 // Trigger an interrupt on another cpu without a corresponding reschedule.
 // Used by the hypervisor to trigger a vmexit.
-void mp_interrupt(mp_ipi_target_t, cpu_mask_t mask);
+void mp_interrupt(mp_ipi_target, cpu_mask_t mask);
 
 // Make a cross cpu call to one or more cpus. Waits for all of the calls
 // to complete before returning.
-void mp_sync_exec(mp_ipi_target_t, cpu_mask_t mask, mp_sync_task_t task, void* context);
+void mp_sync_exec(mp_ipi_target, cpu_mask_t mask, mp_sync_task_t task, void* context);
 
 zx_status_t mp_hotplug_cpu_mask(cpu_mask_t mask);
 
@@ -54,10 +53,10 @@ void mp_unplug_current_cpu();
 // complete.
 zx_status_t mp_unplug_cpu_mask(cpu_mask_t mask, zx_instant_mono_t deadline);
 
-static inline zx_status_t mp_hotplug_cpu(cpu_num_t cpu) {
+inline zx_status_t mp_hotplug_cpu(cpu_num_t cpu) {
   return mp_hotplug_cpu_mask(cpu_num_to_mask(cpu));
 }
-static inline zx_status_t mp_unplug_cpu(cpu_num_t cpu) {
+inline zx_status_t mp_unplug_cpu(cpu_num_t cpu) {
   return mp_unplug_cpu_mask(cpu_num_to_mask(cpu), ZX_TIME_INFINITE);
 }
 
@@ -68,42 +67,11 @@ void mp_mbx_generic_irq();
 // called from arch code during interrupt irq
 void mp_mbx_interrupt_irq();
 
-// represents a pending task for some number of CPUs to execute
-struct mp_ipi_task
-    : fbl::DoublyLinkedListable<mp_ipi_task*, fbl::NodeOptions::AllowRemoveFromContainer> {
-  mp_ipi_task_func_t func;
-  void* context;
-};
-
-// global mp state to track what the cpus are up to
-struct mp_state {
-  // cpus that are currently online
-  ktl::atomic<cpu_mask_t> online_cpus;
-
-  SpinLock ipi_task_lock{"mp_state:ipi_task_lock"_intern};
-  // list of outstanding tasks for CPUs to execute.  Should only be
-  // accessed with the ipi_task_lock held
-  fbl::DoublyLinkedList<mp_ipi_task*> ipi_task_list[SMP_MAX_CPUS] TA_GUARDED(ipi_task_lock);
-
-  // lock for serializing CPU hotplug/unplug operations
-  DECLARE_MUTEX(mp_state) hotplug_lock;
-};
-
-extern struct mp_state mp;
-
 // tracks if a cpu is online and initialized
-static inline void mp_set_curr_cpu_online(bool online) {
-  if (online) {
-    mp.online_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
-  } else {
-    mp.online_cpus.fetch_and(~cpu_num_to_mask(arch_curr_cpu_num()));
-  }
-}
-
-static inline cpu_mask_t mp_get_online_mask() { return mp.online_cpus.load(); }
-static inline bool mp_is_cpu_online(cpu_num_t cpu) {
-  return mp_get_online_mask() & cpu_num_to_mask(cpu);
-}
+void mp_set_cpu_online(cpu_num_t cpu, bool online);
+inline void mp_set_curr_cpu_online(bool online) { mp_set_cpu_online(arch_curr_cpu_num(), online); }
+cpu_mask_t mp_get_online_mask();
+bool mp_is_cpu_online(cpu_num_t cpu);
 
 // We say a CPU is "ready" once it is active and generally ready for tasks.
 // This function signals that the current CPU is ready, allowing for

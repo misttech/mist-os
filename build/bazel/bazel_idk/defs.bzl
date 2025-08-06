@@ -162,7 +162,10 @@ def _create_idk_atom_impl(ctx):
     ]
 
 _create_idk_atom = rule(
-    doc = """Define an IDK atom. Do not instantiate directly - use `idk_atom()` instead.""",
+    doc = """Define an IDK atom. Do not instantiate directly - use `idk_atom()` instead.
+
+Atoms will be checked for category and API area violations when generating the IDK (see `generate_idk`).
+""",
     implementation = _create_idk_atom_impl,
     provides = [FuchsiaIdkAtomInfo],
     attrs = {
@@ -272,6 +275,8 @@ def idk_atom(
         **kwargs):
     """Generate an IDK atom and ensure proper validation of it.
 
+Atoms will be checked for category and API area violations when generating the IDK (see `generate_idk`).
+
     Args:
         name: The name of the IDK atom target. Required.
         type: See _create_idk_atom(). Required.
@@ -327,11 +332,6 @@ def idk_atom(
 
     # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
     # if necessary. See https://fxbug.dev/407083737.
-
-    # TODO(https://fxbug.dev/417305295): Verify category compatibility,
-    # `api_area`, etc. Some of this could potentially be deferred until
-    # generate_idk, especially if not building the internal build metadata (see
-    # above).
 
     _create_idk_atom(
         name = name + "_idk",
@@ -467,7 +467,7 @@ def idk_cc_source_library(
         testonly: Standard definition.
         visibility: Standard definition.
         build_as_static: Unused in Bazel, for GN conversion only.
-            TODO(https://fxbug.dev/417305295): Use this argument if there is a
+            TODO(https://fxbug.dev/421888626): Use this argument if there is a
              way to tell Bazel to not always compile the source set.
         public_configs: Unused in Bazel, for GN conversion only.
         **kwargs: Additional arguments for the underlying library.

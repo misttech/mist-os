@@ -160,6 +160,59 @@ TEST_F(UinputTest, UiDevCreateTouchscreen) {
   EXPECT_EQ(res, 0);
 }
 
+TEST_F(UinputTest, UiDevCreateTouchscreenWithSize) {
+  int res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_ABS);
+  ASSERT_EQ(res, 0);
+
+  uinput_abs_setup uabs_x{};
+  uabs_x.code = ABS_MT_POSITION_X;
+  uabs_x.absinfo.maximum = 1001;
+  res = ioctl(uinput_fd_.get(), UI_ABS_SETUP, &uabs_x);
+  ASSERT_EQ(res, 0);
+
+  uinput_abs_setup uabs_y{};
+  uabs_y.code = ABS_MT_POSITION_Y;
+  uabs_y.absinfo.maximum = 1002;
+  res = ioctl(uinput_fd_.get(), UI_ABS_SETUP, &uabs_y);
+  ASSERT_EQ(res, 0);
+
+  uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 3}};
+  strcpy(usetup.name, "Example device");
+  res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, &usetup);
+  ASSERT_EQ(res, 0);
+
+  auto ls_before = lsDir("/dev/input");
+
+  res = ioctl(uinput_fd_.get(), UI_DEV_CREATE);
+  EXPECT_EQ(res, 0);
+
+  auto ls_after = lsDir("/dev/input");
+  auto diff = lsDiff(ls_after, ls_before);
+  ASSERT_EQ(diff.size(), 1u);
+
+  auto new_device_name = diff[0];
+  EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
+
+  auto new_device_fd = fbl::unique_fd(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
+  ASSERT_TRUE(new_device_fd.is_valid());
+
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(new_device_fd.get(), EVIOCGABS(ABS_MT_POSITION_X), &buf))
+        << "get x-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    EXPECT_NEAR(buf.maximum, 1001.0, 0.1);
+  }
+
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(new_device_fd.get(), EVIOCGABS(ABS_MT_POSITION_Y), &buf))
+        << "get y-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    EXPECT_NEAR(buf.maximum, 1002.0, 0.1);
+  }
+}
+
 TEST_F(UinputTest, UiDevCreateDestroyTouchscreenEvIoGid) {
   auto ls_before = lsDir("/dev/input");
 

@@ -55,36 +55,36 @@ fn vector_value_from_json(
     /// Build a ConfigVectorValue out of all the array elements.
     ///
     /// A macro because enum variants don't exist at the type level in Rust at time of writing.
-    macro_rules! vector_from_array {
+    macro_rules! list_from_array {
         ($list_variant:ident, $val:ident => $convert:expr) => {{
             let mut list = vec![];
             for $val in array {
                 list.push($convert);
             }
-            ConfigVectorValue::$list_variant(list)
+            ConfigVectorValue::$list_variant(list.into())
         }};
     }
 
     Ok(match nested_type {
         ConfigNestedValueType::Bool => {
-            vector_from_array!(BoolVector, v => v.parse_bool()?)
+            list_from_array!(BoolVector, v => v.parse_bool()?)
         }
-        ConfigNestedValueType::Uint8 => vector_from_array!(Uint8Vector, v => v.parse_u8()?),
+        ConfigNestedValueType::Uint8 => list_from_array!(Uint8Vector, v => v.parse_u8()?),
         ConfigNestedValueType::Uint16 => {
-            vector_from_array!(Uint16Vector, v => v.parse_u16()?)
+            list_from_array!(Uint16Vector, v => v.parse_u16()?)
         }
         ConfigNestedValueType::Uint32 => {
-            vector_from_array!(Uint32Vector, v => v.parse_u32()?)
+            list_from_array!(Uint32Vector, v => v.parse_u32()?)
         }
         ConfigNestedValueType::Uint64 => {
-            vector_from_array!(Uint64Vector, v => v.parse_u64()?)
+            list_from_array!(Uint64Vector, v => v.parse_u64()?)
         }
-        ConfigNestedValueType::Int8 => vector_from_array!(Int8Vector,  v => v.parse_i8()?),
-        ConfigNestedValueType::Int16 => vector_from_array!(Int16Vector, v => v.parse_i16()?),
-        ConfigNestedValueType::Int32 => vector_from_array!(Int32Vector, v => v.parse_i32()?),
-        ConfigNestedValueType::Int64 => vector_from_array!(Int64Vector, v => v.parse_i64()?),
+        ConfigNestedValueType::Int8 => list_from_array!(Int8Vector,  v => v.parse_i8()?),
+        ConfigNestedValueType::Int16 => list_from_array!(Int16Vector, v => v.parse_i16()?),
+        ConfigNestedValueType::Int32 => list_from_array!(Int32Vector, v => v.parse_i32()?),
+        ConfigNestedValueType::Int64 => list_from_array!(Int64Vector, v => v.parse_i64()?),
         ConfigNestedValueType::String { max_size } => {
-            vector_from_array!(StringVector, v => v.parse_string(*max_size)?)
+            list_from_array!(StringVector, v => v.parse_string(*max_size)?)
         }
     })
 }
@@ -501,8 +501,8 @@ mod tests {
         type: { vector, element: int32, max_count: 5 },
         tests: [
             max_length_fits: json!([1, 2, 3, 4, 5]) =>
-                Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![1, 2, 3, 4, 5]))),
-            can_be_empty: json!([]) => Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![]))),
+                Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(Box::from([1, 2, 3, 4, 5])))),
+            can_be_empty: json!([]) => Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(Box::from([])))),
             cant_be_too_long: json!([1, 2, 3, 4, 5, 6]) => Err(VectorTooLong { max: 5, actual: 6}),
             element_type_must_match: json!(["foo"]) =>
                 Err(JsonTypeMismatch { expected: JsonTy::Number, received: JsonTy::String }),

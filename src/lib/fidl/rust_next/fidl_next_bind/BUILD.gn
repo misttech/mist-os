@@ -29,6 +29,7 @@ rustc_library("fidl_next_bind") {
   # Enables compatibility impls with the existing Rust bindings.
   # This can be removed once we no longer require backwards compatibility.
   features = [ "compat" ]
+  sources += [ "src/compat.rs" ]
   deps += [ "//src/lib/fidl/rust/fidl" ]
 
   if (is_fuchsia) {

@@ -4,15 +4,30 @@
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <sys/stat.h>
+#include <lib/fdio/vfs.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string_view>
 #include <utility>
 
-#include <fbl/auto_lock.h>
+#include <fbl/ref_ptr.h>
+#include <fbl/string.h>
 
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
 
@@ -23,13 +38,6 @@ PseudoDir::PseudoDir() = default;
 PseudoDir::~PseudoDir() {
   entries_by_name_.clear_unsafe();
   entries_by_id_.clear();
-}
-
-zx::result<VnodeAttributes> PseudoDir::GetAttributes() const {
-  return zx::ok(fs::VnodeAttributes{
-      .content_size = 0,
-      .storage_size = 0,
-  });
 }
 
 zx_status_t PseudoDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) {
@@ -53,8 +61,8 @@ zx_status_t PseudoDir::WatchDir(fs::FuchsiaVfs* vfs, fio::wire::WatchMask mask, 
   return watcher_.WatchDir(vfs, this, mask, options, std::move(watcher));
 }
 
-zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_t* out_actual) {
-  fs::DirentFiller df(data, len);
+zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) {
+  fs::DirentFiller df(dirents, len);
   zx_status_t r = 0;
   if (cookie->n < kDotId) {
     constexpr uint64_t ino = fio::kInoUnknown;

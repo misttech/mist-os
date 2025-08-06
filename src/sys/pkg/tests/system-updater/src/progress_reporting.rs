@@ -8,6 +8,7 @@ use fidl_fuchsia_update_installer_ext::{
     monitor_update, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
 };
 use pretty_assertions::assert_eq;
+use test_case::test_case;
 
 #[fasync::run_singlethreaded(test)]
 async fn progress_reporting_fetch_multiple_packages() {
@@ -94,6 +95,92 @@ async fn progress_reporting_fetch_multiple_packages() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn progress_reporting_fetch_multiple_blobs_packageless() {
+    let env = TestEnv::builder()
+        .ota_manifest(make_manifest([
+            manifest::Blob {
+                uncompressed_size: 100,
+                delivery_blob_type: 1,
+                fuchsia_merkle_root: hash(1),
+            },
+            manifest::Blob {
+                uncompressed_size: 20,
+                delivery_blob_type: 1,
+                fuchsia_merkle_root: hash(2),
+            },
+            manifest::Blob {
+                uncompressed_size: 3000,
+                delivery_blob_type: 1,
+                fuchsia_merkle_root: hash(3),
+            },
+        ]))
+        .build()
+        .await;
+
+    let handle_ota_manifest = env.http_loader_service.block_once();
+    let handle_blob1 = env.ota_downloader_service.block_once(hash(1));
+    let handle_blob2 = env.ota_downloader_service.block_once(hash(2));
+    let handle_blob3 = env.ota_downloader_service.block_once(hash(3));
+
+    // Start the system update.
+    let mut attempt = env.start_packageless_update().await.unwrap();
+
+    assert_eq!(attempt.next().await.unwrap().unwrap(), State::Prepare);
+
+    let info = UpdateInfo::builder().download_size(0).build();
+    handle_ota_manifest.await.unwrap().send(()).unwrap();
+    assert_eq!(attempt.next().await.unwrap().unwrap().id(), StateId::Stage);
+    assert_eq!(attempt.next().await.unwrap().unwrap().id(), StateId::Stage);
+
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Fetch(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(Progress::builder().fraction_completed(0.25).bytes_downloaded(0).build())
+                .build()
+        )
+    );
+
+    handle_blob1.await.unwrap().send(Ok(())).unwrap();
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Fetch(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(Progress::builder().fraction_completed(0.5).bytes_downloaded(0).build())
+                .build()
+        )
+    );
+
+    handle_blob2.await.unwrap().send(Ok(())).unwrap();
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Fetch(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(Progress::builder().fraction_completed(0.75).bytes_downloaded(0).build())
+                .build()
+        )
+    );
+
+    handle_blob3.await.unwrap().send(Ok(())).unwrap();
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Fetch(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(Progress::builder().fraction_completed(1.0).bytes_downloaded(0).build())
+                .build()
+        )
+    );
+
+    // In this test, we are testing Fetch updates. Let's assert the Fetch
+    // phase is over.
+    assert_eq!(attempt.next().await.unwrap().unwrap().id(), StateId::Commit);
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn monitor_fails_when_no_update_running() {
     let env = TestEnv::builder().build().await;
 
@@ -103,9 +190,11 @@ async fn monitor_fails_when_no_update_running() {
     assert_eq!(env.take_interactions(), vec![]);
 }
 
+#[test_case(UPDATE_PKG_URL)]
+#[test_case(MANIFEST_URL)]
 #[fasync::run_singlethreaded(test)]
-async fn monitor_connects_to_existing_attempt() {
-    let env = TestEnv::builder().build().await;
+async fn monitor_connects_to_existing_attempt(update_url: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     let update_pkg = env
         .resolver
@@ -117,9 +206,10 @@ async fn monitor_connects_to_existing_attempt() {
     // Block the update pkg resolve to ensure the update attempt is still in
     // in progress when we try to attach a monitor.
     let handle_update_pkg = env.resolver.url(UPDATE_PKG_URL).block_once();
+    let handle_ota_manifest = env.http_loader_service.block_once();
 
     // Start the system update.
-    let attempt0 = env.start_update().await.unwrap();
+    let attempt0 = env.start_update_with_options(update_url, default_options()).await.unwrap();
 
     // Attach monitor.
     let attempt1 =
@@ -127,7 +217,11 @@ async fn monitor_connects_to_existing_attempt() {
 
     // Now that we attached both monitors to the current attempt, we can unblock the
     // resolve and resume the update attempt.
-    handle_update_pkg.resolve(&update_pkg).await;
+    if update_url == UPDATE_PKG_URL {
+        handle_update_pkg.resolve(&update_pkg).await;
+    } else {
+        handle_ota_manifest.await.unwrap().send(()).unwrap();
+    }
     let monitor0_events: Vec<State> = attempt0.map(|res| res.unwrap()).collect().await;
     let monitor1_events: Vec<State> = attempt1.map(|res| res.unwrap()).collect().await;
 
@@ -148,9 +242,11 @@ async fn monitor_connects_to_existing_attempt() {
     assert_success_monitor_states(monitor1_events, &expected_order);
 }
 
+#[test_case(UPDATE_PKG_URL)]
+#[test_case(MANIFEST_URL)]
 #[fasync::run_singlethreaded(test)]
-async fn succeed_additional_start_requests_when_compatible() {
-    let env = TestEnv::builder().build().await;
+async fn succeed_additional_start_requests_when_compatible(update_url: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     let update_pkg = env
         .resolver
@@ -162,13 +258,14 @@ async fn succeed_additional_start_requests_when_compatible() {
     // Block the update pkg resolve to ensure the update attempt is still in
     // in progress when we try to attach a monitor.
     let handle_update_pkg = env.resolver.url(UPDATE_PKG_URL).block_once();
+    let handle_ota_manifest = env.http_loader_service.block_once();
 
     // Start the system update, making 2 start_update requests. The second start_update request
     // is essentially just a monitor_update request in this case.
-    let attempt0 = env.start_update().await.unwrap();
+    let attempt0 = env.start_update_with_options(update_url, default_options()).await.unwrap();
     let attempt1 = env
         .start_update_with_options(
-            UPDATE_PKG_URL,
+            update_url,
             Options {
                 initiator: Initiator::User,
                 allow_attach_to_existing_attempt: true,
@@ -180,7 +277,11 @@ async fn succeed_additional_start_requests_when_compatible() {
 
     // Now that we attached both monitors to the current attempt, we can unblock the
     // resolve and resume the update attempt.
-    handle_update_pkg.resolve(&update_pkg).await;
+    if update_url == UPDATE_PKG_URL {
+        handle_update_pkg.resolve(&update_pkg).await;
+    } else {
+        handle_ota_manifest.await.unwrap().send(()).unwrap();
+    }
     let monitor0_events: Vec<State> = attempt0.map(|res| res.unwrap()).collect().await;
     let monitor1_events: Vec<State> = attempt1.map(|res| res.unwrap()).collect().await;
 
@@ -201,8 +302,13 @@ async fn succeed_additional_start_requests_when_compatible() {
     assert_success_monitor_states(monitor1_events, &expected_order);
 }
 
+#[test_case(UPDATE_PKG_URL, "fuchsia-pkg://fuchsia.com/different-url")]
+#[test_case(MANIFEST_URL, "http://fuchsia.com/different-url")]
 #[fasync::run_singlethreaded(test)]
-async fn fail_additional_start_requests_when_not_compatible() {
+async fn fail_additional_start_requests_when_not_compatible(
+    compatible_url: &str,
+    incompatible_url: &str,
+) {
     let env = TestEnv::builder().build().await;
 
     env.resolver
@@ -213,10 +319,10 @@ async fn fail_additional_start_requests_when_not_compatible() {
     // Block the update pkg resolve to ensure the update attempt is still in
     // in progress when we try to make additional start_update requests.
     let _handle_update_pkg = env.resolver.url(UPDATE_PKG_URL).block_once();
+    let _handle_ota_manifest = env.http_loader_service.block_once();
 
     // Start the system update.
     let installer_proxy = env.installer_proxy();
-    let compatible_url = UPDATE_PKG_URL;
     let compatible_options = Options {
         initiator: Initiator::User,
         allow_attach_to_existing_attempt: true,
@@ -236,7 +342,6 @@ async fn fail_additional_start_requests_when_not_compatible() {
         allow_attach_to_existing_attempt: false,
         should_write_recovery: true,
     };
-    let incompatible_url = "fuchsia-pkg://fuchsia.com/different-url";
 
     // Show that start_update requests fail with AlreadyInProgress errors.
     assert_matches!(
@@ -277,13 +382,6 @@ async fn fail_additional_start_requests_when_not_compatible() {
 
 pub fn assert_success_monitor_states(states: Vec<State>, ordering: &[StateId]) {
     let res = util::verify_monitor_states(&states, ordering, false);
-    if let Err(e) = res {
-        panic!("Error received when verifying monitor states: {e:#}\nWant ordering: {ordering:#?}\nGot states:{states:#?}");
-    }
-}
-
-pub fn _assert_failure_monitor_states(states: Vec<State>, ordering: Vec<StateId>) {
-    let res = util::verify_monitor_states(&states, &ordering, false);
     if let Err(e) = res {
         panic!("Error received when verifying monitor states: {e:#}\nWant ordering: {ordering:#?}\nGot states:{states:#?}");
     }
