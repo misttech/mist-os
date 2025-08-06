@@ -42,7 +42,7 @@ update_lockfile() {
   local logfile="${SCRIPT_DIR}/debug.log"
   # -local-manifest-project=fuchsia makes Jiri respect unmerged changes to
   # manifests in fuchsia.git.
-  if ! ${JIRI_PATH} -v resolve -local-manifest-project=fuchsia \
+  if ! ${JIRI_PATH} -v resolve -local-manifest-project=mist-os \
     -output "$lockfile" "$manifest" > "$logfile" 2>&1
   then
     echo "Failed to update lockfile $1, jiri logs:"

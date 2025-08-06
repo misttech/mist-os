@@ -14,7 +14,7 @@
   <projects>
     <project name="mist-os"
              path="."
-             remote="https://github.com/mist-os"
+             remote="https://github.com/misttech/mist-os"
              historydepth="2"/>
   </projects>
 </manifest>

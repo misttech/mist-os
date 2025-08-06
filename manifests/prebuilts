@@ -10,7 +10,7 @@
   `//manifests/update-lockfiles.sh`
 
   Then fetch the packages:
-  `jiri fetch-packages -local-manifest-project=fuchsia`
+  `jiri fetch-packages -local-manifest-project=mist-os`
   -->
   <imports>
     <localimport file="toolchain"/>
