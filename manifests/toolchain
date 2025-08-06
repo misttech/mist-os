@@ -27,15 +27,6 @@
              version="git_revision:a100f6367205c6a909d68027af6a8675a8091bd9"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/clang/{{.OS}}-{{.Arch}}"/>
-    <!-- The linux-arm64 version is needed for running on arm64 bots, but the build
-         happens on an x64 machine. If removing this package, make sure to remove it
-         from `fx roll-compiler` first.
-    -->
-    <package name="fuchsia/third_party/clang/linux-arm64"
-             version="git_revision:a100f6367205c6a909d68027af6a8675a8091bd9"
-             platforms="linux-amd64"
-             attributes="clang-arm64"
-             path="prebuilt/third_party/clang/linux-arm64"/>
 
     <!-- GCC
          TODO(mcgrathr): repo/bot link about provenance
@@ -53,23 +44,6 @@
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/go/{{.OS}}-{{.Arch}}"/>
 
-    <!-- LLDB
-         TODO(mcgrathr): repo/bot link about provenance
-    -->
-    <package name="fuchsia/third_party/lldb/${platform}"
-             version="git_revision:0f61051f541a5b8cfce25c84262dfdbadb9ca688"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/lldb/{{.OS}}-{{.Arch}}"/>
-
-    <!-- reclient
-         From Foundry-X team, for using RBE.
-         https://chrome-infra-packages.appspot.com/p/infra/rbe/client/
-    -->
-    <package name="infra/rbe/client/${platform}"
-             version="re_client_version:0.182.0.8eb62dcb-gomaip"
-             platforms="linux-amd64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/reclient/{{.OS}}-{{.Arch}}"/>
-
     <!-- Rust host tools https://ci.chromium.org/p/fuchsia/g/rust/console
          From Rust on Fuchsia team
     -->
@@ -83,22 +57,6 @@
     -->
     <package name="fuchsia/third_party/rust/target/fuchsia"
              version="git_revisions:9ba00e0f9e00990fb88c1beac7172afe93b15609,a100f6367205c6a909d68027af6a8675a8091bd9"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
-    <package name="fuchsia/third_party/rust/target/aarch64-apple-darwin"
-             version="git_revisions:9ba00e0f9e00990fb88c1beac7172afe93b15609,a100f6367205c6a909d68027af6a8675a8091bd9"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
-    <package name="fuchsia/third_party/rust/target/aarch64-unknown-linux-gnu"
-             version="git_revisions:9ba00e0f9e00990fb88c1beac7172afe93b15609,a100f6367205c6a909d68027af6a8675a8091bd9"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
-    <package name="fuchsia/third_party/rust/target/riscv64gc-unknown-linux-gnu"
-             version="git_revisions:9ba00e0f9e00990fb88c1beac7172afe93b15609,a100f6367205c6a909d68027af6a8675a8091bd9"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
-    <package name="fuchsia/third_party/rust/target/wasm32-unknown-unknown"
-             version="git_revision:8c0b4f67c9b4bf477df38c16669fd576d46a2b3d"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
     <package name="fuchsia/third_party/rust/target/x86_64-apple-darwin"
@@ -146,28 +104,6 @@
              version="git_revision:87f13622d9c23308bd358bf234f0d3cc102b92d9"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/ninja/{{.OS}}-{{.Arch}}"/>
-
-    <!-- Breakpad
-         TODO(phosek): repo/bot link about provenance
-    -->
-    <package name="fuchsia/tools/breakpad/${platform}"
-             version="git_revision:e35d1d09ae73eb18e28d11881ec724c279964991"
-             platforms="linux-amd64"
-             path="prebuilt/third_party/breakpad/{{.OS}}-{{.Arch}}"/>
-
-    <!-- CMake - Uploaded by cmake CI builds. Rolled manually as needed.
-    -->
-    <package name="fuchsia/third_party/cmake/${platform}"
-             version="git_revision:7a989a581c8da2fe9822096ee00b288c376b6117"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
-             path="prebuilt/third_party/cmake/{{.OS}}-{{.Arch}}"/>
-
-    <!-- VPython interpreter, needed for running YAPF (and possibly more).
-    -->
-    <package name="infra/tools/luci/vpython/${platform}"
-             version="git_revision:d29aedef008537a54ca177ec0a7933a2f06aa90c"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
-             path="prebuilt/third_party/vpython"/>
 
     <!-- Python3 interpreter, used for host tools after bootstrap.
     -->

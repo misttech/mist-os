@@ -5,10 +5,9 @@
     <localimport file="prebuilts"/>
   </imports>
   <projects>
-    <project name="fuchsia"
+    <project name="mist-os"
              path="."
-             remote="https://fuchsia.googlesource.com/fuchsia"
-             gerrithost="https://fuchsia-review.googlesource.com"
+             remote="https://github.com/mist-os"
              githooks="integration/git-hooks"/>
   </projects>
   <hooks>
