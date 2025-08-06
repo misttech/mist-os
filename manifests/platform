@@ -12,16 +12,10 @@
   </projects>
   <hooks>
     <hook name="install-environment"
-          project="fuchsia"
+          project="mist-os"
           action="scripts/devshell/lib/add_symlink_to_bin.sh"/>
-    <hook name="create-ctf-releases-gni"
-          project="fuchsia"
-          action="sdk/ctf/build/internal/create_ctf_releases_gni.sh"/>
     <hook name="create-build-info-files"
-          project="fuchsia"
+          project="mist-os"
           action="build/info/create_jiri_hook_files.sh"/>
-    <hook name="generate-prebuilt-versions"
-          project="fuchsia"
-          action="tools/build/scripts/generate_prebuilt_versions.sh"/>
   </hooks>
 </manifest>
