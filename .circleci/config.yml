@@ -29,7 +29,7 @@ jobs:
           name: Update Jiri
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri update -v -vv
+            jiri -v -vv update 
       - run:
           name: Jiri project config
           command: | 
