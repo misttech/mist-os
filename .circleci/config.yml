@@ -26,17 +26,17 @@ jobs:
           keys:
             - &jiri-cache jiri-{{ checksum "manifests/jiri.lock" }}
       - run:
+          name: Update Jiri
+          command: |
+            export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri update -v -vv
+      - run:
           name: Jiri project config
           command: | 
             export PATH=$PWD/.jiri_root/bin:$PATH
             set +e  # `jiri project-config`  will fail when there is no cache
             jiri project-config --no-update=true --no-rebase=true
             true
-      - run:
-          name: Update Jiri
-          command: |
-            export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri update
       - save_cache:
           name: Save Jiri Cache
           key: *jiri-cache
