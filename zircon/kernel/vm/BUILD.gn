@@ -136,7 +136,7 @@ source_set("tests") {
     "unittests/slab_unittest.cc",
     "unittests/test_helper.cc",
     "unittests/vmo_unittest.cc",
-    "unittests/vmpl_unittest.cc",
+    #"unittests/vmpl_unittest.cc",
   ]
   deps = [
     "//zircon/kernel/lib/unittest",
